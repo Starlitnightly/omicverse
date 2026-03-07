@@ -42,19 +42,33 @@ from .._monitor import monitor
 def batch_correction(adata:anndata.AnnData,batch_key:str,
                      use_rep='scaled|original|X_pca',
                      methods:str='harmony',n_pcs:int=50,**kwargs)->anndata.AnnData:
-    """
-    Batch correction for single-cell data
+    """Run batch-effect correction for single-cell data integration.
 
-    Arguments:
-        adata: AnnData object
-        batch_key: batch key
-        methods: harmony,combat,scanorama
-        n_pcs: number of PCs
-        kwargs: other parameters for harmony`harmonypy.run_harmony()`,combat`sc.pp.combat()`,scanorama`scanorama.integrate_scanpy()`
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Input data matrix. Different methods require different preprocessing:
+        for example, ``scVI`` typically needs raw counts in ``adata.layers['counts']``.
+    batch_key : str
+        Column in ``adata.obs`` defining batch/domain labels.
+    use_rep : str, default='scaled|original|X_pca'
+        Embedding key used by embedding-based methods (for example Harmony).
+    methods : str, default='harmony'
+        Integration backend. Supported values include ``'harmony'``,
+        ``'combat'``, ``'scanorama'``, ``'scVI'``, ``'CellANOVA'``,
+        and ``'Concord'``.
+    n_pcs : int, default=50
+        Number of principal components used when recomputing embeddings.
+    **kwargs
+        Additional method-specific keyword arguments passed to the selected
+        backend implementation.
 
-    Returns:
-        adata: AnnData object
-    
+    Returns
+    -------
+    anndata.AnnData or object
+        Returns ``adata`` for most methods, scVI model object for ``'scVI'``,
+        and Concord object for ``'Concord'``. The integrated embeddings are
+        written to ``adata.obsm``.
     """
 
     print(f'...Begin using {methods} to correct batch effect')

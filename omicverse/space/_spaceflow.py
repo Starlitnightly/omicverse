@@ -63,6 +63,12 @@ class pySpaceFlow(object):
     3. Applies spatial regularization to preserve spatial structure
     4. Generates pseudo-spatial maps for trajectory analysis
 
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial AnnData containing expression and coordinates in
+        ``adata.obsm['spatial']``.
+
     Attributes:
         adata: AnnData
             Input annotated data matrix containing:
@@ -92,12 +98,10 @@ class pySpaceFlow(object):
     def __init__(self,adata) -> None:
         r"""Initialize SpaceFlow spatial analysis object.
         
-        Arguments:
-            adata: AnnData
-                Annotated data matrix containing:
-                - Gene expression data in adata.X
-                - Spatial coordinates in adata.obsm['spatial']
-                The data should be preprocessed (normalized, scaled)
+        Parameters
+        ----------
+        adata : AnnData
+            Spatial AnnData used for SpaceFlow embedding.
 
         Notes:
             - Automatically checks for SpaceFlow package installation
@@ -134,32 +138,33 @@ class pySpaceFlow(object):
         This method trains a graph neural network to learn spatially-aware cell
         representations using deep graph infomax with spatial regularization.
 
-        Arguments:
-            spatial_regularization_strength: float, optional (default=0.1)
-                Weight for spatial regularization term.
-                Higher values enforce stronger spatial consistency.
-            z_dim: int, optional (default=50)
-                Dimensionality of learned embedding space.
-            lr: float, optional (default=1e-3)
-                Learning rate for Adam optimizer.
-            epochs: int, optional (default=1000)
-                Maximum number of training epochs.
-            max_patience: int, optional (default=50)
-                Number of epochs to wait for improvement before early stopping.
-            min_stop: int, optional (default=100)
-                Minimum number of epochs before allowing early stopping.
-            random_seed: int, optional (default=42)
-                Random seed for reproducibility.
-            gpu: int, optional (default=0)
-                GPU device index to use. Uses CPU if GPU unavailable.
-            regularization_acceleration: bool, optional (default=True)
-                Whether to use subsampling for faster regularization.
-            edge_subset_sz: int, optional (default=1000000)
-                Number of edges to sample for accelerated regularization.
-            
-        Returns:
-            numpy.ndarray
-                Learned embedding matrix of shape (n_cells, z_dim).
+        Parameters
+        ----------
+        spatial_regularization_strength : float, default=0.1
+            Weight of spatial consistency regularization.
+        z_dim : int, default=50
+            Output latent embedding dimension.
+        lr : float, default=1e-3
+            Learning rate.
+        epochs : int, default=1000
+            Maximum training epochs.
+        max_patience : int, default=50
+            Patience for early stopping.
+        min_stop : int, default=100
+            Minimum epochs before early stopping can trigger.
+        random_seed : int, default=42
+            Random seed.
+        gpu : int, default=0
+            Preferred CUDA index.
+        regularization_acceleration : bool, default=True
+            Whether to subsample edges for regularization speedup.
+        edge_subset_sz : int, default=1000000
+            Number of sampled edges when acceleration is enabled.
+
+        Returns
+        -------
+        numpy.ndarray
+            Learned spatial embedding of shape ``(n_cells, z_dim)``.
 
         Notes:
             - Uses deep graph infomax for self-supervised learning
@@ -262,22 +267,21 @@ class pySpaceFlow(object):
         on the learned embeddings, useful for analyzing spatial trajectories and
         organization patterns.
 
-        Arguments:
-            n_neighbors: int, optional (default=20)
-                Number of neighbors for kNN graph construction.
-                Higher values create denser connectivity.
-            resolution: int, optional (default=1)
-                Resolution parameter for Leiden clustering.
-                Higher values yield more fine-grained clusters.
-            max_cell_for_subsampling: int, optional (default=5000)
-                Maximum number of cells to use for distance calculations.
-                Enables analysis of large datasets through subsampling.
-            psm_key: str, optional (default='pSM_spaceflow')
-                Key in adata.obs where pseudo-spatial map values will be stored.
+        Parameters
+        ----------
+        n_neighbors : int, default=20
+            Neighbors used for graph construction on SpaceFlow embedding.
+        resolution : int, default=1
+            Leiden resolution before DPT.
+        max_cell_for_subsampling : int, default=5000
+            Max cells used in root-cell distance calculation.
+        psm_key : str, default='pSM_spaceflow'
+            Output column in ``adata.obs`` for pseudotime scores.
 
-        Returns:
-            numpy.ndarray
-                Pseudo-spatial map values for each cell.
+        Returns
+        -------
+        numpy.ndarray
+            Pseudo-spatial ordering values.
 
         Notes:
             - Constructs neighborhood graph from embeddings
@@ -349,12 +353,17 @@ class GraphEncoder(nn.Module):
     def forward(self, x, edge_index):
         r"""Forward propagation through graph encoder.
         
-        Arguments:
-            x: Input node features.
-            edge_index: Graph edge indices.
-            
-        Returns:
-            Encoded node representations.
+        Parameters
+        ----------
+        x : torch.Tensor
+            Node-feature matrix.
+        edge_index : torch.Tensor
+            Sparse edge index in COO format.
+
+        Returns
+        -------
+        torch.Tensor
+            Encoded node embeddings.
         """
         x = self.conv(x, edge_index)
         x = self.prelu(x)

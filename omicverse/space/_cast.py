@@ -3,7 +3,29 @@ import numpy as np
 import os
 from tqdm import tqdm
 import pandas as pd
+from .._registry import register_function
 
+@register_function(
+    aliases=["CAST", "空间CAST", "CAST整合", "spatial_cast", "空间样本嵌入"],
+    category="space",
+    description="Learn shared spatial embeddings across multiple samples with CAST",
+    prerequisites={
+        "optional_functions": ["pp.preprocess", "space.svg"]
+    },
+    requires={
+        "obs": ["sample_key"],
+        "obsm": ["spatial"]
+    },
+    produces={
+        "obsm": ["X_cast"]
+    },
+    auto_fix="none",
+    examples=[
+        "adata = ov.space.CAST(adata, sample_key='sample', basis='spatial', layer='norm_1e4')",
+        "cast_emb = adata.obsm['X_cast']",
+    ],
+    related=["space.pySTAligner", "space.pySTAGATE", "space.svg"],
+)
 def CAST(adata, sample_key=None, basis='spatial', layer='norm_1e4',
          output_path='output/CAST_Mark', gpu_t=0, device='cuda:0', **kwargs):
     """
@@ -13,35 +35,29 @@ def CAST(adata, sample_key=None, basis='spatial', layer='norm_1e4',
     multiple spatial transcriptomics samples, enabling joint analysis and integration
     of spatial data from different sources.
 
-    Arguments:
-        adata: AnnData
-            Annotated data matrix containing multiple spatial samples.
-            Must contain spatial coordinates in adata.obsm[basis].
-        sample_key: str, optional (default=None)
-            Column name in adata.obs containing sample/batch information.
-            Used to identify different samples for integration.
-        basis: str, optional (default='spatial')
-            Key in adata.obsm containing spatial coordinates.
-        layer: str, optional (default='norm_1e4')
-            Layer in adata.layers containing normalized expression data.
-            Should contain values suitable for CAST analysis.
-        output_path: str, optional (default='output/CAST_Mark')
-            Directory path for saving CAST intermediate outputs and results.
-        gpu_t: int, optional (default=0)
-            GPU device index to use for computation.
-        device: str, optional (default='cuda:0')
-            PyTorch device specification ('cuda:0', 'cpu', etc.).
-        **kwargs:
-            Additional arguments passed to CAST_MARK function:
-            - learning_rate: float
-            - n_epochs: int
-            - batch_size: int
-            - etc.
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Multi-sample spatial AnnData object.
+    sample_key : str, optional
+        Column in ``adata.obs`` identifying sample/batch labels.
+    basis : str, default="spatial"
+        Key in ``adata.obsm`` storing spatial coordinates.
+    layer : str, default="norm_1e4"
+        Layer key containing normalized expression used by CAST.
+    output_path : str, default="output/CAST_Mark"
+        Directory for CAST intermediate files and outputs.
+    gpu_t : int, default=0
+        GPU index used by CAST backend.
+    device : str, default="cuda:0"
+        Torch device string passed to CAST backend.
+    **kwargs
+        Extra keyword arguments forwarded to ``CAST_MARK``.
 
-    Returns:
-        AnnData
-            Input AnnData object updated with CAST results:
-            - adata.obsm['X_cast']: CAST embeddings matrix (n_cells × 512)
+    Returns
+    -------
+    anndata.AnnData
+        Updated AnnData with embedding saved in ``adata.obsm['X_cast']``.
 
     Notes:
         - Requires normalized expression data in specified layer

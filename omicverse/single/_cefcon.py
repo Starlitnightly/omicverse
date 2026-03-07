@@ -38,6 +38,20 @@ biomart_install = False
     related=["single.pyCEFCON", "single.load_human_prior_interaction_network", "pp.preprocess"]
 )
 def mouse_hsc_nestorowa16(fpath: Optional[str] = './data_cache/mouse_hsc_nestorowa16_v0.h5ad', version: Optional[str] = 'v0'):
+    """Load Nestorowa16 mouse HSC reference data used by CEFCON.
+
+    Parameters
+    ----------
+    fpath : str, optional
+        Local cache path for the dataset file.
+    version : {'v0', 'v1'}, default='v0'
+        Dataset version tag.
+
+    Returns
+    -------
+    AnnData
+        Mouse HSC AnnData object.
+    """
     if version=='v0':
         fpath = './data_cache/mouse_hsc_nestorowa16_v0.h5ad'
         url = 'https://zenodo.org/record/8013900/files/mouse_hsc_nestorowa16_v0.h5ad'
@@ -102,6 +116,22 @@ def _download_from_url(file_url: str, save_path: Path):
 def load_human_prior_interaction_network(dataset: str = 'nichenet',
                                          only_directed: bool = False,
                                          force_download: bool = False):
+    """Load one of the packaged human prior interaction networks.
+
+    Parameters
+    ----------
+    dataset : str, default='nichenet'
+        Network source name.
+    only_directed : bool, default=False
+        Keep only directed edges when edge-direction information exists.
+    force_download : bool, default=False
+        Force redownload even when local cache exists.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Two-column edge table with ``from`` and ``to`` gene symbols.
+    """
 
     # The URL for every dataset. These datasets are stored at zenodo (https://doi.org/10.5281/zenodo.7564872).
     urls = {
@@ -204,6 +234,20 @@ def load_human_prior_interaction_network(dataset: str = 'nichenet',
     related=["single.load_human_prior_interaction_network", "single.pyCEFCON", "single.mouse_hsc_nestorowa16"]
 )
 def convert_human_to_mouse_network(net: pd.DataFrame,server_name='asia'):
+    """Convert a human-symbol interaction network to mouse symbols.
+
+    Parameters
+    ----------
+    net : pd.DataFrame
+        Human network edge table with ``from`` and ``to`` columns.
+    server_name : str, default='asia'
+        Ensembl Biomart server preference.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Converted mouse interaction edge table.
+    """
     global biomart_install
     try:
         import biomart
@@ -334,6 +378,21 @@ def convert_human_to_mouse_network(net: pd.DataFrame,server_name='asia'):
     related=["single.mouse_hsc_nestorowa16", "single.load_human_prior_interaction_network", "single.convert_human_to_mouse_network"]
 )
 class pyCEFCON(object):
+    """CEFCON workflow wrapper for driver-regulator discovery.
+
+    Parameters
+    ----------
+    input_expData : str or AnnData or pd.DataFrame
+        Input expression data with optional lineage metadata.
+    input_priorNet : str or pd.DataFrame
+        Prior interaction network.
+    input_genesDE : str or pd.DataFrame, optional
+        Differential-expression score table.
+    repeats : int, default=5
+        Number of model repeats.
+    solver : {'GUROBI', 'SCIP'}, default='GUROBI'
+        ILP solver used for driver-regulator selection.
+    """
 
     def __init__(self,
              # New arguments
@@ -353,11 +412,12 @@ class pyCEFCON(object):
              edge_threshold_param=8,
              remove_self_loops=False,
              topK_drivers=100,
-             solver = 'GUROBI',
+            solver = 'GUROBI',
         #     out_dir='./output'
             ):
         """
-        Arguments:
+        Parameters
+        ----------
             input_expData (str or sc.AnnData or pd.DataFrame): input gene expression data. It can be the path to a csv file, an AnnData object, or a pandas dataframe. If the input is an AnnData object, the lineage name must be contained in AnnData.uns['lineages'], and the lineage information (can be the pseudotime, where non-NA data denotes cells in the lineage) must be contained in AnnData.obs. If no lineage information is detected, all cell expressions will be regarded as one lineage, which will be named 'all' by default.
             input_priorNet (str or pd.DataFrame): input prior gene interaction network. It can be the path to a csv file or a pandas dataframe
             input_genesDE (str or pd.DataFrame): input gene differential expression score. It can be the path to a csv file or a pandas dataframe
@@ -375,7 +435,10 @@ class pyCEFCON(object):
             remove_self_loops (bool, optional): whether to remove all self-loops (default: True)
             topK_drivers (int, optional): number of top-ranked candidate driver genes according to their influence scores (default: 100)
             solver (str, optional): Solver ('GUROBI', 'SCIP') for solving the integer linear programming problems (for identifying drive regulators) (default: 'GUROBI')
-    
+
+        Returns
+        -------
+        None
         """   
         self.input_expData = input_expData
         self.input_priorNet = input_priorNet

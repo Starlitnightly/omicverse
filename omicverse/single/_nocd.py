@@ -44,7 +44,7 @@ class scnocd(object):
             global_imports("torch")
             global_imports("torch.nn","nn")
             global_imports("torch.nn.functional","F")
-            globals()['nocd'] = __import__("omicverse.nocd",fromlist=['nocd'])
+            globals()['nocd'] = __import__("omicverse.external.nocd",fromlist=['nocd'])
         self.adata_raw=adata
         self.adata=adata.copy()
         self.device  = torch.device(f"cuda:{gpu}") if gpu >= 0 and torch.cuda.is_available() else torch.device('cpu')
@@ -151,10 +151,14 @@ class scnocd(object):
         """
         Saves the trained GNN model and necessary metadata.
 
-        Arguments:
+        Parameters
+        ----------
             gnn_save_dir: the directory to save the trained GNN model. Default is 'save_model'.
             gnn_save_name: the name of the saved GNN model. Default is 'gnn'.
 
+        Returns
+        -------
+        None
         """
         path_save = os.path.join(gnn_save_dir, f"{gnn_save_name}.pth")
         if not os.path.exists(gnn_save_dir):
@@ -184,9 +188,13 @@ class scnocd(object):
         """
         Loads the trained GNN model and restores necessary metadata.
 
-        Arguments:
+        Parameters
+        ----------
             gnn_load_dir: the directory to load the trained GNN model.
 
+        Returns
+        -------
+        None
         """
         print(f'loading model from {gnn_load_dir}')
         

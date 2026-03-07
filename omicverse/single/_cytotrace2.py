@@ -21,21 +21,34 @@ from .._registry import register_function
 #pylint: disable=too-many-locals
 def process_subset(idx, chunked_expression, smooth_batch_size, smooth_cores_to_use, 
                    species, use_model_dir, output_dir, max_pcs, seed):
-    r"""Process a subset of the data in parallel for CytoTRACE2 prediction.
-    
-    Arguments:
-        idx (int): Index of the current batch
-        chunked_expression: Expression data chunk for this batch
-        smooth_batch_size (int): Batch size for smoothing operations
-        smooth_cores_to_use (int): Number of cores to use for smoothing
-        species (str): Species type ('mouse' or 'human')
-        use_model_dir (str): Path to model directory
-        output_dir (str): Output directory for results
-        max_pcs (int): Maximum number of principal components
-        seed (int): Random seed for reproducibility
-        
-    Returns:
-        pd.DataFrame: Smoothed CytoTRACE2 scores for the data chunk
+    r"""Run CytoTRACE2 prediction for one data chunk.
+
+    Parameters
+    ----------
+    idx : int
+        Index of the current chunk. Used to generate temporary file suffixes.
+    chunked_expression : pandas.DataFrame
+        Cell-by-gene expression matrix for the current chunk.
+    smooth_batch_size : int
+        Batch size used during diffusion-based smoothing.
+    smooth_cores_to_use : int
+        Number of CPU cores used by smoothing steps.
+    species : str
+        Species label passed to CytoTRACE2 preprocessing (for example,
+        ``'mouse'`` or ``'human'``).
+    use_model_dir : str
+        Directory containing CytoTRACE2 model weight files.
+    output_dir : str
+        Directory used for intermediate and final output files.
+    max_pcs : int
+        Maximum number of principal components for KNN smoothing.
+    seed : int
+        Random seed for reproducible stochastic steps.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Predicted potency table for the chunk after KNN smoothing.
     """
     from ..external.cytotrace2.gen_utils import preprocess, top_var_genes, predict, smoothing_by_diffusion, binning
 
@@ -86,16 +99,23 @@ def process_subset(idx, chunked_expression, smooth_batch_size, smooth_cores_to_u
     return smooth_by_knn_df
 
 def calculate_cores_to_use(chunk_number,smooth_chunk_number,max_cores,disable_parallelization):
-    r"""Calculate optimal number of cores for parallel processing.
-    
-    Arguments:
-        chunk_number (int): Number of data chunks
-        smooth_chunk_number (int): Number of smoothing chunks
-        max_cores (int): Maximum allowed cores
-        disable_parallelization (bool): Whether to disable parallel processing
-        
-    Returns:
-        tuple: (pred_cores_to_use, smooth_cores_to_use) number of cores for prediction and smoothing
+    r"""Choose prediction and smoothing worker counts.
+
+    Parameters
+    ----------
+    chunk_number : int
+        Number of prediction chunks generated from the input dataset.
+    smooth_chunk_number : int
+        Number of smoothing sub-chunks within each prediction chunk.
+    max_cores : int or None
+        Optional user-provided cap on total CPU cores.
+    disable_parallelization : bool
+        If ``True``, force single-core execution.
+
+    Returns
+    -------
+    tuple[int, int]
+        ``(pred_cores_to_use, smooth_cores_to_use)``.
     """
 
     pred_cores_to_use = 1
@@ -165,26 +185,42 @@ def cytotrace2(
                max_pcs = 200,
                seed = 14,
                output_dir = 'cytotrace2_results'):
-    r"""CytoTRACE 2: Deep learning-based cell potency prediction.
+    r"""Predict developmental potency with CytoTRACE2.
 
-    This function predicts cellular potency states using a deep learning model,
-    providing scores for developmental potential and differentiation status.
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Single-cell expression object. Uses ``adata.X`` as the expression matrix.
+    use_model_dir : str
+        Directory containing CytoTRACE2 pretrained model weights.
+    species : str, default='mouse'
+        Species label used by gene preprocessing. Supported values are
+        typically ``'mouse'`` and ``'human'``.
+    batch_size : int, default=10000
+        Number of cells per prediction batch.
+    smooth_batch_size : int, default=1000
+        Number of cells per smoothing batch in diffusion/KNN post-processing.
+    disable_parallelization : bool, default=False
+        Whether to disable multiprocessing.
+    max_cores : int or None, default=None
+        Maximum cores used when parallelization is enabled. ``None`` lets the
+        function infer an available value.
+    max_pcs : int, default=200
+        Number of principal components used in KNN smoothing.
+    seed : int, default=14
+        Random seed used for chunking and stochastic operations.
+    output_dir : str, default='cytotrace2_results'
+        Directory for intermediate files and final result table.
 
-    Arguments:
-        adata: AnnData object containing single-cell RNA-seq data
-        use_model_dir (str): Path to directory containing pre-trained model files
-        species (str): Species of input data - 'mouse' or 'human' (default: 'mouse')
-        batch_size (int): Number of cells to process per batch (default: 10000)
-        smooth_batch_size (int): Batch size for smoothing operations (default: 1000)
-        disable_parallelization (bool): Whether to disable parallel processing (default: False)
-        max_cores (int): Maximum CPU cores for parallel processing (default: None for all cores)
-        max_pcs (int): Maximum number of principal components to use (default: 200)
-        seed (int): Random seed for reproducibility (default: 14)
-        output_dir (str): Directory to save results (default: 'cytotrace2_results')
+    Returns
+    -------
+    pandas.DataFrame
+        CytoTRACE2 result table indexed by cell ID, including
+        ``CytoTRACE2_Score``, potency category, and relative rank score.
 
-    Returns:
-        pd.DataFrame: DataFrame containing CytoTRACE2 scores, potency categories, and relative scores
-    
+    Notes
+    -----
+    This function also writes prediction columns into ``adata.obs``.
     """
     from ..external.cytotrace2.gen_utils import preprocess, top_var_genes, predict, smoothing_by_diffusion, binning
 
@@ -230,7 +266,7 @@ def cytotrace2(
     np.random.seed(seed)
     if batch_size > len(expression):
         print("cytotrace2: The passed batch_size is greater than the number of cells in the subsample. \n    Now setting batch_size to "+str(len(expression))+".")
-        batch_size <- len(expression)
+        batch_size = len(expression)
     if batch_size > 10000:
         print(".   Please consider reducing the batch size to 10000 for runtime and memory efficiency.")
     elif len(expression) > 10000 and batch_size > 10000:
@@ -300,7 +336,8 @@ def cytotrace2(
     
     predicted_df_final['CytoTRACE2_Potency'] = pd.cut(predicted_df_final['CytoTRACE2_Score'], bins=ranges, labels=labels, include_lowest=True)
 
-    ranked_scores = scipy.stats.rankdata(predicted_df_final['CytoTRACE2_Score'])
+    from scipy.stats import rankdata
+    ranked_scores = rankdata(predicted_df_final['CytoTRACE2_Score'])
     relative_scores = (ranked_scores-min(ranked_scores))/(max(ranked_scores)-min(ranked_scores))
     predicted_df_final['CytoTRACE2_Relative'] = relative_scores
 

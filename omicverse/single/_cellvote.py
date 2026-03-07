@@ -29,6 +29,13 @@ from .._registry import register_function
     related=["single.get_celltype_marker", "single.gptcelltype", "single.pySCSA"]
 )
 class CellVote(object):
+    """Ensemble cell-type annotation manager with multiple backends.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Query single-cell AnnData to annotate.
+    """
 
     def __init__(self, adata) -> None:
         self.adata = adata
@@ -199,33 +206,35 @@ class CellVote(object):
         provider="openai",
         result_key="CellVote_celltype",
     ):
-        r"""Vote for the best cell type annotation from multiple annotation methods.
+        r"""Generate consensus cell-type labels by LLM arbitration.
 
-        Arguments:
-            clusters_key: Clusters key for annotation such as leiden or louvain. Default: None.
-            cluster_markers: Dictionary of cluster markers obtained from get_celltype_marker. Default: None.
-            celltype_keys: List of celltype annotation columns in adata.obs. Default: [].
-            model: LLM model used to identify best matched cells in clusters. Default: 'gpt-3.5-turbo'.
-            base_url: LLM API base URL. Default: None.
-            species: Species of scRNA-seq data. Default: 'human'.
-            organization: Organization/tissue type of scRNA-seq data. Default: 'stomach'.
-            provider: API provider when base_url is None. Default: 'openai'.
-            result_key: Column name to store results in adata.obs. Default: 'CellVote_celltype'.
+        Parameters
+        ----------
+        clusters_key : str or None, default=None
+            Column in ``adata.obs`` containing cluster IDs.
+        cluster_markers : dict or None, default=None
+            Marker genes per cluster, typically from
+            ``ov.single.get_celltype_marker``.
+        celltype_keys : list, default=[]
+            Candidate annotation columns in ``adata.obs`` used to build a
+            candidate label set per cluster.
+        model : str, default='gpt-3.5-turbo'
+            Chat model used for final arbitration.
+        base_url : str or None, default=None
+            Optional custom API base URL.
+        species : str, default='human'
+            Species context string used in prompts.
+        organization : str, default='stomach'
+            Tissue/organ context string used in prompts.
+        provider : str, default='openai'
+            Provider preset for default endpoint selection.
+        result_key : str, default='CellVote_celltype'
+            Output column name written to ``adata.obs``.
 
-        Returns:
-            dict: Mapping of cluster IDs to voted cell types.
-
-        Examples:
-            >>> import omicverse as ov
-            >>> # Initialize CellVote
-            >>> vote_obj = ov.single.CellVote(adata)
-            >>> # Get cluster markers
-            >>> markers = ov.single.get_celltype_marker(adata, clustertype='leiden')
-            >>> # Vote with multiple annotation methods
-            >>> result = vote_obj.vote('leiden', markers,
-            ...                        celltype_keys=['scsa_annotation', 'scMulan_anno'])
-            >>> # Result stored in adata.obs['CellVote_celltype']
-            >>> print(adata.obs['CellVote_celltype'].value_counts())
+        Returns
+        -------
+        dict
+            Mapping from cluster ID to voted cell-type label.
         """
 
         cluster_celltypes = {}
@@ -302,6 +311,40 @@ def get_cluster_celltype(
     retry_backoff=1.5,
     verbose=True,
 ):
+    """Resolve one final cell type for each cluster with LLM calls.
+
+    Parameters
+    ----------
+    cluster_celltypes : dict
+        Candidate labels per cluster, usually ``dict[cluster_id -> list[str]]``.
+    cluster_markers : dict
+        Marker genes per cluster, usually ``dict[cluster_id -> list[str]]``.
+    species : str
+        Species context used in prompt construction.
+    organization : str
+        Tissue/organ context used in prompt construction.
+    model : str
+        Chat completion model name.
+    base_url : str or None
+        API base URL. If ``None``, inferred from ``provider``.
+    provider : str
+        Provider preset used for base URL fallback.
+    api_key : str or None, default=None
+        Optional API key override. If ``None``, reads ``AGI_API_KEY``.
+    timeout : int, default=30
+        Request timeout in seconds for each API call.
+    max_retries : int, default=2
+        Maximum retry count for failed requests.
+    retry_backoff : float, default=1.5
+        Exponential backoff base for retry waiting time.
+    verbose : bool, default=True
+        Whether to print retry/fallback diagnostics.
+
+    Returns
+    -------
+    dict
+        Mapping from cluster ID to predicted (or fallback) cell-type label.
+    """
     # from openai import OpenAI
     import os
     import time
@@ -416,4 +459,3 @@ def get_cluster_celltype(
             cluster_celltype[cluster_id] = fallback
 
     return cluster_celltype
-
