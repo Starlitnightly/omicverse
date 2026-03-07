@@ -5,9 +5,53 @@ import random
 import numpy as np
 import torch
 from typing import Union
+from .._registry import register_function
 
 
+@register_function(
+    aliases=['bulk去卷积', 'bulk Deconvolution', 'bulk cell-fraction inference'],
+    category="bulk",
+    description="Deconvolution class for estimating cell-type composition of bulk RNA-seq using single-cell references and TAPE/Scaden backends.",
+    prerequisites={'optional_functions': ['pp.preprocess']},
+    requires={'obs': ['celltype labels in single reference']},
+    produces={'obs': ['predicted cell fractions'], 'uns': ['deconvolution results']},
+    auto_fix='none',
+    examples=['deconv_obj = ov.bulk.Deconvolution(adata_bulk, adata_single, celltype_key="celltype")', 'frac = deconv_obj.deconvolution(method="tape")'],
+    related=['bulk.pyDEG', 'space.Deconvolution']
+)
 class Deconvolution(object):
+    """
+    Deconvolution class for estimating cell-type composition of bulk RNA-seq using single-cell references and TAPE/Scaden backends
+    
+    Parameters
+    ----------
+    adata_bulk : Any
+        Configuration argument used when constructing `Deconvolution`.
+    adata_single : Any
+        Configuration argument used when constructing `Deconvolution`.
+    max_single_cells : int, optional, default=5000
+        Configuration argument used when constructing `Deconvolution`.
+    celltype_key : str, optional, default='celltype'
+        Configuration argument used when constructing `Deconvolution`.
+    cellstate_key : str, optional, default=None
+        Configuration argument used when constructing `Deconvolution`.
+    gpu : Union[int,str], optional, default=0
+        Configuration argument used when constructing `Deconvolution`.
+    
+    Returns
+    -------
+    None
+        Initialize the class instance.
+    
+    Notes
+    -----
+    This class docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> deconv_obj = ov.bulk.Deconvolution(adata_bulk, adata_single, celltype_key="celltype")
+    """
+
     def __init__(
         self,adata_bulk,adata_single,
         max_single_cells:int=5000,
@@ -111,6 +155,57 @@ class Deconvolution(object):
         scale=True,n_cores=4,fast_mode=True,pseudobulk_size=2000,
         **kwargs,
     ):
+        """
+        Estimate cell-type fractions from bulk expression profiles
+        
+        Parameters
+        ----------
+        method : Any, optional, default='tape'
+            Input parameter for `deconvolution`.
+        sep : Any, optional, default='\t'
+            Input parameter for `deconvolution`.
+        scaler : Any, optional, default='mms'
+            Input parameter for `deconvolution`.
+        datatype : Any, optional, default='counts'
+            Input parameter for `deconvolution`.
+        genelenfile : Any, optional, default=None
+            Input parameter for `deconvolution`.
+        mode : Any, optional, default='overall'
+            Input parameter for `deconvolution`.
+        adaptive : Any, optional, default=True
+            Input parameter for `deconvolution`.
+        variance_threshold : Any, optional, default=0.98
+            Input parameter for `deconvolution`.
+        save_model_name : Any, optional, default=None
+            Input parameter for `deconvolution`.
+        batch_size : Any, optional, default=128
+            Input parameter for `deconvolution`.
+        epochs : Any, optional, default=128
+            Input parameter for `deconvolution`.
+        seed : Any, optional, default=1
+            Input parameter for `deconvolution`.
+        scale_size : Any, optional, default=2
+            Input parameter for `deconvolution`.
+        scale : Any, optional, default=True
+            Input parameter for `deconvolution`.
+        n_cores : Any, optional, default=4
+            Input parameter for `deconvolution`.
+        fast_mode : Any, optional, default=True
+            Input parameter for `deconvolution`.
+        pseudobulk_size : Any, optional, default=2000
+            Input parameter for `deconvolution`.
+        **kwargs : Any
+            Input parameter for `deconvolution`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `deconvolution`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
+        """
 
         from ..external.tape import Deconvolution,ScadenDeconvolution
         if method=='scaden':

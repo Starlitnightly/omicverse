@@ -5,6 +5,7 @@ from matplotlib.animation import FuncAnimation, writers
 from matplotlib.collections import LineCollection
 from sklearn.neighbors import NearestNeighbors
 from scipy.stats import norm as normal
+from .._registry import register_function
 
 
 class Streamlines(object):
@@ -421,6 +422,17 @@ def animate_streamplot(X_grid, V_grid, adata=None,
 #                               color='celltype', palette=color_dict,
 #                               saveto='my_animation.gif')
 
+@register_function(
+    aliases=['添加流线图', 'add_streamplot', 'rna velocity streamplot'],
+    category="pl",
+    description="Overlay RNA-velocity streamlines on low-dimensional embeddings to visualize directionality of state transitions.",
+    prerequisites={'optional_functions': ['pp.neighbors', 'pp.umap']},
+    requires={'obsm': ['X_umap or selected basis'], 'obsp': ['connectivities'], 'layers': ['velocity (optional)']},
+    produces={},
+    auto_fix='none',
+    examples=['ov.pl.add_streamplot(adata, basis="umap", velocity_key="velocity")'],
+    related=['pl.embedding', 'single.Velo', 'utils.cal_paga']
+)
 def add_streamplot(
     adata,
     basis='X_umap',
@@ -434,6 +446,47 @@ def add_streamplot(
     arrow_color="k",
     stream_kwargs=None,
 ):
+    """
+    Overlay RNA-velocity streamlines on low-dimensional embeddings to visualize directionality of state transitions
+    
+    Parameters
+    ----------
+    adata : Any
+        Input parameter for `add_streamplot`.
+    basis : Any, optional, default='X_umap'
+        Input parameter for `add_streamplot`.
+    velocity_key : Any, optional, default='velocity_S'
+        Input parameter for `add_streamplot`.
+    density : Any, optional, default=1
+        Input parameter for `add_streamplot`.
+    smooth : Any, optional, default=0.5
+        Input parameter for `add_streamplot`.
+    min_mass : Any, optional, default=1
+        Input parameter for `add_streamplot`.
+    autoscale : Any, optional, default=True
+        Input parameter for `add_streamplot`.
+    adjust_for_stream : Any, optional, default=True
+        Input parameter for `add_streamplot`.
+    ax : Any, optional, default=None
+        Input parameter for `add_streamplot`.
+    arrow_color : Any, optional, default="k"
+        Input parameter for `add_streamplot`.
+    stream_kwargs : Any, optional, default=None
+        Input parameter for `add_streamplot`.
+    
+    Returns
+    -------
+    Any
+        Output produced by `add_streamplot`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> ov.pl.add_streamplot(adata, basis="umap", velocity_key="velocity")
+    """
     X_grid, V_grid = compute_velocity_on_grid(
         X_emb=adata.obsm[basis],
         V_emb=adata.obsm[velocity_key],
