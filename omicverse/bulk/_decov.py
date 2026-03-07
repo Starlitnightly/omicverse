@@ -21,31 +21,31 @@ from .._registry import register_function
 )
 class Deconvolution(object):
     """
-    Deconvolution class for estimating cell-type composition of bulk RNA-seq using single-cell references and TAPE/Scaden backends
-    
+    Bulk RNA-seq deconvolution class for inferring cell-type fractions from single-cell references.
+
     Parameters
     ----------
-    adata_bulk : Any
-        Configuration argument used when constructing `Deconvolution`.
-    adata_single : Any
-        Configuration argument used when constructing `Deconvolution`.
-    max_single_cells : int, optional, default=5000
-        Configuration argument used when constructing `Deconvolution`.
-    celltype_key : str, optional, default='celltype'
-        Configuration argument used when constructing `Deconvolution`.
-    cellstate_key : str, optional, default=None
-        Configuration argument used when constructing `Deconvolution`.
-    gpu : Union[int,str], optional, default=0
-        Configuration argument used when constructing `Deconvolution`.
+    adata_bulk:AnnData
+        Bulk expression matrix with samples in rows and genes in columns.
+    adata_single:AnnData
+        Single-cell reference matrix containing cell-level expression profiles
+        and cell-type annotations used to build signature profiles.
+    max_single_cells:int
+        Maximum number of cells to keep from ``adata_single``. If the reference
+        contains more cells, a random subset is used to control memory/runtime.
+    celltype_key:str
+        Column name in ``adata_single.obs`` storing cell-type labels.
+    cellstate_key:str or None
+        Optional column name in ``adata_single.obs`` storing finer cell-state
+        labels (used by methods such as BayesPrism).
+    gpu:Union[int,str]
+        Compute device selector. Supports CUDA index (for example ``0``),
+        explicit strings such as ``'cuda:0'``, ``'mps'``, or ``'cpu'``.
     
     Returns
     -------
     None
-        Initialize the class instance.
-    
-    Notes
-    -----
-    This class docstring follows the unified OmicVerse help template.
+        Initializes deconvolution inputs and builds reference expression profiles.
     
     Examples
     --------
@@ -96,8 +96,17 @@ class Deconvolution(object):
 
     def _select_device(self, gpu):
         """
-        Select computation device based on user input and PyTorch backend availability.
-        Supports CUDA, MPS (Apple Silicon) and CPU.
+        Resolve a PyTorch device from user input and available backends.
+
+        Parameters
+        ----------
+        gpu:Union[int,str,torch.device]
+            Device hint provided by user.
+
+        Returns
+        -------
+        torch.device
+            Selected device with graceful fallback order (CUDA/MPS/CPU).
         """
         if isinstance(gpu, torch.device):
             return gpu
@@ -156,55 +165,57 @@ class Deconvolution(object):
         **kwargs,
     ):
         """
-        Estimate cell-type fractions from bulk expression profiles
-        
+        Estimate cell-type composition of bulk RNA-seq samples.
+
         Parameters
         ----------
-        method : Any, optional, default='tape'
-            Input parameter for `deconvolution`.
-        sep : Any, optional, default='\t'
-            Input parameter for `deconvolution`.
-        scaler : Any, optional, default='mms'
-            Input parameter for `deconvolution`.
-        datatype : Any, optional, default='counts'
-            Input parameter for `deconvolution`.
-        genelenfile : Any, optional, default=None
-            Input parameter for `deconvolution`.
-        mode : Any, optional, default='overall'
-            Input parameter for `deconvolution`.
-        adaptive : Any, optional, default=True
-            Input parameter for `deconvolution`.
-        variance_threshold : Any, optional, default=0.98
-            Input parameter for `deconvolution`.
-        save_model_name : Any, optional, default=None
-            Input parameter for `deconvolution`.
-        batch_size : Any, optional, default=128
-            Input parameter for `deconvolution`.
-        epochs : Any, optional, default=128
-            Input parameter for `deconvolution`.
-        seed : Any, optional, default=1
-            Input parameter for `deconvolution`.
-        scale_size : Any, optional, default=2
-            Input parameter for `deconvolution`.
-        scale : Any, optional, default=True
-            Input parameter for `deconvolution`.
-        n_cores : Any, optional, default=4
-            Input parameter for `deconvolution`.
-        fast_mode : Any, optional, default=True
-            Input parameter for `deconvolution`.
-        pseudobulk_size : Any, optional, default=2000
-            Input parameter for `deconvolution`.
-        **kwargs : Any
-            Input parameter for `deconvolution`.
-        
+        method:{'tape', 'scaden', 'bayesprism', 'omicstweezer'}
+            Backend used for deconvolution.
+        sep:str
+            Delimiter used when exporting or reading intermediate text matrices.
+        scaler:str
+            Scaling method for TAPE input preprocessing, for example ``'mms'``.
+        datatype:str
+            Data type passed to TAPE (for example raw counts).
+        genelenfile:str or None
+            Path to gene-length file required by certain preprocessing modes.
+        mode:str
+            TAPE running mode controlling how sample-wise fractions are inferred.
+        adaptive:bool
+            Whether to enable adaptive feature selection in TAPE.
+        variance_threshold:float
+            Variance threshold used by TAPE to keep informative genes.
+        save_model_name:str or None
+            Prefix/path used to persist trained model weights for reuse.
+        batch_size:int
+            Mini-batch size for neural-network-based methods.
+        epochs:int
+            Number of training epochs for neural-network-based methods.
+        seed:int
+            Random seed for reproducible pseudo-bulk generation/training.
+        scale_size:int
+            Reserved scaling parameter for compatibility with legacy interfaces.
+        scale:bool
+            Whether to normalize/scale expression values before fitting.
+        n_cores:int
+            Number of CPU processes used by BayesPrism.
+        fast_mode:bool
+            Whether BayesPrism uses fast approximate updates.
+        pseudobulk_size:int
+            Number of pseudo-bulk mixtures generated for model training.
+        **kwargs
+            Additional backend-specific keyword arguments, forwarded to the
+            selected method.
+
         Returns
         -------
-        Any
-            Output produced by `deconvolution`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        pandas.DataFrame
+            Predicted cell-type fractions with samples in rows and cell types in columns.
+
+        Examples
+        --------
+        >>> frac = dec.deconvolution(method='tape', batch_size=128, epochs=200)
+        >>> frac = dec.deconvolution(method='bayesprism', n_cores=8, fast_mode=True)
         """
 
         from ..external.tape import Deconvolution,ScadenDeconvolution

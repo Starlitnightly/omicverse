@@ -236,42 +236,33 @@ def cal_paga(
     minimum_spanning_tree=True,
     copy=False,
 ):
-    """
-    Compute PAGA connectivity among cell groups to summarize lineage topology and coarse-grained trajectory structure
-    
+    """Compute a PAGA graph with optional velocity/time priors.
+
     Parameters
     ----------
-    adata : Any
-        Input parameter for `cal_paga`.
-    groups : Any, optional, default=None
-        Input parameter for `cal_paga`.
-    vkey : Any, optional, default="velocity"
-        Input parameter for `cal_paga`.
-    use_time_prior : Any, optional, default=True
-        Input parameter for `cal_paga`.
-    root_key : Any, optional, default=None
-        Input parameter for `cal_paga`.
-    end_key : Any, optional, default=None
-        Input parameter for `cal_paga`.
-    threshold_root_end_prior : Any, optional, default=None
-        Input parameter for `cal_paga`.
-    minimum_spanning_tree : Any, optional, default=True
-        Input parameter for `cal_paga`.
-    copy : Any, optional, default=False
-        Input parameter for `cal_paga`.
-    
+    adata:anndata.AnnData
+        Annotated data matrix with neighborhood graph.
+    groups:str or None
+        Grouping key in ``adata.obs``; auto-detected when ``None``.
+    vkey:str
+        Velocity layer key used for transition confidence.
+    use_time_prior:str or bool
+        Pseudotime prior key (or ``True`` to auto-use velocity pseudotime).
+    root_key:str or None
+        Obs key marking root states.
+    end_key:str or None
+        Obs key marking terminal states.
+    threshold_root_end_prior:float or None
+        Threshold for root/end priors in ``[0, 1]``.
+    minimum_spanning_tree:bool
+        Whether to prune graph to most confident tree-like structure.
+    copy:bool
+        Whether to return a copied AnnData with computed results.
+
     Returns
     -------
-    Any
-        Output produced by `cal_paga`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> ov.utils.cal_paga(adata, use_time_prior="dpt_pseudotime", vkey="paga")
+    anndata.AnnData or None
+        Copied AnnData if ``copy=True``; otherwise results are written in place.
     """
     if "neighbors" not in adata.uns:
         raise ValueError(
@@ -358,9 +349,21 @@ def strings_to_categoricals(adata):
 
 from pandas import Index
 
-# TODO: Add docstrings
 def make_unique_list(key, allow_array=False):
-    """TODO."""
+    """Normalize user input to a list of keys.
+
+    Parameters
+    ----------
+    key:Any
+        Input key or key collection.
+    allow_array:bool
+        Whether numpy arrays are treated as valid list-like inputs.
+
+    Returns
+    -------
+    list or Any
+        Normalized list-like key representation.
+    """
     from collections import abc
     if isinstance(key, (Index, abc.KeysView)):
         key = list(key)
@@ -372,15 +375,40 @@ def make_unique_list(key, allow_array=False):
     is_list_of_str = is_list and all(isinstance(item, str) for item in key)
     return key if is_list_of_str else key if is_list and len(key) < 20 else [key]
 
-# TODO: Add docstrings
 def check_basis(adata, basis):
-    """TODO."""
+    """Ensure embedding basis follows ``X_<basis>`` convention in ``obsm``.
+
+    Parameters
+    ----------
+    adata:anndata.AnnData
+        AnnData object containing embeddings.
+    basis:str
+        Embedding basis name.
+
+    Returns
+    -------
+    None
+        May add/rename ``adata.obsm`` key.
+    """
     if basis in adata.obsm.keys() and f"X_{basis}" not in adata.obsm.keys():
         adata.obsm[f"X_{basis}"] = adata.obsm[basis]
         print(f"Renamed '{basis}' to convention 'X_{basis}' (adata.obsm).")
 
 def make_unique_valid_list(adata, keys):
-    """TODO."""
+    """Filter key list to those available in AnnData containers.
+
+    Parameters
+    ----------
+    adata:anndata.AnnData
+        AnnData object with obs/var/layer keys.
+    keys:list or str
+        Candidate keys.
+
+    Returns
+    -------
+    list
+        Valid keys existing in AnnData.
+    """
     keys = make_unique_list(keys)
     if all(isinstance(item, str) for item in keys):
         for i, key in enumerate(keys):
@@ -405,7 +433,20 @@ def make_unique_valid_list(adata, keys):
     return keys
 
 def default_basis(adata, **kwargs):
-    """TODO."""
+    """Choose a default embedding basis from AnnData.
+
+    Parameters
+    ----------
+    adata:anndata.AnnData
+        AnnData containing embeddings.
+    **kwargs
+        Optional explicit ``x``/``y`` vectors used to create temporary embedding.
+
+    Returns
+    -------
+    str
+        Selected basis name.
+    """
     if "x" in kwargs and "y" in kwargs:
         keys, x, y = ["embedding"], kwargs.pop("x"), kwargs.pop("y")
         adata.obsm["X_embedding"] = np.stack([x, y]).T
@@ -492,111 +533,108 @@ def plot_paga(adata,
     scatter_flag=None,
     **kwargs,):
     """
-    Plot PAGA graph over embedding coordinates to visualize lineage transitions and connectivity confidence
+    Plot PAGA graph and optional embedding-level annotations.
     
     Parameters
     ----------
-    adata : Any
-        Input parameter for `plot_paga`.
-    basis : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    vkey : Any, optional, default="velocity"
-        Input parameter for `plot_paga`.
-    color : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    layer : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    title : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    threshold : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    layout : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    layout_kwds : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    init_pos : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    root : Any, optional, default=0
-        Input parameter for `plot_paga`.
-    labels : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    single_component : Any, optional, default=False
-        Input parameter for `plot_paga`.
-    dashed_edges : Any, optional, default="connectivities"
-        Input parameter for `plot_paga`.
-    solid_edges : Any, optional, default="transitions_confidence"
-        Input parameter for `plot_paga`.
-    transitions : Any, optional, default="transitions_confidence"
-        Input parameter for `plot_paga`.
-    node_size_scale : Any, optional, default=1
-        Input parameter for `plot_paga`.
-    node_size_power : Any, optional, default=0.5
-        Input parameter for `plot_paga`.
-    edge_width_scale : Any, optional, default=0.4
-        Input parameter for `plot_paga`.
-    min_edge_width : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    max_edge_width : Any, optional, default=2
-        Input parameter for `plot_paga`.
-    arrowsize : Any, optional, default=15
-        Input parameter for `plot_paga`.
-    random_state : Any, optional, default=0
-        Input parameter for `plot_paga`.
-    pos : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    node_colors : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    normalize_to_color : Any, optional, default=False
-        Input parameter for `plot_paga`.
-    cmap : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    cax : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    cb_kwds : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    add_pos : Any, optional, default=True
-        Input parameter for `plot_paga`.
-    export_to_gexf : Any, optional, default=False
-        Input parameter for `plot_paga`.
-    plot : Any, optional, default=True
-        Input parameter for `plot_paga`.
-    use_raw : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    size : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    groups : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    components : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    figsize : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    dpi : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    show : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    save : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    ax : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    ncols : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    scatter_flag : Any, optional, default=None
-        Input parameter for `plot_paga`.
-    **kwargs : Any
-        Input parameter for `plot_paga`.
+    adata:AnnData
+        AnnData with PAGA graph stored in ``adata.uns['paga']``.
+    basis:str or None, optional
+        Embedding basis used for overlay (for example ``'umap'``). Set ``None`` to draw
+        graph layout only.
+    vkey:str, optional
+        Velocity key used by scVelo when velocity-aware plotting is enabled.
+    color:str or sequence of str, optional
+        Cell-level annotation(s) used for coloring.
+    layer:str or None, optional
+        Layer used for expression coloring.
+    title:str or None, optional
+        Plot title.
+    threshold:float or None, optional
+        Minimum edge threshold.
+    layout:str or None, optional
+        Graph layout algorithm name.
+    layout_kwds:dict or None, optional
+        Additional layout options.
+    init_pos:str or None, optional
+        Initialization for graph layout.
+    root:int or None, optional
+        Root index used by tree-like layouts.
+    labels:str or None, optional
+        Node labels to display.
+    single_component:bool, optional
+        Keep only the largest connected component.
+    dashed_edges:str or None, optional
+        Key for dashed edges.
+    solid_edges:str or None, optional
+        Key for solid edges.
+    transitions:str or None, optional
+        Transition-confidence edge key.
+    node_size_scale:float, optional
+        Scale factor for node sizes.
+    node_size_power:float, optional
+        Exponent for node-size scaling.
+    edge_width_scale:float, optional
+        Scale factor for edge widths.
+    min_edge_width:float or None, optional
+        Lower bound for edge widths.
+    max_edge_width:float, optional
+        Upper bound for edge widths.
+    arrowsize:float, optional
+        Arrow size for directed edges.
+    random_state:int, optional
+        Random seed used by layout routines.
+    pos:dict or None, optional
+        Precomputed node positions.
+    node_colors:dict or sequence, optional
+        Custom node colors.
+    normalize_to_color:bool, optional
+        Whether to normalize values before color mapping.
+    cmap:str or matplotlib colormap, optional
+        Colormap.
+    cax:matplotlib.axes.Axes or None, optional
+        Colorbar axis.
+    cb_kwds:dict or None, optional
+        Colorbar keyword arguments.
+    add_pos:bool, optional
+        Whether to save computed positions back to ``adata.uns``.
+    export_to_gexf:bool, optional
+        Whether to export graph to GEXF.
+    plot:bool, optional
+        If ``False``, only compute/return graph data.
+    use_raw:bool or None, optional
+        Whether to use ``adata.raw``.
+    size:float or None, optional
+        Point size for scatter overlay.
+    groups:str or sequence or None, optional
+        Category subset.
+    components:str or sequence or None, optional
+        Embedding components to plot.
+    figsize:tuple or None, optional
+        Figure size.
+    dpi:int or None, optional
+        Figure dpi.
+    show:bool or None, optional
+        Whether to immediately show the figure.
+    save:str or bool or None, optional
+        Save path or Scanpy-style save flag.
+    ax:matplotlib.axes.Axes or None, optional
+        Existing axis.
+    ncols:int or None, optional
+        Number of columns when plotting multiple panels.
+    scatter_flag:bool or None, optional
+        Whether to add embedding scatter underlay.
+    **kwargs
+        Additional arguments forwarded to ``scvelo.pl.paga``.
     
     Returns
     -------
     Any
-        Output produced by `plot_paga`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
+        Return value from ``scvelo.pl.paga``.
     
     Examples
     --------
-    >>> ov.utils.plot_paga(adata, basis="umap", title="PAGA graph")
+    >>> ov.utils.plot_paga(adata, basis='umap', color='celltype', threshold=0.05)
     """
 
     if layout is not None:

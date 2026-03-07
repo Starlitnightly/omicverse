@@ -26,33 +26,29 @@ warnings.filterwarnings("ignore")
 )
 class Single2Spatial(object):
     """
-    Deep-learning mapper that projects single-cell profiles to spatial coordinates using a paired spatial reference
-    
+    Deep-learning mapper that projects single-cell profiles onto spatial coordinates.
+
     Parameters
     ----------
-    single_data : anndata.AnnData
-        Configuration argument used when constructing `Single2Spatial`.
-    spatial_data : anndata.AnnData
-        Configuration argument used when constructing `Single2Spatial`.
-    celltype_key : str
-        Configuration argument used when constructing `Single2Spatial`.
-    spot_key : list, optional, default=['xcoord','ycoord']
-        Configuration argument used when constructing `Single2Spatial`.
-    top_marker_num : Any, optional, default=500
-        Configuration argument used when constructing `Single2Spatial`.
-    marker_used : Any, optional, default=True
-        Configuration argument used when constructing `Single2Spatial`.
-    gpu : Union[int,str], optional, default=0
-        Configuration argument used when constructing `Single2Spatial`.
+    single_data:anndata.AnnData
+        Single-cell reference AnnData containing expression and cell types.
+    spatial_data:anndata.AnnData
+        Spatial transcriptomics AnnData used as mapping target.
+    celltype_key:str
+        Column name in ``single_data.obs`` containing cell-type labels.
+    spot_key:list
+        Column names in ``spatial_data.obs`` storing x/y coordinates.
+    top_marker_num:int
+        Number of marker genes used to train mapping model.
+    marker_used:bool
+        Whether to restrict training features to marker genes.
+    gpu:Union[int,str]
+        Compute device selector (CUDA index, ``'mps'``, or CPU fallback).
     
     Returns
     -------
     None
-        Initialize the class instance.
-    
-    Notes
-    -----
-    This class docstring follows the unified OmicVerse help template.
+        Initializes single-cell to spatial mapping workflow.
     
     Examples
     --------
@@ -68,16 +64,25 @@ class Single2Spatial(object):
         r"""
         Initialize Single2Spatial model for mapping single cells to spatial coordinates.
 
-        Arguments:
-            single_data: Single-cell RNA-seq data as AnnData object
-            spatial_data: Spatial transcriptomics reference data as AnnData object
-            celltype_key: Column name in single_data.obs containing cell type annotations
-            spot_key: Column names in spatial_data.obs for spatial coordinates (['xcoord','ycoord'])
-            top_marker_num: Number of top marker genes to use in model (500)
-            marker_used: Whether to use marker genes for training (True)
-            gpu: GPU device ID; -1 for CPU, 'mps' for Apple Silicon (0)
+        Parameters
+        ----------
+        single_data:anndata.AnnData
+            Single-cell reference AnnData for source expression profiles.
+        spatial_data:anndata.AnnData
+            Spatial reference AnnData providing coordinates and spot expression.
+        celltype_key:str
+            Name of the cell-type annotation column in ``single_data.obs``.
+        spot_key:list
+            Two-column key in ``spatial_data.obs`` defining x/y coordinates.
+        top_marker_num:int
+            Number of marker genes selected for mapping.
+        marker_used:bool
+            Whether marker-based feature selection is enabled.
+        gpu:Union[int,str]
+            Device selector for model training.
             
-        Returns:
+        Returns
+        -------
             None
         """
 
@@ -104,46 +109,45 @@ class Single2Spatial(object):
                     random_seed:int=112,
                     mul_train:int=1,save=True,
                     n_jobs:int=1,num_epochs=1000,batch_size=1000,predicted_size=32)->anndata.AnnData:
-        """
-        Train the deep neural network for single-cell to spatial mapping
+        r"""
+        Train the deep neural network for single-cell to spatial mapping.
         
+        Trains a model to learn the relationship between gene expression patterns
+        and spatial coordinates using reference spatial transcriptomics data.
+
         Parameters
         ----------
-        spot_num : int
-            Input parameter for `train`.
-        cell_num : int
-            Input parameter for `train`.
-        df_save_dir : str, optional, default='save_model'
-            Input parameter for `train`.
-        df_save_name : str, optional, default='df'
-            Input parameter for `train`.
-        max_cell_in_diff_spot_ratio : Any, optional, default=None
-            Input parameter for `train`.
-        k : int, optional, default=10
-            Input parameter for `train`.
-        random_seed : int, optional, default=112
-            Input parameter for `train`.
-        mul_train : int, optional, default=1
-            Input parameter for `train`.
-        save : Any, optional, default=True
-            Input parameter for `train`.
-        n_jobs : int, optional, default=1
-            Input parameter for `train`.
-        num_epochs : Any, optional, default=1000
-            Input parameter for `train`.
-        batch_size : Any, optional, default=1000
-            Input parameter for `train`.
-        predicted_size : Any, optional, default=32
-            Input parameter for `train`.
-        
+        spot_num:int
+            Number of spots sampled when constructing training pairs.
+        cell_num:int
+            Number of cells assigned to each synthetic training spot.
+        df_save_dir:str
+            Directory where model checkpoint is saved.
+        df_save_name:str
+            Filename prefix for saved model checkpoint.
+        max_cell_in_diff_spot_ratio:float or None
+            Optional upper bound on per-cell-type imbalance across spots.
+        k:int
+            Number of nearest neighbors used for mapping refinement.
+        random_seed:int
+            Random seed for reproducible data generation and training.
+        mul_train:int
+            Multiplier for training-pair generation.
+        save:bool
+            Whether to save trained model weights.
+        n_jobs:int
+            Number of parallel workers used by mapping runner.
+        num_epochs:int
+            Number of epochs for neural-network training.
+        batch_size:int
+            Mini-batch size for training.
+        predicted_size:int
+            Output embedding size of prediction head.
+
         Returns
         -------
         anndata.AnnData
-            Output produced by `train`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            Predicted single-cell AnnData with mapped spatial coordinates.
         """
         # load data
 
@@ -186,24 +190,21 @@ class Single2Spatial(object):
     
     def save(self,df_save_dir:str='save_model',
                 df_save_name:str='df',):
-        """
-        Save the trained Single2Spatial model
+        r"""
+        Save the trained Single2Spatial model.
         
+        Saves the neural network model state for later use in spatial mapping.
+
         Parameters
         ----------
-        df_save_dir : str, optional, default='save_model'
-            Input parameter for `save`.
-        df_save_name : str, optional, default='df'
-            Input parameter for `save`.
-        
+        df_save_dir:str
+            Directory where model checkpoint will be written.
+        df_save_name:str
+            Filename prefix of saved model.
+            
         Returns
         -------
-        Any
-            Output produced by `save`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            None
         """
 
         path_save = os.path.join(df_save_dir, f"{df_save_name}.pth")
@@ -221,34 +222,33 @@ class Single2Spatial(object):
                     k:int=10,
                     random_seed:int=112,
                     n_jobs:int=1,predicted_size=32)->anndata.AnnData:
-        """
-        Load a pre-trained Single2Spatial model and perform mapping
+        r"""
+        Load a pre-trained Single2Spatial model and perform mapping.
         
+        Loads a previously trained model and uses it to map single cells to
+        spatial coordinates.
+
         Parameters
         ----------
-        modelsize : Any
-            Input parameter for `load`.
-        df_load_dir : str, optional, default='save_model/df'
-            Input parameter for `load`.
-        max_cell_in_diff_spot_ratio : Any, optional, default=None
-            Input parameter for `load`.
-        k : int, optional, default=10
-            Input parameter for `load`.
-        random_seed : int, optional, default=112
-            Input parameter for `load`.
-        n_jobs : int, optional, default=1
-            Input parameter for `load`.
-        predicted_size : Any, optional, default=32
-            Input parameter for `load`.
-        
+        modelsize:int
+            Hidden/input size configuration required to rebuild network.
+        df_load_dir:str
+            Path to saved checkpoint file.
+        max_cell_in_diff_spot_ratio:float or None
+            Optional upper bound on per-cell-type imbalance across spots.
+        k:int
+            Number of nearest neighbors used for mapping refinement.
+        random_seed:int
+            Random seed for deterministic loading/inference helpers.
+        n_jobs:int
+            Number of parallel workers used by mapping runner.
+        predicted_size:int
+            Output embedding size of prediction head.
+
         Returns
         -------
         anndata.AnnData
-            Output produced by `load`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            Predicted single-cell AnnData with mapped spatial coordinates.
         """
         #xtrain, ytrain = create_data(self.input_data['input_sc_meta'], 
         #                             self.input_data['input_sc_data'], self.input_data["input_st_data"], 
@@ -278,22 +278,20 @@ class Single2Spatial(object):
         return df_meta, df_spot
     
     def spot_assess(self)->anndata.AnnData:
-        """
-        Assess and aggregate predicted spatial data at the spot level
+        r"""
+        Assess and aggregate predicted spatial data at the spot level.
         
+        Aggregates single-cell predictions to spot-level data including cell-type
+        proportions and mean gene expression per spatial location.
+
         Parameters
         ----------
         None
-            This callable does not require explicit parameters.
-        
+            
         Returns
         -------
         anndata.AnnData
-            Output produced by `spot_assess`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            Spot-level AnnData containing cell-type proportions and spot means.
         """
 
         # spot-level
@@ -329,16 +327,25 @@ def spatial_mapping(generate_sc_meta,
     reference spatial transcriptomics data using batch correction and k-nearest
     neighbor assignment.
 
-    Arguments:
-        generate_sc_meta: Metadata for generated single cells
-        generate_sc_data: Expression data for generated single cells
-        input_st_data_path: Path to spatial transcriptomics expression data
-        input_st_meta_path: Path to spatial transcriptomics metadata
-        map_save_dir: Directory to save mapping results ('output')
-        map_save_name: Filename prefix for saved results ('map')
+    Parameters
+    ----------
+    generate_sc_meta:pd.DataFrame
+        Metadata table for generated single cells including cell-type labels.
+    generate_sc_data:pd.DataFrame
+        Expression matrix for generated single cells (genes x cells).
+    input_st_data_path:str
+        CSV path of spatial expression matrix.
+    input_st_meta_path:str
+        CSV path of spatial metadata table.
+    map_save_dir:str
+        Output directory for saved mapping results.
+    map_save_name:str
+        Output filename prefix for saved mapping tables.
 
-    Returns:
-        tuple: (spatial_metadata, spatial_expression_data) containing mapped results
+    Returns
+    -------
+    Tuple[pd.DataFrame,pd.DataFrame]
+        Predicted spatial metadata and expression matrix.
     """
     input_st_data = pd.read_csv(input_st_data_path, index_col=0)
     input_st_meta = pd.read_csv(input_st_meta_path, index_col=0)

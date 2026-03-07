@@ -39,41 +39,35 @@ def lazy(
     scvi_kwargs=None,
 ):
     """
-    Execute an end-to-end single-cell analysis pipeline with automatic QC, normalization, integration, clustering, and annotation helpers
-    
+    Run a one-click single-cell analysis pipeline with resumable steps.
+
     Parameters
     ----------
-    adata : Any
-        Input parameter for `lazy`.
-    species : Any, optional, default="human"
-        Input parameter for `lazy`.
-    reforce_steps : Any, optional, default=[]
-        Input parameter for `lazy`.
-    sample_key : Any, optional, default=None
-        Input parameter for `lazy`.
-    qc_kwargs : Any, optional, default=None
-        Input parameter for `lazy`.
-    preprocess_kwargs : Any, optional, default=None
-        Input parameter for `lazy`.
-    pca_kwargs : Any, optional, default=None
-        Input parameter for `lazy`.
-    harmony_kwargs : Any, optional, default=None
-        Input parameter for `lazy`.
-    scvi_kwargs : Any, optional, default=None
-        Input parameter for `lazy`.
-    
+    adata:AnnData
+        Input AnnData to be processed.
+    species:str
+        Species name used by downstream annotation helpers.
+    reforce_steps:list
+        Step names forced to rerun even if status flags exist. Common values:
+        ``['qc', 'pca', 'preprocess', 'scaled', 'Harmony', 'scVI', 'eval_bench', 'eval_clusters']``.
+    sample_key:str or None
+        Column in ``adata.obs`` used as batch key for correction/integration.
+    qc_kwargs:dict or None
+        Keyword arguments passed to ``ov.pp.qc``.
+    preprocess_kwargs:dict or None
+        Keyword arguments passed to ``ov.pp.preprocess``.
+    pca_kwargs:dict or None
+        Keyword arguments passed to PCA routine.
+    harmony_kwargs:dict or None
+        Keyword arguments for Harmony integration block.
+    scvi_kwargs:dict or None
+        Keyword arguments for scVI integration block.
+
     Returns
     -------
-    Any
-        Output produced by `lazy`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> ov.single.lazy(adata, species="human", sample_key="batch")
+    AnnData
+        Updated AnnData with QC, preprocessing, embeddings, and clustering results.
+
     """
     mode = settings.mode
     print(f"🔧 The mode of lazy is {mode}")

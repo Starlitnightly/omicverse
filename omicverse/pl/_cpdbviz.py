@@ -36,23 +36,19 @@ from ._cpdbviz_plus import CellChatVizPlus
 )
 class CellChatViz(CellChatVizPlus):
     """
-    Visualization class for CellPhoneDB communication outputs, including interaction networks and pathway-centric summaries
+    Visualization helper for CellPhoneDB cell-cell communication outputs.
     
     Parameters
     ----------
-    adata : Any
-        Configuration argument used when constructing `CellChatViz`.
-    palette : Any, optional, default=None
-        Configuration argument used when constructing `CellChatViz`.
+    adata:AnnData
+        AnnData containing CellPhoneDB interaction results.
+    palette:dict or sequence or None
+        Color mapping used for sender/receiver cell types.
     
     Returns
     -------
     None
-        Initialize the class instance.
-    
-    Notes
-    -----
-    This class docstring follows the unified OmicVerse help template.
+        Initializes visualization state for interaction and pathway-level plotting.
     
     Examples
     --------
@@ -63,17 +59,14 @@ class CellChatViz(CellChatVizPlus):
         """
         Initialize with CellPhoneDB AnnData object
         
-        Args:
-            adata: AnnData
-                AnnData object with CellPhoneDB results
-                - obs: 'sender', 'receiver'
-                - var: interaction information including 'classification'
-                - layers: 'pvalues', 'means'
-            palette: dict or list, optional
-                Color palette for cell types. Can be:
-                - dict: mapping cell type names to colors
-                - list: list of colors (will be mapped to cell types in alphabetical order)
-                - None: use default color scheme
+        Parameters
+        ----------
+        adata:AnnData
+            AnnData with CellPhoneDB outputs:
+            ``obs`` includes sender/receiver, ``layers`` includes pvalues/means.
+        palette:dict or list or None
+            Optional color mapping. Dict uses explicit cell-type keys; list is
+            mapped to sorted cell types.
         """
         self.adata = adata
         self.cell_types = self._get_unique_cell_types()
@@ -91,13 +84,15 @@ class CellChatViz(CellChatVizPlus):
         """
         Validate and process the palette parameter
         
-        Args:
-            palette: dict, list, or None
-                Color palette specification
+        Parameters
+        ----------
+        palette:dict or list or None
+            Palette specification from user input.
             
-        Returns:
-            dict or None
-            Validated palette as dict mapping cell types to colors, or None
+        Returns
+        -------
+        dict or None
+            Normalized palette dictionary or ``None``.
         """
         if palette is None:
             return None
@@ -182,13 +177,15 @@ class CellChatViz(CellChatVizPlus):
         """
         Create a custom colormap based on cell type color
         
-        Args:
-            cell_color: str
-                Base color for the cell type
+        Parameters
+        ----------
+        cell_color:str or tuple
+            Base color for one sender cell type.
         
-        Returns:
-            cmap: matplotlib.colors.LinearSegmentedColormap
-                Custom colormap
+        Returns
+        -------
+        matplotlib.colors.LinearSegmentedColormap
+            Color gradient colormap.
         """
         from matplotlib.colors import LinearSegmentedColormap
         import matplotlib.colors as mcolors
@@ -210,25 +207,26 @@ class CellChatViz(CellChatVizPlus):
         """
         Draw curved arrows, mimicking CellChat's rotated blooming effect
         
-        Args:
-            ax: matplotlib.axes.Axes
-                Matplotlib axes object
-            start_pos: tuple
-                Starting position (x, y)
-            end_pos: tuple
-                Ending position (x, y)
-            weight: float
-                Edge weight
-            max_weight: float
-                Maximum weight for normalization
-            color: str or tuple
-                Edge color
-            edge_width_max: float
-                Maximum edge width
-            curve_strength: float
-                Strength of the curve (0 = straight, higher = more curved)
-            arrowsize: float
-                Size of the arrow head
+        Parameters
+        ----------
+        ax:matplotlib.axes.Axes
+            Target axes.
+        start_pos:tuple
+            Edge start coordinates.
+        end_pos:tuple
+            Edge end coordinates.
+        weight:float
+            Edge weight.
+        max_weight:float
+            Maximum edge weight for normalization.
+        color:str or tuple
+            Edge color.
+        edge_width_max:float
+            Maximum rendered line width.
+        curve_strength:float
+            Curvature intensity of arrow path.
+        arrowsize:float
+            Arrow-head size.
         """
         from matplotlib.patches import FancyArrowPatch
         from matplotlib.patches import ConnectionPatch
@@ -323,19 +321,20 @@ class CellChatViz(CellChatVizPlus):
         """
         Draw self-loops (connections from cell type to itself)
         
-        Args:
-            ax: matplotlib.axes.Axes
-                Matplotlib axes object
-            pos: tuple
-                Position (x, y)
-            weight: float
-                Edge weight
-            max_weight: float
-                Maximum weight for normalization
-            color: str or tuple
-                Edge color
-            edge_width_max: float
-                Maximum edge width
+        Parameters
+        ----------
+        ax:matplotlib.axes.Axes
+            Target axes.
+        pos:tuple
+            Node position.
+        weight:float
+            Self-loop weight.
+        max_weight:float
+            Maximum edge weight for normalization.
+        color:str or tuple
+            Self-loop color.
+        edge_width_max:float
+            Maximum rendered line width.
         """
         import matplotlib.patches as patches
         
@@ -362,19 +361,15 @@ class CellChatViz(CellChatVizPlus):
         
         Parameters
         ----------
-        pvalue_threshold : Any, optional, default=0.05
-            Input parameter for `compute_aggregated_network`.
-        use_means : Any, optional, default=True
-            Input parameter for `compute_aggregated_network`.
+        pvalue_threshold:float
+            Significance threshold for interaction filtering.
+        use_means:bool
+            Whether to accumulate means as edge strength.
         
         Returns
         -------
-        Any
-            Output produced by `compute_aggregated_network`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        Tuple[np.ndarray,np.ndarray]
+            Interaction count matrix and weighted-strength matrix.
         """
         # Initialize matrices
         count_matrix = np.zeros((self.n_cell_types, self.n_cell_types))
@@ -404,40 +399,32 @@ class CellChatViz(CellChatVizPlus):
                         use_curved_arrows=True, curve_strength=0.3, adjust_text=False):
         """
         Circular network visualization (similar to CellChat's circle plot)
+        Uses sender cell type colors as edge gradient colors
         
         Parameters
         ----------
-        matrix : Any
-            Input parameter for `netVisual_circle`.
-        title : Any, optional, default="Cell-Cell Communication Network"
-            Input parameter for `netVisual_circle`.
-        edge_width_max : Any, optional, default=10
-            Input parameter for `netVisual_circle`.
-        vertex_size_max : Any, optional, default=50
-            Input parameter for `netVisual_circle`.
-        show_labels : Any, optional, default=True
-            Input parameter for `netVisual_circle`.
-        cmap : Any, optional, default='Blues'
-            Input parameter for `netVisual_circle`.
-        figsize : Any, optional, default=(10, 10)
-            Input parameter for `netVisual_circle`.
-        use_sender_colors : Any, optional, default=True
-            Input parameter for `netVisual_circle`.
-        use_curved_arrows : Any, optional, default=True
-            Input parameter for `netVisual_circle`.
-        curve_strength : Any, optional, default=0.3
-            Input parameter for `netVisual_circle`.
-        adjust_text : Any, optional, default=False
-            Input parameter for `netVisual_circle`.
-        
-        Returns
-        -------
-        Any
-            Output produced by `netVisual_circle`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        matrix:np.ndarray
+            Interaction matrix (count or weighted strength).
+        title:str
+            Plot title.
+        edge_width_max:float
+            Maximum edge width.
+        vertex_size_max:float
+            Maximum node size.
+        show_labels:bool
+            Whether to show cell-type labels.
+        cmap:str
+            Colormap used when sender colors are disabled.
+        figsize:tuple
+            Figure size.
+        use_sender_colors:bool
+            Whether edge colors follow sender cell type.
+        use_curved_arrows:bool
+            Whether to draw curved directional arrows.
+        curve_strength:float
+            Curvature strength for arrows.
+        adjust_text:bool
+            Whether to use adjustText for label collision handling.
         """
         fig, ax = plt.subplots(figsize=figsize)
         
@@ -634,19 +621,15 @@ class CellChatViz(CellChatVizPlus):
         
         Parameters
         ----------
-        min_interactions : Any, optional, default=1
-            Input parameter for `get_ligand_receptor_pairs`.
-        pvalue_threshold : Any, optional, default=0.05
-            Input parameter for `get_ligand_receptor_pairs`.
+        min_interactions:int
+            Minimum number of significant interactions required per L-R pair.
+        pvalue_threshold:float
+            Significance threshold applied to CellPhoneDB p-values.
         
         Returns
         -------
-        Any
-            Output produced by `get_ligand_receptor_pairs`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        Tuple[list,dict]
+            Significant L-R pairs and their summary statistics.
         """
         # Determine ligand-receptor pair column name
         if 'gene_name' in self.adata.var.columns:
@@ -700,17 +683,13 @@ class CellChatViz(CellChatVizPlus):
         
         Parameters
         ----------
-        count_min : Any, optional, default=1
-            Input parameter for `mean`.
-        
+        count_min:float
+            Minimum interaction mean retained in aggregation.
+            
         Returns
         -------
-        Any
-            Output produced by `mean`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        pd.DataFrame
+            Sender-by-receiver matrix of aggregated means.
         """
         # Initialize matrix
         mean_matrix = np.zeros((self.n_cell_types, self.n_cell_types))
@@ -741,17 +720,13 @@ class CellChatViz(CellChatVizPlus):
         
         Parameters
         ----------
-        count_min : Any, optional, default=1
-            Input parameter for `pvalue`.
-        
+        count_min:float
+            Minimum interaction mean retained when averaging p-values.
+            
         Returns
         -------
-        Any
-            Output produced by `pvalue`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        pd.DataFrame
+            Sender-by-receiver matrix of aggregated p-values.
         """
         # Initialize matrix
         pvalue_matrix = np.ones((self.n_cell_types, self.n_cell_types))  # Default p=1
@@ -791,19 +766,15 @@ class CellChatViz(CellChatVizPlus):
         
         Parameters
         ----------
-        pathway_stats : Any
-            Input parameter for `analyze_pathway_statistics`.
-        show_details : Any, optional, default=True
-            Input parameter for `analyze_pathway_statistics`.
+        pathway_stats:dict
+            Pathway statistics dictionary from signaling-pathway analysis.
+        show_details:bool
+            Whether to print detailed per-pathway summary.
         
         Returns
         -------
-        Any
-            Output produced by `analyze_pathway_statistics`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        pd.DataFrame
+            Summary table for all pathways.
         """
         if not pathway_stats:
             print("No pathway statistics available. Run get_signaling_pathways() first.")
@@ -859,21 +830,17 @@ class CellChatViz(CellChatVizPlus):
         
         Parameters
         ----------
-        method : Any, optional, default='mean'
-            Input parameter for `compute_pathway_communication`.
-        min_lr_pairs : Any, optional, default=1
-            Input parameter for `compute_pathway_communication`.
-        min_expression : Any, optional, default=0.1
-            Input parameter for `compute_pathway_communication`.
-        
+        method:str
+            Aggregation method: ``'mean'``, ``'sum'``, ``'max'`` or ``'median'``.
+        min_lr_pairs:int
+            Minimum number of L-R pairs required for a pathway.
+        min_expression:float
+            Minimum expression threshold for valid interactions.
+            
         Returns
         -------
-        Any
-            Output produced by `compute_pathway_communication`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        dict
+            Pathway-level communication matrices and summary statistics.
         """
         pathways = [p for p in self.adata.var['classification'].unique() if pd.notna(p)]
         pathway_communication = {}
@@ -964,23 +931,19 @@ class CellChatViz(CellChatVizPlus):
         
         Parameters
         ----------
-        pathway_communication : Any, optional, default=None
-            Input parameter for `get_significant_pathways_v2`.
-        strength_threshold : Any, optional, default=0.1
-            Input parameter for `get_significant_pathways_v2`.
-        pvalue_threshold : Any, optional, default=0.05
-            Input parameter for `get_significant_pathways_v2`.
-        min_significant_pairs : Any, optional, default=1
-            Input parameter for `get_significant_pathways_v2`.
-        
+        pathway_communication:dict or None
+            Precomputed pathway communication results.
+        strength_threshold:float
+            Minimum pathway total strength.
+        pvalue_threshold:float
+            P-value threshold for significant cell-pair interactions.
+        min_significant_pairs:int
+            Minimum number of significant cell pairs.
+            
         Returns
         -------
-        Any
-            Output produced by `get_significant_pathways_v2`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        Tuple[list,pd.DataFrame]
+            Significant pathway list and pathway summary table.
         """
         if pathway_communication is None:
             pathway_communication = self.compute_pathway_communication()
@@ -1053,21 +1016,17 @@ class CellChatViz(CellChatVizPlus):
         
         Parameters
         ----------
-        signaling_pathway : Any, optional, default=None
-            Input parameter for `demo_curved_arrows`.
-        curve_strength : Any, optional, default=0.4
-            Input parameter for `demo_curved_arrows`.
-        figsize : Any, optional, default=(12, 10)
-            Input parameter for `demo_curved_arrows`.
+        signaling_pathway:str or None
+            Pathway name to visualize; if ``None`` uses aggregated network.
+        curve_strength:float
+            Curvature strength for arrows.
+        figsize:tuple
+            Figure size.
         
         Returns
         -------
-        Any
-            Output produced by `demo_curved_arrows`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        Tuple[matplotlib.figure.Figure,matplotlib.axes.Axes]
+            Figure and axes of demo visualization.
         """
         print("🌸 Demonstrating CellChat-style curved arrow effects...")
         print(f"📏 Curvature strength: {curve_strength} (recommended range: 0.2-0.6)")
@@ -1114,37 +1073,33 @@ class CellChatViz(CellChatVizPlus):
         
         Parameters
         ----------
-        matrix : Any
-            Input parameter for `netVisual_circle_focused`.
-        title : Any, optional, default="Cell-Cell Communication Network"
-            Input parameter for `netVisual_circle_focused`.
-        edge_width_max : Any, optional, default=10
-            Input parameter for `netVisual_circle_focused`.
-        vertex_size_max : Any, optional, default=50
-            Input parameter for `netVisual_circle_focused`.
-        show_labels : Any, optional, default=True
-            Input parameter for `netVisual_circle_focused`.
-        cmap : Any, optional, default='Blues'
-            Input parameter for `netVisual_circle_focused`.
-        figsize : Any, optional, default=(10, 10)
-            Input parameter for `netVisual_circle_focused`.
-        min_interaction_threshold : Any, optional, default=0
-            Input parameter for `netVisual_circle_focused`.
-        use_sender_colors : Any, optional, default=True
-            Input parameter for `netVisual_circle_focused`.
-        use_curved_arrows : Any, optional, default=True
-            Input parameter for `netVisual_circle_focused`.
-        curve_strength : Any, optional, default=0.3
-            Input parameter for `netVisual_circle_focused`.
-        
+        matrix:np.ndarray
+            Interaction matrix (count or weighted strength).
+        title:str
+            Plot title.
+        edge_width_max:float
+            Maximum edge width.
+        vertex_size_max:float
+            Maximum node size.
+        show_labels:bool
+            Whether to display cell-type labels.
+        cmap:str
+            Colormap used when sender colors are disabled.
+        figsize:tuple
+            Figure size.
+        min_interaction_threshold:float
+            Minimum interaction strength for including a cell type.
+        use_sender_colors:bool
+            Whether edge colors follow sender cell type.
+        use_curved_arrows:bool
+            Whether to render curved directional arrows.
+        curve_strength:float
+            Curvature strength for arrows.
+            
         Returns
         -------
-        Any
-            Output produced by `netVisual_circle_focused`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        Tuple[matplotlib.figure.Figure,matplotlib.axes.Axes]
+            Figure and axes of focused circular network.
         """
         # Find cell types with actual interactions
         interaction_mask = (matrix.sum(axis=0) + matrix.sum(axis=1)) > min_interaction_threshold
@@ -1329,35 +1284,39 @@ class CellChatViz(CellChatVizPlus):
                                    edge_width_max=10, show_labels=True, cmap='Blues', 
                                    figsize=(20, 15), ncols=4, use_sender_colors=True):
         """
-        Draw individual circular network diagrams for each cell type, showing its outgoing signals
+        Plot one outgoing communication circle per cell type.
+
+        Each subplot keeps only edges emitted by one sender cell type and shares
+        a global edge-width scale, making sender-specific communication patterns
+        directly comparable across panels.
         
         Parameters
         ----------
-        pvalue_threshold : Any, optional, default=0.05
-            Input parameter for `netVisual_individual_circle`.
-        vertex_size_max : Any, optional, default=50
-            Input parameter for `netVisual_individual_circle`.
-        edge_width_max : Any, optional, default=10
-            Input parameter for `netVisual_individual_circle`.
-        show_labels : Any, optional, default=True
-            Input parameter for `netVisual_individual_circle`.
-        cmap : Any, optional, default='Blues'
-            Input parameter for `netVisual_individual_circle`.
-        figsize : Any, optional, default=(20, 15)
-            Input parameter for `netVisual_individual_circle`.
-        ncols : Any, optional, default=4
-            Input parameter for `netVisual_individual_circle`.
-        use_sender_colors : Any, optional, default=True
-            Input parameter for `netVisual_individual_circle`.
+        pvalue_threshold : float
+            Significance cutoff applied to ligand-receptor p-values when
+            constructing communication strengths.
+        vertex_size_max : float
+            Upper scaling factor for node sizes (nodes reflect total incoming +
+            outgoing activity).
+        edge_width_max : float
+            Upper scaling factor for edge widths, shared across all subplots.
+        show_labels : bool
+            If ``True``, draw cell-type labels around the circle in each panel.
+        cmap : str
+            Matplotlib colormap used for edge coloring when
+            ``use_sender_colors=False``.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+        ncols : int
+            Number of columns in the subplot grid.
+        use_sender_colors : bool
+            If ``True``, color each edge by sender cell type (CellChat-like
+            style); otherwise use the numeric colormap from ``cmap``.
         
         Returns
         -------
-        Any
-            Output produced by `netVisual_individual_circle`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        matplotlib.figure.Figure
+            Figure containing one outgoing-network subplot per cell type.
         """
         # Compute weight matrix
         _, weight_matrix = self.compute_aggregated_network(pvalue_threshold)
@@ -1498,35 +1457,39 @@ class CellChatViz(CellChatVizPlus):
                                            edge_width_max=10, show_labels=True, cmap='Reds', 
                                            figsize=(20, 15), ncols=4, use_sender_colors=True):
         """
-        Draw individual circular network diagrams for each cell type, showing its incoming signals
+        Plot one incoming communication circle per cell type.
+
+        Each subplot keeps only edges received by one target cell type. This is
+        useful for identifying which senders dominate the incoming signal of each
+        receiver population.
         
         Parameters
         ----------
-        pvalue_threshold : Any, optional, default=0.05
-            Input parameter for `netVisual_individual_circle_incoming`.
-        vertex_size_max : Any, optional, default=50
-            Input parameter for `netVisual_individual_circle_incoming`.
-        edge_width_max : Any, optional, default=10
-            Input parameter for `netVisual_individual_circle_incoming`.
-        show_labels : Any, optional, default=True
-            Input parameter for `netVisual_individual_circle_incoming`.
-        cmap : Any, optional, default='Reds'
-            Input parameter for `netVisual_individual_circle_incoming`.
-        figsize : Any, optional, default=(20, 15)
-            Input parameter for `netVisual_individual_circle_incoming`.
-        ncols : Any, optional, default=4
-            Input parameter for `netVisual_individual_circle_incoming`.
-        use_sender_colors : Any, optional, default=True
-            Input parameter for `netVisual_individual_circle_incoming`.
+        pvalue_threshold : float
+            Significance cutoff applied to ligand-receptor p-values when
+            constructing communication strengths.
+        vertex_size_max : float
+            Upper scaling factor for node sizes (nodes reflect total incoming +
+            outgoing activity).
+        edge_width_max : float
+            Upper scaling factor for edge widths, shared across all subplots.
+        show_labels : bool
+            If ``True``, draw cell-type labels around the circle in each panel.
+        cmap : str
+            Matplotlib colormap used for edge coloring when
+            ``use_sender_colors=False``.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+        ncols : int
+            Number of columns in the subplot grid.
+        use_sender_colors : bool
+            If ``True``, color edges by sender identity so incoming signal origin
+            is visually explicit.
         
         Returns
         -------
-        Any
-            Output produced by `netVisual_individual_circle_incoming`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        matplotlib.figure.Figure
+            Figure containing one incoming-network subplot per cell type.
         """
         # Compute weight matrix
         _, weight_matrix = self.compute_aggregated_network(pvalue_threshold)
@@ -1676,29 +1639,27 @@ class CellChatViz(CellChatVizPlus):
     def netVisual_heatmap(self, matrix, title="Communication Heatmap", 
                          cmap='Reds', figsize=(10, 8), show_values=True):
         """
-        Heatmap visualization of cell-cell communication
+        Visualize a communication matrix as a sender-receiver heatmap.
         
         Parameters
         ----------
-        matrix : Any
-            Input parameter for `netVisual_heatmap`.
-        title : Any, optional, default="Communication Heatmap"
-            Input parameter for `netVisual_heatmap`.
-        cmap : Any, optional, default='Reds'
-            Input parameter for `netVisual_heatmap`.
-        figsize : Any, optional, default=(10, 8)
-            Input parameter for `netVisual_heatmap`.
-        show_values : Any, optional, default=True
-            Input parameter for `netVisual_heatmap`.
-        
+        matrix : np.ndarray
+            2D matrix of communication strength with shape
+            ``(n_cell_types, n_cell_types)`` where rows are senders and columns
+            are receivers.
+        title : str
+            Figure title.
+        cmap : str
+            Matplotlib/seaborn colormap used for heat intensity.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+        show_values : bool
+            If ``True``, annotate each heatmap tile with the numeric value.
+
         Returns
         -------
-        Any
-            Output produced by `netVisual_heatmap`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        Tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+            Figure and axes containing the rendered heatmap.
         """
         fig, ax = plt.subplots(figsize=figsize)
         
@@ -1721,37 +1682,38 @@ class CellChatViz(CellChatVizPlus):
                                 add_row_sum=True, add_col_sum=True, 
                                 linewidth=0.5, figsize=(8, 6), title="Communication Heatmap"):
         """
-        Use marsilea package to draw cell-cell communication heatmap (mimicking CellChat's netVisual_heatmap function)
+        Draw a CellChat-style communication heatmap with Marsilea.
+
+        The function can either visualize the full aggregated network or restrict
+        to one/multiple signaling pathway classifications.
         
         Parameters
         ----------
-        signaling : Any, optional, default=None
-            Input parameter for `netVisual_heatmap_marsilea`.
-        pvalue_threshold : Any, optional, default=0.05
-            Input parameter for `netVisual_heatmap_marsilea`.
-        color_heatmap : Any, optional, default="Reds"
-            Input parameter for `netVisual_heatmap_marsilea`.
-        add_dendrogram : Any, optional, default=True
-            Input parameter for `netVisual_heatmap_marsilea`.
-        add_row_sum : Any, optional, default=True
-            Input parameter for `netVisual_heatmap_marsilea`.
-        add_col_sum : Any, optional, default=True
-            Input parameter for `netVisual_heatmap_marsilea`.
-        linewidth : Any, optional, default=0.5
-            Input parameter for `netVisual_heatmap_marsilea`.
-        figsize : Any, optional, default=(8, 6)
-            Input parameter for `netVisual_heatmap_marsilea`.
-        title : Any, optional, default="Communication Heatmap"
-            Input parameter for `netVisual_heatmap_marsilea`.
-        
+        signaling : str or list or None
+            Pathway name(s) in ``adata.var['classification']``. If ``None``, use
+            all pathways and plot the global aggregated network.
+        pvalue_threshold : float
+            P-value threshold used to decide significant ligand-receptor pairs.
+        color_heatmap : str
+            Colormap for the communication intensity heatmap.
+        add_dendrogram : bool
+            If ``True``, add hierarchical clustering dendrograms for rows/columns.
+        add_row_sum : bool
+            If ``True``, annotate outgoing total strength per sender cell type.
+        add_col_sum : bool
+            If ``True``, annotate incoming total strength per receiver cell type.
+        linewidth : float
+            Cell border width in the heatmap.
+        figsize : tuple
+            Reserved for API compatibility; Marsilea handles actual canvas size
+            at render time.
+        title : str
+            Base title displayed on the Marsilea heatmap.
+            
         Returns
         -------
-        Any
-            Output produced by `netVisual_heatmap_marsilea`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        marsilea.Heatmap
+            Configured Marsilea heatmap object; call ``render()`` to display.
         """
         if not MARSILEA_AVAILABLE:
             raise ImportError("marsilea package is not available. Please install it: pip install marsilea")
@@ -1851,39 +1813,41 @@ class CellChatViz(CellChatVizPlus):
                                           add_dendrogram=True, add_row_sum=True, add_col_sum=True,
                                           linewidth=0.5, figsize=(8, 6), title="Communication Heatmap"):
         """
-        Use marsilea package to draw focused cell-cell communication heatmap, showing only cell types with actual interactions
+        Draw a focused Marsilea heatmap keeping only active cell types.
+
+        Cell types with total incoming + outgoing strength below
+        ``min_interaction_threshold`` are removed to emphasize meaningful
+        communication structure.
         
         Parameters
         ----------
-        signaling : Any, optional, default=None
-            Input parameter for `netVisual_heatmap_marsilea_focused`.
-        pvalue_threshold : Any, optional, default=0.05
-            Input parameter for `netVisual_heatmap_marsilea_focused`.
-        min_interaction_threshold : Any, optional, default=0
-            Input parameter for `netVisual_heatmap_marsilea_focused`.
-        color_heatmap : Any, optional, default="Reds"
-            Input parameter for `netVisual_heatmap_marsilea_focused`.
-        add_dendrogram : Any, optional, default=True
-            Input parameter for `netVisual_heatmap_marsilea_focused`.
-        add_row_sum : Any, optional, default=True
-            Input parameter for `netVisual_heatmap_marsilea_focused`.
-        add_col_sum : Any, optional, default=True
-            Input parameter for `netVisual_heatmap_marsilea_focused`.
-        linewidth : Any, optional, default=0.5
-            Input parameter for `netVisual_heatmap_marsilea_focused`.
-        figsize : Any, optional, default=(8, 6)
-            Input parameter for `netVisual_heatmap_marsilea_focused`.
-        title : Any, optional, default="Communication Heatmap"
-            Input parameter for `netVisual_heatmap_marsilea_focused`.
-        
+        signaling : str or list or None
+            Pathway name(s) in ``adata.var['classification']``. If ``None``, use
+            the globally aggregated network.
+        pvalue_threshold : float
+            P-value threshold used to define significant ligand-receptor pairs.
+        min_interaction_threshold : float
+            Minimum total communication strength required to retain a cell type.
+        color_heatmap : str
+            Colormap for the communication intensity heatmap.
+        add_dendrogram : bool
+            If ``True``, add hierarchical clustering dendrograms.
+        add_row_sum : bool
+            If ``True``, show outgoing totals as side annotations.
+        add_col_sum : bool
+            If ``True``, show incoming totals as top annotations.
+        linewidth : float
+            Cell border width in the heatmap.
+        figsize : tuple
+            Reserved for API compatibility; Marsilea handles actual canvas size
+            at render time.
+        title : str
+            Base title for the figure.
+            
         Returns
         -------
-        Any
-            Output produced by `netVisual_heatmap_marsilea_focused`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        marsilea.Heatmap
+            Focused Marsilea heatmap object; call ``render()`` to display.
         """
         if not MARSILEA_AVAILABLE:
             raise ImportError("marsilea package is not available. Please install it: pip install marsilea")
@@ -1989,29 +1953,26 @@ class CellChatViz(CellChatVizPlus):
     def netVisual_chord(self, matrix, title="Chord Diagram", threshold=0, 
                        cmap='tab20', figsize=(12, 12)):
         """
-        Chord diagram visualization
+        Plot a polar chord-like diagram for cell-cell communication.
         
         Parameters
         ----------
-        matrix : Any
-            Input parameter for `netVisual_chord`.
-        title : Any, optional, default="Chord Diagram"
-            Input parameter for `netVisual_chord`.
-        threshold : Any, optional, default=0
-            Input parameter for `netVisual_chord`.
-        cmap : Any, optional, default='tab20'
-            Input parameter for `netVisual_chord`.
-        figsize : Any, optional, default=(12, 12)
-            Input parameter for `netVisual_chord`.
-        
+        matrix : np.ndarray
+            Communication matrix with senders as rows and receivers as columns.
+        title : str
+            Figure title.
+        threshold : float
+            Minimum edge weight to draw a connection.
+        cmap : str
+            Reserved for compatibility; node colors are currently derived from
+            cell-type palette.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+
         Returns
         -------
-        Any
-            Output produced by `netVisual_chord`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        Tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+            Figure and polar axes for the chord-style plot.
         """
         from matplotlib.path import Path
         import matplotlib.patches as patches
@@ -2084,29 +2045,29 @@ class CellChatViz(CellChatVizPlus):
     def netVisual_hierarchy(self, pathway_name=None, sources=None, targets=None,
                            pvalue_threshold=0.05, figsize=(14, 10)):
         """
-        Hierarchy plot visualization
+        Visualize directed communication as a two-layer hierarchy plot.
+
+        Source cell types are drawn on the left and target cell types on the
+        right, with arrow width proportional to communication strength.
         
         Parameters
         ----------
-        pathway_name : Any, optional, default=None
-            Input parameter for `netVisual_hierarchy`.
-        sources : Any, optional, default=None
-            Input parameter for `netVisual_hierarchy`.
-        targets : Any, optional, default=None
-            Input parameter for `netVisual_hierarchy`.
-        pvalue_threshold : Any, optional, default=0.05
-            Input parameter for `netVisual_hierarchy`.
-        figsize : Any, optional, default=(14, 10)
-            Input parameter for `netVisual_hierarchy`.
-        
+        pathway_name : str or None
+            Pathway in ``adata.var['classification']`` to visualize. If ``None``,
+            use all pathways.
+        sources : list or None
+            Optional sender cell types to keep.
+        targets : list or None
+            Optional receiver cell types to keep.
+        pvalue_threshold : float
+            P-value threshold for selecting significant ligand-receptor pairs.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+
         Returns
         -------
-        Any
-            Output produced by `netVisual_hierarchy`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        Tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+            Figure and axes containing the hierarchy diagram.
         """
         fig, ax = plt.subplots(figsize=figsize)
         
@@ -2214,29 +2175,29 @@ class CellChatViz(CellChatVizPlus):
     def netVisual_bubble(self, sources=None, targets=None, pathways=None,
                         pvalue_threshold=0.05, figsize=(12, 10)):
         """
-        Bubble plot visualization
+        Plot pathway-level communication as a bubble matrix.
+
+        Y-axis shows sender->receiver pairs, X-axis shows signaling pathways,
+        bubble size encodes mean communication strength, and color encodes
+        significance as ``-log10(p-value)``.
         
         Parameters
         ----------
-        sources : Any, optional, default=None
-            Input parameter for `netVisual_bubble`.
-        targets : Any, optional, default=None
-            Input parameter for `netVisual_bubble`.
-        pathways : Any, optional, default=None
-            Input parameter for `netVisual_bubble`.
-        pvalue_threshold : Any, optional, default=0.05
-            Input parameter for `netVisual_bubble`.
-        figsize : Any, optional, default=(12, 10)
-            Input parameter for `netVisual_bubble`.
-        
+        sources : list or None
+            Optional sender cell types to include.
+        targets : list or None
+            Optional receiver cell types to include.
+        pathways : list or None
+            Optional pathway names in ``adata.var['classification']``.
+        pvalue_threshold : float
+            P-value threshold for significant ligand-receptor pairs.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+
         Returns
         -------
-        Any
-            Output produced by `netVisual_bubble`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        Tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+            Figure and axes containing the communication bubble plot.
         """
         # Prepare data
         data_list = []
@@ -2349,21 +2310,22 @@ class CellChatViz(CellChatVizPlus):
     
     def compute_pathway_network(self, pvalue_threshold=0.05):
         """
-        Compute pathway-level communication networks
-        
+        Compute one sender-receiver matrix per signaling pathway.
+
+        For each pathway in ``adata.var['classification']``, the matrix entry
+        ``[sender, receiver]`` stores the sum of mean values from significant
+        ligand-receptor pairs for that cell pair.
+
         Parameters
         ----------
-        pvalue_threshold : Any, optional, default=0.05
-            Input parameter for `compute_pathway_network`.
+        pvalue_threshold : float
+            P-value threshold used to define significant interactions.
         
         Returns
         -------
-        Any
-            Output produced by `compute_pathway_network`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        Dict[str, np.ndarray]
+            Mapping from pathway name to communication matrix of shape
+            ``(n_cell_types, n_cell_types)``.
         """
         pathways = self.adata.var['classification'].unique()
         pathway_networks = {}
@@ -2397,23 +2359,22 @@ class CellChatViz(CellChatVizPlus):
     
     def identify_signaling_role(self, pattern="all", pvalue_threshold=0.05):
         """
-        Identify cellular signaling roles (sender, receiver, mediator, influencer)
+        Score cell types by their signaling roles in the communication network.
         
         Parameters
         ----------
-        pattern : Any, optional, default="all"
-            Input parameter for `identify_signaling_role`.
-        pvalue_threshold : Any, optional, default=0.05
-            Input parameter for `identify_signaling_role`.
-        
+        pattern : str
+            Scoring mode. ``'outgoing'`` uses row sums (sender role),
+            ``'incoming'`` uses column sums (receiver role), and ``'all'`` uses
+            total communication strength.
+        pvalue_threshold : float
+            P-value threshold for selecting significant interactions.
+
         Returns
         -------
-        Any
-            Output produced by `identify_signaling_role`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        Tuple[pd.DataFrame, matplotlib.figure.Figure]
+            DataFrame with absolute/relative role scores and the corresponding
+            barplot figure.
         """
         count_matrix, weight_matrix = self.compute_aggregated_network(pvalue_threshold)
         
@@ -2468,21 +2429,19 @@ class CellChatViz(CellChatVizPlus):
     
     def compute_network_similarity(self, method='functional'):
         """
-        Compute pathway similarity (functional or structural similarity)
+        Compute pairwise similarity between pathway-specific networks.
         
         Parameters
         ----------
-        method : Any, optional, default='functional'
-            Input parameter for `compute_network_similarity`.
-        
+        method : str
+            Similarity definition. ``'functional'`` uses cosine similarity of
+            flattened weighted matrices. ``'structural'`` uses Jaccard similarity
+            of binary edge-presence patterns.
+
         Returns
         -------
-        Any
-            Output produced by `compute_network_similarity`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        Tuple[np.ndarray, list]
+            Symmetric similarity matrix and corresponding ordered pathway names.
         """
         pathway_networks = self.compute_pathway_network()
         pathways = list(pathway_networks.keys())
@@ -2516,25 +2475,24 @@ class CellChatViz(CellChatVizPlus):
     
     def netEmbedding(self, method='functional', n_components=2, figsize=(10, 8)):
         """
-        Pathway embedding and clustering visualization (UMAP)
+        Embed pathway similarity into low-dimensional space and cluster pathways.
+
+        UMAP is used when available; otherwise PCA is used as a fallback.
         
         Parameters
         ----------
-        method : Any, optional, default='functional'
-            Input parameter for `netEmbedding`.
-        n_components : Any, optional, default=2
-            Input parameter for `netEmbedding`.
-        figsize : Any, optional, default=(10, 8)
-            Input parameter for `netEmbedding`.
-        
+        method : str
+            Similarity definition forwarded to
+            :meth:`compute_network_similarity`.
+        n_components : int
+            Number of embedding dimensions.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+
         Returns
         -------
-        Any
-            Output produced by `netEmbedding`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        Tuple[np.ndarray, np.ndarray, matplotlib.figure.Figure]
+            Embedding coordinates, KMeans cluster assignments, and scatter plot.
         """
         try:
             from umap import UMAP
@@ -2600,37 +2558,37 @@ class CellChatViz(CellChatVizPlus):
                                vertex_size_max=50, edge_width_max=10, show_labels=True, 
                                cmap='Blues', figsize=(8, 8), use_sender_colors=True):
         """
-        Draw circular network diagram for a single specified cell type
+        Plot communication circle for one selected cell type.
+
+        Depending on ``direction``, the plot keeps either outgoing edges from the
+        chosen sender or incoming edges to the chosen receiver.
         
         Parameters
         ----------
-        cell_type : Any
-            Input parameter for `netVisual_single_circle`.
-        direction : Any, optional, default='outgoing'
-            Input parameter for `netVisual_single_circle`.
-        pvalue_threshold : Any, optional, default=0.05
-            Input parameter for `netVisual_single_circle`.
-        vertex_size_max : Any, optional, default=50
-            Input parameter for `netVisual_single_circle`.
-        edge_width_max : Any, optional, default=10
-            Input parameter for `netVisual_single_circle`.
-        show_labels : Any, optional, default=True
-            Input parameter for `netVisual_single_circle`.
-        cmap : Any, optional, default='Blues'
-            Input parameter for `netVisual_single_circle`.
-        figsize : Any, optional, default=(8, 8)
-            Input parameter for `netVisual_single_circle`.
-        use_sender_colors : Any, optional, default=True
-            Input parameter for `netVisual_single_circle`.
+        cell_type : str
+            Cell type name to visualize.
+        direction : str
+            ``'outgoing'`` to view emitted signals, ``'incoming'`` to view
+            received signals.
+        pvalue_threshold : float
+            P-value threshold for significant interactions.
+        vertex_size_max : float
+            Upper scaling factor for node size.
+        edge_width_max : float
+            Upper scaling factor for edge width.
+        show_labels : bool
+            If ``True``, annotate cell-type labels.
+        cmap : str
+            Colormap used when ``use_sender_colors=False``.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+        use_sender_colors : bool
+            If ``True``, edge color follows sender identity.
         
         Returns
         -------
-        Any
-            Output produced by `netVisual_single_circle`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        Tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+            Figure and axes for the single-cell-type communication view.
         """
         if cell_type not in self.cell_types:
             raise ValueError(f"Cell type '{cell_type}' not found in data. Available cell types: {self.cell_types}")
@@ -2675,49 +2633,50 @@ class CellChatViz(CellChatVizPlus):
                            show_labels=True, cmap='Blues', figsize=(10, 8), focused_view=True,
                            use_sender_colors=True, use_curved_arrows=True, curve_strength=0.3, adjust_text=False):
         """
-        Draw aggregated network diagram for specific signaling pathways (mimicking CellChat's netVisual_aggregate function)
+        Draw an aggregated communication network for selected signaling pathways.
+
+        Ligand-receptor pairs belonging to ``signaling`` are filtered from
+        ``adata.var['classification']`` and summarized into a single cell-cell
+        communication matrix for visualization.
         
         Parameters
         ----------
-        signaling : Any
-            Input parameter for `netVisual_aggregate`.
-        layout : Any, optional, default='circle'
-            Input parameter for `netVisual_aggregate`.
-        vertex_receiver : Any, optional, default=None
-            Input parameter for `netVisual_aggregate`.
-        vertex_sender : Any, optional, default=None
-            Input parameter for `netVisual_aggregate`.
-        pvalue_threshold : Any, optional, default=0.05
-            Input parameter for `netVisual_aggregate`.
-        vertex_size_max : Any, optional, default=50
-            Input parameter for `netVisual_aggregate`.
-        edge_width_max : Any, optional, default=10
-            Input parameter for `netVisual_aggregate`.
-        show_labels : Any, optional, default=True
-            Input parameter for `netVisual_aggregate`.
-        cmap : Any, optional, default='Blues'
-            Input parameter for `netVisual_aggregate`.
-        figsize : Any, optional, default=(10, 8)
-            Input parameter for `netVisual_aggregate`.
-        focused_view : Any, optional, default=True
-            Input parameter for `netVisual_aggregate`.
-        use_sender_colors : Any, optional, default=True
-            Input parameter for `netVisual_aggregate`.
-        use_curved_arrows : Any, optional, default=True
-            Input parameter for `netVisual_aggregate`.
-        curve_strength : Any, optional, default=0.3
-            Input parameter for `netVisual_aggregate`.
-        adjust_text : Any, optional, default=False
-            Input parameter for `netVisual_aggregate`.
-        
+        signaling : str or list
+            Pathway name(s) in ``adata.var['classification']``.
+        layout : str
+            Visualization style. Supported values are ``'circle'`` and
+            ``'hierarchy'``.
+        vertex_receiver : list or None
+            Receiver cell types to display in hierarchy layout.
+        vertex_sender : list or None
+            Sender cell types to display in hierarchy layout.
+        pvalue_threshold : float
+            P-value threshold for significant ligand-receptor pairs.
+        vertex_size_max : float
+            Upper scaling factor for node size.
+        edge_width_max : float
+            Upper scaling factor for edge width.
+        show_labels : bool
+            Whether to display node labels.
+        cmap : str
+            Colormap used when ``use_sender_colors=False``.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+        focused_view : bool
+            In circle layout, if ``True`` keep only cell types with non-zero
+            interactions.
+        use_sender_colors : bool
+            If ``True``, edge color follows sender cell identity.
+        use_curved_arrows : bool
+            Whether to use curved directed edges in circle layout.
+        curve_strength : float
+            Curvature intensity for curved arrows.
+        adjust_text : bool
+            If ``True``, run ``adjustText`` to reduce label overlap.
         Returns
         -------
-        Any
-            Output produced by `netVisual_aggregate`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        Tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+            Figure and axes containing the aggregated network view.
         """
         # Ensure signaling is in list format
         if isinstance(signaling, str):
@@ -2879,25 +2838,23 @@ class CellChatViz(CellChatVizPlus):
         
         Parameters
         ----------
-        min_interactions : Any, optional, default=1
-            Input parameter for `get_signaling_pathways`.
-        pathway_pvalue_threshold : Any, optional, default=0.05
-            Input parameter for `get_signaling_pathways`.
-        method : Any, optional, default='fisher'
-            Input parameter for `get_signaling_pathways`.
-        correction_method : Any, optional, default='fdr_bh'
-            Input parameter for `get_signaling_pathways`.
-        min_expression : Any, optional, default=0.1
-            Input parameter for `get_signaling_pathways`.
+            min_interactions: int
+                Minimum L-R pair count threshold per pathway (default: 1)
+            pathway_pvalue_threshold: float
+                Pathway-level p-value threshold (default: 0.05)
+            method: str
+                P-value combination method: 'fisher', 'stouffer', 'min', 'mean' (default: 'fisher')
+            correction_method: str
+                Multiple testing correction method: 'fdr_bh', 'bonferroni', 'holm', None (default: 'fdr_bh')
+            min_expression: float
+                Minimum expression threshold (default: 0.1)
         
         Returns
         -------
-        Any
-            Output produced by `get_signaling_pathways`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            pathways: list
+                Significant signaling pathway list
+            pathway_stats: dict
+                Detailed statistics for each pathway
         """
         from scipy.stats import combine_pvalues
         from statsmodels.stats.multitest import multipletests
@@ -3034,19 +2991,10 @@ class CellChatViz(CellChatVizPlus):
         
         Parameters
         ----------
-        pvalue_threshold : Any, optional, default=0.05
-            Input parameter for `plot_all_visualizations`.
-        save_prefix : Any, optional, default=None
-            Input parameter for `plot_all_visualizations`.
-        
-        Returns
-        -------
-        Any
-            Output produced by `plot_all_visualizations`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            pvalue_threshold: float
+                P-value threshold
+            save_prefix: str
+                If provided, save figures with this prefix
         """
         figures = {}
         
@@ -3137,63 +3085,60 @@ class CellChatViz(CellChatVizPlus):
         
         Parameters
         ----------
-        signaling : Any, optional, default=None
-            Input parameter for `netVisual_chord_cell`.
-        group_celltype : Any, optional, default=None
-            Input parameter for `netVisual_chord_cell`.
-        sources : Any, optional, default=None
-            Input parameter for `netVisual_chord_cell`.
-        targets : Any, optional, default=None
-            Input parameter for `netVisual_chord_cell`.
-        pvalue_threshold : Any, optional, default=0.05
-            Input parameter for `netVisual_chord_cell`.
-        count_min : Any, optional, default=1
-            Input parameter for `netVisual_chord_cell`.
-        gap : Any, optional, default=0.03
-            Input parameter for `netVisual_chord_cell`.
-        use_gradient : Any, optional, default=True
-            Input parameter for `netVisual_chord_cell`.
-        sort : Any, optional, default="size"
-            Input parameter for `netVisual_chord_cell`.
-        directed : Any, optional, default=True
-            Input parameter for `netVisual_chord_cell`.
-        cmap : Any, optional, default=None
-            Input parameter for `netVisual_chord_cell`.
-        chord_colors : Any, optional, default=None
-            Input parameter for `netVisual_chord_cell`.
-        rotate_names : Any, optional, default=False
-            Input parameter for `netVisual_chord_cell`.
-        fontcolor : Any, optional, default="black"
-            Input parameter for `netVisual_chord_cell`.
-        fontsize : Any, optional, default=12
-            Input parameter for `netVisual_chord_cell`.
-        start_at : Any, optional, default=0
-            Input parameter for `netVisual_chord_cell`.
-        extent : Any, optional, default=360
-            Input parameter for `netVisual_chord_cell`.
-        min_chord_width : Any, optional, default=0
-            Input parameter for `netVisual_chord_cell`.
-        colors : Any, optional, default=None
-            Input parameter for `netVisual_chord_cell`.
-        ax : Any, optional, default=None
-            Input parameter for `netVisual_chord_cell`.
-        figsize : Any, optional, default=(8, 8)
-            Input parameter for `netVisual_chord_cell`.
-        title_name : Any, optional, default=None
-            Input parameter for `netVisual_chord_cell`.
-        save : Any, optional, default=None
-            Input parameter for `netVisual_chord_cell`.
-        normalize_to_sender : Any, optional, default=True
-            Input parameter for `netVisual_chord_cell`.
-        
+            signaling: str, list or None
+                Specific signaling pathway names. If None, show aggregated results of all pathways
+            group_celltype: dict or None
+                Cell type grouping mapping, e.g., {'CellA': 'GroupX', 'CellB': 'GroupX', 'CellC': 'GroupY'}
+                If None, each cell type is shown individually
+            sources: list or None
+                Specified sender cell type list. If None, include all cell types
+            targets: list or None
+                Specified receiver cell type list. If None, include all cell types
+            pvalue_threshold: float
+                P-value threshold for significant interactions
+            count_min: int
+                Minimum interaction count threshold
+            gap: float
+                Gap between chord diagram segments (0.03)
+            use_gradient: bool
+                Whether to use gradient effects (True)
+            sort: str or None
+                Sorting method: "size", "distance", None ("size")
+            directed: bool
+                Whether to show directionality (True)
+            cmap: str or None
+                Colormap name (None, use cell type colors)
+            chord_colors: str or None
+                Chord colors (None)
+            rotate_names: bool
+                Whether to rotate names (False)
+            fontcolor: str
+                Font color ("black")
+            fontsize: int
+                Font size (12)
+            start_at: int
+                Starting angle (0)
+            extent: int
+                Angle range covered by chord diagram (360)
+            min_chord_width: int
+                Minimum chord width (0)
+            colors: list or None
+                Custom color list (None, use cell type colors)
+            ax: matplotlib.axes.Axes or None
+                Matplotlib axes object (None, create new plot)
+            figsize: tuple
+                Figure size (8, 8)
+            title_name: str or None
+                Plot title (None)
+            save: str or None
+                Save file path (None)
+            normalize_to_sender: bool
+                Whether to normalize to sender for equal arc widths (True)
+            
         Returns
         -------
-        Any
-            Output produced by `netVisual_chord_cell`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            fig: matplotlib.figure.Figure
+            ax: matplotlib.axes.Axes
         """
         try:
             from ..external.mpl_chord.chord_diagram import chord_diagram
@@ -3452,61 +3397,60 @@ class CellChatViz(CellChatVizPlus):
         
         Parameters
         ----------
-        ligand_receptor_pairs : Any, optional, default=None
-            Input parameter for `netVisual_chord_LR`.
-        sources : Any, optional, default=None
-            Input parameter for `netVisual_chord_LR`.
-        targets : Any, optional, default=None
-            Input parameter for `netVisual_chord_LR`.
-        pvalue_threshold : Any, optional, default=0.05
-            Input parameter for `netVisual_chord_LR`.
-        count_min : Any, optional, default=1
-            Input parameter for `netVisual_chord_LR`.
-        gap : Any, optional, default=0.03
-            Input parameter for `netVisual_chord_LR`.
-        use_gradient : Any, optional, default=True
-            Input parameter for `netVisual_chord_LR`.
-        sort : Any, optional, default="size"
-            Input parameter for `netVisual_chord_LR`.
-        directed : Any, optional, default=True
-            Input parameter for `netVisual_chord_LR`.
-        cmap : Any, optional, default=None
-            Input parameter for `netVisual_chord_LR`.
-        chord_colors : Any, optional, default=None
-            Input parameter for `netVisual_chord_LR`.
-        rotate_names : Any, optional, default=False
-            Input parameter for `netVisual_chord_LR`.
-        fontcolor : Any, optional, default="black"
-            Input parameter for `netVisual_chord_LR`.
-        fontsize : Any, optional, default=12
-            Input parameter for `netVisual_chord_LR`.
-        start_at : Any, optional, default=0
-            Input parameter for `netVisual_chord_LR`.
-        extent : Any, optional, default=360
-            Input parameter for `netVisual_chord_LR`.
-        min_chord_width : Any, optional, default=0
-            Input parameter for `netVisual_chord_LR`.
-        colors : Any, optional, default=None
-            Input parameter for `netVisual_chord_LR`.
-        ax : Any, optional, default=None
-            Input parameter for `netVisual_chord_LR`.
-        figsize : Any, optional, default=(8, 8)
-            Input parameter for `netVisual_chord_LR`.
-        title_name : Any, optional, default=None
-            Input parameter for `netVisual_chord_LR`.
-        save : Any, optional, default=None
-            Input parameter for `netVisual_chord_LR`.
-        normalize_to_sender : Any, optional, default=True
-            Input parameter for `netVisual_chord_LR`.
-        
+            ligand_receptor_pairs: str, list or None
+                Specific ligand-receptor pair names. Supports following formats:
+                - Single string: "LIGAND_RECEPTOR" (e.g.: "TGFB1_TGFBR1")  
+                - String list: ["LIGAND1_RECEPTOR1", "LIGAND2_RECEPTOR2"]
+                - If None, show aggregated results of all ligand-receptor pairs
+            sources: list or None
+                Specified sender cell type list. If None, include all cell types
+            targets: list or None
+                Specified receiver cell type list. If None, include all cell types
+            pvalue_threshold: float
+                P-value threshold for significant interactions
+            count_min: int
+                Minimum interaction count threshold
+            gap: float
+                Gap between chord diagram segments
+            use_gradient: bool
+                Whether to use gradient effects
+            sort: str or None
+                Sorting method: "size", "distance", None
+            directed: bool
+                Whether to show directionality
+            cmap: str or None
+                Colormap name
+            chord_colors: str or None
+                Chord colors
+            rotate_names: bool
+                Whether to rotate names
+            fontcolor: str
+                Font color
+            fontsize: int
+                Font size
+            start_at: int
+                Starting angle
+            extent: int
+                Angle range covered by chord diagram
+            min_chord_width: int
+                Minimum chord width
+            colors: list or None
+                Custom color list
+            ax: matplotlib.axes.Axes or None
+                Matplotlib axes object
+            figsize: tuple
+                Figure size
+            title_name: str or None
+                Plot title
+            save: str or None
+                Save file path
+            normalize_to_sender: bool
+                Whether to hide names of cell types without received signals (True)
+            
         Returns
         -------
-        Any
-            Output produced by `netVisual_chord_LR`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+            fig: matplotlib.figure.Figure
+            ax: matplotlib.axes.Axes
         """
         try:
             from ..external.mpl_chord.chord_diagram import chord_diagram
@@ -3694,6 +3638,3 @@ class CellChatViz(CellChatVizPlus):
         
         return fig, ax
     
-
-
-

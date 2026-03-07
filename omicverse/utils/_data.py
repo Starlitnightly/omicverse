@@ -130,15 +130,22 @@ DATA_DOWNLOAD_LINK_DICT = {
 def get_utils_dataset_url(dataset_name: str, prefer_stanford: bool = True) -> str:
     """Get URL for a dataset by name, preferring Stanford over Figshare.
 
-    Args:
-        dataset_name: Name of the dataset (e.g., 'GO_bp', 'GDSC_exp').
-        prefer_stanford: Whether to prefer Stanford links over Figshare (default: True).
+    Parameters
+    ----------
+    dataset_name : str
+        Dataset key in ``DATA_DOWNLOAD_LINK_DICT``.
+    prefer_stanford : bool
+        Whether Stanford mirror is preferred over Figshare mirror.
 
-    Returns:
-        URL string for the dataset.
+    Returns
+    -------
+    str
+        Download URL for requested dataset.
 
-    Raises:
-        ValueError: If dataset name is not found.
+    Raises
+    ------
+    ValueError
+        If dataset name does not exist in ``DATA_DOWNLOAD_LINK_DICT``.
     """
     if dataset_name not in DATA_DOWNLOAD_LINK_DICT:
         raise ValueError(f"Dataset '{dataset_name}' not found in DATA_DOWNLOAD_LINK_DICT")
@@ -196,30 +203,22 @@ def _dbg(msg):
     related=["utils.read_csv", "utils.read_h5ad", "pp.preprocess"]
 )
 def read(path, backend='python', **kwargs):
-    """
-    Universal file reader for common bioinformatics data formats including h5ad, csv, tsv, txt, and gzipped files
-    
+    r"""
+    Read common omics file formats into AnnData or pandas DataFrame.
+
     Parameters
     ----------
-    path : Any
-        Input parameter for `read`.
-    backend : Any, optional, default='python'
-        Input parameter for `read`.
-    **kwargs : Any
-        Input parameter for `read`.
-    
+    path : str
+        Input file path.
+    backend : str
+        Backend used for ``.h5ad`` reading: ``'python'`` or ``'rust'``.
+    **kwargs
+        Additional keyword arguments forwarded to backend readers.
+
     Returns
     -------
-    Any
-        Output produced by `read`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> # Read AnnData file
+    AnnData or pd.DataFrame
+        Loaded AnnData object (for ``.h5ad``) or DataFrame (for table files).
     """
     ext = Path(path).suffix.lower()
 
@@ -271,25 +270,27 @@ def read(path, backend='python', **kwargs):
 )
 def convert_to_pandas(df_obj):
     """
-    Convert PyDataFrameElem or Rust DataFrame objects to pandas DataFrame
-    
+    Convert PyDataFrameElem or similar objects to pandas DataFrame.
+
+    This is a utility function to convert Rust-based DataFrame objects
+    (like PyDataFrameElem from anndata-rs/SnapATAC2) to pandas DataFrames.
+
     Parameters
     ----------
     df_obj : Any
-        Input parameter for `convert_to_pandas`.
-    
+        PyDataFrameElem or similar DataFrame-like object.
+
     Returns
     -------
-    Any
-        Output produced by `convert_to_pandas`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
+    pandas.DataFrame
+        Converted DataFrame.
+
     Examples
     --------
-    >>> # Convert Rust backend obs to pandas
+        >>> import omicverse as ov
+        >>> adata = ov.read('data.h5ad', backend='rust')
+        >>> obs_df = ov.utils.convert_to_pandas(adata.obs)
+        >>> print(obs_df)  # Now displays as pandas DataFrame
     """
     import pandas as pd
 
@@ -444,25 +445,25 @@ class PyDataFrameElemWrapper:
 )
 def wrap_dataframe(df_obj):
     """
-    Wrap PyDataFrameElem to provide pandas DataFrame-like interface
-    
+    Wrap PyDataFrameElem to provide pandas DataFrame-like interface.
+
     Parameters
     ----------
     df_obj : Any
-        Input parameter for `wrap_dataframe`.
-    
+        PyDataFrameElem or similar DataFrame-like object.
+
     Returns
     -------
-    Any
-        Output produced by `wrap_dataframe`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
+    PyDataFrameElemWrapper
+        Wrapped object with pandas-like convenience methods.
+
     Examples
     --------
-    >>> # Wrap PyDataFrameElem for pandas-like usage
+        >>> import omicverse as ov
+        >>> adata = ov.read('data.h5ad', backend='rust')
+        >>> obs = ov.utils.wrap_dataframe(adata.obs)
+        >>> print(obs.head())
+        >>> print(obs.shape)
     """
     return PyDataFrameElemWrapper(df_obj)
 
@@ -485,25 +486,27 @@ def wrap_dataframe(df_obj):
 )
 def convert_to_pandas(df_obj):
     """
-    Convert PyDataFrameElem or Rust DataFrame objects to pandas DataFrame
-    
+    Convert PyDataFrameElem or similar objects to pandas DataFrame.
+
+    This is a utility function to convert Rust-based DataFrame objects
+    (like PyDataFrameElem from anndata-rs/SnapATAC2) to pandas DataFrames.
+
     Parameters
     ----------
     df_obj : Any
-        Input parameter for `convert_to_pandas`.
-    
+        PyDataFrameElem or similar DataFrame-like object.
+
     Returns
     -------
-    Any
-        Output produced by `convert_to_pandas`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
+    pandas.DataFrame
+        Converted DataFrame.
+
     Examples
     --------
-    >>> # Convert Rust backend obs to pandas
+        >>> import omicverse as ov
+        >>> adata = ov.read('data.h5ad', backend='rust')
+        >>> obs_df = ov.utils.convert_to_pandas(adata.obs)
+        >>> print(obs_df)  # Now displays as pandas DataFrame
     """
     import pandas as pd
 
@@ -583,25 +586,23 @@ def convert_to_pandas(df_obj):
 )
 def read_csv(**kwargs):
     """
-    Thin wrapper around pandas.read_csv used across OmicVerse tutorials for reproducible tabular input handling
+    Read a CSV file via ``pandas.read_csv``.
     
     Parameters
     ----------
-    **kwargs : Any
-        Input parameter for `read_csv`.
+    **kwargs
+        Keyword arguments accepted by ``pandas.read_csv`` (for example ``filepath_or_buffer``,
+        ``sep``, ``index_col``, ``dtype``).
     
     Returns
     -------
-    Any
-        Output produced by `read_csv`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
+    pandas.DataFrame
+        Parsed table.
     
     Examples
     --------
-    >>> ov.utils.read_csv("metadata.csv", index_col=0)
+    >>> df = ov.utils.read_csv('metadata.csv', index_col=0)
+    >>> df = ov.utils.read_csv('counts.tsv', sep='\\t')
     """
     return pd.read_csv(**kwargs)
 
@@ -630,26 +631,13 @@ def read_10x_h5(**kwargs):
     related=['utils.download_GDSC_data', 'single.Drug_Response']
 )
 def download_CaDRReS_model():
-    """
-    Download pretrained CaDRReS drug-response models used by single-cell drug sensitivity prediction workflows
-    
-    Parameters
-    ----------
-    None
-        This callable does not require explicit parameters.
-    
+    r"""
+    Download pretrained CaDRReS model parameter/output files.
+
     Returns
     -------
-    Any
-        Output produced by `download_CaDRReS_model`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> ov.utils.download_CaDRReS_model()
+    None
+        Downloads model files into local ``./models`` directory.
     """
     _datasets = [
         'cadrres-wo-sample-bias_output_dict_all_genes',
@@ -675,26 +663,13 @@ def download_CaDRReS_model():
     related=['utils.download_CaDRReS_model', 'single.Drug_Response']
 )
 def download_GDSC_data():
-    """
-    Download GDSC pharmacogenomic response matrices and annotation files for drug-response modeling
-    
-    Parameters
-    ----------
-    None
-        This callable does not require explicit parameters.
-    
+    r"""
+    Download GDSC expression and drug mask tables.
+
     Returns
     -------
-    Any
-        Output produced by `download_GDSC_data`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> ov.utils.download_GDSC_data()
+    None
+        Downloads data files into local ``./models`` directory.
     """
     _datasets = {
         'masked_drugs': '.csv',
@@ -723,26 +698,12 @@ def download_GDSC_data():
     related=["utils.geneset_prepare", "bulk.geneset_enrichment", "bulk.pyGSEA"]
 )
 def download_pathway_database():
-    """
-    Download pathway and gene set databases for enrichment analysis
-    
-    Parameters
-    ----------
-    None
-        This callable does not require explicit parameters.
-    
+    r"""Download pathway and gene set databases for enrichment analysis.
+
     Returns
     -------
-    Any
-        Output produced by `download_pathway_database`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> ov.utils.download_pathway_database()
+    None
+        Downloads pathway resources to local ``./genesets`` directory.
     """
     _datasets = [
         'GO_Biological_Process_2021',
@@ -775,26 +736,12 @@ def download_pathway_database():
     related=["bulk.Matrix_ID_mapping", "utils.geneset_prepare"]
 )
 def download_geneid_annotation_pair():
-    """
-    Download gene ID annotation mapping files for various organisms
-    
-    Parameters
-    ----------
-    None
-        This callable does not require explicit parameters.
-    
+    r"""Download gene ID annotation mapping files for various organisms.
+
     Returns
     -------
-    Any
-        Output produced by `download_geneid_annotation_pair`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> ov.utils.download_geneid_annotation_pair()
+    None
+        Downloads gene ID mapping tables to local ``./genesets`` directory.
     """
     _datasets = [
         'pair_GRCm39',
@@ -844,30 +791,29 @@ def download_geneid_annotation_pair():
     related=["bulk.Matrix_ID_mapping", "utils.download_geneid_annotation_pair", "utils.read_gtf"]
 )
 def gtf_to_pair_tsv(gtf_path, output_path, gene_id_version=True):
-    """
-    Convert GTF file to gene ID mapping pairs TSV format for Matrix_ID_mapping
-    
+    r"""Convert GTF file to gene ID mapping pairs TSV format.
+
     Parameters
     ----------
-    gtf_path : Any
-        Input parameter for `gtf_to_pair_tsv`.
-    output_path : Any
-        Input parameter for `gtf_to_pair_tsv`.
-    gene_id_version : Any, optional, default=True
-        Input parameter for `gtf_to_pair_tsv`.
-    
+    gtf_path : str
+        Path to input GTF file.
+    output_path : str
+        Path for output TSV file.
+    gene_id_version : bool
+        Whether to keep version numbers in gene IDs.
+
     Returns
     -------
-    Any
-        Output produced by `gtf_to_pair_tsv`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
+    int
+        Number of unique genes written to output file.
+
     Examples
     --------
-    >>> # Convert GTF to mapping pairs
+        >>> import omicverse as ov
+        >>> # Convert GTF to mapping pairs
+        >>> gene_count = ov.utils.gtf_to_pair_tsv('genes.gtf', 'gene_pairs.tsv')
+        >>> # Use converted file for gene mapping
+        >>> data = ov.bulk.Matrix_ID_mapping(data, 'gene_pairs.tsv')
     """
     import pandas as pd
     from ._genomics import read_gtf
@@ -932,26 +878,13 @@ def gtf_to_pair_tsv(gtf_path, output_path, gene_id_version=True):
     related=['single.pyTOSICA', 'single.pathway_enrichment']
 )
 def download_tosica_gmt():
-    """
-    Download curated GMT pathway/gene-set files required by TOSICA-based single-cell annotation workflows
-    
-    Parameters
-    ----------
-    None
-        This callable does not require explicit parameters.
-    
+    r"""
+    Download curated GMT files used by TOSICA workflows.
+
     Returns
     -------
-    Any
-        Output produced by `download_tosica_gmt`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> ov.utils.download_tosica_gmt()
+    None
+        Downloads GMT files into local ``./genesets`` directory.
     """
     _datasets = [
         'GO_bp',
@@ -985,28 +918,19 @@ def download_tosica_gmt():
     related=["bulk.geneset_enrichment", "utils.download_tosica_gmt", "single.pathway_enrichment"]
 )
 def geneset_prepare(geneset_path,organism='Human',):
-    """
-    Load and prepare gene sets from GMT/TXT files for enrichment analysis
-    
+    r"""Load and prepare gene sets from GMT/TXT files for enrichment analysis.
+
     Parameters
     ----------
-    geneset_path : Any
-        Input parameter for `geneset_prepare`.
-    organism : Any, optional, default='Human'
-        Input parameter for `geneset_prepare`.
-    
+    geneset_path : str
+        Path to geneset file.
+    organism : str
+        Organism name used for gene-symbol case normalization.
+
     Returns
     -------
-    Any
-        Output produced by `geneset_prepare`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> # Load human gene sets
+    dict
+        Dictionary where keys are pathway names and values are gene symbol lists.
     """
     result_dict = {}
     file_path=geneset_path
@@ -1055,19 +979,20 @@ def geneset_prepare(geneset_path,organism='Human',):
     return go_bio_dict
 
 def geneset_prepare_old(geneset_path,organism='Human'):
-    r"""load geneset
+    r"""
+    Legacy geneset loader for old double-tab GMT-like files.
 
     Parameters
     ----------
-    - geneset_path: `str`
-        Path of geneset file.
-    - organism: `str`
-        Organism of geneset file. Default: 'Human'
+    geneset_path : str
+        Path to geneset file.
+    organism : str
+        Organism name used for gene-symbol case normalization.
 
     Returns
     -------
-    - go_bio_dict: `dict`
-        A dictionary of geneset.
+    dict
+        Dictionary of pathway-to-genes mapping.
     """
     go_bio_geneset=pd.read_csv(geneset_path,sep='\t\t',header=None)
     go_bio_dict={}
@@ -1098,34 +1023,24 @@ def get_gene_annotation(
         gtf: os.PathLike = None, gtf_by: str = None,
         by_func: Optional[Callable] = None
 ) -> None:
-    """
-    Map transcript/gene identifiers to annotation fields (e.g., symbol, biotype) using GTF metadata and store into adata.var
-    
+    r"""
+    Annotate ``adata.var`` by merging with gene-level GTF attributes.
+
     Parameters
     ----------
-    adata : anndata.AnnData
-        Input parameter for `get_gene_annotation`.
-    var_by : str, optional, default=None
-        Input parameter for `get_gene_annotation`.
-    gtf : os.PathLike, optional, default=None
-        Input parameter for `get_gene_annotation`.
-    gtf_by : str, optional, default=None
-        Input parameter for `get_gene_annotation`.
-    by_func : Optional[Callable], optional, default=None
-        Input parameter for `get_gene_annotation`.
-    
-    Returns
-    -------
-    None
-        Output produced by `get_gene_annotation`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> ov.utils.get_gene_annotation(adata, var_by="gene_id", gtf="genes.gtf", gtf_by="gene_id")
+        adata : Input dataset.
+        var_by : Specify a column in ``adata.var`` used to merge with GTF attributes,
+            otherwise ``adata.var_names`` is used by default.
+        gtf : Path to the GTF file.
+        gtf_by : Specify a field in the GTF attributes used to merge with ``adata.var``,
+            e.g. "gene_id", "gene_name".
+        by_func : Specify an element-wise function used to transform merging fields,
+            e.g. removing suffix in gene IDs.
+
+    Note:
+        The genomic locations are converted to 0-based as specified
+        in bed format rather than 1-based as specified in GTF format.
+
     """
     if gtf is None:
         raise ValueError("Missing required argument `gtf`!")
@@ -1398,14 +1313,17 @@ def _perm_test(
 
 def anndata_sparse(adata):
     """
-    Set adata.X to csr_matrix
+    Convert ``adata.X`` to CSR sparse matrix.
 
-    Arguments:
-        adata: AnnData
+    Parameters
+    ----------
+    adata : AnnData
+        Input AnnData object.
 
-    Returns:
-        adata: AnnData
-
+    Returns
+    -------
+    AnnData
+        AnnData with ``X`` converted to CSR format.
     """
 
     from scipy.sparse import csr_matrix
@@ -1430,28 +1348,29 @@ def anndata_sparse(adata):
     related=["utils.retrieve_layers", "pp.preprocess", "pp.scale"]
 )
 def store_layers(adata,layers='counts'):
-    """
-    Store the X matrix of AnnData in adata.uns for later retrieval
-    
+    """Store the X matrix of AnnData in adata.uns for later retrieval.
+
     Parameters
     ----------
-    adata : Any
-        Input parameter for `store_layers`.
-    layers : Any, optional, default='counts'
-        Input parameter for `store_layers`.
-    
+    adata : AnnData
+        AnnData object containing single-cell data.
+    layers : str
+        Layer name used for stored snapshot.
+
     Returns
     -------
-    Any
-        Output produced by `store_layers`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
+    None
+        Stores current ``adata.X`` snapshot into ``adata.uns``.
+
     Examples
     --------
-    >>> # Store current X matrix as 'counts'
+        >>> import omicverse as ov
+        >>> # Store original counts before preprocessing
+        >>> ov.utils.store_layers(adata, layers='raw_counts')
+        >>> # Apply preprocessing
+        >>> adata = ov.pp.preprocess(adata)
+        >>> # Retrieve original data if needed
+        >>> ov.utils.retrieve_layers(adata, layers='raw_counts')
     """
 
 
@@ -1486,28 +1405,29 @@ def store_layers(adata,layers='counts'):
     related=["utils.store_layers", "pp.preprocess", "pp.scale"]
 )
 def retrieve_layers(adata,layers='counts'):
-    """
-    Retrieve previously stored X matrix from adata.uns and restore to adata.X
-    
+    """Retrieve previously stored X matrix from adata.uns and restore to adata.X.
+
     Parameters
     ----------
-    adata : Any
-        Input parameter for `retrieve_layers`.
-    layers : Any, optional, default='counts'
-        Input parameter for `retrieve_layers`.
-    
+    adata : AnnData
+        AnnData object containing single-cell data.
+    layers : str
+        Layer name used for stored snapshot retrieval.
+
     Returns
     -------
-    Any
-        Output produced by `retrieve_layers`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
+    None
+        Restores stored matrix into ``adata.X``.
+
     Examples
     --------
-    >>> # Retrieve stored counts data
+        >>> import omicverse as ov
+        >>> # Store original data before preprocessing
+        >>> ov.utils.store_layers(adata, layers='raw_counts')
+        >>> # Apply preprocessing
+        >>> adata = ov.pp.preprocess(adata)
+        >>> # Retrieve original data
+        >>> ov.utils.retrieve_layers(adata, layers='raw_counts')
     """
 
     adata_test=adata.uns['layers_{}'.format(layers)].copy()
@@ -1553,27 +1473,19 @@ class easter_egg(object):
 )
 def save(file, path,):
     """
-    Persist Python objects (models, results, intermediate analysis states) for reproducible downstream reuse
-    
+    Save Python object to file using pickle fallback strategy.
+
     Parameters
     ----------
     file : Any
-        Input parameter for `save`.
-    path : Any
-        Input parameter for `save`.
-    
+        Python object to serialize.
+    path : str
+        Output file path.
+
     Returns
     -------
-    Any
-        Output produced by `save`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> ov.utils.save(cpdb_results, "data/cpdb/gex_cpdb_test.pkl")
+    None
+        Writes serialized object to disk.
     """
     print(f"{Colors.HEADER}{Colors.BOLD}💾 Save Operation:{Colors.ENDC}")
     print(f"   {Colors.CYAN}Target path: {Colors.BOLD}{path}{Colors.ENDC}")
@@ -1609,27 +1521,19 @@ def save(file, path,):
 )
 def load(path,backend=None):
     """
-    Load serialized analysis objects previously saved with ov.utils.save to resume computation or visualization
-    
+    Load serialized Python object from disk.
+
     Parameters
     ----------
-    path : Any
-        Input parameter for `load`.
-    backend : Any, optional, default=None
-        Input parameter for `load`.
-    
+    path : str
+        Input file path.
+    backend : str or None
+        Preferred deserializer backend (``'pickle'`` or ``'cloudpickle'``).
+
     Returns
     -------
     Any
-        Output produced by `load`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> cpdb_results = ov.utils.load("data/cpdb/gex_cpdb_test.pkl")
+        Deserialized Python object.
     """
     print(f"{Colors.HEADER}{Colors.BOLD}📂 Load Operation:{Colors.ENDC}")
     print(f"   {Colors.CYAN}Source path: {Colors.BOLD}{path}{Colors.ENDC}")
@@ -1694,32 +1598,40 @@ def load(path,backend=None):
     related=["utils.read", "utils.convert_to_pandas", "pp.preprocess"]
 )
 def convert_adata_for_rust(adata, output_file=None, verbose=True, close_file=True):
-    """
-    Convert old Python-backend h5ad AnnData to be compatible with Rust backend requirements using snapatac2.AnnData
+    """Convert AnnData object to be compatible with Rust backend using snapatac2.AnnData.
+    
+    This function creates a new backed AnnData object using snapatac2.AnnData constructor,
+    ensuring full compatibility with Rust backend requirements. It handles:
+    - Proper sparse matrix formatting
+    - DataFrame compatibility
+    - Data type consistency
+    - Automatic unique name generation
     
     Parameters
     ----------
-    adata : Any
-        Input parameter for `convert_adata_for_rust`.
-    output_file : Any, optional, default=None
-        Input parameter for `convert_adata_for_rust`.
-    verbose : Any, optional, default=True
-        Input parameter for `convert_adata_for_rust`.
-    close_file : Any, optional, default=True
-        Input parameter for `convert_adata_for_rust`.
-    
+    adata : AnnData
+        AnnData object to be converted (Python backend object).
+    output_file : str or None
+        Output h5ad path. If ``None``, a temporary file is created.
+    verbose : bool
+        Whether to print conversion progress.
+    close_file : bool
+        Whether to close the snapatac2 AnnData after creation.
+        
     Returns
     -------
-    Any
-        Output produced by `convert_adata_for_rust`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
+    str
+        Path to converted h5ad file compatible with Rust backend.
+        
     Examples
     --------
-    >>> # Convert for Rust backend using snapatac2
+        >>> import omicverse as ov
+        >>> # Load old h5ad file with Python backend
+        >>> adata = ov.read('old_data.h5ad', backend='python') 
+        >>> # Convert for Rust compatibility
+        >>> output_path = ov.utils.convert_adata_for_rust(adata, 'fixed_data.h5ad')
+        >>> # Now read with Rust backend
+        >>> adata_rust = ov.read(output_path, backend='rust')
     """
     import numpy as np
     import pandas as pd

@@ -19,14 +19,11 @@ from .._registry import register_function
         "query to reference label transfer",
     ],
     category="single",
-    description="Reference-based annotation transfer class that aligns query and reference data, integrates embeddings, and transfers cell-type labels via weighted kNN.",
+    description="Reference-to-query label transfer class that integrates two AnnData objects and assigns cell types to query cells using weighted kNN in an integrated latent space.",
     prerequisites={
         'optional_functions': ['pp.preprocess', 'single.batch_correction']
     },
-    requires={
-        'var': ['shared genes between query and reference'],
-        'obs': ['reference celltype labels']
-    },
+    requires={'var': ['shared genes between query and reference'], 'obs': ['reference celltype labels']},
     produces={
         'obsm': ['X_pca_harmony_anno', 'X_scVI_anno', 'X_scanorama_anno'],
         'obs': ['harmony_prediction', 'scVI_prediction', 'scanorama_prediction']
@@ -46,21 +43,21 @@ from .._registry import register_function
 )
 class AnnotationRef(object):
     """
-    Reference-based annotation transfer helper.
+    Reference-based label transfer helper for single-cell annotation.
     
     Parameters
     ----------
     adata_query : AnnData
-        Initialization argument for `AnnotationRef`.
+        Query AnnData that needs cell-type annotation.
     adata_ref : AnnData
-        Initialization argument for `AnnotationRef`.
-    celltype_key : str, optional, default='celltype'
-        Initialization argument for `AnnotationRef`.
+        Reference AnnData with known cell-type labels.
+    celltype_key : str
+        Column name in ``adata_ref.obs`` containing reference cell-type labels.
     
     Returns
     -------
     None
-        Creates a configured class instance.
+        Initializes concatenated query/reference data and checks feature overlap.
     """
     def __init__(self, adata_query: AnnData, adata_ref: AnnData, celltype_key: str = 'celltype'):
         self.adata_query = adata_query
@@ -93,21 +90,25 @@ class AnnotationRef(object):
 
     def preprocess(self,mode='shiftlog|pearson',n_HVGs=3000,batch_key='integrate_batch'):
         """
-        Preprocess concatenated query+reference AnnData for integration.
-        
+        Preprocess concatenated query/reference data for robust label transfer.
+
         Parameters
         ----------
-        mode : Any, optional, default='shiftlog|pearson'
-            Input parameter for `preprocess`.
-        n_HVGs : Any, optional, default=3000
-            Input parameter for `preprocess`.
-        batch_key : Any, optional, default='integrate_batch'
-            Input parameter for `preprocess`.
-        
+        mode : str
+            Preprocessing mode string passed to ``ov.pp.preprocess``.
+        n_HVGs : int
+            Number of highly variable genes retained.
+        batch_key : str
+            Batch key used for HVG selection and integration.
+
         Returns
         -------
-        Any
-            Output produced by `preprocess`.
+        None
+            Updates ``self.adata_new`` with HVG selection, scaling, and PCA.
+
+        Examples
+        --------
+        >>> ar.preprocess(mode='shiftlog|pearson', n_HVGs=3000)
         """
         from ..pp._preprocess import preprocess,scale,pca
         self.adata_new=preprocess(self.adata_new,mode=mode,
@@ -121,19 +122,23 @@ class AnnotationRef(object):
         **kwargs
     ):
         """
-        Train/compute integrated embedding for transfer annotation.
-        
+        Train/compute an integrated embedding used for reference label transfer.
+
         Parameters
         ----------
-        method : Any, optional, default='harmony'
-            Input parameter for `train`.
-        **kwargs : Any
-            Input parameter for `train`.
-        
+        method : {'harmony', 'scVI', 'scanorama'}
+            Integration backend used to create shared latent space for transfer.
+        **kwargs
+            Additional arguments forwarded to ``single.batch_correction``.
+
         Returns
         -------
-        Any
-            Output produced by `train`.
+        anndata.AnnData
+            Query AnnData with integrated embedding copied to ``.obsm``.
+
+        Examples
+        --------
+        >>> ar.train(method='harmony')
         """
         from ._batch import batch_correction
         if method=='harmony':
@@ -158,22 +163,26 @@ class AnnotationRef(object):
     def predict(self,method='harmony',n_neighbors=15,pred_key=None,uncert_key=None):
         """
         Transfer reference labels to query cells using weighted kNN.
-        
+
         Parameters
         ----------
-        method : Any, optional, default='harmony'
-            Input parameter for `predict`.
-        n_neighbors : Any, optional, default=15
-            Input parameter for `predict`.
-        pred_key : Any, optional, default=None
-            Input parameter for `predict`.
-        uncert_key : Any, optional, default=None
-            Input parameter for `predict`.
+        method : {'harmony', 'scVI', 'scanorama'}
+            Integration space used for kNN transfer.
+        n_neighbors : int
+            Number of neighbors in the weighted kNN model.
+        pred_key : str or None
+            Output ``obs`` key for predicted labels.
+        uncert_key : str or None
+            Output ``obs`` key for uncertainty scores.
         
         Returns
         -------
-        Any
-            Output produced by `predict`.
+        anndata.AnnData
+            Query AnnData with predicted labels and uncertainties in ``.obs``.
+
+        Examples
+        --------
+        >>> adata_q = ar.predict(method='harmony', n_neighbors=15)
         """
         if method=='harmony':
             if pred_key is None:

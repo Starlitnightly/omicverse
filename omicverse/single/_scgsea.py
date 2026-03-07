@@ -12,16 +12,25 @@ from .._registry import register_function
 def geneset_aucell_tmp(adata, geneset_name, geneset, AUC_threshold=0.01, seed=42, chunk_size=10000):
     r"""Calculate the AUC-ell score for a given gene set.
 
-    Arguments:
-        adata: AnnData object containing gene expression data.
-        geneset_name: Name of the gene set.
-        geneset: List of gene symbols for the gene set.
-        AUC_threshold: AUC threshold used to determine significant interactions. (0.01)
-        seed: Seed used to initialize the random number generator. (42)
-        chunk_size: The number of cells to process in each chunk. (10000)
+    Parameters
+    ----------
+    adata:anndata.AnnData
+        AnnData containing expression matrix.
+    geneset_name:str
+        Name of gene set; used as output column prefix.
+    geneset:list
+        Gene symbols composing the gene set.
+    AUC_threshold:float
+        AUCell rank threshold percentile.
+    seed:int
+        Random seed for ranking backend.
+    chunk_size:int
+        Number of cells processed per chunk.
 
-    Returns:
-        None: Adds a column to the 'obs' attribute of the adata object containing the AUC-ell score for the gene set.
+    Returns
+    -------
+    None
+        Writes AUCell score to ``adata.obs[f'{geneset_name}_aucell']``.
     """
     from ..external.ctxcore.recovery import aucs
 
@@ -69,34 +78,25 @@ def global_imports(modulename,shortname = None, asfunction = False):
     related=['single.pathway_aucell', 'single.pathway_aucell_enrichment']
 )
 def geneset_aucell(adata,geneset_name,geneset,AUC_threshold=0.01,seed=42):
-    """
-    Score per-cell activity of a custom gene set using AUCell ranking-based enrichment robust to library-size variation
-    
+    r"""Calculate the AUC-ell score for a given gene set.
+
     Parameters
     ----------
-    adata : Any
-        Input parameter for `geneset_aucell`.
-    geneset_name : Any
-        Input parameter for `geneset_aucell`.
-    geneset : Any
-        Input parameter for `geneset_aucell`.
-    AUC_threshold : Any, optional, default=0.01
-        Input parameter for `geneset_aucell`.
-    seed : Any, optional, default=42
-        Input parameter for `geneset_aucell`.
-    
+    adata:anndata.AnnData
+        AnnData containing expression matrix.
+    geneset_name:str
+        Name of gene set; used as output column prefix.
+    geneset:list
+        Gene symbols composing the gene set.
+    AUC_threshold:float
+        AUCell rank threshold percentile.
+    seed:int
+        Random seed for ranking backend.
+
     Returns
     -------
-    Any
-        Output produced by `geneset_aucell`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> ov.single.geneset_aucell(adata, geneset_name="IFN_response", geneset=ifn_genes)
+    None
+        Writes AUCell score to ``adata.obs[f'{geneset_name}_aucell']``.
     """
     from ..external.ctxcore.recovery import aucs
 
@@ -132,34 +132,25 @@ def geneset_aucell(adata,geneset_name,geneset,AUC_threshold=0.01,seed=42):
     related=['single.geneset_aucell', 'single.pathway_aucell_enrichment']
 )
 def pathway_aucell(adata,pathway_names,pathways_dict,AUC_threshold=0.01,seed=42):
-    """
-    Compute single-cell pathway activity scores across multiple pathways using AUCell and write scores into cell metadata
-    
+    r"""Calculate the area under the curve (AUC) for a set of pathways in an AnnData object.
+
     Parameters
     ----------
-    adata : Any
-        Input parameter for `pathway_aucell`.
-    pathway_names : Any
-        Input parameter for `pathway_aucell`.
-    pathways_dict : Any
-        Input parameter for `pathway_aucell`.
-    AUC_threshold : Any, optional, default=0.01
-        Input parameter for `pathway_aucell`.
-    seed : Any, optional, default=42
-        Input parameter for `pathway_aucell`.
-    
+    adata:anndata.AnnData
+        AnnData containing expression matrix.
+    pathway_names:list
+        Ordered pathway names to score.
+    pathways_dict:dict
+        Mapping from pathway name to list of genes.
+    AUC_threshold:float
+        AUCell rank threshold percentile.
+    seed:int
+        Random seed for ranking backend.
+
     Returns
     -------
-    Any
-        Output produced by `pathway_aucell`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> ov.single.pathway_aucell(adata, pathway_names=list(pathways.keys()), pathways_dict=pathways)
+    None
+        Writes per-pathway AUCell scores to ``adata.obs``.
     """
     from ..external.ctxcore.recovery import aucs
 
@@ -189,16 +180,25 @@ def pathway_aucell(adata,pathway_names,pathways_dict,AUC_threshold=0.01,seed=42)
 def pathway_aucell_tmp(adata, pathway_names, pathways_dict, AUC_threshold=0.01, seed=42, chunk_size=10000):
     r"""Calculate the area under the curve (AUC) for a set of pathways in an AnnData object.
 
-    Arguments:
-        adata: AnnData object containing the data.
-        pathway_names: Names of the pathways to analyze.
-        pathways_dict: Dictionary containing the gene sets for each pathway.
-        AUC_threshold: AUC threshold to use for determining significant gene-pathway associations. (0.01)
-        seed: Random seed for reproducibility. (42)
-        chunk_size: The number of cells to process in each chunk. (10000)
+    Parameters
+    ----------
+    adata:anndata.AnnData
+        AnnData containing expression matrix.
+    pathway_names:list
+        Ordered pathway names to score.
+    pathways_dict:dict
+        Mapping from pathway name to list of genes.
+    AUC_threshold:float
+        AUCell rank threshold percentile.
+    seed:int
+        Random seed for ranking backend.
+    chunk_size:int
+        Number of cells processed per chunk.
 
-    Returns:
-        None: The function modifies the `adata.obs` attribute of the input AnnData object.
+    Returns
+    -------
+    None
+        Writes per-pathway AUCell scores to ``adata.obs``.
     """
     from ..external.ctxcore.recovery import aucs
 
@@ -241,36 +241,27 @@ def pathway_aucell_tmp(adata, pathway_names, pathways_dict, AUC_threshold=0.01, 
     related=['single.pathway_aucell', 'single.pathway_enrichment']
 )
 def pathway_aucell_enrichment(adata,pathways_dict,AUC_threshold=0.01,seed=42,num_workers=1,gene_overlap_threshold=0.80):
-    """
-    Identify pathways with robust AUCell activity signals by integrating score distribution and gene-overlap constraints
-    
+    r"""Enrich cell annotations with pathway activity scores using the AUC-ell method.
+
     Parameters
     ----------
-    adata : Any
-        Input parameter for `pathway_aucell_enrichment`.
-    pathways_dict : Any
-        Input parameter for `pathway_aucell_enrichment`.
-    AUC_threshold : Any, optional, default=0.01
-        Input parameter for `pathway_aucell_enrichment`.
-    seed : Any, optional, default=42
-        Input parameter for `pathway_aucell_enrichment`.
-    num_workers : Any, optional, default=1
-        Input parameter for `pathway_aucell_enrichment`.
-    gene_overlap_threshold : Any, optional, default=0.80
-        Input parameter for `pathway_aucell_enrichment`.
-    
+    adata:anndata.AnnData
+        AnnData containing expression matrix.
+    pathways_dict:dict
+        Mapping from pathway name to list of genes.
+    AUC_threshold:float
+        AUCell rank threshold percentile.
+    seed:int
+        Random seed for AUCell backend.
+    num_workers:int
+        Number of workers used in AUCell computation.
+    gene_overlap_threshold:float
+        Minimum fraction of pathway genes present in ``adata.var_names``.
+
     Returns
     -------
-    Any
-        Output produced by `pathway_aucell_enrichment`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> ov.single.pathway_aucell_enrichment(adata, pathways_dict=pathways, AUC_threshold=0.01)
+    anndata.AnnData
+        AnnData whose ``X`` stores pathway AUCell activity matrix.
     """
     from ..external.ctxcore.genesig import GeneSignature
 
@@ -297,16 +288,25 @@ def pathway_aucell_enrichment_tmp(adata, pathways_dict, AUC_threshold=0.01, seed
                               num_workers=1, chunk_size=10000):
     r"""Enrich cell annotations with pathway activity scores using the AUC-ell method.
 
-    Arguments:
-        adata: AnnData object containing the expression matrix.
-        pathways_dict: A dictionary where keys are pathway names and values are lists of genes associated with each pathway.
-        AUC_threshold: The threshold for calculating the area under the curve (AUC) values using the AUC-ell method. (0.01)
-        seed: The seed to use for the random number generator. (42)
-        num_workers: The number of workers to use for parallel processing. (1)
-        chunk_size: The number of cells to process in each chunk. (10000)
+    Parameters
+    ----------
+    adata:anndata.AnnData
+        AnnData containing expression matrix.
+    pathways_dict:dict
+        Mapping from pathway name to list of genes.
+    AUC_threshold:float
+        AUCell rank threshold percentile.
+    seed:int
+        Random seed for AUCell backend.
+    num_workers:int
+        Number of workers used in AUCell computation.
+    chunk_size:int
+        Number of cells processed per chunk.
 
-    Returns:
-        adata_aucs: AnnData object containing the pathway activity scores for each cell in the input AnnData object.
+    Returns
+    -------
+    anndata.AnnData
+        AnnData whose ``X`` stores pathway AUCell activity matrix.
     """
     from tqdm import tqdm
     from ..external.ctxcore.genesig import GeneSignature
@@ -355,40 +355,39 @@ def pathway_aucell_enrichment_tmp(adata, pathways_dict, AUC_threshold=0.01, seed
 )
 def pathway_enrichment(adata, pathways_dict,organism='Human',group_by='louvain', 
                        cutoff=0.05, logfc_threshold=2,pvalue_type='adjust',plot=True):
-    """
-    Run pathway enrichment on cluster/group differential genes to connect transcriptional changes with biological processes
+    r"""Perform pathway enrichment analysis on gene expression data.
     
     Parameters
     ----------
-    adata : Any
-        Input parameter for `pathway_enrichment`.
-    pathways_dict : Any
-        Input parameter for `pathway_enrichment`.
-    organism : Any, optional, default='Human'
-        Input parameter for `pathway_enrichment`.
-    group_by : Any, optional, default='louvain'
-        Input parameter for `pathway_enrichment`.
-    cutoff : Any, optional, default=0.05
-        Input parameter for `pathway_enrichment`.
-    logfc_threshold : Any, optional, default=2
-        Input parameter for `pathway_enrichment`.
-    pvalue_type : Any, optional, default='adjust'
-        Input parameter for `pathway_enrichment`.
-    plot : Any, optional, default=True
-        Input parameter for `pathway_enrichment`.
+    adata:anndata.AnnData
+        AnnData with ``rank_genes_groups`` results and cluster labels.
+    pathways_dict:dict
+        Mapping from pathway/set name to member genes.
+    organism:str
+        Organism name used by enrichment backend.
+    group_by:str
+        ``adata.obs`` key used as grouping variable.
+    cutoff:float
+        Significance cutoff for pathway filtering.
+    logfc_threshold:float
+        Minimum log2 fold-change threshold for DE genes.
+    pvalue_type:str
+        P-value type used for final filtering: ``'adjust'`` or ``'raw'``.
+    plot:bool
+        Whether to draw per-cluster barplots for enriched pathways.
     
     Returns
     -------
-    Any
-        Output produced by `pathway_enrichment`.
+    pd.DataFrame
+        Enrichment result table with cluster labels and pathway statistics.
     
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
+    Examples:
+        >>> # Perform pathway enrichment analysis on adata using pathways_dict
+        >>> res = pathway_enrichment(adata, pathways_dict)
     
-    Examples
-    --------
-    >>> ov.single.pathway_enrichment(adata, pathways_dict=pathways, organism="Human", group_by="leiden")
+    Reference:
+        The code for pathway_enrichment() function was adapted from scanpy workflows: 
+        https://scanpy-tutorials.readthedocs.io/en/latest/pbmc3k.html#Gene-set-enrichment-analysis.
     """
 
     #import gseapy as gp
@@ -471,36 +470,31 @@ def pathway_enrichment(adata, pathways_dict,organism='Human',group_by='louvain',
     related=['single.pathway_enrichment', 'bulk.geneset_plot']
 )
 def pathway_enrichment_plot(enrich_res,term_num=5,return_table=False,figsize=(3,10),plot_title='',**kwds):
-    """
-    Visualize top enriched pathways with effect size and significance to facilitate biological interpretation of DEG-derived signatures
-    
+    r"""Visualize the pathway enrichment analysis results as a heatmap.
+
     Parameters
     ----------
-    enrich_res : Any
-        Input parameter for `pathway_enrichment_plot`.
-    term_num : Any, optional, default=5
-        Input parameter for `pathway_enrichment_plot`.
-    return_table : Any, optional, default=False
-        Input parameter for `pathway_enrichment_plot`.
-    figsize : Any, optional, default=(3,10)
-        Input parameter for `pathway_enrichment_plot`.
-    plot_title : Any, optional, default=''
-        Input parameter for `pathway_enrichment_plot`.
-    **kwds : Any
-        Input parameter for `pathway_enrichment_plot`.
-    
+    enrich_res:pd.DataFrame
+        DataFrame returned by ``pathway_enrichment``.
+    term_num:int
+        Number of top terms kept per cluster.
+    return_table:bool
+        Whether to return pivot/heatmap table instead of plotting.
+    figsize:tuple
+        Figure size for heatmap.
+    plot_title:str
+        Heatmap title.
+    **kwds
+        Additional keyword arguments forwarded to ``sns.heatmap``.
+
     Returns
     -------
-    Any
-        Output produced by `pathway_enrichment_plot`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> ov.single.pathway_enrichment_plot(enrich_res, term_num=20, figsize=(6,8))
+    matplotlib.axes.Axes or pd.DataFrame
+        Heatmap axes, or table when ``return_table=True``.
+
+    Examples:
+        >>> res = pathway_enrichment(adata, pathways_dict)
+        >>> pathway_enrichment_plot(res, term_num=10, return_table=True, figsize=(6,12), cmap='Blues')
     """
 
     celltypes=enrich_res['Cluster'].unique()
@@ -529,6 +523,5 @@ def pathway_enrichment_plot(enrich_res,term_num=5,return_table=False,figsize=(3,
 
     
     return ax
-
 
 

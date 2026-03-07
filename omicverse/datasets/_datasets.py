@@ -121,30 +121,21 @@ DATA_DOWNLOAD_LINK_DICT = {
     related=['datasets.pancreatic_endocrinogenesis', 'datasets.sc_ref_Lymph_Node']
 )
 def download_data(url: str, file_path: Optional[str] = None, dir: str = "./data") -> str:
-    """
-    Download OmicVerse tutorial datasets or resources to local cache with progress and integrity checks
-    
+    """Download a dataset file to local storage.
+
     Parameters
     ----------
-    url : str
-        Input parameter for `download_data`.
-    file_path : Optional[str], optional, default=None
-        Input parameter for `download_data`.
-    dir : str, optional, default="./data"
-        Input parameter for `download_data`.
-    
+    url:str
+        Source URL of the dataset file.
+    file_path:Optional[str]
+        Target filename. If ``None``, the basename of ``url`` is used.
+    dir:str
+        Output directory where file is stored.
+
     Returns
     -------
     str
-        Output produced by `download_data`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> ov.datasets.download_data(url, file_path="pbmc3k.h5ad", dir="data")
+        Absolute/relative local path of downloaded file.
     """
     file_path = ntpath.basename(url) if file_path is None else file_path
     file_path = os.path.join(dir, file_path)
@@ -184,12 +175,17 @@ def download_data(url: str, file_path: Optional[str] = None, dir: str = "./data"
 def get_dataset_url(dataset_name: str, prefer_stanford: bool = True) -> str:
     """Get URL for a dataset by name, preferring Stanford over Figshare.
 
-    Args:
-        dataset_name: Name of the dataset (e.g., 'neuron_splicing').
-        prefer_stanford: Whether to prefer Stanford links over Figshare (default: True).
+    Parameters
+    ----------
+    dataset_name:str
+        Dataset key in ``DATA_DOWNLOAD_LINK_DICT``.
+    prefer_stanford:bool
+        Whether Stanford mirror is preferred over Figshare mirror.
 
-    Returns:
-        URL string for the dataset.
+    Returns
+    -------
+    str
+        Download URL for the requested dataset.
 
     Raises:
         ValueError: If dataset name is not found.
@@ -213,12 +209,17 @@ def get_dataset_url(dataset_name: str, prefer_stanford: bool = True) -> str:
 def get_adata(url: str, filename: Optional[str] = None) -> Optional[AnnData]:
     """Download example data to local folder.
 
-    Args:
-        url: the url of the data.
-        filename: the name of the file to be saved.
+    Parameters
+    ----------
+    url:str
+        Download URL of an ``.h5ad`` or ``.loom`` dataset file.
+    filename:Optional[str]
+        Local filename used for caching.
 
-    Returns:
-        An Annodata object.
+    Returns
+    -------
+    Optional[AnnData]
+        Loaded AnnData object; ``None`` if loading fails.
     """
 
     try:
@@ -255,7 +256,22 @@ def get_adata(url: str, filename: Optional[str] = None) -> Optional[AnnData]:
 
 
 def download_data_requests(url: str, file_path: Optional[str] = None, dir: str = "./data") -> str:
-    """Download data with headers to bypass 403 errors."""
+    """Download data with custom headers to reduce HTTP 403 failures.
+
+    Parameters
+    ----------
+    url:str
+        Source URL of the dataset file.
+    file_path:Optional[str]
+        Target filename. If ``None``, the basename of ``url`` is used.
+    dir:str
+        Output directory where file is stored.
+
+    Returns
+    -------
+    str
+        Local path to downloaded (or cached) file.
+    """
     if not os.path.exists(dir):
         os.makedirs(dir)
 
@@ -480,28 +496,10 @@ def pancreatic_endocrinogenesis(
     url: str = "https://github.com/theislab/scvelo_notebooks/raw/master/data/Pancreas/endocrinogenesis_day15.h5ad",
     filename: Optional[str] = None,
 ) -> AnnData:
-    """
-    Load or download the pancreatic endocrinogenesis reference dataset for developmental trajectory and lineage analyses
-    
-    Parameters
-    ----------
-    url : str, optional, default="https://github.com/theislab/scvelo_notebooks/raw/master/data/Pancreas/endocrinogenesis_day15.h5ad"
-        Input parameter for `pancreatic_endocrinogenesis`.
-    filename : Optional[str], optional, default=None
-        Input parameter for `pancreatic_endocrinogenesis`.
-    
-    Returns
-    -------
-    AnnData
-        Output produced by `pancreatic_endocrinogenesis`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> adata = ov.datasets.pancreatic_endocrinogenesis()
+    """Pancreatic endocrinogenesis. Data from scvelo.
+
+    Pancreatic epithelial and Ngn3-Venus fusion (NVF) cells during secondary transition / embryonic day 15.5.
+    https://dev.biologists.org/content/146/12/dev173849
     """
 
     adata = get_adata(url, filename)
@@ -649,21 +647,21 @@ def blobs(
 
     Parameters
     ----------
-    n_variables
-        Dimension of feature space.
-    n_centers
-        Number of cluster centers.
-    cluster_std
-        Standard deviation of clusters.
-    n_observations
-        Number of observations.
-    random_state
-        Determines random number generation for dataset creation.
+    n_variables:int
+        Feature dimension of generated data.
+    n_centers:int
+        Number of Gaussian cluster centers.
+    cluster_std:float
+        Standard deviation of each Gaussian cluster.
+    n_observations:int
+        Number of synthetic observations (cells).
+    random_state:int
+        Random seed passed to sklearn data generation.
 
     Returns
     -------
-    Annotated data matrix containing a observation annotation 'blobs' that
-    indicates cluster identity.
+    AnnData
+        Synthetic AnnData with ``obs['blobs']`` storing cluster labels.
     """
     print(f"{Colors.HEADER}🎯 Generating Gaussian Blobs dataset{Colors.ENDC}")
     
@@ -900,15 +898,23 @@ def create_mock_dataset(
     """
     Create a mock single-cell dataset for testing statistical functions.
     
-    Arguments:
-        n_cells: Number of cells to simulate.
-        n_genes: Number of genes to simulate.
-        n_cell_types: Number of cell types to simulate.
-        with_clustering: Whether to include clustering preprocessing.
-        random_state: Random seed for reproducibility.
-    
-    Returns:
-        AnnData object with mock single-cell data.
+    Parameters
+    ----------
+    n_cells:int
+        Number of cells simulated in mock dataset.
+    n_genes:int
+        Number of genes simulated in mock dataset.
+    n_cell_types:int
+        Number of synthetic cell types.
+    with_clustering:bool
+        Whether to run lightweight preprocessing and clustering-like fields.
+    random_state:int
+        Random seed for deterministic dataset generation.
+
+    Returns
+    -------
+    AnnData
+        Simulated AnnData with expression matrix and basic metadata fields.
     """
     
     np.random.seed(random_state)
@@ -1031,26 +1037,9 @@ def create_mock_dataset(
 def decov_bulk_covid_bulk(
     filename: str = "COVID_PBMC_bulk.h5ad"
 ) -> AnnData:
-    """
-    Load the bulk RNA-seq cohort used in DeCOV spatial deconvolution examples for cross-platform reference mapping
-    
-    Parameters
-    ----------
-    filename : str, optional, default="COVID_PBMC_bulk.h5ad"
-        Input parameter for `decov_bulk_covid_bulk`.
-    
-    Returns
-    -------
-    AnnData
-        Output produced by `decov_bulk_covid_bulk`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> bulk_df = ov.datasets.decov_bulk_covid_bulk()
+    """COVID-19 PBMC bulk data from Decov et al. 2020.
+
+    This data consists of 10,000 cells × 15,000 genes.
     """
     print(f"{Colors.HEADER}🧬 Loading COVID-19 PBMC bulk data{Colors.ENDC}")
     url = get_dataset_url("COVID_PBMC_bulk")
@@ -1071,26 +1060,9 @@ def decov_bulk_covid_bulk(
 def decov_bulk_covid_single(
     filename: str = "COVID_PBMC_single.h5ad"
 ) -> AnnData:
-    """
-    Load the single-cell reference cohort paired with DeCOV bulk data for cell-type signature derivation and transfer
-    
-    Parameters
-    ----------
-    filename : str, optional, default="COVID_PBMC_single.h5ad"
-        Input parameter for `decov_bulk_covid_single`.
-    
-    Returns
-    -------
-    AnnData
-        Output produced by `decov_bulk_covid_single`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> adata_sc = ov.datasets.decov_bulk_covid_single()
+    """COVID-19 PBMC single-cell data from Decov et al. 2020.
+
+    This data consists of 10,000 cells × 15,000 genes.
     """
     print(f"{Colors.HEADER}🧬 Loading COVID-19 PBMC single-cell data{Colors.ENDC}")
     url = get_dataset_url("COVID_PBMC_single")
@@ -1112,28 +1084,9 @@ def sc_ref_Lymph_Node(
     url: str = "https://cell2location.cog.sanger.ac.uk/paper/integrated_lymphoid_organ_scrna/RegressionNBV4Torch_57covariates_73260cells_10237genes/sc.h5ad",
     filename: str = "sc_ref_Lymph_Node.h5ad"
 ) -> AnnData:
-    """
-    Load a lymph-node single-cell reference dataset for immune-cell annotation and spatial deconvolution benchmarking
+    """SC reference data for Lymph Node.
     
-    Parameters
-    ----------
-    url : str, optional, default="https://cell2location.cog.sanger.ac.uk/paper/integrated_lymphoid_organ_scrna/RegressionNBV4Torch_57covariates_73260cells_10237genes/sc.h5ad"
-        Input parameter for `sc_ref_Lymph_Node`.
-    filename : str, optional, default="sc_ref_Lymph_Node.h5ad"
-        Input parameter for `sc_ref_Lymph_Node`.
-    
-    Returns
-    -------
-    AnnData
-        Output produced by `sc_ref_Lymph_Node`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> adata_ref = ov.datasets.sc_ref_Lymph_Node()
+    This data consists of 10,000 cells × 15,000 genes.
     """
     print(f"{Colors.HEADER}🧬 Loading SC reference data for Lymph Node{Colors.ENDC}")
     adata = get_adata(url, filename)
@@ -1147,11 +1100,15 @@ def pbmc3k(processed: bool = False) -> AnnData:
     3k PBMCs from 10x Genomics. Downloads directly from public URLs,
     falls back to mock data generation if URLs are unavailable.
     
-    Arguments:
-        processed: Whether to load processed version with clustering (default: True)
+    Parameters
+    ----------
+    processed:bool
+        If ``True``, load processed PBMC3k file; otherwise load raw matrix.
     
-    Returns:
-        AnnData object with PBMC 3k data
+    Returns
+    -------
+    AnnData
+        PBMC3k AnnData, with mock fallback if remote download fails.
     """
     try:
         if processed:
@@ -1185,8 +1142,10 @@ def bhattacherjee(processed: bool = True) -> AnnData:
     collected at three time points: Maintenance, 48h after cocaine withdrawal and
     15 days after cocaine withdrawal.
 
-    Args:
-        processed: If True, returns processed data. If False, returns raw data.
+    Parameters
+    ----------
+    processed:bool
+        Whether to return processed-style fallback mock data on failure.
 
     References:
         Bhattacherjee A, Djekidel MN, Chen R, Chen W, Tuesta LM, Zhang Y. Cell
@@ -1194,8 +1153,10 @@ def bhattacherjee(processed: bool = True) -> AnnData:
         adolescence and addiction. Nat Commun. 2019 Sep 13;10(1):4169.
         doi: 10.1038/s41467-019-12054-3. PMID: 31519873; PMCID: PMC6744514.
 
-    Returns:
-        :class:`~anndata.AnnData` object of a single-cell RNA seq dataset
+    Returns
+    -------
+    AnnData
+        Single-cell RNA-seq dataset from Bhattacherjee et al. or mock fallback.
 
     Examples:
         >>> import omicverse as ov

@@ -166,77 +166,69 @@ def ref(
     **kwargs
 ) -> Dict[str, str]:
     """
-    Build a kallisto|bustools-compatible reference index and transcript-to-gene map from FASTA/GTF resources for RNA-seq quantification
-    
+    Build kallisto index and transcript-to-gene mapping files via ``kb ref``.
+
     Parameters
     ----------
-    index_path : str
-        Input parameter for `ref`.
-    t2g_path : str
-        Input parameter for `ref`.
-    fasta_paths : Optional[Union[str, List[str]]], optional, default=None
-        Input parameter for `ref`.
-    gtf_paths : Optional[Union[str, List[str]]], optional, default=None
-        Input parameter for `ref`.
-    cdna_path : Optional[str], optional, default=None
-        Input parameter for `ref`.
-    workflow : str, optional, default='standard'
-        Input parameter for `ref`.
-    d : Optional[str], optional, default=None
-        Input parameter for `ref`.
-    k : Optional[int], optional, default=None
-        Input parameter for `ref`.
-    threads : int, optional, default=8
-        Input parameter for `ref`.
-    overwrite : bool, optional, default=False
-        Input parameter for `ref`.
-    temp_dir : str, optional, default='tmp'
-        Input parameter for `ref`.
-    make_unique : bool, optional, default=False
-        Input parameter for `ref`.
-    include : Optional[List[Dict[str, str]]], optional, default=None
-        Input parameter for `ref`.
-    exclude : Optional[List[Dict[str, str]]], optional, default=None
-        Input parameter for `ref`.
-    dlist : Optional[str], optional, default=None
-        Input parameter for `ref`.
-    dlist_overhang : int, optional, default=1
-        Input parameter for `ref`.
-    aa : bool, optional, default=False
-        Input parameter for `ref`.
-    max_ec_size : Optional[int], optional, default=None
-        Input parameter for `ref`.
-    nucleus : bool, optional, default=False
-        Input parameter for `ref`.
-    f2 : Optional[str], optional, default=None
-        Input parameter for `ref`.
-    c1 : Optional[str], optional, default=None
-        Input parameter for `ref`.
-    c2 : Optional[str], optional, default=None
-        Input parameter for `ref`.
-    flank : Optional[int], optional, default=None
-        Input parameter for `ref`.
-    feature : Optional[str], optional, default=None
-        Input parameter for `ref`.
-    no_mismatches : bool, optional, default=False
-        Input parameter for `ref`.
-    distinguish : bool, optional, default=False
-        Input parameter for `ref`.
-    **kwargs : Any
-        Input parameter for `ref`.
-    
+    index_path:str
+        Output path for generated kallisto index file.
+    t2g_path:str
+        Output path for transcript-to-gene mapping table.
+    fasta_paths:str|list[str]|None, optional
+        Input transcript/genome FASTA file(s) used to build the reference.
+    gtf_paths:str|list[str]|None, optional
+        Input GTF annotation file(s) aligned with ``fasta_paths``.
+    cdna_path:str|None, optional
+        Optional cDNA FASTA output path required by some workflows.
+    workflow:str, optional
+        kb workflow mode (for example ``standard``, ``nucleus``, ``lamanno``, ``kite``).
+    d:str|None, optional
+        Prebuilt reference bundle shortcut (``kb ref -d``).
+    k:int|None, optional
+        K-mer length for kallisto index construction.
+    threads:int, optional
+        Number of threads for ``kb`` execution.
+    overwrite:bool, optional
+        Whether to overwrite existing output files.
+    temp_dir:str, optional
+        Temporary directory root for kb intermediate files.
+    make_unique:bool, optional
+        Make feature IDs unique when duplicate names are detected.
+    include:list[dict[str,str]]|None, optional
+        Attribute filters to include specific transcript/gene records.
+    exclude:list[dict[str,str]]|None, optional
+        Attribute filters to exclude records.
+    dlist:str|None, optional
+        Decoy list file for selective-alignment workflows.
+    dlist_overhang:int, optional
+        Overhang length used when generating decoy targets.
+    aa:bool, optional
+        Enable amino-acid mode where supported by kb workflow.
+    max_ec_size:int|None, optional
+        Maximum equivalence-class size for index generation.
+    nucleus:bool, optional
+        Shortcut to switch from ``standard`` to ``nucleus`` workflow.
+    f2:str|None, optional
+        Secondary FASTA output/input path for nucleus/velocity workflows.
+    c1:str|None, optional
+        Spliced transcript capture output path for velocity workflows.
+    c2:str|None, optional
+        Intronic transcript capture output path for velocity workflows.
+    flank:int|None, optional
+        Flanking sequence length for selected workflows.
+    feature:str|None, optional
+        Feature FASTA path used by ``kite`` workflow.
+    no_mismatches:bool, optional
+        Disable mismatches for feature barcoding workflows.
+    distinguish:bool, optional
+        Distinguish overlapping features when supported by kb.
+    **kwargs
+        Additional kb flags passed through (for example ``kallisto``, ``bustools``, ``opt_off``).
+
     Returns
     -------
-    Dict[str, str]
-        Output produced by `ref`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> ov.alignment.single.ref(index_path="index.idx", t2g_path="t2g.tsv", fasta_paths=["transcripts.fa"], gtf_paths=["genes.gtf"])
+    dict[str,str]
+        Metadata dictionary with workflow info and generated output paths.
     """
     print(f"[kb ref] Starting ref workflow: {workflow}", flush=True)
 
@@ -445,107 +437,99 @@ def count(
     **kwargs
 ) -> Dict[str, str]:
     """
-    Quantify gene expression matrices from FASTQ data using a prebuilt kallisto|bustools reference and sequencing technology presets
-    
+    Quantify expression matrices from FASTQ files via ``kb count``.
+
     Parameters
     ----------
-    index_path : str
-        Input parameter for `count`.
-    t2g_path : str
-        Input parameter for `count`.
-    technology : str
-        Input parameter for `count`.
-    fastq_paths : Union[str, List[str]]
-        Input parameter for `count`.
-    output_path : str, optional, default='.'
-        Input parameter for `count`.
-    whitelist_path : Optional[str], optional, default=None
-        Input parameter for `count`.
-    replacement_path : Optional[str], optional, default=None
-        Input parameter for `count`.
-    threads : int, optional, default=8
-        Input parameter for `count`.
-    memory : str, optional, default='2G'
-        Input parameter for `count`.
-    workflow : str, optional, default='standard'
-        Input parameter for `count`.
-    overwrite : bool, optional, default=False
-        Input parameter for `count`.
-    temp_dir : str, optional, default='tmp'
-        Input parameter for `count`.
-    tcc : bool, optional, default=False
-        Input parameter for `count`.
-    mm : bool, optional, default=False
-        Input parameter for `count`.
-    filter_barcodes : bool, optional, default=False
-        Input parameter for `count`.
-    filter_threshold : Optional[int], optional, default=None
-        Input parameter for `count`.
-    loom : bool, optional, default=False
-        Input parameter for `count`.
-    loom_names : Optional[Union[str, List[str]]], optional, default=None
-        Input parameter for `count`.
-    h5ad : bool, optional, default=False
-        Input parameter for `count`.
-    cellranger : bool, optional, default=False
-        Input parameter for `count`.
-    gene_names : bool, optional, default=False
-        Input parameter for `count`.
-    report : bool, optional, default=False
-        Input parameter for `count`.
-    strand : Optional[str], optional, default=None
-        Input parameter for `count`.
-    parity : Optional[str], optional, default=None
-        Input parameter for `count`.
-    fragment_l : Optional[int], optional, default=None
-        Input parameter for `count`.
-    fragment_s : Optional[int], optional, default=None
-        Input parameter for `count`.
-    bootstraps : Optional[int], optional, default=None
-        Input parameter for `count`.
-    em : bool, optional, default=False
-        Input parameter for `count`.
-    aa : bool, optional, default=False
-        Input parameter for `count`.
-    genomebam : bool, optional, default=False
-        Input parameter for `count`.
-    inleaved : bool, optional, default=False
-        Input parameter for `count`.
-    batch_barcodes : bool, optional, default=False
-        Input parameter for `count`.
-    exact_barcodes : bool, optional, default=False
-        Input parameter for `count`.
-    numreads : Optional[int], optional, default=None
-        Input parameter for `count`.
-    store_num : bool, optional, default=False
-        Input parameter for `count`.
-    long_read : bool, optional, default=False
-        Input parameter for `count`.
-    threshold : float, optional, default=0.8
-        Input parameter for `count`.
-    platform : str, optional, default='ONT'
-        Input parameter for `count`.
-    c1 : Optional[str], optional, default=None
-        Input parameter for `count`.
-    c2 : Optional[str], optional, default=None
-        Input parameter for `count`.
-    nucleus : bool, optional, default=False
-        Input parameter for `count`.
-    **kwargs : Any
-        Input parameter for `count`.
-    
+    index_path:str
+        Path to kallisto index produced by ``kb ref``.
+    t2g_path:str
+        Transcript-to-gene mapping table used for gene-level aggregation.
+    technology:str
+        Sequencing technology preset (for example ``10XV3``, ``BULK``).
+    fastq_paths:str|list[str]
+        One or more FASTQ file paths passed to kb count.
+    output_path:str, optional
+        Output directory for count matrices and intermediate files.
+    whitelist_path:str|None, optional
+        Optional custom barcode whitelist.
+    replacement_path:str|None, optional
+        Optional barcode replacement file.
+    threads:int, optional
+        Number of threads used by kb.
+    memory:str, optional
+        Memory request string passed to kb (for example ``2G``).
+    workflow:str, optional
+        kb workflow mode (``standard``, ``nucleus``, ``lamanno`` etc.).
+    overwrite:bool, optional
+        Whether to overwrite existing output directory contents.
+    temp_dir:str, optional
+        Temporary directory root for kb intermediate files.
+    tcc:bool, optional
+        Output transcript compatibility counts instead of gene matrix.
+    mm:bool, optional
+        Use memory-mapped mode when supported.
+    filter_barcodes:bool, optional
+        Enable barcode filtering (not valid for ``technology='BULK'``).
+    filter_threshold:int|None, optional
+        Barcode filter threshold used by bustools filtering.
+    loom:bool, optional
+        Export loom matrix.
+    loom_names:str|list[str]|None, optional
+        Custom loom row/column naming behavior.
+    h5ad:bool, optional
+        Export H5AD matrix output.
+    cellranger:bool, optional
+        Emit Cell Ranger-compatible output structure.
+    gene_names:bool, optional
+        Prefer gene symbols over IDs when possible.
+    report:bool, optional
+        Generate additional kb report files.
+    strand:str|None, optional
+        Strand option for long-read/technology-specific modes.
+    parity:str|None, optional
+        Read parity setting for specific technologies.
+    fragment_l:int|None, optional
+        Mean fragment length for bulk-like protocols.
+    fragment_s:int|None, optional
+        Fragment length standard deviation.
+    bootstraps:int|None, optional
+        Number of kallisto bootstrap rounds.
+    em:bool, optional
+        Enable EM optimization.
+    aa:bool, optional
+        Enable amino-acid mode where supported.
+    genomebam:bool, optional
+        Request genome BAM generation (version-dependent support).
+    inleaved:bool, optional
+        Treat reads as interleaved input.
+    batch_barcodes:bool, optional
+        Enable batched barcode handling.
+    exact_barcodes:bool, optional
+        Require exact barcode matching.
+    numreads:int|None, optional
+        Limit number of reads processed.
+    store_num:bool, optional
+        Store BUS record counts in output metadata.
+    long_read:bool, optional
+        Enable long-read mode.
+    threshold:float, optional
+        Long-read assignment threshold.
+    platform:str, optional
+        Long-read platform label (for example ``ONT``).
+    c1:str|None, optional
+        Spliced capture file path for velocity workflows.
+    c2:str|None, optional
+        Intronic capture file path for velocity workflows.
+    nucleus:bool, optional
+        Shortcut to switch workflow from ``standard`` to ``nucleus``.
+    **kwargs
+        Extra kb flags forwarded verbatim.
+
     Returns
     -------
-    Dict[str, str]
-        Output produced by `count`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> ov.alignment.single.count(index_path="index.idx", t2g_path="t2g.tsv", technology="10XV3", fastq_paths=["R1.fastq.gz", "R2.fastq.gz"], output_path="./kb_out")
+    dict[str,str]
+        Metadata dictionary including workflow settings and discovered output files.
     """
     print(f"[kb count] Starting count workflow: {workflow}", flush=True)
     print(f"[kb count] Technology: {technology}", flush=True)
@@ -824,42 +808,37 @@ def parallel_fastq_dump(
     gzip: bool = False,
     **kwargs
 ) -> Dict[str, Union[str, int]]:
-    """
-    Download SRA data in parallel using parallel-fastq-dump
-    
+    r"""Download SRA data in parallel using parallel-fastq-dump.
+
+    This function wraps the parallel-fastq-dump tool to download sequencing data
+    from NCBI SRA (Sequence Read Archive) in parallel for faster downloads.
+
     Parameters
     ----------
-    sra_id : str
-        Input parameter for `parallel_fastq_dump`.
-    threads : int, optional, default=1
-        Input parameter for `parallel_fastq_dump`.
-    outdir : str, optional, default='.'
-        Input parameter for `parallel_fastq_dump`.
-    tmpdir : Optional[str], optional, default=None
-        Input parameter for `parallel_fastq_dump`.
-    min_spot_id : int, optional, default=1
-        Input parameter for `parallel_fastq_dump`.
-    max_spot_id : Optional[int], optional, default=None
-        Input parameter for `parallel_fastq_dump`.
-    split_files : bool, optional, default=False
-        Input parameter for `parallel_fastq_dump`.
-    gzip : bool, optional, default=False
-        Input parameter for `parallel_fastq_dump`.
-    **kwargs : Any
-        Input parameter for `parallel_fastq_dump`.
-    
+    sra_id:str
+        SRA accession ID (for example ``SRR2244401``).
+    threads:int, optional
+        Number of parallel threads used by ``parallel-fastq-dump``.
+    outdir:str, optional
+        Output directory for downloaded FASTQ files.
+    tmpdir:str|None, optional
+        Temporary directory for chunk/intermediate files.
+    min_spot_id:int, optional
+        Minimum SRA spot ID to download.
+    max_spot_id:int|None, optional
+        Maximum SRA spot ID to download. ``None`` downloads all remaining spots.
+    split_files:bool, optional
+        Split paired-end reads into separate ``*_1``/``*_2`` FASTQ files.
+    gzip:bool, optional
+        Compress output FASTQ files using gzip.
+    **kwargs
+        Additional flags passed through to ``parallel-fastq-dump``.
+
     Returns
     -------
-    Dict[str, Union[str, int]]
-        Output produced by `parallel_fastq_dump`.
-    
-    Notes
-    -----
-    This docstring follows the unified OmicVerse help template.
-    
-    Examples
-    --------
-    >>> # Download SRA data with 4 threads
+    dict[str,str|int]
+        Download metadata including input parameters and discovered output FASTQ paths.
+
     Examples:
         >>> import omicverse as ov
         >>> # Download SRA data with 4 threads and split files

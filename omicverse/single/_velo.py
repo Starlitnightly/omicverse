@@ -4,9 +4,9 @@ from .._registry import register_function
 
 
 @register_function(
-    aliases=['RNA velocity分析器', 'Velo', 'velocity pipeline', 'dynamo scvelo wrapper'],
+    aliases=['RNA velocity分析器', 'Velo', 'RNA velocity pipeline', 'dynamo scvelo wrapper', '细胞状态转变速度分析'],
     category="single",
-    description="Unified RNA velocity workflow wrapper supporting dynamo, scvelo, latentvelo and graphvelo backends for dynamic cell-state transition analysis.",
+    description="Unified RNA velocity workflow supporting dynamo, scvelo, latentvelo and graphvelo to infer transcriptional state transitions and directional trajectories.",
     prerequisites={'optional_functions': ['pp.preprocess', 'pp.neighbors']},
     requires={'layers': ['spliced/unspliced or counts'], 'obsm': ['X_umap (recommended)']},
     produces={'layers': ['velocity-related layers'], 'obsm': ['velocity embeddings'], 'uns': ['velocity graphs']},
@@ -16,21 +16,18 @@ from .._registry import register_function
 )
 class Velo:
     """
-    Unified RNA velocity workflow wrapper supporting dynamo, scvelo, latentvelo and graphvelo backends for dynamic cell-state transition analysis
+    RNA velocity analysis wrapper for directional cell-state transition inference.
     
     Parameters
     ----------
-    adata : Any
-        Configuration argument used when constructing `Velo`.
+    adata : AnnData
+        AnnData containing spliced/unspliced layers (or backend-compatible count layers)
+        and low-dimensional embeddings.
     
     Returns
     -------
     None
-        Initialize the class instance.
-    
-    Notes
-    -----
-    This class docstring follows the unified OmicVerse help template.
+        Initializes velocity workflow state.
     
     Examples
     --------
@@ -43,21 +40,12 @@ class Velo:
 
     def run(self):
         """
-        Print a quick summary of the current velocity input AnnData
-        
-        Parameters
-        ----------
-        None
-            This callable does not require explicit parameters.
-        
+        Print a quick diagnostic summary for velocity input data.
+
         Returns
         -------
-        Any
-            Output produced by `run`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Prints basic matrix size and expression statistics.
         """
         print(f"{Colors.HEADER}{Colors.BOLD}{EMOJI['start']} Vela Analysis Initialization:{Colors.ENDC}")
         print(f"   {Colors.CYAN}Input data shape: {Colors.BOLD}{self.adata.shape[0]} cells × {self.adata.shape[1]} genes{Colors.ENDC}")
@@ -67,23 +55,23 @@ class Velo:
 
     def filter_genes(self,min_shared_counts=20,**kwargs):
         """
-        Filter genes for velocity analysis using scVelo gene filtering
-        
+        Filter genes for velocity modeling using scVelo shared-count criteria.
+
         Parameters
         ----------
-        min_shared_counts : Any, optional, default=20
-            Input parameter for `filter_genes`.
-        **kwargs : Any
-            Input parameter for `filter_genes`.
-        
+        min_shared_counts : int
+            Minimum shared spliced/unspliced counts required to keep a gene.
+        **kwargs
+            Additional keyword arguments forwarded to ``scvelo.pp.filter_genes``.
+
         Returns
         -------
-        Any
-            Output produced by `filter_genes`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Updates ``self.adata`` in-place.
+
+        Examples
+        --------
+        >>> velo.filter_genes(min_shared_counts=20)
         """
         from scvelo.pp import filter_genes
         filter_genes(self.adata,min_shared_counts=min_shared_counts,**kwargs)
@@ -93,27 +81,27 @@ class Velo:
                    n_pcs=30,
                    **kwargs):
         """
-        Run dynamo preprocessing and build a neighborhood graph
-        
+        Preprocess expression data before velocity estimation.
+
         Parameters
         ----------
-        recipe : Any, optional, default='monocle'
-            Input parameter for `preprocess`.
-        n_neighbors : Any, optional, default=30
-            Input parameter for `preprocess`.
-        n_pcs : Any, optional, default=30
-            Input parameter for `preprocess`.
-        **kwargs : Any
-            Input parameter for `preprocess`.
-        
+        recipe : str
+            Dynamo preprocessing recipe (for example ``'monocle'``).
+        n_neighbors : int
+            Number of neighbors for the graph built after preprocessing.
+        n_pcs : int
+            Number of principal components for neighbor graph construction.
+        **kwargs
+            Additional keyword arguments passed to ``dynamo.pp.Preprocessor``.
+
         Returns
         -------
-        Any
-            Output produced by `preprocess`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Writes preprocessing outputs to ``self.adata``.
+
+        Examples
+        --------
+        >>> velo.preprocess(recipe='monocle', n_neighbors=30, n_pcs=30)
         """
         import dynamo as dyn 
         preprocessor = dyn.pp.Preprocessor(cell_cycle_score_enable=True,**kwargs)
@@ -123,27 +111,27 @@ class Velo:
 
     def moments(self,backend='dynamo',n_pcs=30,n_neighbors=30,**kwargs):
         """
-        Compute first/second order moments for selected velocity backend
-        
+        Compute neighborhood moments required by RNA velocity models.
+
         Parameters
         ----------
-        backend : Any, optional, default='dynamo'
-            Input parameter for `moments`.
-        n_pcs : Any, optional, default=30
-            Input parameter for `moments`.
-        n_neighbors : Any, optional, default=30
-            Input parameter for `moments`.
-        **kwargs : Any
-            Input parameter for `moments`.
-        
+        backend : {'dynamo', 'scvelo'}
+            Backend used to compute moments.
+        n_pcs : int
+            Number of principal components.
+        n_neighbors : int
+            Number of neighbors used in moment estimation.
+        **kwargs
+            Additional backend-specific options.
+
         Returns
         -------
-        Any
-            Output produced by `moments`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Stores moments in ``adata.layers``.
+
+        Examples
+        --------
+        >>> velo.moments(backend='dynamo')
         """
         if backend == 'dynamo':
             import dynamo as dyn 
@@ -158,23 +146,23 @@ class Velo:
     
     def dynamics(self,backend='dynamo',**kwargs):
         """
-        Fit transcriptional dynamics model for the selected backend
-        
+        Fit transcriptional dynamics parameters for velocity inference.
+
         Parameters
         ----------
-        backend : Any, optional, default='dynamo'
-            Input parameter for `dynamics`.
-        **kwargs : Any
-            Input parameter for `dynamics`.
-        
+        backend : {'dynamo', 'scvelo'}
+            Backend used to estimate kinetics.
+        **kwargs
+            Additional arguments passed to backend fitting functions.
+
         Returns
         -------
-        Any
-            Output produced by `dynamics`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Stores fitted parameters in ``self.adata``.
+
+        Examples
+        --------
+        >>> velo.dynamics(backend='scvelo')
         """
         if backend == 'dynamo':
             import dynamo as dyn 
@@ -199,37 +187,38 @@ class Velo:
         **kwargs
     ):
         """
-        Estimate RNA velocity vectors and store them in ``adata.layers``
-        
+        Estimate RNA velocity vectors and write them into AnnData.
+
         Parameters
         ----------
-        method : Any, optional, default='dynamo'
-            Input parameter for `cal_velocity`.
-        batch_key : Any, optional, default=None
-            Input parameter for `cal_velocity`.
-        celltype_key : Any, optional, default=None
-            Input parameter for `cal_velocity`.
-        velocity_key : Any, optional, default='velocity_S'
-            Input parameter for `cal_velocity`.
-        n_jobs : Any, optional, default=1
-            Input parameter for `cal_velocity`.
-        n_top_genes : Any, optional, default=2000
-            Input parameter for `cal_velocity`.
-        param_name_key : Any, optional, default='tmp/latentvelo_params'
-            Input parameter for `cal_velocity`.
-        latentvelo_VAE_kwargs : Any, optional, default={}
-            Input parameter for `cal_velocity`.
-        **kwargs : Any
-            Input parameter for `cal_velocity`.
-        
+        method : {'dynamo', 'scvelo', 'latentvelo', 'graphvelo'}
+            Velocity estimation strategy.
+        batch_key : str or None
+            Batch key used by latentvelo.
+        celltype_key : str or None
+            Cell-type key used by latentvelo.
+        velocity_key : str
+            Output velocity layer key.
+        n_jobs : int
+            Number of jobs used by graphvelo.
+        n_top_genes : int
+            Number of top genes used by latentvelo.
+        param_name_key : str
+            Directory/key to store latentvelo parameters.
+        latentvelo_VAE_kwargs : dict
+            Extra arguments for latentvelo VAE construction.
+        **kwargs
+            Additional backend-specific options.
+
         Returns
         -------
-        Any
-            Output produced by `cal_velocity`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Writes velocity outputs to ``self.adata.layers``/``.obsm``/``.var``.
+
+        Examples
+        --------
+        >>> velo.cal_velocity(method='dynamo')
+        >>> velo.cal_velocity(method='graphvelo', n_jobs=4)
         """
         
         if method == 'dynamo':
@@ -290,31 +279,31 @@ class Velo:
         **kwargs
     ):
         """
-        Refine velocity fields with GraphVelo and project to embeddings
-        
+        Refine velocity vectors with GraphVelo and project to selected embeddings.
+
         Parameters
         ----------
-        xkey : Any, optional, default='Ms'
-            Input parameter for `graphvelo`.
-        vkey : Any, optional, default='velocity_S'
-            Input parameter for `graphvelo`.
-        n_jobs : Any, optional, default=1
-            Input parameter for `graphvelo`.
-        basis_keys : Any, optional, default=['X_umap','X_pca']
-            Input parameter for `graphvelo`.
-        gene_subset : Any, optional, default=None
-            Input parameter for `graphvelo`.
-        **kwargs : Any
-            Input parameter for `graphvelo`.
-        
+        xkey : str
+            Layer key containing expression moments used as model input.
+        vkey : str
+            Layer key containing initial velocity vectors.
+        n_jobs : int
+            Number of CPU jobs for GraphVelo training.
+        basis_keys : list of str
+            Embedding keys in ``adata.obsm`` to project refined velocity onto.
+        gene_subset : list of str or None
+            Gene subset used by GraphVelo; if ``None``, backend default is used.
+        **kwargs
+            Additional arguments passed to ``GraphVelo``.
+
         Returns
         -------
-        Any
-            Output produced by `graphvelo`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Stores refined velocity in ``adata.layers['velocity_gv']`` and projected vectors in ``adata.obsm``.
+
+        Examples
+        --------
+        >>> velo.graphvelo(xkey='Ms', vkey='velocity_S', basis_keys=['X_umap'])
         """
         from ..external.graphvelo.graph_velocity import GraphVelo
         from ..external.graphvelo.utils import adj_to_knn
@@ -335,50 +324,50 @@ class Velo:
 
     def velocity_graph(self,basis='umap',vkey='velocity_S',**kwargs):
         """
-        Construct velocity graph from precomputed velocity vectors
-        
+        Build a velocity transition graph from precomputed velocity vectors.
+
         Parameters
         ----------
-        basis : Any, optional, default='umap'
-            Input parameter for `velocity_graph`.
-        vkey : Any, optional, default='velocity_S'
-            Input parameter for `velocity_graph`.
-        **kwargs : Any
-            Input parameter for `velocity_graph`.
-        
+        basis : str
+            Embedding basis used by scVelo graph construction.
+        vkey : str
+            Velocity layer key.
+        **kwargs
+            Additional arguments forwarded to ``scvelo.tl.velocity_graph``.
+
         Returns
         -------
-        Any
-            Output produced by `velocity_graph`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Writes velocity graph to ``adata.uns``/``adata.obsp``.
+
+        Examples
+        --------
+        >>> velo.velocity_graph(basis='umap', vkey='velocity_S')
         """
         import scvelo as scv
         scv.tl.velocity_graph(self.adata, vkey=vkey, **kwargs)
     
     def velocity_embedding(self,basis='umap',vkey='velocity_S',**kwargs):   
         """
-        Project velocity vectors onto a low-dimensional embedding
-        
+        Project velocity vectors onto a low-dimensional embedding.
+
         Parameters
         ----------
-        basis : Any, optional, default='umap'
-            Input parameter for `velocity_embedding`.
-        vkey : Any, optional, default='velocity_S'
-            Input parameter for `velocity_embedding`.
-        **kwargs : Any
-            Input parameter for `velocity_embedding`.
-        
+        basis : str
+            Embedding basis name (for example ``'umap'``).
+        vkey : str
+            Velocity layer key.
+        **kwargs
+            Additional arguments forwarded to ``scvelo.tl.velocity_embedding``.
+
         Returns
         -------
-        Any
-            Output produced by `velocity_embedding`.
-        
-        Notes
-        -----
-        This docstring follows the unified OmicVerse help template.
+        None
+            Writes projected vectors to ``adata.obsm``.
+
+        Examples
+        --------
+        >>> velo.velocity_embedding(basis='umap', vkey='velocity_S')
         """
         import scvelo as scv
         scv.tl.velocity_embedding(self.adata, basis=basis, vkey=vkey, **kwargs)
@@ -386,6 +375,22 @@ class Velo:
 
 
     def _graphvelo_cal(self,backend='dynamo',xkey='Ms',vkey='velocity_S',n_jobs=1,**kwargs):
+        """
+        Internal helper to run GraphVelo refinement from selected backend outputs.
+
+        Parameters
+        ----------
+        backend : {'dynamo', 'scvelo'}
+            Source backend used to initialize velocity inputs.
+        xkey : str
+            Expression layer key used by GraphVelo.
+        vkey : str
+            Velocity layer key to overwrite with refined velocity.
+        n_jobs : int
+            Number of CPU jobs for GraphVelo training.
+        **kwargs
+            Additional keyword arguments forwarded to ``GraphVelo``.
+        """
         from ..external.graphvelo.graph_velocity import GraphVelo
         from ..external.graphvelo.utils import mack_score, adj_to_knn
         if backend == 'dynamo':
@@ -413,6 +418,26 @@ class Velo:
         latentvelo_VAE_kwargs={},
         use_rep=None,
         **kwargs):
+        """
+        Internal helper to train latentvelo and export velocity outputs.
+
+        Parameters
+        ----------
+        param_name_key : str
+            Directory used to store latentvelo training artifacts.
+        velocity_key : str
+            Velocity key prefix used for marker-gene flags.
+        celltype_key : str or None
+            Optional cell-type annotation key for AnnotVAE mode.
+        batch_key : str or None
+            Optional batch key used in latentvelo preprocessing.
+        latentvelo_VAE_kwargs : dict
+            Additional keyword arguments for VAE/AnnotVAE initialization.
+        use_rep : str or None
+            Representation key used in latentvelo preprocessing.
+        **kwargs
+            Additional training arguments passed to latentvelo ``train``.
+        """
         try:
             import torchdiffeq
         except:
@@ -488,7 +513,20 @@ from scipy.sparse import issparse
 
 # TODO: Addd docstrings
 def quiver_autoscale(X_emb, V_emb):
-    """TODO."""
+    """Estimate a quiver scale factor from embedding coordinates and vectors.
+
+    Parameters
+    ----------
+    X_emb : array-like
+        Embedding coordinates with shape ``(n_cells, 2)``.
+    V_emb : array-like
+        Velocity vectors projected into embedding space.
+
+    Returns
+    -------
+    float
+        Suggested quiver scale normalized to embedding magnitude.
+    """
     import matplotlib.pyplot as pl
 
     scale_factor = np.abs(X_emb).max()  # just so that it handles very large values
@@ -540,34 +578,30 @@ def velocity_embedding(
 
     Parameters
     ----------
-    data: :class:`~anndata.AnnData`
-        Annotated data matrix.
-    basis: `str` (default: `'tsne'`)
-        Which embedding to use.
-    vkey: `str` (default: `'velocity'`)
-        Name of velocity estimates to be used.
-    scale: `int` (default: 10)
-        Scale parameter of gaussian kernel for transition matrix.
-    self_transitions: `bool` (default: `True`)
-        Whether to allow self transitions, based on the confidences of transitioning to
-        neighboring cells.
-    use_negative_cosines: `bool` (default: `True`)
-        Whether to project cell-to-cell transitions with negative cosines into
-        negative/opposite direction.
-    direct_pca_projection: `bool` (default: `None`)
-        Whether to directly project the velocities into PCA space,
-        thus skipping the velocity graph.
-    retain_scale: `bool` (default: `False`)
-        Whether to retain scale from high dimensional space in embedding.
-    autoscale: `bool` (default: `True`)
-        Whether to scale the embedded velocities by a scalar multiplier,
-        which simply ensures that the arrows in the embedding are properly scaled.
-    all_comps: `bool` (default: `True`)
-        Whether to compute the velocities on all embedding components.
-    T: `csr_matrix` (default: `None`)
-        Allows the user to directly pass a transition matrix.
-    copy: `bool` (default: `False`)
-        Return a copy instead of writing to `adata`.
+    data : AnnData
+        AnnData containing precomputed velocity layers and embeddings.
+    basis : str or None
+        Embedding basis key without ``X_`` prefix (for example ``'umap'``).
+    vkey : str
+        Layer key storing velocity matrix.
+    scale : int
+        Gaussian-kernel scale used in transition matrix construction.
+    self_transitions : bool
+        Whether to allow self transitions in transition matrix.
+    use_negative_cosines : bool
+        Whether negative cosine transitions contribute opposite-direction vectors.
+    direct_pca_projection : bool or None
+        Whether to directly project velocity to PCA space without graph-based transport.
+    retain_scale : bool
+        Whether to keep high-dimensional scale in projected velocities.
+    autoscale : bool
+        Whether to automatically rescale projected velocity vectors.
+    all_comps : bool
+        Whether to use all embedding components.
+    T : csr_matrix or None
+        Optional precomputed transition matrix.
+    copy : bool
+        Whether to return a copied AnnData instead of in-place update.
 
     Returns
     -------
