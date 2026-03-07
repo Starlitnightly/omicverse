@@ -97,3 +97,4 @@ from ._datasets import (
     pbmc8k,
     seqfish,
 )
+from ._signatures import load_signatures_from_file, predefined_signatures
