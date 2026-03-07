@@ -72,6 +72,7 @@ _LAZY_MODULES = {
     'space',
     'pl',
     'utils',
+    'io',
     'datasets',
     'external',
     'llm',
@@ -81,8 +82,8 @@ _LAZY_MODULES = {
 
 # Lazy attribute mappings: {attribute_name: (module_path, attr_name)}
 _LAZY_ATTRS = {
-    # From utils._data - MAJOR BOTTLENECK (4.5s)!
-    'read': ('.utils._data', 'read'),
+    # From io.single
+    'read': ('.io.single', 'read'),
 
     # From utils._plot - Lightweight, but let's be lazy
     'palette': ('.utils._plot', 'palette'),
