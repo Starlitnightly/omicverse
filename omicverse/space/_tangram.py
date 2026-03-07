@@ -63,6 +63,19 @@ class Tangram(object):
     3. Projecting cell type annotations to spatial coordinates
     4. Optionally imputing full gene expression profiles
 
+    Parameters
+    ----------
+    adata_sc : AnnData
+        Single-cell reference AnnData with cell-type labels.
+    adata_sp : AnnData
+        Spatial AnnData to receive projected cell-type information.
+    clusters : str, default=''
+        Cell-type column name in ``adata_sc.obs``.
+    marker_size : int, default=100
+        Number of marker genes selected per cell type for mapping.
+    gene_to_lowercase : bool, default=False
+        Whether to lowercase gene names before matching genes across datasets.
+
     Attributes:
         adata_sc: AnnData
             Single-cell RNA-seq data with:
@@ -102,9 +115,14 @@ class Tangram(object):
         This method verifies that the Tangram package is available and prints
         its version number. If not installed, it raises an informative error.
 
-        Raises:
-            ImportError: If Tangram package is not installed, with instructions
-                for installation.
+        Parameters
+        ----------
+        None
+
+        Raises
+        ------
+        ImportError
+            Raised when `tangram-sc` is not installed.
 
         Notes:
             - Sets global tg_install flag when successful
@@ -136,23 +154,18 @@ class Tangram(object):
         3. Identifying marker genes
         4. Preparing data for mapping
 
-        Arguments:
-            adata_sc: AnnData
-                Single-cell RNA-seq data containing:
-                - Normalized gene expression matrix
-                - Cell type annotations in obs[clusters]
-            adata_sp: AnnData
-                Spatial transcriptomics data containing:
-                - Normalized gene expression matrix
-                - Spatial coordinates in obsm['spatial']
-            clusters: str, optional (default='')
-                Column name in adata_sc.obs containing cell type annotations.
-            marker_size: int, optional (default=100)
-                Number of top marker genes to select per cell type.
-                More markers can improve accuracy but increase computation time.
-            gene_to_lowercase: bool, optional (default=False)
-                Whether to convert gene names to lowercase for matching between
-                datasets. Useful when gene naming conventions differ.
+        Parameters
+        ----------
+        adata_sc : AnnData
+            Single-cell reference AnnData used as source profiles.
+        adata_sp : AnnData
+            Spatial AnnData used as target tissue map.
+        clusters : str, default=''
+            Cell-type annotation column in ``adata_sc.obs``.
+        marker_size : int, default=100
+            Number of top-ranked marker genes selected per cell type.
+        gene_to_lowercase : bool, default=False
+            Whether to lowercase gene names before intersection.
 
         Notes:
             - Automatically filters genes present in at least one cell
@@ -201,25 +214,16 @@ class Tangram(object):
         to spatial locations. It optimizes the mapping to preserve both gene
         expression patterns and spatial structure.
 
-        Arguments:
-            mode: str, optional (default="clusters")
-                Mapping mode:
-                - "clusters": Map cell type proportions (faster)
-                - "cells": Map individual cells (more detailed)
-            num_epochs: int, optional (default=500)
-                Number of training epochs. More epochs may improve results
-                but increase training time.
-            device: str, optional (default="cuda:0")
-                Computing device to use:
-                - "cuda:0" (or other GPU index) for GPU acceleration
-                - "cpu" for CPU computation
-            **kwargs: Any
-                Additional arguments passed to tangram.map_cells_to_space:
-                - density_prior: Prior on spatial density
-                - lambda_d: Density regularization strength
-                - lambda_g1: Gene-expression regularization
-                - lambda_g2: Spatial regularization
-                - lambda_r: Entropy regularization
+        Parameters
+        ----------
+        mode : {'clusters', 'cells'}, default='clusters'
+            Tangram mapping mode.
+        num_epochs : int, default=500
+            Number of optimization epochs.
+        device : str, default='cuda:0'
+            Compute device used by Tangram backend.
+        **kwargs : Any
+            Additional arguments forwarded to ``tangram.map_cells_to_space``.
 
         Notes:
             - Automatically stores mapping in self.ad_map
@@ -251,17 +255,16 @@ class Tangram(object):
         This method creates a visualization-ready AnnData object containing the
         predicted cell type proportions for each spatial location.
 
-        Arguments:
-            annotation_list: list, optional (default=None)
-                List of cell types to include in the projection.
-                If None, uses all cell types from training data.
-            
-        Returns:
-            AnnData
-                Modified spatial data containing:
-                - Original spatial data
-                - Cell type proportions in obsm['tangram_ct_pred']
-                - Normalized proportions in obs for each cell type
+        Parameters
+        ----------
+        annotation_list : list, optional
+            Subset of cell types to project. Uses all discovered cell types when
+            ``None``.
+
+        Returns
+        -------
+        AnnData
+            Spatial AnnData copy with projected cell-type proportions.
 
         Notes:
             - Automatically normalizes cell type proportions
@@ -288,21 +291,19 @@ class Tangram(object):
         This method uses the trained mapping to predict the expression of all genes
         in the spatial locations, including genes not used in the mapping.
 
-        Arguments:
-            ad_map: AnnData, optional (default=None)
-                Mapping result from train(). If None, uses self.ad_map.
-            ad_sc: AnnData, optional (default=None)
-                Single-cell reference data. If None, uses self.adata_sc.
-            **kwargs: Any
-                Additional arguments passed to tangram.project_genes:
-                - scale: Whether to scale imputed values
-                - filter_genes: Whether to filter genes before imputation
-                - filter_threshold: Expression threshold for filtering
+        Parameters
+        ----------
+        ad_map : AnnData, optional
+            Tangram mapping AnnData from ``train``. Defaults to ``self.ad_map``.
+        ad_sc : AnnData, optional
+            Single-cell reference AnnData. Defaults to ``self.adata_sc``.
+        **kwargs : Any
+            Additional arguments forwarded to ``tangram.project_genes``.
 
-        Returns:
-            AnnData
-                Spatial data with imputed gene expression for all genes
-                in the single-cell reference data.
+        Returns
+        -------
+        AnnData
+            Spatial-gene imputation AnnData returned by Tangram.
 
         Notes:
             - Uses mapping weights to transfer expression
@@ -331,8 +332,8 @@ def construct_obs_plot(df_plot: pd.DataFrame,
     This helper function processes cell type proportion data for visualization
     by normalizing and optionally clipping extreme values.
 
-    Arguments:
-        df_plot: pd.DataFrame
+    Parameters
+    ----------        df_plot: pd.DataFrame
             DataFrame containing cell type proportions or other values
             to be added to observation metadata.
         adata: AnnData
@@ -366,8 +367,8 @@ def global_imports(modulename,shortname = None, asfunction = False):
     This helper function dynamically imports a module and makes it available
     in the global namespace, optionally with a custom name.
 
-    Arguments:
-        modulename: str
+    Parameters
+    ----------        modulename: str
             Name of the module to import (e.g., 'numpy').
         shortname: str, optional (default=None)
             Alternative name to use in the global namespace.

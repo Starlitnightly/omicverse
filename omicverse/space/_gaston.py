@@ -56,6 +56,12 @@ class GASTON(object):
     3. Model gene expression patterns along spatial gradients
     4. Characterize tissue organization and architecture
 
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial AnnData containing expression matrix and coordinates in
+        ``adata.obsm['spatial']``.
+
     Attributes:
         adata: AnnData
             Input annotated data matrix containing:
@@ -92,12 +98,10 @@ class GASTON(object):
     def __init__(self,adata) -> None:
         r"""Initialize GASTON spatial clustering object.
         
-        Arguments:
-            adata: AnnData
-                Annotated data matrix containing:
-                - Spatial coordinates in adata.obsm['spatial']
-                - Gene expression data in adata.X
-                - Optional histology image in adata.uns['spatial']
+        Parameters
+        ----------
+        adata : AnnData
+            Input spatial AnnData.
         """
         self.adata=adata
 
@@ -108,23 +112,18 @@ class GASTON(object):
         for GASTON analysis, including gene expression counts, spatial coordinates,
         and optionally RGB features from histology images.
 
-        Arguments:
-            get_rgb: bool, optional (default=False)
-                Whether to extract RGB features from histology image.
-            spot_umi_threshold: int, optional (default=50)
-                Minimum UMI count threshold for filtering spots.
-            
-        Returns:
-            tuple
-                If get_rgb=False:
-                    - counts_mat: Gene expression count matrix
-                    - coords_mat: Spatial coordinates array
-                    - gene_labels: Array of gene names
-                If get_rgb=True:
-                    - counts_mat: Gene expression count matrix
-                    - coords_mat: Spatial coordinates array
-                    - gene_labels: Array of gene names
-                    - RGB_mean: Array of mean RGB values per spot
+        Parameters
+        ----------
+        get_rgb : bool, default=False
+            Whether to extract per-spot RGB features from tissue image.
+        spot_umi_threshold : int, default=50
+            Minimum total counts per spot for filtering.
+
+        Returns
+        -------
+        tuple
+            ``(counts_mat, coords_mat, gene_labels)`` or additionally
+            ``RGB_mean`` when ``get_rgb=True``.
 
         Notes:
             - Filters spots based on UMI count threshold
@@ -167,21 +166,21 @@ class GASTON(object):
         This method selects highly variable genes using Pearson residuals,
         performs dimensionality reduction, and optionally combines with RGB features.
 
-        Arguments:
-            num_dims: int, optional (default=5)
-                Number of PCA dimensions to retain.
-            clip: float, optional (default=0.01)
-                Clipping value for Pearson residuals to handle outliers.
-            n_top_genes: int, optional (default=5000)
-                Number of highly variable genes to select.
-            use_RGB: bool, optional (default=False)
-                Whether to include RGB features in output matrix.
-            
-        Returns:
-            numpy.ndarray
-                Feature matrix combining:
-                - PCA of top Pearson residual genes
-                - RGB features (if use_RGB=True)
+        Parameters
+        ----------
+        num_dims : int, default=5
+            Number of PCA components kept as GASTON features.
+        clip : float, default=0.01
+            Clipping parameter used in Pearson residual normalization.
+        n_top_genes : int, default=5000
+            Number of highly variable genes considered.
+        use_RGB : bool, default=False
+            Whether to concatenate RGB features (requires ``get_rgb=True`` before).
+
+        Returns
+        -------
+        numpy.ndarray
+            Feature matrix for GASTON training.
 
         Notes:
             - Uses Pearson residuals for robust feature selection
@@ -214,9 +213,10 @@ class GASTON(object):
         This method prepares the feature matrix and spatial coordinates for
         neural network training by rescaling them to appropriate ranges.
 
-        Arguments:
-            A: numpy.ndarray
-                Feature matrix from get_top_pearson_residuals().
+        Parameters
+        ----------
+        A : numpy.ndarray
+            Feature matrix from ``get_top_pearson_residuals``.
 
         Notes:
             - Converts data to PyTorch tensors
@@ -239,23 +239,22 @@ class GASTON(object):
         gene expression patterns. It performs multiple training runs with different
         random initializations to ensure robust results.
 
-        Arguments:
-            isodepth_arch: list, optional (default=[20,20])
-                Architecture for isodepth neural network d(x,y).
-                Each element specifies number of neurons in a hidden layer.
-            expression_fn_arch: list, optional (default=[20,20])
-                Architecture for expression function network h(w).
-                Each element specifies number of neurons in a hidden layer.
-            num_epochs: int, optional (default=10000)
-                Number of training epochs per restart.
-            checkpoint: int, optional (default=500)
-                Save model checkpoint every N epochs.
-            out_dir: str, optional (default='result/test_outputs')
-                Directory to save model files and checkpoints.
-            optimizer: str, optional (default="adam")
-                Optimization algorithm to use.
-            num_restarts: int, optional (default=30)
-                Number of training runs with different random seeds.
+        Parameters
+        ----------
+        isodepth_arch : list, default=[20, 20]
+            Hidden-layer architecture for depth network.
+        expression_fn_arch : list, default=[20, 20]
+            Hidden-layer architecture for expression network.
+        num_epochs : int, default=10000
+            Epochs per restart.
+        checkpoint : int, default=500
+            Checkpoint interval.
+        out_dir : str, default='result/test_outputs'
+            Output directory for model checkpoints.
+        optimizer : str, default='adam'
+            Optimizer name.
+        num_restarts : int, default=30
+            Number of random restarts.
 
         Notes:
             - Multiple restarts help avoid local optima
@@ -284,20 +283,19 @@ class GASTON(object):
         This method analyzes trained models to select the best performing one
         and helps determine the optimal number of spatial domains.
 
-        Arguments:
-            out_dir: str, optional (default='result/test_outputs')
-                Directory containing trained model files.
-            max_domain_num: int, optional (default=8)
-                Maximum number of domains to test.
-            start_from: int, optional (default=2)
-                Minimum number of domains to consider.
-            
-        Returns:
-            tuple
-                (best_model, features, coordinates):
-                - best_model: Selected GASTON model
-                - features: Feature matrix used for training
-                - coordinates: Spatial coordinates
+        Parameters
+        ----------
+        out_dir : str, default='result/test_outputs'
+            Directory containing saved restart models.
+        max_domain_num : int, default=8
+            Maximum domain count tested during model selection.
+        start_from : int, default=2
+            Minimum domain count tested.
+
+        Returns
+        -------
+        tuple
+            ``(best_model, features, coordinates)``.
 
         Notes:
             - Uses likelihood curves to determine optimal domain number
@@ -319,12 +317,12 @@ class GASTON(object):
         This method uses the trained model to compute continuous spatial depth
         values and assign spots to discrete spatial domains.
 
-        Arguments:
-            num_domains: int, optional (default=10)
+        Parameters
+        ----------            num_domains: int, optional (default=10)
                 Number of spatial domains to identify.
             
-        Returns:
-            tuple
+        Returns
+        -------            tuple
                 (isodepth_values, domain_labels):
                 - isodepth_values: Continuous spatial depth per spot
                 - domain_labels: Discrete domain assignments
@@ -355,8 +353,8 @@ class GASTON(object):
         This method creates visualizations of the learned spatial organization
         including isodepth contours and optional flow streamlines.
 
-        Arguments:
-            show_streamlines: bool, optional (default=True)
+        Parameters
+        ----------            show_streamlines: bool, optional (default=True)
                 Whether to show directional flow streamlines.
             rotate_angle: float, optional (default=-90)
                 Rotation angle in degrees for plot orientation.
@@ -367,8 +365,8 @@ class GASTON(object):
             **kwargs:
                 Additional arguments passed to plotting functions.
 
-        Returns:
-            matplotlib.figure.Figure
+        Returns
+        -------            matplotlib.figure.Figure
                 Figure containing the visualization.
 
         Notes:
@@ -391,8 +389,8 @@ class GASTON(object):
         This method visualizes the identified spatial domains by coloring spots
         according to their domain assignments.
 
-        Arguments:
-            domain_colors: dict or list
+        Parameters
+        ----------            domain_colors: dict or list
                 Colors for each spatial domain.
             figsize: tuple, optional (default=(6,6))
                 Figure size in inches.
@@ -409,8 +407,8 @@ class GASTON(object):
             **kwargs:
                 Additional arguments passed to plotting functions.
 
-        Returns:
-            matplotlib.figure.Figure
+        Returns
+        -------            matplotlib.figure.Figure
                 Figure containing the domain visualization.
 
         Notes:
@@ -434,8 +432,8 @@ class GASTON(object):
         This method visualizes spatial domains while focusing on a specific range
         of isodepth values, useful for examining particular tissue layers.
 
-        Arguments:
-            domain_colors: dict or list
+        Parameters
+        ----------            domain_colors: dict or list
                 Colors for each spatial domain.
             isodepth_min: float, optional (default=4.5)
                 Minimum isodepth value to include.
@@ -452,8 +450,8 @@ class GASTON(object):
             **kwargs:
                 Additional arguments passed to plotting functions.
 
-        Returns:
-            matplotlib.figure.Figure
+        Returns
+        -------            matplotlib.figure.Figure
                 Figure containing the restricted domain visualization.
 
         Notes:
@@ -478,8 +476,8 @@ class GASTON(object):
         This method filters spots based on isodepth values and optionally adjusts
         for physical distances, useful for layer-specific analyses.
 
-        Arguments:
-            isodepth_min: float, optional (default=4.5)
+        Parameters
+        ----------            isodepth_min: float, optional (default=4.5)
                 Minimum isodepth value to include.
             isodepth_max: float, optional (default=6.8)
                 Maximum isodepth value to include.
@@ -502,8 +500,8 @@ class GASTON(object):
             **kwargs:
                 Additional arguments passed to plotting functions.
 
-        Returns:
-            tuple
+        Returns
+        -------            tuple
                 (counts, coords, isodepth, labels, features):
                 - counts: Filtered count matrix
                 - coords: Filtered spatial coordinates
@@ -546,14 +544,14 @@ class GASTON(object):
         This method removes genes with low expression and those matching specified
         prefixes (e.g., mitochondrial and ribosomal genes).
 
-        Arguments:
-            umi_thresh: int, optional (default=1000)
+        Parameters
+        ----------            umi_thresh: int, optional (default=1000)
                 Minimum total UMI count threshold for genes.
             exclude_prefix: list, optional (default=['Mt-', 'Rpl', 'Rps'])
                 Gene name prefixes to exclude.
 
-        Returns:
-            tuple
+        Returns
+        -------            tuple
                 (gene_labels, gene_indices):
                 - gene_labels: Filtered gene names
                 - gene_indices: Indices of kept genes
@@ -583,16 +581,16 @@ class GASTON(object):
         This method fits piecewise linear functions to gene expression patterns
         along the spatial depth gradient.
 
-        Arguments:
-            cell_type_df: pandas.DataFrame, optional (default=None)
+        Parameters
+        ----------            cell_type_df: pandas.DataFrame, optional (default=None)
                 Cell type annotations if available.
             ct_list: list, optional (default=[])
                 List of cell types to analyze.
             **kwargs:
                 Additional arguments for piecewise fitting.
 
-        Returns:
-            dict
+        Returns
+        -------            dict
                 Dictionary containing fitted parameters and statistics.
 
         Notes:
@@ -620,8 +618,8 @@ class GASTON(object):
         This method bins spots and their expression data based on isodepth values,
         useful for analyzing trends along spatial axes.
 
-        Arguments:
-            cell_type_df: pandas.DataFrame, optional (default=None)
+        Parameters
+        ----------            cell_type_df: pandas.DataFrame, optional (default=None)
                 Cell type annotations if available.
             num_bins: int, optional (default=15)
                 Number of spatial bins to create.
@@ -632,8 +630,8 @@ class GASTON(object):
             **kwargs:
                 Additional arguments for binning process.
 
-        Returns:
-            tuple
+        Returns
+        -------            tuple
                 (binned_data, bin_edges, statistics):
                 - binned_data: Expression data per bin
                 - bin_edges: Isodepth values defining bins
@@ -669,12 +667,12 @@ class GASTON(object):
         This method constructs a new AnnData object containing only the spots
         within the restricted isodepth range.
 
-        Arguments:
-            offset: float, optional (default=10**6)
+        Parameters
+        ----------            offset: float, optional (default=10**6)
                 Offset for coordinate normalization.
 
-        Returns:
-            anndata.AnnData
+        Returns
+        -------            anndata.AnnData
                 AnnData object containing restricted data.
 
         Notes:
@@ -743,8 +741,8 @@ class GASTON(object):
         This method visualizes gene expression patterns and their piecewise
         linear fits along the spatial depth gradient.
 
-        Arguments:
-            gene: str
+        Parameters
+        ----------            gene: str
                 Name of gene to plot.
             domain_colors: dict or list
                 Colors for each spatial domain.
@@ -765,8 +763,8 @@ class GASTON(object):
             domain_boundary_plotting: bool, optional (default=True)
                 Whether to show domain boundaries.
 
-        Returns:
-            matplotlib.figure.Figure
+        Returns
+        -------            matplotlib.figure.Figure
                 Figure containing the visualization.
 
         Notes:
@@ -794,8 +792,8 @@ class GASTON(object):
         This method creates a spatial visualization of raw gene expression levels
         across the tissue section.
 
-        Arguments:
-            gene_name: str
+        Parameters
+        ----------            gene_name: str
                 Name of gene to plot.
             rotate_angle: float, optional (default=-90)
                 Rotation angle in degrees for plot orientation.
@@ -808,8 +806,8 @@ class GASTON(object):
             **kwargs:
                 Additional arguments passed to plotting functions.
 
-        Returns:
-            matplotlib.figure.Figure
+        Returns
+        -------            matplotlib.figure.Figure
                 Figure containing the expression visualization.
 
         Notes:
@@ -835,8 +833,8 @@ class GASTON(object):
         This method creates a specialized visualization of gene expression using
         GASTON's representation enhancement.
 
-        Arguments:
-            gene_name: str
+        Parameters
+        ----------            gene_name: str
                 Name of gene to plot.
             rotate_angle: float, optional (default=-90)
                 Rotation angle in degrees for plot orientation.
@@ -847,8 +845,8 @@ class GASTON(object):
             **kwargs:
                 Additional arguments passed to plotting functions.
 
-        Returns:
-            matplotlib.figure.Figure
+        Returns
+        -------            matplotlib.figure.Figure
                 Figure containing the enhanced visualization.
 
         Notes:
