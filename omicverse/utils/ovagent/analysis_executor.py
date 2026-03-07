@@ -474,6 +474,8 @@ class AnalysisExecutor:
                     }
                 if self._ctx.enable_filesystem_context and self._ctx._filesystem_context:
                     self.process_context_directives(code, {})
+                if capture_stdout:
+                    return {"adata": result_adata, "stdout": ""}
                 return result_adata
 
             except Exception as e:
