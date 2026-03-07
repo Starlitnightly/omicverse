@@ -177,6 +177,21 @@ def generate_G(gene:list,species:int,score:float=0.4) -> nx.Graph:
     related=["bulk.string_interaction", "bulk.string_map", "utils.plot_network"]
 )
 class pyPPI(object):
+    """Protein-protein interaction (PPI) analysis wrapper based on STRING.
+
+    Parameters
+    ----------
+    gene : list
+        Gene symbols used as seed nodes for building the interaction network.
+    species : int
+        NCBI taxonomy id (e.g., 9606 for human).
+    gene_type_dict : dict
+        Mapping from gene symbol to category/type used in node styling.
+    gene_color_dict : dict
+        Mapping from gene symbol to display color.
+    score : float, default=0.4
+        Minimum confidence score for retaining interactions.
+    """
 
     def __init__(self,gene: list,species: int,gene_type_dict: dict,gene_color_dict: dict,
                  score: float = 0.4) -> None:
