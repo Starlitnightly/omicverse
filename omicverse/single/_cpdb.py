@@ -10,6 +10,7 @@ import matplotlib.patches as mpatches
 import scanpy as sc
 import matplotlib
 import anndata
+from .._registry import register_function
 
 kpy_install=False
 
@@ -824,6 +825,17 @@ def validate_cpdb_database(cpdb_file_path):
     return str(cpdb_path)
 
 
+@register_function(
+    aliases=['CellPhoneDB 分析', 'run_cellphonedb_v5', 'cell-cell communication v5'],
+    category="single",
+    description="Run CellPhoneDB v5 statistical ligand-receptor analysis to identify significant cell-cell communication pairs.",
+    prerequisites={'optional_functions': ['pp.qc', 'pp.preprocess']},
+    requires={'obs': ['celltype labels'], 'var': ['gene symbols']},
+    produces={'uns': ['cellphonedb_results']},
+    auto_fix='escalate',
+    examples=['ov.single.run_cellphonedb_v5(adata, cpdb_file_path="./cellphonedb.zip", celltype_key="cell_labels", iterations=1000, pvalue=0.05)'],
+    related=['pl.CellChatViz', 'single.pathway_enrichment']
+)
 def run_cellphonedb_v5(adata, 
                            cpdb_file_path,  # Now mandatory
                            celltype_key='celltype',
@@ -841,68 +853,55 @@ def run_cellphonedb_v5(adata,
                            separator='|',
                            **kwargs):
     """
-    Run CellPhoneDB statistical analysis with automatic database download
+    Run CellPhoneDB v5 statistical ligand-receptor analysis to identify significant cell-cell communication pairs
     
-    Parameters:
-    -----------
-    adata : AnnData
-        Annotated data matrix
-    cpdb_file_path : str
-        Path to CellPhoneDB database zip file (REQUIRED)
-        If file doesn't exist, will attempt automatic download
-    celltype_key : str
-        Column name in adata.obs containing cell type annotations
-    min_cell_fraction : float
-        Minimum fraction of total cells required for a cell type to be included
-    min_genes : int
-        Minimum number of genes required per cell
-    min_cells : int
-        Minimum number of cells required per gene
-    iterations : int
-        Number of shufflings performed in the analysis
-    threshold : float
-        Min % of cells expressing a gene for this to be employed in the analysis
-    pvalue : float
-        P-value threshold to employ for significance
-    threads : int
-        Number of threads to use in the analysis
-    output_dir : str or None
-        Directory to save results. If None, creates temporary directory
-    temp_dir : str or None
-        Directory for temporary files. If None, uses system temp
-    cleanup_temp : bool
-        Whether to clean up temporary files after analysis
-    debug : bool
-        Saves all intermediate tables employed during the analysis
-    separator : str
-        String to employ to separate cells in the results dataframes
-    **kwargs : dict
-        Additional parameters for cpdb_statistical_analysis_method.call
-        
-    Returns:
-    --------
-    dict : CellPhoneDB results
-    adata_cpdb : AnnData
-        Formatted AnnData object for visualization with CellChatViz
-        
-    Examples:
-    --------
-    # Basic usage - will download database automatically if needed
-    cpdb_results, adata_cpdb = run_cellphonedb_analysis(
-        adata, 
-        cpdb_file_path='./cellphonedb.zip',
-        celltype_key='celltype_minor'
-    )
+    Parameters
+    ----------
+    adata : Any
+        Input parameter for `run_cellphonedb_v5`.
+    cpdb_file_path : Any
+        Input parameter for `run_cellphonedb_v5`.
+    celltype_key : Any, optional, default='celltype'
+        Input parameter for `run_cellphonedb_v5`.
+    min_cell_fraction : Any, optional, default=0.005
+        Input parameter for `run_cellphonedb_v5`.
+    min_genes : Any, optional, default=200
+        Input parameter for `run_cellphonedb_v5`.
+    min_cells : Any, optional, default=3
+        Input parameter for `run_cellphonedb_v5`.
+    iterations : Any, optional, default=1000
+        Input parameter for `run_cellphonedb_v5`.
+    threshold : Any, optional, default=0.1
+        Input parameter for `run_cellphonedb_v5`.
+    pvalue : Any, optional, default=0.05
+        Input parameter for `run_cellphonedb_v5`.
+    threads : Any, optional, default=10
+        Input parameter for `run_cellphonedb_v5`.
+    output_dir : Any, optional, default=None
+        Input parameter for `run_cellphonedb_v5`.
+    temp_dir : Any, optional, default=None
+        Input parameter for `run_cellphonedb_v5`.
+    cleanup_temp : Any, optional, default=True
+        Input parameter for `run_cellphonedb_v5`.
+    debug : Any, optional, default=False
+        Input parameter for `run_cellphonedb_v5`.
+    separator : Any, optional, default='|'
+        Input parameter for `run_cellphonedb_v5`.
+    **kwargs : Any
+        Input parameter for `run_cellphonedb_v5`.
     
-    # Advanced usage
-    cpdb_results, adata_cpdb = run_cellphonedb_analysis(
-        adata,
-        cpdb_file_path='/path/to/cellphonedb.zip',
-        celltype_key='celltype_minor',
-        min_cell_fraction=0.01,
-        iterations=2000,
-        threads=20
-    )
+    Returns
+    -------
+    Any
+        Output produced by `run_cellphonedb_v5`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> ov.single.run_cellphonedb_v5(adata, cpdb_file_path="./cellphonedb.zip", celltype_key="cell_labels", iterations=1000, pvalue=0.05)
     """
     import os
     import tempfile

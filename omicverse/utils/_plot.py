@@ -189,24 +189,50 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
              vector_friendly: bool = True,
              show_monitor=True,
              ):
-    r"""Configure plotting settings for OmicVerse.
+    """
+    Configure plotting settings for OmicVerse including matplotlib, scanpy, and GPU detection
     
-    Arguments:
-        verbosity: Scanpy verbosity level. Default: 3.
-        dpi: Resolution for matplotlib figures. Default: 80.
-        facecolor: Background color for figures. Default: 'white'.
-        font_path: Path to font for custom fonts. Default: None.
-        ipython_format: IPython display format. Default: 'retina'.
-        dpi_save: Resolution for saved figures. Default: 300.
-        transparent: Whether to use transparent background. Default: None.
-        scanpy: Whether to apply scanpy settings. Default: True.
-        fontsize: Default font size for plots. Default: 14.
-        color_map: Default color map for plots. Default: None.
-        figsize: Default figure size. Default: None.
-        vector_friendly: Control rasterization for vector-friendly plots. Default: True.
-        
-    Returns:
-        None: The function configures global plotting settings and displays initialization information.
+    Parameters
+    ----------
+    verbosity : int, optional, default=3
+        Input parameter for `plot_set`.
+    dpi : int, optional, default=80
+        Input parameter for `plot_set`.
+    facecolor : str, optional, default='white'
+        Input parameter for `plot_set`.
+    font_path : str, optional, default=None
+        Input parameter for `plot_set`.
+    ipython_format : str, optional, default="retina"
+        Input parameter for `plot_set`.
+    dpi_save : int, optional, default=300
+        Input parameter for `plot_set`.
+    transparent : bool, optional, default=None
+        Input parameter for `plot_set`.
+    scanpy : bool, optional, default=True
+        Input parameter for `plot_set`.
+    fontsize : int, optional, default=14
+        Input parameter for `plot_set`.
+    color_map : Union[str, None], optional, default=None
+        Input parameter for `plot_set`.
+    figsize : Union[int, None], optional, default=None
+        Input parameter for `plot_set`.
+    vector_friendly : bool, optional, default=True
+        Input parameter for `plot_set`.
+    show_monitor : Any, optional, default=True
+        Input parameter for `plot_set`.
+    
+    Returns
+    -------
+    Any
+        Output produced by `plot_set`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> ov.utils.ov_plot_set()
     """
     global _has_printed_logo
 
@@ -398,20 +424,74 @@ style=plot_set
 
 
 
+@register_function(
+    aliases=['调色板', 'pyomic_palette', 'omicverse palette'],
+    category="utils",
+    description="Return a high-contrast categorical color palette commonly used for cell-type and cluster visualization in OmicVerse.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['colors = ov.utils.pyomic_palette()'],
+    related=['utils.palette', 'utils.plot_cellproportion']
+)
 def pyomic_palette()->list:
-    r"""Returns the default OmicVerse color palette.
+    """
+    Return a high-contrast categorical color palette commonly used for cell-type and cluster visualization in OmicVerse
     
-    Returns:
-        List of hex color codes for plotting
-    """ 
+    Parameters
+    ----------
+    None
+        This callable does not require explicit parameters.
+    
+    Returns
+    -------
+    list
+        Output produced by `pyomic_palette`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> colors = ov.utils.pyomic_palette()
+    """
     return sc_color
 
+@register_function(
+    aliases=['颜色方案', 'palette', 'categorical palette'],
+    category="utils",
+    description="Return standardized categorical color maps for consistent annotation coloring across plots and reports.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['colors = ov.utils.palette()'],
+    related=['utils.pyomic_palette', 'pl.embedding']
+)
 def palette()->list:
-    r"""Returns the default OmicVerse color palette.
+    """
+    Return standardized categorical color maps for consistent annotation coloring across plots and reports
     
-    Returns:
-        List of hex color codes for plotting
-    """ 
+    Parameters
+    ----------
+    None
+        This callable does not require explicit parameters.
+    
+    Returns
+    -------
+    list
+        Output produced by `palette`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> colors = ov.utils.palette()
+    """
     return sc_color
 
 def red_palette()->list:
@@ -446,16 +526,42 @@ def blue_palette()->list:
     """ 
     return blue_color
 
+@register_function(
+    aliases=['文本标注避让', 'plot_text_set', 'adjust plot text'],
+    category="utils",
+    description="Post-process overlapping text labels in figures to improve readability of pathway, gene, or cluster annotations.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['texts = ov.utils.plot_text_set(texts, text_knock=0.6, text_maxsize=12)'],
+    related=['bulk.geneset_plot_multi', 'utils.plot_cellproportion']
+)
 def plot_text_set(text, text_knock=2, text_maxsize=20):
-    r"""Format text for plotting by adding line breaks.
+    """
+    Post-process overlapping text labels in figures to improve readability of pathway, gene, or cluster annotations
     
-    Arguments:
-        text: Text string to format
-        text_knock: Number of words between line breaks (2)
-        text_maxsize: Maximum text length before formatting (20)
-        
-    Returns:
-        Formatted text string with line breaks
+    Parameters
+    ----------
+    text : Any
+        Input parameter for `plot_text_set`.
+    text_knock : Any, optional, default=2
+        Input parameter for `plot_text_set`.
+    text_maxsize : Any, optional, default=20
+        Input parameter for `plot_text_set`.
+    
+    Returns
+    -------
+    Any
+        Output produced by `plot_text_set`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> texts = ov.utils.plot_text_set(texts, text_knock=0.6, text_maxsize=12)
     """
     if len(text) <= text_maxsize:
         return text
@@ -706,25 +812,57 @@ def plot_network(G:nx.Graph,G_type_dict:dict,G_color_dict:dict,pos_type:str='spr
     
     return fig,ax
 
+@register_function(
+    aliases=['细胞比例可视化', 'plot_cellproportion', 'cell proportion plot'],
+    category="utils",
+    description="Visualize cell-type composition across groups/samples to compare immune or stromal shifts between conditions.",
+    prerequisites={},
+    requires={'obs': ['cell type labels', 'group labels']},
+    produces={},
+    auto_fix='none',
+    examples=['ov.utils.plot_cellproportion(adata, celltype_clusters="celltype", visual_clusters="condition")'],
+    related=['pl.plot_grouped_fractions', 'pl.add_pie2spatial']
+)
 def plot_cellproportion(adata:anndata.AnnData,celltype_clusters:str,visual_clusters:str,
                        visual_li=None,visual_name:str='',figsize:tuple=(4,6),
                        ticks_fontsize:int=12,labels_fontsize:int=12,
                        legend:bool=False):
-    r"""Plot stacked bar chart showing cell type proportions across groups.
+    """
+    Visualize cell-type composition across groups/samples to compare immune or stromal shifts between conditions
     
-    Arguments:
-        adata: AnnData object
-        celltype_clusters: Column name for cell types
-        visual_clusters: Column name for grouping variable
-        visual_li: List of groups to plot (None)
-        visual_name: Label for x-axis ('')
-        figsize: Figure size ((4,6))
-        ticks_fontsize: Font size for tick labels (12)
-        labels_fontsize: Font size for axis labels (12)
-        legend: Whether to show legend (False)
-        
-    Returns:
-        Tuple of (figure, axes) objects
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Input parameter for `plot_cellproportion`.
+    celltype_clusters : str
+        Input parameter for `plot_cellproportion`.
+    visual_clusters : str
+        Input parameter for `plot_cellproportion`.
+    visual_li : Any, optional, default=None
+        Input parameter for `plot_cellproportion`.
+    visual_name : str, optional, default=''
+        Input parameter for `plot_cellproportion`.
+    figsize : tuple, optional, default=(4,6)
+        Input parameter for `plot_cellproportion`.
+    ticks_fontsize : int, optional, default=12
+        Input parameter for `plot_cellproportion`.
+    labels_fontsize : int, optional, default=12
+        Input parameter for `plot_cellproportion`.
+    legend : bool, optional, default=False
+        Input parameter for `plot_cellproportion`.
+    
+    Returns
+    -------
+    Any
+        Output produced by `plot_cellproportion`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> ov.utils.plot_cellproportion(adata, celltype_clusters="celltype", visual_clusters="condition")
     """
 
     b=pd.DataFrame(columns=['cell_type','value','Week'])
@@ -793,25 +931,56 @@ def plot_cellproportion(adata:anndata.AnnData,celltype_clusters:str,visual_clust
     fig.tight_layout()
     return fig,ax
 
+@register_function(
+    aliases=['细胞类型嵌入图', 'plot_embedding_celltype', 'embedding celltype visualization'],
+    category="utils",
+    description="Plot embedding coordinates with cell-type annotations for rapid inspection of cluster separation and annotation quality.",
+    prerequisites={'optional_functions': ['pp.umap', 'pp.pca']},
+    requires={'obsm': ['X_umap or selected basis'], 'obs': ['cell type labels']},
+    produces={},
+    auto_fix='none',
+    examples=['ov.utils.plot_embedding_celltype(adata, basis="umap", celltype_key="celltype")'],
+    related=['pl.embedding', 'single.generate_scRNA_report']
+)
 def plot_embedding_celltype(adata:anndata.AnnData,figsize:tuple=(6,4),basis:str='umap',
                             celltype_key:str='major_celltype',title:str=None,
                             celltype_range:tuple=(2,9),
                             embedding_range:tuple=(3,10),
                             xlim:int=-1000)->tuple:
-    r"""Create combined embedding plot with cell type legend and counts.
+    """
+    Plot embedding coordinates with cell-type annotations for rapid inspection of cluster separation and annotation quality
     
-    Arguments:
-        adata: AnnData object
-        figsize: Figure size ((6,4))
-        basis: Embedding basis name ('umap')
-        celltype_key: Column name for cell types ('major_celltype')
-        title: Plot title (None)
-        celltype_range: Grid range for cell type panel ((2,9))
-        embedding_range: Grid range for embedding panel ((3,10))
-        xlim: X-axis limit for counts (-1000)
-        
-    Returns:
-        Tuple of (figure, [embedding_axis, celltype_axis])
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Input parameter for `plot_embedding_celltype`.
+    figsize : tuple, optional, default=(6,4)
+        Input parameter for `plot_embedding_celltype`.
+    basis : str, optional, default='umap'
+        Input parameter for `plot_embedding_celltype`.
+    celltype_key : str, optional, default='major_celltype'
+        Input parameter for `plot_embedding_celltype`.
+    title : str, optional, default=None
+        Input parameter for `plot_embedding_celltype`.
+    celltype_range : tuple, optional, default=(2,9)
+        Input parameter for `plot_embedding_celltype`.
+    embedding_range : tuple, optional, default=(3,10)
+        Input parameter for `plot_embedding_celltype`.
+    xlim : int, optional, default=-1000
+        Input parameter for `plot_embedding_celltype`.
+    
+    Returns
+    -------
+    tuple
+        Output produced by `plot_embedding_celltype`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> ov.utils.plot_embedding_celltype(adata, basis="umap", celltype_key="celltype")
     """
 
     adata.obs[celltype_key]=adata.obs[celltype_key].astype('category')
@@ -898,19 +1067,38 @@ def gen_mpl_labels(
     adata, groupby, exclude=(), 
     basis='X_umap',ax=None, adjust_kwargs=None, text_kwargs=None
 ):
-    """Add cluster labels at median positions in embedding plots with automatic text positioning.
+    """
+    Add cluster labels at median positions in embedding plots with automatic text positioning
     
-    Arguments:
-        adata: AnnData object containing single-cell data.
-        groupby: Column name for grouping in adata.obs.
-        exclude: Groups to exclude from labeling. Default: ().
-        basis: Embedding basis name in adata.obsm. Default: 'X_umap'.
-        ax: Matplotlib axes object. Default: None.
-        adjust_kwargs: Parameters for adjustText text adjustment. Default: None.
-        text_kwargs: Parameters for text styling (None)
-        
-    Returns:
-        None
+    Parameters
+    ----------
+    adata : Any
+        Input parameter for `gen_mpl_labels`.
+    groupby : Any
+        Input parameter for `gen_mpl_labels`.
+    exclude : Any, optional, default=()
+        Input parameter for `gen_mpl_labels`.
+    basis : Any, optional, default='X_umap'
+        Input parameter for `gen_mpl_labels`.
+    ax : Any, optional, default=None
+        Input parameter for `gen_mpl_labels`.
+    adjust_kwargs : Any, optional, default=None
+        Input parameter for `gen_mpl_labels`.
+    text_kwargs : Any, optional, default=None
+        Input parameter for `gen_mpl_labels`.
+    
+    Returns
+    -------
+    Any
+        Output produced by `gen_mpl_labels`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> # Basic cluster labeling
     """
     if adjust_kwargs is None:
         adjust_kwargs = {"text_from_points": False}
@@ -1017,22 +1205,44 @@ def stacking_vol(data_dict:dict,color_dict:dict,
                  plot_genes_num:int=10,
                  plot_genes_fontsize:int=8,
                 plot_genes_weight:str='bold')->tuple:
-    """Create stacked volcano plots for comparing differential expression across multiple datasets.
+    """
+    Create stacked volcano plots for comparing differential expression across multiple datasets
     
-    Arguments:
-        data_dict: Dictionary with DataFrames containing 'logfoldchanges', 'pvals_adj', 'names' columns.
-        color_dict: Dictionary mapping dataset names to colors
-        pval_threshold: P-value significance threshold (0.01)
-        log2fc_threshold: Log2 fold change threshold (2)
-        figsize: Figure size ((8,4))
-        sig_color: Color for significant points ('#a51616')
-        normal_color: Color for non-significant points ('#c7c7c7')
-        plot_genes_num: Number of top genes to label (10)
-        plot_genes_fontsize: Font size for gene labels (8)
-        plot_genes_weight: Font weight for gene labels ('bold')
-        
-    Returns:
-        Tuple of (figure, axes_dict)
+    Parameters
+    ----------
+    data_dict : dict
+        Input parameter for `stacking_vol`.
+    color_dict : dict
+        Input parameter for `stacking_vol`.
+    pval_threshold : float, optional, default=0.01
+        Input parameter for `stacking_vol`.
+    log2fc_threshold : int, optional, default=2
+        Input parameter for `stacking_vol`.
+    figsize : tuple, optional, default=(8,4)
+        Input parameter for `stacking_vol`.
+    sig_color : str, optional, default='#a51616'
+        Input parameter for `stacking_vol`.
+    normal_color : str, optional, default='#c7c7c7'
+        Input parameter for `stacking_vol`.
+    plot_genes_num : int, optional, default=10
+        Input parameter for `stacking_vol`.
+    plot_genes_fontsize : int, optional, default=8
+        Input parameter for `stacking_vol`.
+    plot_genes_weight : str, optional, default='bold'
+        Input parameter for `stacking_vol`.
+    
+    Returns
+    -------
+    tuple
+        Output produced by `stacking_vol`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> # Basic stacked volcano plot
     """
     
     fig = plt.figure(figsize=figsize)
@@ -1126,28 +1336,38 @@ def stacking_vol(data_dict:dict,color_dict:dict,
 )
 def plot_ConvexHull(adata:anndata.AnnData,basis:str,cluster_key:str,
                     hull_cluster:str,ax,color=None,alpha:float=0.2):
-    """Add convex hull outline for a specific cluster in embedding plot.
+    """
+    Add convex hull outline for a specific cluster in embedding plot
     
-    Arguments:
-        adata: AnnData object containing single-cell data.
-        basis: Embedding basis name in adata.obsm (e.g., 'X_umap', 'X_tsne').
-        cluster_key: Column name for cluster assignments in adata.obs.
-        hull_cluster: Specific cluster identifier to outline.
-        ax: Matplotlib axes object to draw on.
-        color: Hull color. Default: None (automatic).
-        alpha: Hull transparency level. Default: 0.2.
-        
-    Returns:
-        ax: Modified matplotlib axes object with convex hull added.
-
-    Examples:
-        >>> import omicverse as ov
-        >>> import matplotlib.pyplot as plt
-        >>> # Create embedding plot with convex hull
-        >>> fig, ax = plt.subplots()
-        >>> ov.utils.embedding(adata, basis='X_umap', color='leiden', ax=ax)
-        >>> ov.utils.plot_ConvexHull(adata, basis='X_umap', cluster_key='leiden',
-        ...                          hull_cluster='0', ax=ax)
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Input parameter for `plot_ConvexHull`.
+    basis : str
+        Input parameter for `plot_ConvexHull`.
+    cluster_key : str
+        Input parameter for `plot_ConvexHull`.
+    hull_cluster : str
+        Input parameter for `plot_ConvexHull`.
+    ax : Any
+        Input parameter for `plot_ConvexHull`.
+    color : Any, optional, default=None
+        Input parameter for `plot_ConvexHull`.
+    alpha : float, optional, default=0.2
+        Input parameter for `plot_ConvexHull`.
+    
+    Returns
+    -------
+    Any
+        Output produced by `plot_ConvexHull`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> # Basic convex hull for a cluster
     """
     
     adata.obs[cluster_key]=adata.obs[cluster_key].astype('category')
@@ -1176,9 +1396,50 @@ def plot_ConvexHull(adata:anndata.AnnData,basis:str,cluster_key:str,
 
 
 
+@register_function(
+    aliases=['基因集词云', 'geneset_wordcloud', 'gene wordcloud'],
+    category="utils",
+    description="Generate cluster-resolved word clouds from dominant genes/gene sets to summarize pseudotime-associated programs visually.",
+    prerequisites={'optional_functions': ['single.gene_trends']},
+    requires={'obs': ['cluster labels'], 'var': ['gene names']},
+    produces={},
+    auto_fix='none',
+    examples=['gw_obj = ov.utils.geneset_wordcloud(adata=adata_aucs[:, var_name], cluster_key="g1", pseudotime="pt_via")', 'gw_obj.get()'],
+    related=['single.gene_trends', 'utils.plot_text_set']
+)
 class geneset_wordcloud(object):
+    """
+    Generate cluster-resolved word clouds from dominant genes/gene sets to summarize pseudotime-associated programs visually
+    
+    Parameters
+    ----------
+    adata : Any
+        Configuration argument used when constructing `geneset_wordcloud`.
+    cluster_key : Any
+        Configuration argument used when constructing `geneset_wordcloud`.
+    pseudotime : Any
+        Configuration argument used when constructing `geneset_wordcloud`.
+    resolution : Any, optional, default=1000
+        Configuration argument used when constructing `geneset_wordcloud`.
+    figsize : Any, optional, default=(4,10)
+        Configuration argument used when constructing `geneset_wordcloud`.
+    
+    Returns
+    -------
+    None
+        Initialize the class instance.
+    
+    Notes
+    -----
+    This class docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> gw_obj = ov.utils.geneset_wordcloud(adata=adata_aucs[:, var_name], cluster_key="g1", pseudotime="pt_via")
+    """
 
     def __init__(self,adata,cluster_key,pseudotime,resolution=1000,figsize=(4,10)):
+        """Initialize word-cloud builder from AnnData and grouping metadata."""
         self.adata=adata
         self.cluster_key=cluster_key
         self.pseudotime=pseudotime
@@ -1186,6 +1447,23 @@ class geneset_wordcloud(object):
         self.resolution=resolution
 
     def get(self,):
+        """
+        Compute per-cluster dominant genes and generate word-cloud objects
+        
+        Parameters
+        ----------
+        None
+            This callable does not require explicit parameters.
+        
+        Returns
+        -------
+        Any
+            Output produced by `get`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
+        """
         from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
         #Get the DataFrame of anndata
         test_df=self.adata.to_df()
@@ -1239,12 +1517,63 @@ class geneset_wordcloud(object):
         return wc_dict
 
     def get_geneset(self):
+        """
+        Return gene-to-dominant-cluster assignment table
+        
+        Parameters
+        ----------
+        None
+            This callable does not require explicit parameters.
+        
+        Returns
+        -------
+        Any
+            Output produced by `get_geneset`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
+        """
         return self.result_df
 
     def get_wordcloud(self):
+        """
+        Return generated word-cloud objects by cluster
+        
+        Parameters
+        ----------
+        None
+            This callable does not require explicit parameters.
+        
+        Returns
+        -------
+        Any
+            Output produced by `get_wordcloud`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
+        """
         return self.wc_dict
 
     def plot(self):
+        """
+        Plot stacked cluster-wise word clouds ordered by pseudotime
+        
+        Parameters
+        ----------
+        None
+            This callable does not require explicit parameters.
+        
+        Returns
+        -------
+        Any
+            Output produced by `plot`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
+        """
         fig = plt.figure(figsize=self.figsize)
         grid = plt.GridSpec(self.resolution, 10)
         
@@ -1276,6 +1605,33 @@ class geneset_wordcloud(object):
         return fig
     def plot_heatmap(self,n_convolve=10,figwidth=10,cmap='RdBu_r',
                      cbar=False,cbar_kws=None,cbar_fontsize=12):
+        """
+        Plot word-cloud panel plus smoothed feature heatmap along pseudotime
+        
+        Parameters
+        ----------
+        n_convolve : Any, optional, default=10
+            Input parameter for `plot_heatmap`.
+        figwidth : Any, optional, default=10
+            Input parameter for `plot_heatmap`.
+        cmap : Any, optional, default='RdBu_r'
+            Input parameter for `plot_heatmap`.
+        cbar : Any, optional, default=False
+            Input parameter for `plot_heatmap`.
+        cbar_kws : Any, optional, default=None
+            Input parameter for `plot_heatmap`.
+        cbar_fontsize : Any, optional, default=12
+            Input parameter for `plot_heatmap`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `plot_heatmap`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
+        """
         if cbar_kws==None:
             cbar_kws={'shrink':0.5,'location':'left'}
 
@@ -1383,26 +1739,36 @@ def plot_pca_variance_ratio(
     show=None,
     save=None,
 ):
-    r"""Plot PCA variance ratio to determine optimal number of principal components.
-
-    Arguments:
-        adata: AnnData object containing PCA results.
-        use_rep: Key in adata.uns for variance ratios. Default: 'scaled|original|pca_var_ratios'.
-        n_pcs: Number of principal components to plot. Default: 30.
-        log: Whether to use logarithmic scale. Default: False.
-        show: Show the figure. Default: None.
-        save: Save the figure to file. Default: None.
-
-    Returns:
-        None: Displays or saves the PCA variance ratio plot.
-
-    Examples:
-        >>> import omicverse as ov
-        >>> # Basic PCA variance ratio plot
-        >>> ov.pp.pca(adata, n_pcs=50)
-        >>> ov.utils.plot_pca_variance_ratio(adata, n_pcs=30)
-        >>> # Custom variance ratios with log scale
-        >>> ov.utils.plot_pca_variance_ratio(adata, n_pcs=50, log=True)
+    """
+    Plot PCA variance ratio to determine optimal number of principal components
+    
+    Parameters
+    ----------
+    adata : Any
+        Input parameter for `plot_pca_variance_ratio`.
+    use_rep : Any, optional, default='scaled|original|pca_var_ratios'
+        Input parameter for `plot_pca_variance_ratio`.
+    n_pcs : int, optional, default=30
+        Input parameter for `plot_pca_variance_ratio`.
+    log : bool, optional, default=False
+        Input parameter for `plot_pca_variance_ratio`.
+    show : Any, optional, default=None
+        Input parameter for `plot_pca_variance_ratio`.
+    save : Any, optional, default=None
+        Input parameter for `plot_pca_variance_ratio`.
+    
+    Returns
+    -------
+    Any
+        Output produced by `plot_pca_variance_ratio`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> # Basic PCA variance ratio plot
     """
     ranking(
         adata,

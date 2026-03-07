@@ -445,9 +445,38 @@ reference_dict = {
     'Banksy':'Singhal, V., Chou, N., Lee, J. et al. BANKSY unifies cell typing and tissue domain segmentation for scalable spatial omics data analysis. Nat Genet 56, 431–441 (2024). https://doi.org/10.1038/s41588-024-01664-3'
 }
 
+@register_function(
+    aliases=['生成参考表', 'generate_reference_table', 'reference table', 'annotation reference table'],
+    category="core",
+    description="Generate a standardized reference table from AnnData feature metadata for downstream annotation, mapping, and report generation workflows.",
+    prerequisites={'optional_functions': ['utils.get_gene_annotation']},
+    requires={'var': ['gene symbols or feature annotation']},
+    produces={'uns': ['reference_table']},
+    auto_fix='none',
+    examples=['ov.generate_reference_table(adata)'],
+    related=['utils.get_gene_annotation', 'datasets.download_data', 'single.generate_scRNA_report']
+)
 def generate_reference_table(adata):
     """
-    Generate a table of references for the adata object.
+    Generate a standardized reference table from AnnData feature metadata for downstream annotation, mapping, and report generation workflows
+    
+    Parameters
+    ----------
+    adata : Any
+        Input parameter for `generate_reference_table`.
+    
+    Returns
+    -------
+    Any
+        Output produced by `generate_reference_table`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> ov.generate_reference_table(adata)
     """
     import pandas as pd
     if 'REFERENCE_MANU' not in adata.uns.keys():

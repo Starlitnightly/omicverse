@@ -8,6 +8,7 @@ import base64
 from io import BytesIO
 import warnings
 import os
+from .._registry import register_function
 warnings.filterwarnings('ignore')
 
 from ..pl import *
@@ -187,28 +188,52 @@ class HTMLReportGenerator:
         return ''.join(logo_items)
 
 
+@register_function(
+    aliases=['单细胞分析报告', 'generate_scRNA_report', 'scRNA report'],
+    category="single",
+    description="Generate an HTML report summarizing single-cell QC, clustering, markers, and embedding views for reproducible interpretation.",
+    prerequisites={'optional_functions': ['lazy', 'pp.preprocess', 'pp.neighbors', 'pp.umap']},
+    requires={'obs': ['cluster labels'], 'obsm': ['X_umap (recommended)']},
+    produces={'uns': ['analysis_report']},
+    auto_fix='none',
+    examples=['ov.single.generate_scRNA_report(adata, output_path="reports/pbmc_report.html", species="human")'],
+    related=['single.lazy', 'utils.plot_embedding_celltype']
+)
 def generate_scRNA_report(adata, output_path="scRNA_analysis_report.html", 
                          species='human', sample_key=None, template_dir=None,
                          enable_analytics=True, analytics_id="OV-001"):
     """
-    Generate MultiQC-style HTML report for single-cell RNA-seq analysis
+    Generate an HTML report summarizing single-cell QC, clustering, markers, and embedding views for reproducible interpretation
     
-    Parameters:
-    -----------
-    adata : AnnData object
-        The analyzed single-cell data object from lazy function
-    output_path : str
-        Path to save the HTML report
-    species : str
-        Species information for the analysis
-    sample_key : str
-        Key for batch/sample information
-    template_dir : str
-        Directory containing HTML templates (optional)
-    enable_analytics : bool
-        Whether to enable analytics tracking
-    analytics_id : str
-        The ID for analytics tracking
+    Parameters
+    ----------
+    adata : Any
+        Input parameter for `generate_scRNA_report`.
+    output_path : Any, optional, default="scRNA_analysis_report.html"
+        Input parameter for `generate_scRNA_report`.
+    species : Any, optional, default='human'
+        Input parameter for `generate_scRNA_report`.
+    sample_key : Any, optional, default=None
+        Input parameter for `generate_scRNA_report`.
+    template_dir : Any, optional, default=None
+        Input parameter for `generate_scRNA_report`.
+    enable_analytics : Any, optional, default=True
+        Input parameter for `generate_scRNA_report`.
+    analytics_id : Any, optional, default="OV-001"
+        Input parameter for `generate_scRNA_report`.
+    
+    Returns
+    -------
+    Any
+        Output produced by `generate_scRNA_report`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> ov.single.generate_scRNA_report(adata, output_path="reports/pbmc_report.html", species="human")
     """
     
     # Initialize report generator

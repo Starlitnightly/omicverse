@@ -9,6 +9,7 @@ import scipy.sparse as sp
 from sklearn.preprocessing import normalize
 from tqdm import tqdm
 from .._settings import add_reference
+from .._registry import register_function
 
 simba_install=False
 
@@ -20,13 +21,59 @@ def global_imports(modulename,shortname = None, asfunction = False):
     else:        
         globals()[shortname] = __import__(modulename)
 
+@register_function(
+    aliases=['SIMBA整合器', 'pySIMBA', 'single-cell batch integration simba'],
+    category="single",
+    description="SIMBA wrapper for batch correction and integrated manifold learning across single-cell datasets.",
+    prerequisites={'optional_functions': ['pp.preprocess']},
+    requires={'obs': ['batch labels']},
+    produces={'obsm': ['X_simba'], 'uns': ['simba graph/model']},
+    auto_fix='none',
+    examples=['simba_object = ov.single.pySIMBA(adata, workdir)', 'simba_object.preprocess(batch_key="batch")'],
+    related=['single.batch_correction', 'pp.neighbors', 'pp.umap']
+)
 class pySIMBA(object):
+    """
+    SIMBA wrapper for batch correction and integrated manifold learning across single-cell datasets
+    
+    Parameters
+    ----------
+    adata : Any
+        Configuration argument used when constructing `pySIMBA`.
+    workdir : Any, optional, default="simba_result"
+        Configuration argument used when constructing `pySIMBA`.
+    
+    Returns
+    -------
+    None
+        Initialize the class instance.
+    
+    Notes
+    -----
+    This class docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> simba_object = ov.single.pySIMBA(adata, workdir)
+    """
 
     def check_simba(self):
-        r"""Check if SIMBA package has been installed.
+        """
+        Check if SIMBA package has been installed
         
-        Raises:
-            ImportError: If SIMBA package is not installed
+        Parameters
+        ----------
+        None
+            This callable does not require explicit parameters.
+        
+        Returns
+        -------
+        Any
+            Output produced by `check_simba`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         global simba_install
         try:
@@ -58,16 +105,30 @@ class pySIMBA(object):
 
     def preprocess(self,batch_key='batch',min_n_cells=3,
                     method='lib_size',n_top_genes=3000,n_bins=5):
-        r"""Preprocess the AnnData object for SIMBA analysis.
-
-        Arguments:
-            batch_key (str): Key of batch information in adata.obs (default: 'batch')
-            min_n_cells (int): Minimum number of cells for a gene to be considered (default: 3)
-            method (str): Method for normalization (default: 'lib_size')
-            n_top_genes (int): Number of top variable genes to keep (default: 3000)
-            n_bins (int): Number of bins for discretization (default: 5)
-
+        """
+        Preprocess the AnnData object for SIMBA analysis
         
+        Parameters
+        ----------
+        batch_key : Any, optional, default='batch'
+            Input parameter for `preprocess`.
+        min_n_cells : Any, optional, default=3
+            Input parameter for `preprocess`.
+        method : Any, optional, default='lib_size'
+            Input parameter for `preprocess`.
+        n_top_genes : Any, optional, default=3000
+            Input parameter for `preprocess`.
+        n_bins : Any, optional, default=5
+            Input parameter for `preprocess`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `preprocess`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         adata=self.adata
         adata_dict={}
@@ -84,14 +145,28 @@ class pySIMBA(object):
 
     def gen_graph(self,n_components=15, k=15,
                     copy=False,dirname='graph0'):
-        r"""Generate the graph structure for batch correction.
-
-        Arguments:
-            n_components (int): Number of components for dimensionality reduction (default: 15)
-            k (int): Number of neighbors for graph construction (default: 15)
-            copy (bool): Whether to copy the adata object (default: False)
-            dirname (str): Directory name for saving graph results (default: 'graph0')
+        """
+        Generate the graph structure for batch correction
         
+        Parameters
+        ----------
+        n_components : Any, optional, default=15
+            Input parameter for `gen_graph`.
+        k : Any, optional, default=15
+            Input parameter for `gen_graph`.
+        copy : Any, optional, default=False
+            Input parameter for `gen_graph`.
+        dirname : Any, optional, default='graph0'
+            Input parameter for `gen_graph`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `gen_graph`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
 
 
@@ -112,14 +187,28 @@ class pySIMBA(object):
                     dirname=dirname)
         
     def train(self,num_workers=12,auto_wd=True, save_wd=True, output='model'):
-        r"""Train the SIMBA model for batch correction.
-
-        Arguments:
-            num_workers (int): Number of workers for parallel training (default: 12)
-            auto_wd (bool): Whether to use automatic weight decay (default: True)
-            save_wd (bool): Whether to save weight decay parameters (default: True)
-            output (str): Output directory for saving the trained model (default: 'model')
-
+        """
+        Train the SIMBA model for batch correction
+        
+        Parameters
+        ----------
+        num_workers : Any, optional, default=12
+            Input parameter for `train`.
+        auto_wd : Any, optional, default=True
+            Input parameter for `train`.
+        save_wd : Any, optional, default=True
+            Input parameter for `train`.
+        output : Any, optional, default='model'
+            Input parameter for `train`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `train`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
 
         # modify parameters
@@ -131,13 +220,22 @@ class pySIMBA(object):
         add_reference(self.adata,'SIMBA','batch correction with SIMBA')
 
     def load(self,model_path=None):
-        r"""Load a pre-trained SIMBA model for batch correction.
-
-        Arguments:
-            model_path (str): Path to the model directory (default: None)
-                            If None, loads from default location
-
+        """
+        Load a pre-trained SIMBA model for batch correction
         
+        Parameters
+        ----------
+        model_path : Any, optional, default=None
+            Input parameter for `load`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `load`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         # load in graph ('graph0') info
         if model_path==None:
@@ -149,13 +247,22 @@ class pySIMBA(object):
        
 
     def batch_correction(self,use_precomputed=False):
-        r"""Perform batch correction using the trained SIMBA model.
-
-        Arguments:
-            use_precomputed (bool): Whether to use precomputed embeddings (default: False)
-
-        Returns:
-            AnnData: Batch-corrected AnnData object with X_simba embedding
+        """
+        Perform batch correction using the trained SIMBA model
+        
+        Parameters
+        ----------
+        use_precomputed : Any, optional, default=False
+            Input parameter for `batch_correction`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `batch_correction`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         dict_adata = si.read_embedding()
         adata_dict={}

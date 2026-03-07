@@ -4,6 +4,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse import coo_matrix, issparse
 
 from scanpy.tools._paga import PAGA
+from .._registry import register_function
 
 # TODO: Add docstrings
 class PAGA_tree(PAGA):
@@ -213,6 +214,17 @@ def get_sparse_from_igraph(graph, weight_attr=None):
         return csr_matrix(shape)
 
 
+@register_function(
+    aliases=['计算 PAGA 图', 'cal_paga', 'trajectory graph abstraction'],
+    category="utils",
+    description="Compute PAGA connectivity among cell groups to summarize lineage topology and coarse-grained trajectory structure.",
+    prerequisites={'functions': ['pp.neighbors'], 'optional_functions': ['pp.leiden']},
+    requires={'obsp': ['connectivities'], 'uns': ['neighbors'], 'obs': ['cluster labels']},
+    produces={'uns': ['paga'], 'obs': ['pseudotime (optional)']},
+    auto_fix='escalate',
+    examples=['ov.utils.cal_paga(adata, use_time_prior="dpt_pseudotime", vkey="paga")'],
+    related=['utils.plot_paga', 'pp.neighbors', 'pp.umap']
+)
 def cal_paga(
     adata,
     groups=None,
@@ -224,50 +236,42 @@ def cal_paga(
     minimum_spanning_tree=True,
     copy=False,
 ):
-    """PAGA graph with velocity-directed edges.
-
-    Mapping out the coarse-grained connectivity structures of complex manifolds
-    :cite:p:`Wolf19`. By quantifying the connectivity of partitions (groups, clusters) of the
-    single-cell graph, partition-based graph abstraction (PAGA) generates a much
-    simpler abstracted graph (*PAGA graph*) of partitions, in which edge weights
-    represent confidence in the presence of connections.
-
+    """
+    Compute PAGA connectivity among cell groups to summarize lineage topology and coarse-grained trajectory structure
+    
     Parameters
     ----------
-    adata : :class:`~anndata.AnnData`
-        An annotated data matrix.
-    groups : key for categorical in `adata.obs`, optional (default: 'louvain')
-        You can pass your predefined groups by choosing any categorical
-        annotation of observations (`adata.obs`).
-    vkey: `str` or `None` (default: `None`)
-        Key for annotations of observations/cells or variables/genes.
-    use_time_prior : `str` or bool, optional (default: True)
-        Obs key for pseudo-time values.
-        If True, 'velocity_pseudotime' is used if available.
-    root_key : `str` or bool, optional (default: None)
-        Obs key for root states.
-    end_key : `str` or bool, optional (default: None)
-        Obs key for end states.
-    threshold_root_end_prior : `float` (default: 0.9)
-        Threshold for root and final states priors, to be in the range of [0,1].
-        Values above the threshold will be considered as terminal and included as prior.
-    minimum_spanning_tree : bool, optional (default: True)
-        Whether to prune the tree such that a path from A-to-B
-        is removed if another more confident path exists.
-    copy : `bool`, optional (default: `False`)
-        Copy `adata` before computation and return a copy.
-        Otherwise, perform computation inplace and return `None`.
-
+    adata : Any
+        Input parameter for `cal_paga`.
+    groups : Any, optional, default=None
+        Input parameter for `cal_paga`.
+    vkey : Any, optional, default="velocity"
+        Input parameter for `cal_paga`.
+    use_time_prior : Any, optional, default=True
+        Input parameter for `cal_paga`.
+    root_key : Any, optional, default=None
+        Input parameter for `cal_paga`.
+    end_key : Any, optional, default=None
+        Input parameter for `cal_paga`.
+    threshold_root_end_prior : Any, optional, default=None
+        Input parameter for `cal_paga`.
+    minimum_spanning_tree : Any, optional, default=True
+        Input parameter for `cal_paga`.
+    copy : Any, optional, default=False
+        Input parameter for `cal_paga`.
+    
     Returns
     -------
-    connectivities: `.uns`
-        The full adjacency matrix of the abstracted graph, weights correspond to
-        confidence in the connectivities of partitions.
-    connectivities_tree: `.uns`
-        The adjacency matrix of the tree-like subgraph that best explains the topology.
-    transitions_confidence: `.uns`
-        The adjacency matrix of the abstracted directed graph, weights correspond to
-        confidence in the transitions between partitions.
+    Any
+        Output produced by `cal_paga`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> ov.utils.cal_paga(adata, use_time_prior="dpt_pseudotime", vkey="paga")
     """
     if "neighbors" not in adata.uns:
         raise ValueError(
@@ -432,6 +436,17 @@ def _safe_categorical_to_str(adata, color_key):
         return adata_copy
     return adata
 
+@register_function(
+    aliases=['绘制 PAGA 图', 'plot_paga', 'paga visualization'],
+    category="utils",
+    description="Plot PAGA graph over embedding coordinates to visualize lineage transitions and connectivity confidence.",
+    prerequisites={'functions': ['cal_paga']},
+    requires={'uns': ['paga'], 'obsm': ['X_umap or selected basis']},
+    produces={},
+    auto_fix='none',
+    examples=['ov.utils.plot_paga(adata, basis="umap", title="PAGA graph")'],
+    related=['utils.cal_paga', 'pl.embedding']
+)
 def plot_paga(adata,
     basis=None,
     vkey="velocity",
@@ -476,6 +491,113 @@ def plot_paga(adata,
     ncols=None,
     scatter_flag=None,
     **kwargs,):
+    """
+    Plot PAGA graph over embedding coordinates to visualize lineage transitions and connectivity confidence
+    
+    Parameters
+    ----------
+    adata : Any
+        Input parameter for `plot_paga`.
+    basis : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    vkey : Any, optional, default="velocity"
+        Input parameter for `plot_paga`.
+    color : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    layer : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    title : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    threshold : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    layout : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    layout_kwds : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    init_pos : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    root : Any, optional, default=0
+        Input parameter for `plot_paga`.
+    labels : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    single_component : Any, optional, default=False
+        Input parameter for `plot_paga`.
+    dashed_edges : Any, optional, default="connectivities"
+        Input parameter for `plot_paga`.
+    solid_edges : Any, optional, default="transitions_confidence"
+        Input parameter for `plot_paga`.
+    transitions : Any, optional, default="transitions_confidence"
+        Input parameter for `plot_paga`.
+    node_size_scale : Any, optional, default=1
+        Input parameter for `plot_paga`.
+    node_size_power : Any, optional, default=0.5
+        Input parameter for `plot_paga`.
+    edge_width_scale : Any, optional, default=0.4
+        Input parameter for `plot_paga`.
+    min_edge_width : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    max_edge_width : Any, optional, default=2
+        Input parameter for `plot_paga`.
+    arrowsize : Any, optional, default=15
+        Input parameter for `plot_paga`.
+    random_state : Any, optional, default=0
+        Input parameter for `plot_paga`.
+    pos : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    node_colors : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    normalize_to_color : Any, optional, default=False
+        Input parameter for `plot_paga`.
+    cmap : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    cax : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    cb_kwds : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    add_pos : Any, optional, default=True
+        Input parameter for `plot_paga`.
+    export_to_gexf : Any, optional, default=False
+        Input parameter for `plot_paga`.
+    plot : Any, optional, default=True
+        Input parameter for `plot_paga`.
+    use_raw : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    size : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    groups : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    components : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    figsize : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    dpi : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    show : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    save : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    ax : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    ncols : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    scatter_flag : Any, optional, default=None
+        Input parameter for `plot_paga`.
+    **kwargs : Any
+        Input parameter for `plot_paga`.
+    
+    Returns
+    -------
+    Any
+        Output produced by `plot_paga`.
+    
+    Notes
+    -----
+    This docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> ov.utils.plot_paga(adata, basis="umap", title="PAGA graph")
+    """
 
     if layout is not None:
         basis = None
@@ -531,4 +653,3 @@ def plot_paga(adata,
     ncols=ncols,
     scatter_flag=scatter_flag,
     **kwargs,)
-

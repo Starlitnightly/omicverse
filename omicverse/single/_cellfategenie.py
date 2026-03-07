@@ -83,6 +83,29 @@ def augment_gene_expression_noise(X_train, noise_std=0.01):
     related=["pp.leiden", "utils.plot_heatmap", "pl.embedding"]
 )
 class Fate(object):
+    """
+    TimeFateKernel: Adaptive ridge regression model to identify timing-associated genes in single-cell pseudotime analysis
+    
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Configuration argument used when constructing `Fate`.
+    pseudotime : str
+        Configuration argument used when constructing `Fate`.
+    
+    Returns
+    -------
+    None
+        Initialize the class instance.
+    
+    Notes
+    -----
+    This class docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> # Initialize Fate analysis
+    """
 
     def __init__(self,adata:anndata.AnnData,pseudotime:str):
         """
@@ -104,18 +127,30 @@ class Fate(object):
                    )->pd.DataFrame:
         """
         Initialize the model
-
-        Arguments:
-            test_size: float, the proportion of test set
-            random_state: int, random seed
-            alpha: float, the regularization strength of Ridge regression
-            use_data_augmentation: bool, 是否使用数据增强策略
-            augmentation_strategy: str, 数据增强策略的名称，例如 'jitter_pseudotime_noise', 'gene_expression_noise', 'both', 'none'
-            augmentation_intensity: float, 数据增强的强度参数，例如噪声的标准差，抖动的范围
-
-        Returns:
-            res_pd_ievt: pd.DataFrame, the result of ridge model
-
+        
+        Parameters
+        ----------
+        test_size : float, optional, default=0.3
+            Input parameter for `model_init`.
+        random_state : int, optional, default=112
+            Input parameter for `model_init`.
+        alpha : float, optional, default=0.1
+            Input parameter for `model_init`.
+        use_data_augmentation : bool, optional, default=False
+            Input parameter for `model_init`.
+        augmentation_strategy : str, optional, default='jitter_pseudotime_noise'
+            Input parameter for `model_init`.
+        augmentation_intensity : float, optional, default=0.05
+            Input parameter for `model_init`.
+        
+        Returns
+        -------
+        pd.DataFrame
+            Output produced by `model_init`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         X = self.adata.to_df()
         y = self.adata.obs.loc[:,self.pseudotime]
@@ -174,13 +209,22 @@ class Fate(object):
     def atac_init(self,columns,gene_name='neargene'): # 保持不变， 不需要修改
         """
         Initialize the atac model
-
-        if you want to use atac data to fit the model, you should use this function first
-
-        Arguments:
-            columns: list, the columns of atac data
-            gene_name: str, the column name of gene name in adata.var
-
+        
+        Parameters
+        ----------
+        columns : Any
+            Input parameter for `atac_init`.
+        gene_name : Any, optional, default='neargene'
+            Input parameter for `atac_init`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `atac_init`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         self.atac_gene_name=gene_name
         self.peak_pd=self.adata.var[columns].copy()
@@ -189,10 +233,20 @@ class Fate(object):
     def get_related_peak(self,peak): # 保持不变， 不需要修改
         """
         Get the related peak of gene
-
-        Arguments:
-            peak: str, the peak name
-
+        
+        Parameters
+        ----------
+        peak : Any
+            Input parameter for `get_related_peak`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `get_related_peak`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         related_genes=self.peak_pd.loc[peak,self.atac_gene_name].unique()
         return self.peak_pd.loc[self.peak_pd[self.atac_gene_name].isin(related_genes)].index.tolist()
@@ -205,21 +259,36 @@ class Fate(object):
             )->pd.DataFrame:
         """
         Adaptive Threshold Regression
-
-        Arguments:
-            test_size: float, the proportion of test set
-            random_state: int, random seed
-            alpha: float, the regularization strength of Ridge regression
-            stop: int, the maximum number of iterations
-            flux: float, the flux of r2
-            related: bool, whether to use the related peak if you use atac data
-            use_data_augmentation: bool, 是否使用数据增强策略
-            augmentation_strategy: str, 数据增强策略的名称，例如 'jitter_pseudotime_noise', 'gene_expression_noise', 'both', 'none'
-            augmentation_intensity: float, 数据增强的强度参数，例如噪声的标准差，抖动的范围
-
-        Returns:
-            res_pd: pd.DataFrame, the result of ridge model
-
+        
+        Parameters
+        ----------
+        test_size : float, optional, default=0.4
+            Input parameter for `ATR`.
+        random_state : int, optional, default=112
+            Input parameter for `ATR`.
+        alpha : float, optional, default=0.1
+            Input parameter for `ATR`.
+        stop : int, optional, default=100
+            Input parameter for `ATR`.
+        flux : Any, optional, default=0.01
+            Input parameter for `ATR`.
+        related : Any, optional, default=False
+            Input parameter for `ATR`.
+        use_data_augmentation : bool, optional, default=False
+            Input parameter for `ATR`.
+        augmentation_strategy : str, optional, default='jitter_pseudotime_noise'
+            Input parameter for `ATR`.
+        augmentation_intensity : float, optional, default=0.05
+            Input parameter for `ATR`.
+        
+        Returns
+        -------
+        pd.DataFrame
+            Output produced by `ATR`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         res_pd=pd.DataFrame()
         coef_threshold_li=[]
@@ -294,19 +363,32 @@ class Fate(object):
                    )->pd.DataFrame:
         """
         Fit the model
-
-        Arguments:
-            test_size: float, the proportion of test set
-            random_state: int, random seed
-            alpha: float, the regularization strength of Ridge regression
-            related: bool, whether to use the related peak if you use atac data
-            use_data_augmentation: bool, 是否使用数据增强策略
-            augmentation_strategy: str, 数据增强策略的名称，例如 'jitter_pseudotime_noise', 'gene_expression_noise', 'both', 'none'
-            augmentation_intensity: float, 数据增强的强度参数，例如噪声的标准差，抖动的范围
-
-        Returns:
-            res_pd_ievt: pd.DataFrame, the result of ridge model
-
+        
+        Parameters
+        ----------
+        test_size : float, optional, default=0.3
+            Input parameter for `model_fit`.
+        random_state : int, optional, default=112
+            Input parameter for `model_fit`.
+        alpha : float, optional, default=0.1
+            Input parameter for `model_fit`.
+        related : Any, optional, default=False
+            Input parameter for `model_fit`.
+        use_data_augmentation : bool, optional, default=False
+            Input parameter for `model_fit`.
+        augmentation_strategy : str, optional, default='jitter_pseudotime_noise'
+            Input parameter for `model_fit`.
+        augmentation_intensity : float, optional, default=0.05
+            Input parameter for `model_fit`.
+        
+        Returns
+        -------
+        pd.DataFrame
+            Output produced by `model_fit`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         train_idx=self.coef.loc[self.coef['abs(coef)']>=self.coef_threshold].index.values
         if related == True:
@@ -360,6 +442,23 @@ class Fate(object):
         return res_pd_ievt
 
     def kendalltau_filter(self): # 保持不变， 不需要修改
+        """
+        Compute Kendall tau statistics for filtered features vs pseudotime
+        
+        Parameters
+        ----------
+        None
+            This callable does not require explicit parameters.
+        
+        Returns
+        -------
+        Any
+            Output produced by `kendalltau_filter`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
+        """
         import pandas as pd
         from scipy.stats import kendalltau
         test_pd=pd.DataFrame()
@@ -387,6 +486,39 @@ class Fate(object):
                     sim_key: str = "DM_Similarity",
                     eigval_key: str = "DM_EigenValues",
                     eigvec_key: str = "DM_EigenVectors",):
+        """
+        Estimate low-dimensional density on diffusion-map coordinates
+        
+        Parameters
+        ----------
+        n_components : int, optional, default=10
+            Input parameter for `low_density`.
+        knn : int, optional, default=30
+            Input parameter for `low_density`.
+        alpha : float, optional, default=0
+            Input parameter for `low_density`.
+        seed : Any, optional, default=0
+            Input parameter for `low_density`.
+        pca_key : str, optional, default="X_pca"
+            Input parameter for `low_density`.
+        kernel_key : str, optional, default="DM_Kernel"
+            Input parameter for `low_density`.
+        sim_key : str, optional, default="DM_Similarity"
+            Input parameter for `low_density`.
+        eigval_key : str, optional, default="DM_EigenValues"
+            Input parameter for `low_density`.
+        eigvec_key : str, optional, default="DM_EigenVectors"
+            Input parameter for `low_density`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `low_density`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
+        """
         try:
             import mellon
         except:
@@ -409,6 +541,35 @@ class Fate(object):
                     expression_key: str = "MAGIC_imputed_data",
                     distances_key: str = "distances",
                     ):
+        """
+        Calculate lineage-specific change scores using density variability
+        
+        Parameters
+        ----------
+        cluster_key : str
+            Input parameter for `lineage_score`.
+        lineage : Any, optional, default=None
+            Input parameter for `lineage_score`.
+        cell_mask : Any, optional, default="specification"
+            Input parameter for `lineage_score`.
+        density_key : str, optional, default="mellon_log_density_lowd"
+            Input parameter for `lineage_score`.
+        localvar_key : str, optional, default="local_variability"
+            Input parameter for `lineage_score`.
+        expression_key : str, optional, default="MAGIC_imputed_data"
+            Input parameter for `lineage_score`.
+        distances_key : str, optional, default="distances"
+            Input parameter for `lineage_score`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `lineage_score`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
+        """
         from ..external.palantir.utils import run_low_density_variability,run_local_variability
 
         if localvar_key not in self.adata.layers.keys():
@@ -432,13 +593,20 @@ class Fate(object):
     def get_coef(self,type:str='raw')->pd.DataFrame: # 保持不变， 不需要修改
         """
         Get the coef of model
-
-        Arguments:
-            type: str, the type of coef, 'raw' or 'filter'
-
-        Returns:
-            coef: pd.DataFrame, the coef of model
-
+        
+        Parameters
+        ----------
+        type : str, optional, default='raw'
+            Input parameter for `get_coef`.
+        
+        Returns
+        -------
+        pd.DataFrame
+            Output produced by `get_coef`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
 
         if type=='raw':
@@ -449,13 +617,20 @@ class Fate(object):
     def get_r2(self,type:str='raw')->float: # 保持不变， 不需要修改
         """
         Get the r2 of model
-
-        Arguments:
-            type: str, the type of r2, 'raw' or 'filter'
-
-        Returns:
-            r2: float, the r2 of model
-
+        
+        Parameters
+        ----------
+        type : str, optional, default='raw'
+            Input parameter for `get_r2`.
+        
+        Returns
+        -------
+        float
+            Output produced by `get_r2`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         if type=='raw':
             return self.raw_r2
@@ -465,13 +640,20 @@ class Fate(object):
     def get_mse(self,type:str='raw')->pd.DataFrame: # 保持不变， 不需要修改
         """
         Get the mse of model
-
-        Arguments:
-            type: str, the type of mse, 'raw' or 'filter'
-
-        Returns:
-            mse: float, the mse of model
-
+        
+        Parameters
+        ----------
+        type : str, optional, default='raw'
+            Input parameter for `get_mse`.
+        
+        Returns
+        -------
+        pd.DataFrame
+            Output produced by `get_mse`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         if type=='raw':
             return self.raw_mse
@@ -481,13 +663,20 @@ class Fate(object):
     def get_rmse(self,type:str='raw')->pd.DataFrame: # 保持不变， 不需要修改
         """
         Get the rmse of model
-
-        Arguments:
-            type: str, the type of rmse, 'raw' or 'filter'
-
-        Returns:
-            rmse: float, the rmse of model
-
+        
+        Parameters
+        ----------
+        type : str, optional, default='raw'
+            Input parameter for `get_rmse`.
+        
+        Returns
+        -------
+        pd.DataFrame
+            Output produced by `get_rmse`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         if type=='raw':
             return self.raw_rmse
@@ -497,13 +686,20 @@ class Fate(object):
     def get_mae(self,type:str='raw')->pd.DataFrame: # 保持不变， 不需要修改
         """
         Get the mae of model
-
-        Arguments:
-            type: str, the type of mae, 'raw' or 'filter'
-
-        Returns:
-            mae: float, the mae of model
-
+        
+        Parameters
+        ----------
+        type : str, optional, default='raw'
+            Input parameter for `get_mae`.
+        
+        Returns
+        -------
+        pd.DataFrame
+            Output produced by `get_mae`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         if type=='raw':
             return self.raw_mae
@@ -514,17 +710,26 @@ class Fate(object):
                     fontsize:int=12,alpha:float=0.8)->tuple:
         """
         Plot the filtering result
-
-        Arguments:
-            figsize: tuple, the size of figure
-            color: str, the color of scatter
-            fontsize: int, the size of text
-            alpha: float, the transparency of scatter
-
-        Returns:
-            fig: matplotlib.pyplot.figure, the figure of filtering result
-            ax: matplotlib.pyplot.axis, the axis of filtering result
-
+        
+        Parameters
+        ----------
+        figsize : tuple, optional, default=(3,3)
+            Input parameter for `plot_filtering`.
+        color : str, optional, default='#5ca8dc'
+            Input parameter for `plot_filtering`.
+        fontsize : int, optional, default=12
+            Input parameter for `plot_filtering`.
+        alpha : float, optional, default=0.8
+            Input parameter for `plot_filtering`.
+        
+        Returns
+        -------
+        tuple
+            Output produced by `plot_filtering`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         fig, ax = plt.subplots(figsize=figsize)
         ax.scatter(self.max_threshold['coef_threshold'],
@@ -558,17 +763,26 @@ class Fate(object):
                     fontsize:int=12)->tuple:
         """
         Plot the fitting result
-
-        Arguments:
-            type: str, the type of fitting result, 'raw' or 'filter'
-            figsize: tuple, the size of figure
-            color: str, the color of scatter
-            fontsize: int, the size of text
-
-        Returns:
-            fig: matplotlib.pyplot.figure, the figure of fitting result
-            ax: matplotlib.pyplot.axis, the axis of fitting result
-
+        
+        Parameters
+        ----------
+        type : str, optional, default='raw'
+            Input parameter for `plot_fitting`.
+        figsize : tuple, optional, default=(3,3)
+            Input parameter for `plot_fitting`.
+        color : str, optional, default='#0d6a3b'
+            Input parameter for `plot_fitting`.
+        fontsize : int, optional, default=12
+            Input parameter for `plot_fitting`.
+        
+        Returns
+        -------
+        tuple
+            Output produced by `plot_fitting`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         import seaborn as sns
         fig, ax = plt.subplots(figsize=figsize)
@@ -607,20 +821,32 @@ class Fate(object):
                     fontsize:int=12,legend_loc:list=[0.2,0.1,0],omics='RNA')->tuple:
         """
         Plot the colorful of clusters fitting result
-
-        Arguments:
-            type: str, the type of fitting result, 'raw' or 'filter'
-            cluster_key: str, the key of cluster of color
-            figsize: tuple, the size of figure
-            color: str, the color of scatter
-            fontsize: int, the size of text
-            legend_loc: list, the location of r2,mae,mse
-            omics: str, the type of omics
-
-        Returns:
-            fig: matplotlib.pyplot.figure, the figure of fitting result
-            ax: matplotlib.pyplot.axis, the axis of fitting result
-
+        
+        Parameters
+        ----------
+        type : str, optional, default='raw'
+            Input parameter for `plot_color_fitting`.
+        cluster_key : str, optional, default='clusters'
+            Input parameter for `plot_color_fitting`.
+        figsize : tuple, optional, default=(3,3)
+            Input parameter for `plot_color_fitting`.
+        color : str, optional, default='#6BBBA0'
+            Input parameter for `plot_color_fitting`.
+        fontsize : int, optional, default=12
+            Input parameter for `plot_color_fitting`.
+        legend_loc : list, optional, default=[0.2,0.1,0]
+            Input parameter for `plot_color_fitting`.
+        omics : Any, optional, default='RNA'
+            Input parameter for `plot_color_fitting`.
+        
+        Returns
+        -------
+        tuple
+            Output produced by `plot_color_fitting`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         #fontsize=13
         fig, ax = plt.subplots(figsize=figsize)
@@ -696,7 +922,43 @@ class Fate(object):
                          fontsize=fontsize+1)
         return fig,ax
 
+@register_function(
+    aliases=['基因趋势分析器', 'gene_trends', 'pseudotime gene trends'],
+    category="single",
+    description="Model and visualize gene-set or gene-level trends along pseudotime to identify dynamic programs during differentiation.",
+    prerequisites={'optional_functions': ['single.VIA', 'utils.cal_paga']},
+    requires={'obs': ['pseudotime'], 'var': ['genes/features']},
+    produces={'uns': ['gene trend fits']},
+    auto_fix='none',
+    examples=['gt_obj = ov.single.gene_trends(adata_aucs, "pt_via", var_name)', 'gt_obj.calculate()'],
+    related=['single.Fate', 'utils.plot_paga']
+)
 class gene_trends(object):
+    """
+    Model and visualize gene-set or gene-level trends along pseudotime to identify dynamic programs during differentiation
+    
+    Parameters
+    ----------
+    adata : Any
+        Configuration argument used when constructing `gene_trends`.
+    pseudotime : Any
+        Configuration argument used when constructing `gene_trends`.
+    var_names : Any
+        Configuration argument used when constructing `gene_trends`.
+    
+    Returns
+    -------
+    None
+        Initialize the class instance.
+    
+    Notes
+    -----
+    This class docstring follows the unified OmicVerse help template.
+    
+    Examples
+    --------
+    >>> gt_obj = ov.single.gene_trends(adata_aucs, "pt_via", var_name)
+    """
 
     def __init__(self,adata,pseudotime,var_names):
         """
@@ -716,10 +978,20 @@ class gene_trends(object):
     def calculate(self,n_convolve=None):
         """
         Calculate the trends of gene with pseudotime
-
-        Arguments:
-            n_convolve: int, the number of convolve to smooth the trends
         
+        Parameters
+        ----------
+        n_convolve : Any, optional, default=None
+            Input parameter for `calculate`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `calculate`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         import numpy as np
         from scipy.spatial.distance import euclidean
@@ -783,6 +1055,19 @@ class gene_trends(object):
         """
         Get the data of heatmap of trends
         
+        Parameters
+        ----------
+        None
+            This callable does not require explicit parameters.
+        
+        Returns
+        -------
+        Any
+            Output produced by `get_heatmap`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         return self.normalized_data
     
@@ -790,6 +1075,19 @@ class gene_trends(object):
         """
         Get the kendalltau of trends
         
+        Parameters
+        ----------
+        None
+            This callable does not require explicit parameters.
+        
+        Returns
+        -------
+        Any
+            Output produced by `get_kendalltau`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         return self.kt
     
@@ -797,6 +1095,19 @@ class gene_trends(object):
         """
         Get the linregress of trends
         
+        Parameters
+        ----------
+        None
+            This callable does not require explicit parameters.
+        
+        Returns
+        -------
+        Any
+            Output produced by `get_linregress`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         return self.lr
     
@@ -805,13 +1116,26 @@ class gene_trends(object):
                         threshold:float=0.1):
         """
         Calculate the border cell of each cluster
-
-        Arguments:
-            adata: AnnData object
-            pseudotime: str, the column name of pseudotime in adata.obs
-            cluster_key: str, the column name of cluster in adata.obs
-            threshold: float, the threshold of border cell
         
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            Input parameter for `cal_border_cell`.
+        pseudotime : str
+            Input parameter for `cal_border_cell`.
+        cluster_key : str
+            Input parameter for `cal_border_cell`.
+        threshold : float, optional, default=0.1
+            Input parameter for `cal_border_cell`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `cal_border_cell`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         adata.obs[cluster_key]=adata.obs[cluster_key].astype('category')
         adata.obs['border']=False
@@ -836,18 +1160,30 @@ class gene_trends(object):
                         num_gene:int=10,threshold=None):
         """
         Get the border gene between two clusters
-
-        Arguments:
-            adata: AnnData object
-            cluster_key: str, the column name of cluster in adata.obs
-            cluster1: str, the name of cluster1
-            cluster2: str, the name of cluster2
-            num_gene: int, the number of border gene
-            threshold: float, the threshold of border gene
-
-        Returns:
-            border_gene: list, the list of border gene
         
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            Input parameter for `get_border_gene`.
+        cluster_key : str
+            Input parameter for `get_border_gene`.
+        cluster1 : str
+            Input parameter for `get_border_gene`.
+        cluster2 : str
+            Input parameter for `get_border_gene`.
+        num_gene : int, optional, default=10
+            Input parameter for `get_border_gene`.
+        threshold : Any, optional, default=None
+            Input parameter for `get_border_gene`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `get_border_gene`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         if threshold is None:
             threshold=self.normalized_pd.mean().mean()
@@ -869,16 +1205,26 @@ class gene_trends(object):
                         num_gene:int=10,threshold=None):
         """
         Get the border gene between two clusters for all clusters
-
-        Arguments:
-            adata: AnnData object
-            cluster_key: str, the column name of cluster in adata.obs
-            num_gene: int, the number of border gene
-            threshold: float, the threshold of border gene
-
-        Returns:
-            border_gene_dict: dict, the dict of border gene
         
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            Input parameter for `get_multi_border_gene`.
+        cluster_key : str
+            Input parameter for `get_multi_border_gene`.
+        num_gene : int, optional, default=10
+            Input parameter for `get_multi_border_gene`.
+        threshold : Any, optional, default=None
+            Input parameter for `get_multi_border_gene`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `get_multi_border_gene`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         border_gene_dict={}
         for cluster1 in adata.obs[cluster_key].cat.categories:
@@ -896,16 +1242,26 @@ class gene_trends(object):
                                 cluster_key:str,cluster1:str,cluster2:str,):
         """
         Get the special border gene between two clusters
-
-        Arguments:
-            adata: AnnData object
-            cluster_key: str, the column name of cluster in adata.obs
-            cluster1: str, the name of cluster1
-            cluster2: str, the name of cluster2
-
-        Returns:
-            border_gene: list, the list of border gene
         
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            Input parameter for `get_special_border_gene`.
+        cluster_key : str
+            Input parameter for `get_special_border_gene`.
+        cluster1 : str
+            Input parameter for `get_special_border_gene`.
+        cluster2 : str
+            Input parameter for `get_special_border_gene`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `get_special_border_gene`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         # the border gene can't appear in other cluster
         border_gene_dict=self.get_multi_border_gene(adata,cluster_key,num_gene=10)
@@ -925,17 +1281,28 @@ class gene_trends(object):
                         num_gene:int=10,threshold=None):
         """
         Get the kernel gene of cluster
-
-        Arguments:
-            adata: AnnData object
-            cluster_key: str, the column name of cluster in adata.obs
-            cluster: str, the name of cluster
-            num_gene: int, the number of kernel gene
-            threshold: float, the threshold of kernel gene
-
-        Returns:
-            kernel_gene: list, the list of kernel gene
         
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            Input parameter for `get_kernel_gene`.
+        cluster_key : str
+            Input parameter for `get_kernel_gene`.
+        cluster : str
+            Input parameter for `get_kernel_gene`.
+        num_gene : int, optional, default=10
+            Input parameter for `get_kernel_gene`.
+        threshold : Any, optional, default=None
+            Input parameter for `get_kernel_gene`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `get_kernel_gene`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         if threshold is None:
             threshold=self.normalized_pd.mean().mean()
@@ -950,16 +1317,26 @@ class gene_trends(object):
                         cluster_key:str,num_gene:int=10,threshold=None):
         """
         Get the kernel gene of cluster for all clusters
-
-        Arguments:
-            adata: AnnData object
-            cluster_key: str, the column name of cluster in adata.obs
-            num_gene: int, the number of kernel gene
-            threshold: float, the threshold of kernel gene
-
-        Returns:
-            kernel_gene_dict: dict, the dict of kernel gene
         
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            Input parameter for `get_multi_kernel_gene`.
+        cluster_key : str
+            Input parameter for `get_multi_kernel_gene`.
+        num_gene : int, optional, default=10
+            Input parameter for `get_multi_kernel_gene`.
+        threshold : Any, optional, default=None
+            Input parameter for `get_multi_kernel_gene`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `get_multi_kernel_gene`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         kernel_gene_dict={}
         for cluster in adata.obs[cluster_key].cat.categories:
@@ -973,15 +1350,26 @@ class gene_trends(object):
                                 cluster_key:str,cluster:str,num_gene:int=10,):
         """
         Get the special kernel gene of cluster
-
-        Arguments:
-            adata: AnnData object
-            cluster_key: str, the column name of cluster in adata.obs
-            cluster: str, the name of cluster
-            num_gene: int, the number of kernel gene
-
-        Returns:
-            kernel_gene: list, the list of kernel gene
+        
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            Input parameter for `get_special_kernel_gene`.
+        cluster_key : str
+            Input parameter for `get_special_kernel_gene`.
+        cluster : str
+            Input parameter for `get_special_kernel_gene`.
+        num_gene : int, optional, default=10
+            Input parameter for `get_special_kernel_gene`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `get_special_kernel_gene`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         # the border gene can't appear in other cluster
         kernel_gene_dict=self.get_multi_kernel_gene(adata,cluster_key,num_gene=num_gene)
@@ -999,19 +1387,30 @@ class gene_trends(object):
                   ylabel:str='Genes',fontsize:int=12):
         """
         Plot the trends of gene with pseudotime
-
-        Arguments:
-            figsize: tuple, the size of figure
-            max_threshold: float, the threshold of max value
-            color: str, the color of scatter
-            xlabel: str, the label of x axis
-            ylabel: str, the label of y axis
-            fontsize: int, the size of text
-
-        Returns:
-            fig: matplotlib.pyplot.figure, the figure of trends
-            ax: matplotlib.pyplot.axis, the axis of trends
         
+        Parameters
+        ----------
+        figsize : tuple, optional, default=(3,3)
+            Input parameter for `plot_trend`.
+        max_threshold : float, optional, default=0.8
+            Input parameter for `plot_trend`.
+        color : str, optional, default='#a51616'
+            Input parameter for `plot_trend`.
+        xlabel : str, optional, default='pseudotime'
+            Input parameter for `plot_trend`.
+        ylabel : str, optional, default='Genes'
+            Input parameter for `plot_trend`.
+        fontsize : int, optional, default=12
+            Input parameter for `plot_trend`.
+        
+        Returns
+        -------
+        Any
+            Output produced by `plot_trend`.
+        
+        Notes
+        -----
+        This docstring follows the unified OmicVerse help template.
         """
         fig, ax = plt.subplots(figsize=figsize)
         # 执行Cox-Stuart检验
