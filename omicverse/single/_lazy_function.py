@@ -13,8 +13,20 @@ import scanpy as sc
 import numpy as np
 
 from .._settings import add_reference, settings
+from .._registry import register_function
 
 
+@register_function(
+    aliases=['一键单细胞流程', 'lazy', 'lazy scRNA pipeline', 'automatic single-cell pipeline'],
+    category="single",
+    description="Execute an end-to-end single-cell analysis pipeline with automatic QC, normalization, integration, clustering, and annotation helpers.",
+    prerequisites={'optional_functions': ['pp.qc']},
+    requires={'layers': ['counts (recommended)']},
+    produces={'obsm': ['X_pca', 'X_umap'], 'obsp': ['connectivities'], 'uns': ['neighbors', 'lazy_pipeline']},
+    auto_fix='auto',
+    examples=['ov.single.lazy(adata, species="human", sample_key="batch")'],
+    related=['pp.preprocess', 'single.generate_scRNA_report', 'single.gptcelltype']
+)
 def lazy(
     adata,
     species="human",
@@ -27,13 +39,34 @@ def lazy(
     scvi_kwargs=None,
 ):
     """
-    This is a very interesting function. We can use this function to avoid many unnecessary steps.
+    Run a one-click single-cell analysis pipeline with resumable steps.
 
-    arguments:
-        adata: the data to analysis
-        reforce_steps: we can reforce run lazy step, because some step have been run and will be skipped.
-                        ['qc','pca','preprocess','scaled','Harmony','scVI','eval_bench','eval_clusters']
-        sample_key: the key store in `adata.obs` to batch correction.
+    Parameters
+    ----------
+    adata:AnnData
+        Input AnnData to be processed.
+    species:str
+        Species name used by downstream annotation helpers.
+    reforce_steps:list
+        Step names forced to rerun even if status flags exist. Common values:
+        ``['qc', 'pca', 'preprocess', 'scaled', 'Harmony', 'scVI', 'eval_bench', 'eval_clusters']``.
+    sample_key:str or None
+        Column in ``adata.obs`` used as batch key for correction/integration.
+    qc_kwargs:dict or None
+        Keyword arguments passed to ``ov.pp.qc``.
+    preprocess_kwargs:dict or None
+        Keyword arguments passed to ``ov.pp.preprocess``.
+    pca_kwargs:dict or None
+        Keyword arguments passed to PCA routine.
+    harmony_kwargs:dict or None
+        Keyword arguments for Harmony integration block.
+    scvi_kwargs:dict or None
+        Keyword arguments for scVI integration block.
+
+    Returns
+    -------
+    AnnData
+        Updated AnnData with QC, preprocessing, embeddings, and clustering results.
 
     """
     mode = settings.mode

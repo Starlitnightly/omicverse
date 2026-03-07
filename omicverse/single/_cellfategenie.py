@@ -39,12 +39,17 @@ def augment_pseudotime_jitter(y_train, jitter_std=0.05):
     """
     对 pseudotime 数据添加高斯噪声 (抖动).
 
-    Arguments:
-        y_train: pd.Series, 训练集的 pseudotime 数据.
-        jitter_std: float, 高斯噪声的标准差，控制抖动强度.
+    Parameters
+    ----------
+    y_train:pd.Series
+        Pseudotime values in training set.
+    jitter_std:float
+        Standard deviation of Gaussian jitter.
 
-    Returns:
-        pd.Series: 增强后的 pseudotime 数据.
+    Returns
+    -------
+    pd.Series
+        Jittered pseudotime series.
     """
     noise = np.random.normal(0, jitter_std, size=y_train.shape)
     return y_train + noise
@@ -53,12 +58,17 @@ def augment_gene_expression_noise(X_train, noise_std=0.01):
     """
     对基因表达数据添加高斯噪声.
 
-    Arguments:
-        X_train: pd.DataFrame, 训练集的基因表达数据.
-        noise_std: float, 高斯噪声的标准差，控制噪声强度.
+    Parameters
+    ----------
+    X_train:pd.DataFrame
+        Training-set gene expression matrix.
+    noise_std:float
+        Standard deviation of additive Gaussian noise.
 
-    Returns:
-        pd.DataFrame: 增强后的基因表达数据.
+    Returns
+    -------
+    pd.DataFrame
+        Noise-augmented gene expression matrix.
     """
     noise = np.random.normal(0, noise_std, size=X_train.shape)
     return X_train + noise
@@ -83,14 +93,36 @@ def augment_gene_expression_noise(X_train, noise_std=0.01):
     related=["pp.leiden", "utils.plot_heatmap", "pl.embedding"]
 )
 class Fate(object):
+    """
+    Adaptive ridge-regression framework for pseudotime-associated gene discovery.
+
+    Parameters
+    ----------
+    adata:anndata.AnnData
+        AnnData object containing pseudotime in ``obs`` and gene expression features.
+    pseudotime:str
+        ``adata.obs`` key storing pseudotime values.
+
+    Returns
+    -------
+    None
+        Initializes Fate model state.
+    
+    Examples
+    --------
+    >>> # Initialize Fate analysis
+    """
 
     def __init__(self,adata:anndata.AnnData,pseudotime:str):
         """
-        Cellfategenie model
+        Initialize TimeFate model.
 
-        Arguments:
-            adata: AnnData object
-            pseudotime: str, the column name of pseudotime in adata.obs
+        Parameters
+        ----------
+        adata:anndata.AnnData
+            Input AnnData containing expression matrix and pseudotime metadata.
+        pseudotime:str
+            Column name in ``adata.obs`` storing pseudotime values.
 
         """
         self.adata=adata
@@ -105,16 +137,26 @@ class Fate(object):
         """
         Initialize the model
 
-        Arguments:
-            test_size: float, the proportion of test set
-            random_state: int, random seed
-            alpha: float, the regularization strength of Ridge regression
-            use_data_augmentation: bool, 是否使用数据增强策略
-            augmentation_strategy: str, 数据增强策略的名称，例如 'jitter_pseudotime_noise', 'gene_expression_noise', 'both', 'none'
-            augmentation_intensity: float, 数据增强的强度参数，例如噪声的标准差，抖动的范围
+        Parameters
+        ----------
+        test_size:float
+            Proportion of samples used as test set.
+        random_state:int
+            Random seed for train/test split.
+        alpha:float
+            Ridge regularization strength.
+        use_data_augmentation:bool
+            Whether to apply augmentation to training data.
+        augmentation_strategy:str
+            Augmentation mode: ``'jitter_pseudotime_noise'``,
+            ``'gene_expression_noise'``, ``'both'`` or ``'none'``.
+        augmentation_intensity:float
+            Noise/jitter intensity used by selected strategy.
 
-        Returns:
-            res_pd_ievt: pd.DataFrame, the result of ridge model
+        Returns
+        -------
+        pd.DataFrame
+            Per-gene coefficient table from initial ridge model.
 
         """
         X = self.adata.to_df()
@@ -177,7 +219,8 @@ class Fate(object):
 
         if you want to use atac data to fit the model, you should use this function first
 
-        Arguments:
+        Parameters
+        ----------
             columns: list, the columns of atac data
             gene_name: str, the column name of gene name in adata.var
 
@@ -190,7 +233,8 @@ class Fate(object):
         """
         Get the related peak of gene
 
-        Arguments:
+        Parameters
+        ----------
             peak: str, the peak name
 
         """
@@ -206,19 +250,32 @@ class Fate(object):
         """
         Adaptive Threshold Regression
 
-        Arguments:
-            test_size: float, the proportion of test set
-            random_state: int, random seed
-            alpha: float, the regularization strength of Ridge regression
-            stop: int, the maximum number of iterations
-            flux: float, the flux of r2
-            related: bool, whether to use the related peak if you use atac data
-            use_data_augmentation: bool, 是否使用数据增强策略
-            augmentation_strategy: str, 数据增强策略的名称，例如 'jitter_pseudotime_noise', 'gene_expression_noise', 'both', 'none'
-            augmentation_intensity: float, 数据增强的强度参数，例如噪声的标准差，抖动的范围
+        Parameters
+        ----------
+        test_size:float
+            Proportion of samples used as test set in each iteration.
+        random_state:int
+            Random seed for split reproducibility.
+        alpha:float
+            Ridge regularization strength.
+        stop:int
+            Maximum number of threshold iterations.
+        flux:float
+            Allowed R2 drop from raw model when selecting threshold.
+        related:bool
+            Whether to extend selected features to related ATAC peaks.
+        use_data_augmentation:bool
+            Whether to apply data augmentation in each ATR iteration.
+        augmentation_strategy:str
+            Augmentation mode: ``'jitter_pseudotime_noise'``,
+            ``'gene_expression_noise'``, ``'both'`` or ``'none'``.
+        augmentation_intensity:float
+            Noise/jitter intensity used by selected strategy.
 
-        Returns:
-            res_pd: pd.DataFrame, the result of ridge model
+        Returns
+        -------
+        pd.DataFrame
+            Iteration table with coefficient threshold and corresponding R2.
 
         """
         res_pd=pd.DataFrame()
@@ -295,17 +352,28 @@ class Fate(object):
         """
         Fit the model
 
-        Arguments:
-            test_size: float, the proportion of test set
-            random_state: int, random seed
-            alpha: float, the regularization strength of Ridge regression
-            related: bool, whether to use the related peak if you use atac data
-            use_data_augmentation: bool, 是否使用数据增强策略
-            augmentation_strategy: str, 数据增强策略的名称，例如 'jitter_pseudotime_noise', 'gene_expression_noise', 'both', 'none'
-            augmentation_intensity: float, 数据增强的强度参数，例如噪声的标准差，抖动的范围
+        Parameters
+        ----------
+        test_size:float
+            Proportion of samples used as test set.
+        random_state:int
+            Random seed for split reproducibility.
+        alpha:float
+            Ridge regularization strength in filtered model.
+        related:bool
+            Whether to extend selected features to related ATAC peaks.
+        use_data_augmentation:bool
+            Whether to augment training data.
+        augmentation_strategy:str
+            Augmentation mode: ``'jitter_pseudotime_noise'``,
+            ``'gene_expression_noise'``, ``'both'`` or ``'none'``.
+        augmentation_intensity:float
+            Noise/jitter intensity used by selected strategy.
 
-        Returns:
-            res_pd_ievt: pd.DataFrame, the result of ridge model
+        Returns
+        -------
+        pd.DataFrame
+            Per-gene coefficient table from filtered model.
 
         """
         train_idx=self.coef.loc[self.coef['abs(coef)']>=self.coef_threshold].index.values
@@ -360,6 +428,18 @@ class Fate(object):
         return res_pd_ievt
 
     def kendalltau_filter(self): # 保持不变， 不需要修改
+        """
+        Compute Kendall's tau between filtered gene trends and pseudotime.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Per-gene correlation statistics with columns ``kendalltau_sta`` and ``pvalue``.
+
+        Examples
+        --------
+        >>> kt = fate.kendalltau_filter()
+        """
         import pandas as pd
         from scipy.stats import kendalltau
         test_pd=pd.DataFrame()
@@ -387,6 +467,39 @@ class Fate(object):
                     sim_key: str = "DM_Similarity",
                     eigval_key: str = "DM_EigenValues",
                     eigvec_key: str = "DM_EigenVectors",):
+        """
+        Estimate manifold density on diffusion-map coordinates.
+
+        Parameters
+        ----------
+        n_components:int, optional
+            Number of diffusion components.
+        knn:int, optional
+            Number of neighbors for diffusion map construction.
+        alpha:float, optional
+            Diffusion alpha parameter.
+        seed:int, optional
+            Random seed.
+        pca_key:str, optional
+            ``adata.obsm`` key containing PCA coordinates.
+        kernel_key:str, optional
+            Key used to store diffusion kernel.
+        sim_key:str, optional
+            Key used to store diffusion similarity.
+        eigval_key:str, optional
+            Key used to store diffusion eigenvalues.
+        eigvec_key:str, optional
+            Key used to store diffusion eigenvectors.
+
+        Returns
+        -------
+        None
+            Stores low-dimensional density in ``adata.obs['mellon_log_density_lowd']``.
+
+        Examples
+        --------
+        >>> fate.low_density(n_components=10, knn=30)
+        """
         try:
             import mellon
         except:
@@ -409,6 +522,35 @@ class Fate(object):
                     expression_key: str = "MAGIC_imputed_data",
                     distances_key: str = "distances",
                     ):
+        """
+        Compute lineage-specific change scores using low-density variability.
+
+        Parameters
+        ----------
+        cluster_key:str
+            ``adata.obs`` key containing cluster or lineage labels.
+        lineage:sequence of str, optional
+            Cluster labels defining the lineage-of-interest.
+        cell_mask:str, optional
+            ``adata.obsm`` key used as lineage mask.
+        density_key:str, optional
+            ``adata.obs`` key containing estimated density.
+        localvar_key:str, optional
+            ``adata.layers`` key for local variability matrix.
+        expression_key:str, optional
+            Layer key used for expression in variability estimation.
+        distances_key:str, optional
+            ``adata.obsp`` key containing neighborhood distances.
+
+        Returns
+        -------
+        None
+            Writes lineage scores to ``adata.var['change_scores_lineage']``.
+
+        Examples
+        --------
+        >>> fate.lineage_score(cluster_key='celltype', lineage=['Prog', 'Diff'])
+        """
         from ..external.palantir.utils import run_low_density_variability,run_local_variability
 
         if localvar_key not in self.adata.layers.keys():
@@ -433,11 +575,15 @@ class Fate(object):
         """
         Get the coef of model
 
-        Arguments:
-            type: str, the type of coef, 'raw' or 'filter'
+        Parameters
+        ----------
+        type:str
+            Coefficient table type: ``'raw'`` or ``'filter'``.
 
-        Returns:
-            coef: pd.DataFrame, the coef of model
+        Returns
+        -------
+        pd.DataFrame
+            Selected coefficient table.
 
         """
 
@@ -450,11 +596,15 @@ class Fate(object):
         """
         Get the r2 of model
 
-        Arguments:
-            type: str, the type of r2, 'raw' or 'filter'
+        Parameters
+        ----------
+        type:str
+            Metric type: ``'raw'`` or ``'filter'``.
 
-        Returns:
-            r2: float, the r2 of model
+        Returns
+        -------
+        float
+            R2 score of selected model.
 
         """
         if type=='raw':
@@ -466,11 +616,15 @@ class Fate(object):
         """
         Get the mse of model
 
-        Arguments:
-            type: str, the type of mse, 'raw' or 'filter'
+        Parameters
+        ----------
+        type:str
+            Metric type: ``'raw'`` or ``'filter'``.
 
-        Returns:
-            mse: float, the mse of model
+        Returns
+        -------
+        float
+            MSE of selected model.
 
         """
         if type=='raw':
@@ -482,11 +636,15 @@ class Fate(object):
         """
         Get the rmse of model
 
-        Arguments:
-            type: str, the type of rmse, 'raw' or 'filter'
+        Parameters
+        ----------
+        type:str
+            Metric type: ``'raw'`` or ``'filter'``.
 
-        Returns:
-            rmse: float, the rmse of model
+        Returns
+        -------
+        float
+            RMSE of selected model.
 
         """
         if type=='raw':
@@ -498,11 +656,15 @@ class Fate(object):
         """
         Get the mae of model
 
-        Arguments:
-            type: str, the type of mae, 'raw' or 'filter'
+        Parameters
+        ----------
+        type:str
+            Metric type: ``'raw'`` or ``'filter'``.
 
-        Returns:
-            mae: float, the mae of model
+        Returns
+        -------
+        float
+            MAE of selected model.
 
         """
         if type=='raw':
@@ -515,15 +677,21 @@ class Fate(object):
         """
         Plot the filtering result
 
-        Arguments:
-            figsize: tuple, the size of figure
-            color: str, the color of scatter
-            fontsize: int, the size of text
-            alpha: float, the transparency of scatter
+        Parameters
+        ----------
+        figsize:tuple
+            Figure size.
+        color:str
+            Scatter color.
+        fontsize:int
+            Axis/annotation font size.
+        alpha:float
+            Scatter transparency.
 
-        Returns:
-            fig: matplotlib.pyplot.figure, the figure of filtering result
-            ax: matplotlib.pyplot.axis, the axis of filtering result
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure,matplotlib.axes.Axes]
+            Figure and axes of ATR filtering plot.
 
         """
         fig, ax = plt.subplots(figsize=figsize)
@@ -559,15 +727,21 @@ class Fate(object):
         """
         Plot the fitting result
 
-        Arguments:
-            type: str, the type of fitting result, 'raw' or 'filter'
-            figsize: tuple, the size of figure
-            color: str, the color of scatter
-            fontsize: int, the size of text
+        Parameters
+        ----------
+        type:str
+            Model type: ``'raw'`` or ``'filter'``.
+        figsize:tuple
+            Figure size.
+        color:str
+            Regression/scatter color.
+        fontsize:int
+            Axis/title font size.
 
-        Returns:
-            fig: matplotlib.pyplot.figure, the figure of fitting result
-            ax: matplotlib.pyplot.axis, the axis of fitting result
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure,matplotlib.axes.Axes]
+            Figure and axes of fit-quality plot.
 
         """
         import seaborn as sns
@@ -608,18 +782,27 @@ class Fate(object):
         """
         Plot the colorful of clusters fitting result
 
-        Arguments:
-            type: str, the type of fitting result, 'raw' or 'filter'
-            cluster_key: str, the key of cluster of color
-            figsize: tuple, the size of figure
-            color: str, the color of scatter
-            fontsize: int, the size of text
-            legend_loc: list, the location of r2,mae,mse
-            omics: str, the type of omics
+        Parameters
+        ----------
+        type:str
+            Model type: ``'raw'`` or ``'filter'``.
+        cluster_key:str
+            ``adata.obs`` key used for cluster-wise coloring.
+        figsize:tuple
+            Figure size.
+        color:str
+            Base color for regression line/confidence region.
+        fontsize:int
+            Axis/title font size.
+        legend_loc:list
+            Text placement coordinates for metric summary.
+        omics:str
+            Omics label displayed in metric summary.
 
-        Returns:
-            fig: matplotlib.pyplot.figure, the figure of fitting result
-            ax: matplotlib.pyplot.axis, the axis of fitting result
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure,matplotlib.axes.Axes]
+            Figure and axes of colored fit-quality plot.
 
         """
         #fontsize=13
@@ -696,13 +879,46 @@ class Fate(object):
                          fontsize=fontsize+1)
         return fig,ax
 
+@register_function(
+    aliases=['基因趋势分析器', 'gene_trends', 'pseudotime gene trends'],
+    category="single",
+    description="Model and visualize gene-set or gene-level trends along pseudotime to identify dynamic programs during differentiation.",
+    prerequisites={'optional_functions': ['single.VIA', 'utils.cal_paga']},
+    requires={'obs': ['pseudotime'], 'var': ['genes/features']},
+    produces={'uns': ['gene trend fits']},
+    auto_fix='none',
+    examples=['gt_obj = ov.single.gene_trends(adata_aucs, "pt_via", var_name)', 'gt_obj.calculate()'],
+    related=['single.Fate', 'utils.plot_paga']
+)
 class gene_trends(object):
+    """
+    Fit and visualize smooth feature trends along pseudotime.
+
+    Parameters
+    ----------
+    adata:AnnData
+        AnnData containing pseudotime and feature matrix.
+    pseudotime:str
+        ``adata.obs`` key used for temporal ordering.
+    var_names:sequence of str
+        Feature names to model along pseudotime.
+
+    Returns
+    -------
+    None
+        Initializes trend analysis configuration.
+    
+    Examples
+    --------
+    >>> gt_obj = ov.single.gene_trends(adata_aucs, "pt_via", var_name)
+    """
 
     def __init__(self,adata,pseudotime,var_names):
         """
         Initialize the gene_trends analysis based on pseudotime
 
-        Arguments:
+        Parameters
+        ----------
             adata: AnnData object
             pseudotime: str, the column name of pseudotime in adata.obs
             var_names: list, the list of gene name to calculate
@@ -717,7 +933,8 @@ class gene_trends(object):
         """
         Calculate the trends of gene with pseudotime
 
-        Arguments:
+        Parameters
+        ----------
             n_convolve: int, the number of convolve to smooth the trends
         
         """
@@ -806,7 +1023,8 @@ class gene_trends(object):
         """
         Calculate the border cell of each cluster
 
-        Arguments:
+        Parameters
+        ----------
             adata: AnnData object
             pseudotime: str, the column name of pseudotime in adata.obs
             cluster_key: str, the column name of cluster in adata.obs
@@ -837,7 +1055,8 @@ class gene_trends(object):
         """
         Get the border gene between two clusters
 
-        Arguments:
+        Parameters
+        ----------
             adata: AnnData object
             cluster_key: str, the column name of cluster in adata.obs
             cluster1: str, the name of cluster1
@@ -845,7 +1064,8 @@ class gene_trends(object):
             num_gene: int, the number of border gene
             threshold: float, the threshold of border gene
 
-        Returns:
+        Returns
+        -------
             border_gene: list, the list of border gene
         
         """
@@ -870,13 +1090,15 @@ class gene_trends(object):
         """
         Get the border gene between two clusters for all clusters
 
-        Arguments:
+        Parameters
+        ----------
             adata: AnnData object
             cluster_key: str, the column name of cluster in adata.obs
             num_gene: int, the number of border gene
             threshold: float, the threshold of border gene
 
-        Returns:
+        Returns
+        -------
             border_gene_dict: dict, the dict of border gene
         
         """
@@ -897,13 +1119,15 @@ class gene_trends(object):
         """
         Get the special border gene between two clusters
 
-        Arguments:
+        Parameters
+        ----------
             adata: AnnData object
             cluster_key: str, the column name of cluster in adata.obs
             cluster1: str, the name of cluster1
             cluster2: str, the name of cluster2
 
-        Returns:
+        Returns
+        -------
             border_gene: list, the list of border gene
         
         """
@@ -926,14 +1150,16 @@ class gene_trends(object):
         """
         Get the kernel gene of cluster
 
-        Arguments:
+        Parameters
+        ----------
             adata: AnnData object
             cluster_key: str, the column name of cluster in adata.obs
             cluster: str, the name of cluster
             num_gene: int, the number of kernel gene
             threshold: float, the threshold of kernel gene
 
-        Returns:
+        Returns
+        -------
             kernel_gene: list, the list of kernel gene
         
         """
@@ -951,13 +1177,15 @@ class gene_trends(object):
         """
         Get the kernel gene of cluster for all clusters
 
-        Arguments:
+        Parameters
+        ----------
             adata: AnnData object
             cluster_key: str, the column name of cluster in adata.obs
             num_gene: int, the number of kernel gene
             threshold: float, the threshold of kernel gene
 
-        Returns:
+        Returns
+        -------
             kernel_gene_dict: dict, the dict of kernel gene
         
         """
@@ -974,13 +1202,15 @@ class gene_trends(object):
         """
         Get the special kernel gene of cluster
 
-        Arguments:
+        Parameters
+        ----------
             adata: AnnData object
             cluster_key: str, the column name of cluster in adata.obs
             cluster: str, the name of cluster
             num_gene: int, the number of kernel gene
 
-        Returns:
+        Returns
+        -------
             kernel_gene: list, the list of kernel gene
         """
         # the border gene can't appear in other cluster
@@ -1000,7 +1230,8 @@ class gene_trends(object):
         """
         Plot the trends of gene with pseudotime
 
-        Arguments:
+        Parameters
+        ----------
             figsize: tuple, the size of figure
             max_threshold: float, the threshold of max value
             color: str, the color of scatter
@@ -1008,7 +1239,8 @@ class gene_trends(object):
             ylabel: str, the label of y axis
             fontsize: int, the size of text
 
-        Returns:
+        Returns
+        -------
             fig: matplotlib.pyplot.figure, the figure of trends
             ax: matplotlib.pyplot.axis, the axis of trends
         

@@ -3,9 +3,62 @@ import numpy as np
 import anndata as ad
 from anndata import AnnData
 import scanpy as sc
+from .._registry import register_function
 
 
+@register_function(
+    aliases=[
+        "参考映射注释",
+        "reference mapping annotation",
+        "细胞类型参考映射注释",
+        "cell type reference mapping annotation",
+        "细胞类型图谱注释",
+        "cell type atlas annotation",
+        "AnnotationRef",
+        "reference transfer annotation",
+        "query to reference label transfer",
+    ],
+    category="single",
+    description="Reference-to-query label transfer class that integrates two AnnData objects and assigns cell types to query cells using weighted kNN in an integrated latent space.",
+    prerequisites={
+        'optional_functions': ['pp.preprocess', 'single.batch_correction']
+    },
+    requires={'var': ['shared genes between query and reference'], 'obs': ['reference celltype labels']},
+    produces={
+        'obsm': ['X_pca_harmony_anno', 'X_scVI_anno', 'X_scanorama_anno'],
+        'obs': ['harmony_prediction', 'scVI_prediction', 'scanorama_prediction']
+    },
+    auto_fix='escalate',
+    examples=[
+        "ref_anno = ov.single.AnnotationRef(adata_query, adata_ref, celltype_key='celltype')",
+        "ref_anno.train(method='harmony')",
+        "adata_query = ref_anno.predict(method='harmony', n_neighbors=15)"
+    ],
+    related=[
+        "single.Annotation",
+        "single.batch_correction",
+        "utils.weighted_knn_trainer",
+        "utils.weighted_knn_transfer",
+    ]
+)
 class AnnotationRef(object):
+    """
+    Reference-based label transfer helper for single-cell annotation.
+    
+    Parameters
+    ----------
+    adata_query : AnnData
+        Query AnnData that needs cell-type annotation.
+    adata_ref : AnnData
+        Reference AnnData with known cell-type labels.
+    celltype_key : str
+        Column name in ``adata_ref.obs`` containing reference cell-type labels.
+    
+    Returns
+    -------
+    None
+        Initializes concatenated query/reference data and checks feature overlap.
+    """
     def __init__(self, adata_query: AnnData, adata_ref: AnnData, celltype_key: str = 'celltype'):
         self.adata_query = adata_query
         self.adata_ref = adata_ref
@@ -36,6 +89,27 @@ class AnnotationRef(object):
         print(f"Concatenated adata saved to self.adata_new")
 
     def preprocess(self,mode='shiftlog|pearson',n_HVGs=3000,batch_key='integrate_batch'):
+        """
+        Preprocess concatenated query/reference data for robust label transfer.
+
+        Parameters
+        ----------
+        mode : str
+            Preprocessing mode string passed to ``ov.pp.preprocess``.
+        n_HVGs : int
+            Number of highly variable genes retained.
+        batch_key : str
+            Batch key used for HVG selection and integration.
+
+        Returns
+        -------
+        None
+            Updates ``self.adata_new`` with HVG selection, scaling, and PCA.
+
+        Examples
+        --------
+        >>> ar.preprocess(mode='shiftlog|pearson', n_HVGs=3000)
+        """
         from ..pp._preprocess import preprocess,scale,pca
         self.adata_new=preprocess(self.adata_new,mode=mode,
                        n_HVGs=n_HVGs,batch_key=batch_key)
@@ -47,6 +121,25 @@ class AnnotationRef(object):
         self,method='harmony',
         **kwargs
     ):
+        """
+        Train/compute an integrated embedding used for reference label transfer.
+
+        Parameters
+        ----------
+        method : {'harmony', 'scVI', 'scanorama'}
+            Integration backend used to create shared latent space for transfer.
+        **kwargs
+            Additional arguments forwarded to ``single.batch_correction``.
+
+        Returns
+        -------
+        anndata.AnnData
+            Query AnnData with integrated embedding copied to ``.obsm``.
+
+        Examples
+        --------
+        >>> ar.train(method='harmony')
+        """
         from ._batch import batch_correction
         if method=='harmony':
             batch_correction(self.adata_new,batch_key='integrate_batch',methods='harmony',**kwargs)
@@ -68,6 +161,29 @@ class AnnotationRef(object):
         return self.adata_query
 
     def predict(self,method='harmony',n_neighbors=15,pred_key=None,uncert_key=None):
+        """
+        Transfer reference labels to query cells using weighted kNN.
+
+        Parameters
+        ----------
+        method : {'harmony', 'scVI', 'scanorama'}
+            Integration space used for kNN transfer.
+        n_neighbors : int
+            Number of neighbors in the weighted kNN model.
+        pred_key : str or None
+            Output ``obs`` key for predicted labels.
+        uncert_key : str or None
+            Output ``obs`` key for uncertainty scores.
+        
+        Returns
+        -------
+        anndata.AnnData
+            Query AnnData with predicted labels and uncertainties in ``.obs``.
+
+        Examples
+        --------
+        >>> adata_q = ar.predict(method='harmony', n_neighbors=15)
+        """
         if method=='harmony':
             if pred_key is None:
                 pred_key='harmony_prediction'

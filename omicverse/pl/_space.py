@@ -6,16 +6,21 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import ListedColormap
 from matplotlib.gridspec import GridSpec
+from .._registry import register_function
 
 def html_to_rgb(html_color):
     r"""
     Convert HTML hex color code to RGB tuple.
     
-    Args:
-        html_color: HTML hex color string (e.g., '#FF0000' or 'FF0000')
+    Parameters
+    ----------
+    html_color : str
+        HTML hex color string (for example ``'#FF0000'`` or ``'FF0000'``).
         
-    Returns:
-        rgb_color: RGB tuple with values 0-255
+    Returns
+    -------
+    Tuple[int, int, int]
+        RGB tuple with values in ``[0, 255]``.
     """
     # 去掉颜色代码前的 `#`
     html_color = html_color.lstrip('#')
@@ -40,15 +45,20 @@ def get_rgb_function(cmap, min_value, max_value):
     r"""
     Generate a function to map continuous values to RGB using colormap.
     
-    Args:
-        cmap: Matplotlib colormap object
-        min_value: Minimum value for color mapping
-        max_value: Maximum value for color mapping
+    Parameters
+    ----------
+    cmap : matplotlib.colors.Colormap
+        Colormap used for value-to-color mapping.
+    min_value : float
+        Lower bound of mapped value range.
+    max_value : float
+        Upper bound of mapped value range.
         
-    Returns:
-        func: Function that maps values to RGB colors
+    Returns
+    -------
+    Callable
+        Function mapping numeric arrays to RGBA values.
     """
-    r"""Generate a function to map continous values to RGB values using colormap between min_value & max_value."""
 
     if min_value > max_value:
         raise ValueError("Max_value should be greater or than min_value.")
@@ -76,11 +86,15 @@ def rgb_to_ryb(rgb):
     r"""
     Convert colors from RGB colorspace to RYB (red-yellow-blue) colorspace.
     
-    Args:
-        rgb: RGB color array with shape (N, 3) or (3,)
+    Parameters
+    ----------
+    rgb : array-like
+        RGB color array with shape ``(N, 3)`` or ``(3,)``.
         
-    Returns:
-        ryb: RYB color array with same shape as input
+    Returns
+    -------
+    numpy.ndarray
+        RYB color array with same shape as input.
     """
     rgb = np.array(rgb)
     if len(rgb.shape) == 1:
@@ -108,11 +122,15 @@ def ryb_to_rgb(ryb):
     r"""
     Convert colors from RYB (red-yellow-blue) colorspace to RGB colorspace.
     
-    Args:
-        ryb: RYB color array with shape (N, 3) or (3,)
+    Parameters
+    ----------
+    ryb : array-like
+        RYB color array with shape ``(N, 3)`` or ``(3,)``.
         
-    Returns:
-        rgb: RGB color array with same shape as input
+    Returns
+    -------
+    numpy.ndarray
+        RGB color array with same shape as input.
     """
     ryb = np.array(ryb)
     if len(ryb.shape) == 1:
@@ -177,41 +195,75 @@ def plot_spatial_general(
     
     Supports up to 7 cell types with default colors: yellow, orange, blue, green, purple, grey, white.
     
-    Args:
-        adata: Annotated data object
-        value_df: DataFrame with cell abundances or features (max 7 columns) across locations
-        coords: Array with x,y coordinates for plotting spots
-        labels: List of cell type labels
-        text: DataFrame with x,y coordinates and text for annotations (None)
-        circle_diameter: Diameter of spot circles (4.0)
-        alpha_scaling: Color transparency adjustment factor (1.0)
-        max_col: Maximum colorscale values for each column ((np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf))
-        max_color_quantile: Quantile threshold for colorscale cropping (0.98)
-        show_img: Whether to display background image (True)
-        img: Background tissue image array (None)
-        img_alpha: Transparency of background image (1.0)
-        adjust_text: Whether to adjust text labels to prevent overlap (False)
-        plt_axis: Axis display setting ('off')
-        axis_y_flipped: Whether to flip y-axis to match image coordinates (True)
-        x_y_labels: Axis labels as (x_label, y_label) (('', ''))
-        crop_x: X-axis cropping limits as (min, max) (None)
-        crop_y: Y-axis cropping limits as (min, max) (None)
-        text_box_alpha: Transparency of text boxes (0.9)
-        reorder_cmap: Color order indices for categories (range(7))
-        style: Plot style - 'fast' or 'dark_background' ('fast')
-        colorbar_position: Colorbar position - 'bottom', 'right', or None ('bottom')
-        colorbar_label_kw: Keyword arguments for colorbar labels ({})
-        colorbar_shape: Colorbar shape parameters ({})
-        colorbar_tick_size: Colorbar tick label size (12)
-        colorbar_grid: Colorbar grid dimensions as (rows, cols) (None, auto-determined)
-        image_cmap: Colormap for grayscale background image ('Greys_r')
-        white_spacing: Percentage of colorbar hidden as white space (20)
-        palette: Custom color palette as list or dict (None, uses defaults)
-        legend_title_fontsize: Font size for legend titles (12)
-        return_ax: Whether to return axes object (False)
+    Parameters
+    ----------
+    adata : AnnData
+        AnnData object associated with plotted spatial values.
+    value_df : pd.DataFrame
+        Spot-by-feature matrix (max 7 columns) to render as blended colors.
+    coords : array-like
+        XY coordinates for spots.
+    labels : list
+        Feature labels used in legends/colorbars.
+    text : pd.DataFrame or None
+        Optional annotation table with coordinates and text labels.
+    circle_diameter : float
+        Diameter of rendered circles.
+    alpha_scaling : float
+        Scaling factor for transparency.
+    max_col : tuple
+        Per-channel cap values for color scaling.
+    max_color_quantile : float
+        Quantile for clipping extreme values before color mapping.
+    show_img : bool
+        Whether to show tissue background image.
+    img : array-like or None
+        Tissue image array.
+    img_alpha : float
+        Background image transparency.
+    adjust_text : bool
+        Whether to optimize text label positions.
+    plt_axis : str
+        Axis visibility mode.
+    axis_y_flipped : bool
+        Whether to invert y-axis for image-aligned coordinates.
+    x_y_labels : tuple
+        Axis labels as ``(x_label, y_label)``.
+    crop_x : tuple or None
+        Optional x-axis crop limits.
+    crop_y : tuple or None
+        Optional y-axis crop limits.
+    text_box_alpha : float
+        Alpha of text-box background.
+    reorder_cmap : iterable
+        Order indices used to reorder default colormaps.
+    style : str
+        Matplotlib style context.
+    colorbar_position : str or None
+        Colorbar location: ``'bottom'``, ``'right'`` or ``None``.
+    colorbar_label_kw : dict
+        Extra text kwargs for colorbar titles.
+    colorbar_shape : dict
+        Layout parameters for colorbar grid.
+    colorbar_tick_size : int
+        Tick label size of colorbar.
+    colorbar_grid : tuple or None
+        ``(rows, cols)`` of colorbar panel grid.
+    image_cmap : str
+        Colormap used for grayscale background image.
+    white_spacing : int
+        White-gap proportion in generated alpha colormaps.
+    palette : list or dict or None
+        Custom feature colors.
+    legend_title_fontsize : int
+        Font size of legend titles.
+    return_ax : bool
+        Whether to return axes along with figure.
         
-    Returns:
-        fig: matplotlib.figure.Figure object, or (fig, ax) if return_ax=True
+    Returns
+    -------
+    matplotlib.figure.Figure or Tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+        Figure, or figure-plus-axes if ``return_ax=True``.
     """
 
     if value_df.shape[1] > 7:
@@ -424,21 +476,40 @@ def plot_spatial_general(
         return fig
 
 
+@register_function(
+    aliases=['空间表达绘图', 'plot_spatial', 'spatial abundance plot', 'deconvolution spatial plot'],
+    category="pl",
+    description="Render spatial abundance or expression on tissue coordinates with optional histology background for spot-level interpretation.",
+    prerequisites={},
+    requires={'obsm': ['spatial'], 'uns': ['spatial']},
+    produces={},
+    auto_fix='none',
+    examples=['ov.pl.plot_spatial(adata=decov_obj.adata_cell2location, color=clust_labels, labels=clust_labels, show_img=True, style="fast")'],
+    related=['pl.add_pie2spatial', 'space.crop_space_visium', 'space.map_spatial_auto']
+)
 def plot_spatial(adata, color, img_key="hires", show_img=True, **kwargs):
     r"""
     Create spatial plot from Visium data with color gradient and interpolation.
     
     Supports up to 7 cell types with default colors: yellow, orange, blue, green, purple, grey, white.
     
-    Args:
-        adata: AnnData object with spatial coordinates in adata.obsm['spatial']
-        color: List of column names from adata.obs to plot
-        img_key: Image resolution key - 'hires' or 'lowres' ('hires')
-        show_img: Whether to display background tissue image (True)
-        **kwargs: Additional arguments passed to plot_spatial_general
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial AnnData containing coordinates and optional image metadata.
+    color : list
+        Feature names from ``adata.obs`` or genes from ``adata.var_names``.
+    img_key : str
+        Spatial image resolution key (for example ``'hires'`` or ``'lowres'``).
+    show_img : bool
+        Whether to draw tissue image as background.
+    **kwargs
+        Additional arguments forwarded to ``plot_spatial_general``.
         
-    Returns:
-        fig: matplotlib.figure.Figure object
+    Returns
+    -------
+    matplotlib.figure.Figure
+        Figure of spatial abundance/expression plot.
     """
 
     if show_img is True:
@@ -471,13 +542,19 @@ def create_colormap(R, G, B):
     r"""
     Create a matplotlib colormap from RGB values with alpha gradient.
     
-    Args:
-        R: Red component (0-255)
-        G: Green component (0-255)
-        B: Blue component (0-255)
+    Parameters
+    ----------
+    R : int
+        Red channel in ``[0, 255]``.
+    G : int
+        Green channel in ``[0, 255]``.
+    B : int
+        Blue channel in ``[0, 255]``.
         
-    Returns:
-        colormap: matplotlib.colors.ListedColormap object
+    Returns
+    -------
+    matplotlib.colors.ListedColormap
+        Colormap with alpha gradient from transparent to opaque.
     """
     spacing = int(20 * 2.55)
 
@@ -507,25 +584,43 @@ def spatial_value(adata,color,library_id,
     r"""
     Plot spatial expression values for a single gene or feature on tissue image.
     
-    Args:
-        adata: AnnData object with spatial data
-        color: Gene name or obs column to visualize
-        library_id: Spatial library identifier
-        dot_size: Size of spots on the plot (4)
-        white_spacing: White space percentage in colormap (20)
-        colorbar_show: Whether to display colorbar (True)
-        colorbar_tick_size: Font size for colorbar ticks (12)
-        cmap: Colormap for values (create_colormap(255, 0, 0))
-        legend_title_fontsize: Font size for legend title (12)
-        legend_title_color: Color for legend title (None, auto-determined)
-        colorbar_label_kw: Additional colorbar label arguments ({})
-        res: Image resolution - 'hires' or 'lowres' ('hires')
-        img_show: Whether to show background tissue image (True)
-        ax: Existing matplotlib axes object (None)
-        alpha_img: Transparency of background image (1)
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial AnnData object.
+    color : str
+        Gene name or ``obs`` column to visualize.
+    library_id : str
+        Key in ``adata.uns['spatial']`` selecting target library.
+    dot_size : float
+        Spot size used in scatter overlay.
+    white_spacing : int
+        Reserved white-spacing parameter for colormap style.
+    colorbar_show : bool
+        Whether to display horizontal colorbar.
+    colorbar_tick_size : int
+        Tick label size for colorbar.
+    cmap : matplotlib.colors.Colormap
+        Colormap used for signal values.
+    legend_title_fontsize : int
+        Font size of colorbar title.
+    legend_title_color : tuple or None
+        Color of colorbar title text.
+    colorbar_label_kw : dict
+        Extra kwargs for colorbar title text.
+    res : str
+        Tissue image resolution key.
+    img_show : bool
+        Whether to render tissue image background.
+    ax : matplotlib.axes.Axes or None
+        Existing axes to plot into.
+    alpha_img : float
+        Background image transparency.
         
-    Returns:
-        ax: matplotlib.axes.Axes object
+    Returns
+    -------
+    matplotlib.axes.Axes
+        Axes containing spatial value rendering.
     """
 
     #ax_input=False
@@ -615,7 +710,21 @@ import pandas as pd
 from matplotlib.patches import Wedge
 
 def _make_color_dict(cell_type_columns, colors):
-    """统一生成颜色字典"""
+    """
+    Build color mapping dictionary for cell-type columns.
+
+    Parameters
+    ----------
+    cell_type_columns : list
+        Cell-type column names.
+    colors : list, dict or None
+        User-defined colors.
+
+    Returns
+    -------
+    dict
+        Mapping from cell type to RGBA/hex color.
+    """
     if colors is None:
         pal = plt.cm.Set3(np.linspace(0, 1, len(cell_type_columns)))
         return {ct: pal[i] for i, ct in enumerate(cell_type_columns)}
@@ -626,7 +735,30 @@ def _make_color_dict(cell_type_columns, colors):
     return colors
 
 def _draw_pie(ax, x, y, fracs, cols, radius, start_angle=90, alpha=0.8, zorder=5):
-    """在 (x,y) 处画一个半径为 radius 的饼图（数据坐标单位）"""
+    """
+    Draw a pie chart at a given data coordinate.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Target axes.
+    x : float
+        X coordinate.
+    y : float
+        Y coordinate.
+    fracs : sequence
+        Slice fractions.
+    cols : sequence
+        Slice colors.
+    radius : float
+        Pie radius in data units.
+    start_angle : float
+        Start angle in degrees.
+    alpha : float
+        Pie transparency.
+    zorder : int
+        Artist draw order.
+    """
     if len(fracs) == 0:
         return
     theta = start_angle
@@ -654,7 +786,39 @@ def add_pie_charts_to_spatial(
     zorder=50,               # 提高层级，确保盖住散点
 ):
     """
-    在现有 spatial 图上叠加细胞比例饼图（高效 & 兼容）
+    Overlay per-spot composition pie charts on an existing spatial axis.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial AnnData object.
+    cell_type_columns : list
+        Columns in ``adata.obs`` holding component fractions.
+    ax : matplotlib.axes.Axes
+        Existing axes to draw on.
+    spatial_coords : array-like or None
+        Optional external coordinates.
+    pie_radius : float
+        Pie radius in data units.
+    pie_radius_px : float or None
+        Pie radius in pixels (converted to data units).
+    min_proportion : float
+        Minimum slice proportion retained for drawing.
+    colors : list, dict or None
+        Color definitions for slices.
+    alpha : float
+        Pie transparency.
+    add_gray_remainder : bool
+        Whether to add a gray remainder slice if fractions sum below 1.
+    renormalize_if_sum_gt1 : bool
+        Whether to renormalize rows when fractions sum above 1.
+    zorder : int
+        Artist draw order.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+        Axes with overlaid pie charts.
     """
     if 'spatial' not in adata.obsm:
         raise ValueError("No spatial coordinates found in adata.obsm['spatial']")
@@ -733,6 +897,21 @@ def add_pie_charts_to_spatial(
 from matplotlib.patches import Wedge
 
 def _data_radius_from_pixels(ax, r_px: float) -> float:
+    """
+    Convert pixel radius to data-coordinate radius.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Target axes.
+    r_px : float
+        Radius in pixels.
+
+    Returns
+    -------
+    float
+        Radius in data coordinates.
+    """
     fig = ax.figure
     fig.canvas.draw()
     inv = ax.transData.inverted()
@@ -741,6 +920,17 @@ def _data_radius_from_pixels(ax, r_px: float) -> float:
     dx = abs(p1[0] - p0[0]); dy = abs(p1[1] - p0[1])
     return r_px * min(dx, dy)
 
+@register_function(
+    aliases=['空间饼图叠加', 'add_pie2spatial', 'pie chart on spatial'],
+    category="pl",
+    description="Overlay per-spot cell-type proportion pie charts onto spatial coordinates to inspect local microenvironment composition.",
+    prerequisites={},
+    requires={'obsm': ['spatial'], 'obs': ['cell-type proportion columns']},
+    produces={},
+    auto_fix='none',
+    examples=['ov.pl.add_pie2spatial(adata, cell_type_columns=clust_labels, pie_radius=0.45)'],
+    related=['pl.plot_spatial', 'utils.plot_cellproportion']
+)
 def add_pie2spatial(
     adata,
     cell_type_columns,
@@ -760,6 +950,56 @@ def add_pie2spatial(
     legend_loc=(1.05, 1.0),
     ncols=3,
 ):
+    """
+    Overlay per-spot pie charts of cell-type composition on a spatial map.
+    
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial AnnData object. Requires ``adata.obsm['spatial']``.
+    cell_type_columns : list of str
+        Columns in ``adata.obs`` (or genes in ``adata.var_names``) used as pie components.
+    ax : matplotlib.axes.Axes
+        Target axes.
+    pie_radius : float, optional
+        Pie radius in data coordinates when ``pie_radius_px`` is not provided.
+    img_key : str, optional
+        Spatial image key used to rescale coordinates (for example ``'hires'``).
+    spatial_coords : array-like, optional
+        External coordinates overriding ``adata.obsm['spatial']``.
+    pie_radius_px : float or None, optional
+        Pie radius in pixels; converted to data units automatically.
+    min_proportion : float, optional
+        Minimum slice proportion to draw.
+    colors : dict or sequence, optional
+        Color mapping for cell types.
+    alpha : float, optional
+        Pie transparency.
+    remainder : {'gap', 'gray', 'outline'}, optional
+        How to render unassigned mass when proportions do not sum to 1.
+    remainder_color : str, optional
+        Color for remainder slice when ``remainder='gray'``.
+    remainder_alpha : float, optional
+        Alpha for remainder slice.
+    renormalize_if_sum_gt1 : bool, optional
+        If ``True``, renormalize rows whose sum exceeds 1.
+    zorder : int, optional
+        Drawing order for pie artists.
+    legend_loc : tuple, optional
+        Legend anchor location.
+    ncols : int, optional
+        Number of legend columns.
+    
+    Returns
+    -------
+    matplotlib.axes.Axes
+        Axes with pie overlays.
+    
+    Examples
+    --------
+    >>> ax = ov.pl.plot_spatial(adata)
+    >>> ov.pl.add_pie2spatial(adata, cell_type_columns=['T', 'B', 'Myeloid'], ax=ax)
+    """
     if 'spatial' not in adata.obsm:
         raise ValueError("No spatial coordinates found in adata.obsm['spatial']")
 
@@ -865,7 +1105,21 @@ def add_pie2spatial(
 from matplotlib.patches import Wedge
 
 def _data_radius_from_pixels(ax, r_px: float) -> float:
-    """把屏幕上的像素半径换算成数据坐标半径（取 x/y 两个方向的最小值以保持近似圆形）"""
+    """
+    Convert pixel radius to data-coordinate radius (aspect aware).
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Target axes.
+    r_px : float
+        Radius in pixels.
+
+    Returns
+    -------
+    float
+        Radius in data coordinates.
+    """
     # 轴的可视范围（数据单位）
     x0, x1 = ax.get_xlim()
     y0, y1 = ax.get_ylim()
@@ -879,6 +1133,30 @@ def _data_radius_from_pixels(ax, r_px: float) -> float:
     return r_px * min(rx, ry)
 
 def _draw_pie(ax, x, y, fracs, cols, radius, start_angle=90, alpha=0.8, zorder=50):
+    """
+    Draw a pie chart at given coordinate using Wedge patches.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Target axes.
+    x : float
+        X coordinate.
+    y : float
+        Y coordinate.
+    fracs : sequence
+        Slice fractions.
+    cols : sequence
+        Slice colors.
+    radius : float
+        Radius in data units.
+    start_angle : float
+        Starting angle in degrees.
+    alpha : float
+        Pie transparency.
+    zorder : int
+        Artist draw order.
+    """
     theta = start_angle
     for f, c in zip(fracs, cols):
         if f <= 0:

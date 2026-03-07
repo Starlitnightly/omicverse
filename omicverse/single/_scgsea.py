@@ -6,21 +6,31 @@ import anndata
 import seaborn as sns
 from .._settings import add_reference
 from ._aucell import derive_auc_threshold,fast_rank,_rank_sparse_row,aucell
+from .._registry import register_function
 
 
 def geneset_aucell_tmp(adata, geneset_name, geneset, AUC_threshold=0.01, seed=42, chunk_size=10000):
     r"""Calculate the AUC-ell score for a given gene set.
 
-    Arguments:
-        adata: AnnData object containing gene expression data.
-        geneset_name: Name of the gene set.
-        geneset: List of gene symbols for the gene set.
-        AUC_threshold: AUC threshold used to determine significant interactions. (0.01)
-        seed: Seed used to initialize the random number generator. (42)
-        chunk_size: The number of cells to process in each chunk. (10000)
+    Parameters
+    ----------
+    adata:anndata.AnnData
+        AnnData containing expression matrix.
+    geneset_name:str
+        Name of gene set; used as output column prefix.
+    geneset:list
+        Gene symbols composing the gene set.
+    AUC_threshold:float
+        AUCell rank threshold percentile.
+    seed:int
+        Random seed for ranking backend.
+    chunk_size:int
+        Number of cells processed per chunk.
 
-    Returns:
-        None: Adds a column to the 'obs' attribute of the adata object containing the AUC-ell score for the gene set.
+    Returns
+    -------
+    None
+        Writes AUCell score to ``adata.obs[f'{geneset_name}_aucell']``.
     """
     from ..external.ctxcore.recovery import aucs
 
@@ -56,18 +66,37 @@ def global_imports(modulename,shortname = None, asfunction = False):
     else:        
         globals()[shortname] = __import__(modulename)
 
+@register_function(
+    aliases=['基因集 AUCell', 'geneset_aucell', 'gene set activity scoring'],
+    category="single",
+    description="Score per-cell activity of a custom gene set using AUCell ranking-based enrichment robust to library-size variation.",
+    prerequisites={'optional_functions': ['pp.preprocess']},
+    requires={'var': ['gene names'], 'layers': ['normalized expression (recommended)']},
+    produces={'obs': ['aucell scores'], 'uns': ['aucell parameters']},
+    auto_fix='none',
+    examples=['ov.single.geneset_aucell(adata, geneset_name="IFN_response", geneset=ifn_genes)'],
+    related=['single.pathway_aucell', 'single.pathway_aucell_enrichment']
+)
 def geneset_aucell(adata,geneset_name,geneset,AUC_threshold=0.01,seed=42):
     r"""Calculate the AUC-ell score for a given gene set.
 
-    Arguments:
-        adata: AnnData object containing gene expression data.
-        geneset_name: Name of the gene set.
-        geneset: List of gene symbols for the gene set.
-        AUC_threshold: AUC threshold used to determine significant interactions. (0.01)
-        seed: Seed used to initialize the random number generator. (42)
+    Parameters
+    ----------
+    adata:anndata.AnnData
+        AnnData containing expression matrix.
+    geneset_name:str
+        Name of gene set; used as output column prefix.
+    geneset:list
+        Gene symbols composing the gene set.
+    AUC_threshold:float
+        AUCell rank threshold percentile.
+    seed:int
+        Random seed for ranking backend.
 
-    Returns:
-        None: Adds a column to the 'obs' attribute of the adata object containing the AUC-ell score for the gene set.
+    Returns
+    -------
+    None
+        Writes AUCell score to ``adata.obs[f'{geneset_name}_aucell']``.
     """
     from ..external.ctxcore.recovery import aucs
 
@@ -91,18 +120,37 @@ def geneset_aucell(adata,geneset_name,geneset,AUC_threshold=0.01,seed=42):
         np_rnk_sparse.shape[1],weights,auc_threshold
         )
     
+@register_function(
+    aliases=['通路 AUCell', 'pathway_aucell', 'pathway activity scoring'],
+    category="single",
+    description="Compute single-cell pathway activity scores across multiple pathways using AUCell and write scores into cell metadata.",
+    prerequisites={'optional_functions': ['pp.preprocess']},
+    requires={'var': ['gene names']},
+    produces={'obs': ['pathway auc scores'], 'uns': ['pathway auc settings']},
+    auto_fix='none',
+    examples=['ov.single.pathway_aucell(adata, pathway_names=list(pathways.keys()), pathways_dict=pathways)'],
+    related=['single.geneset_aucell', 'single.pathway_aucell_enrichment']
+)
 def pathway_aucell(adata,pathway_names,pathways_dict,AUC_threshold=0.01,seed=42):
     r"""Calculate the area under the curve (AUC) for a set of pathways in an AnnData object.
 
-    Arguments:
-        adata: AnnData object containing the data.
-        pathway_names: Names of the pathways to analyze.
-        pathways_dict: Dictionary containing the gene sets for each pathway.
-        AUC_threshold: AUC threshold to use for determining significant gene-pathway associations. (0.01)
-        seed: Random seed for reproducibility. (42)
+    Parameters
+    ----------
+    adata:anndata.AnnData
+        AnnData containing expression matrix.
+    pathway_names:list
+        Ordered pathway names to score.
+    pathways_dict:dict
+        Mapping from pathway name to list of genes.
+    AUC_threshold:float
+        AUCell rank threshold percentile.
+    seed:int
+        Random seed for ranking backend.
 
-    Returns:
-        None: The function modifies the `adata.obs` attribute of the input AnnData object.
+    Returns
+    -------
+    None
+        Writes per-pathway AUCell scores to ``adata.obs``.
     """
     from ..external.ctxcore.recovery import aucs
 
@@ -132,16 +180,25 @@ def pathway_aucell(adata,pathway_names,pathways_dict,AUC_threshold=0.01,seed=42)
 def pathway_aucell_tmp(adata, pathway_names, pathways_dict, AUC_threshold=0.01, seed=42, chunk_size=10000):
     r"""Calculate the area under the curve (AUC) for a set of pathways in an AnnData object.
 
-    Arguments:
-        adata: AnnData object containing the data.
-        pathway_names: Names of the pathways to analyze.
-        pathways_dict: Dictionary containing the gene sets for each pathway.
-        AUC_threshold: AUC threshold to use for determining significant gene-pathway associations. (0.01)
-        seed: Random seed for reproducibility. (42)
-        chunk_size: The number of cells to process in each chunk. (10000)
+    Parameters
+    ----------
+    adata:anndata.AnnData
+        AnnData containing expression matrix.
+    pathway_names:list
+        Ordered pathway names to score.
+    pathways_dict:dict
+        Mapping from pathway name to list of genes.
+    AUC_threshold:float
+        AUCell rank threshold percentile.
+    seed:int
+        Random seed for ranking backend.
+    chunk_size:int
+        Number of cells processed per chunk.
 
-    Returns:
-        None: The function modifies the `adata.obs` attribute of the input AnnData object.
+    Returns
+    -------
+    None
+        Writes per-pathway AUCell scores to ``adata.obs``.
     """
     from ..external.ctxcore.recovery import aucs
 
@@ -172,19 +229,39 @@ def pathway_aucell_tmp(adata, pathway_names, pathways_dict, AUC_threshold=0.01, 
 
         adata.obs[f'{pathway_name}_aucell'] = auc_results
             
+@register_function(
+    aliases=['通路活性富集', 'pathway_aucell_enrichment', 'pathway overactivity screen'],
+    category="single",
+    description="Identify pathways with robust AUCell activity signals by integrating score distribution and gene-overlap constraints.",
+    prerequisites={'functions': ['pathway_aucell']},
+    requires={'obs': ['pathway auc scores']},
+    produces={'uns': ['pathway_aucell_enrichment']},
+    auto_fix='none',
+    examples=['ov.single.pathway_aucell_enrichment(adata, pathways_dict=pathways, AUC_threshold=0.01)'],
+    related=['single.pathway_aucell', 'single.pathway_enrichment']
+)
 def pathway_aucell_enrichment(adata,pathways_dict,AUC_threshold=0.01,seed=42,num_workers=1,gene_overlap_threshold=0.80):
     r"""Enrich cell annotations with pathway activity scores using the AUC-ell method.
 
-    Arguments:
-        adata: AnnData object containing the expression matrix.
-        pathways_dict: A dictionary where keys are pathway names and values are lists of genes associated with each pathway.
-        AUC_threshold: The threshold for calculating the area under the curve (AUC) values using the AUC-ell method. (0.01)
-        seed: The seed to use for the random number generator. (42)
-        num_workers: The number of workers to use for parallel processing. (1)
-        gene_overlap_threshold: Minimum fraction of pathway genes that must be present in expression matrix (0.80 = 80%).
+    Parameters
+    ----------
+    adata:anndata.AnnData
+        AnnData containing expression matrix.
+    pathways_dict:dict
+        Mapping from pathway name to list of genes.
+    AUC_threshold:float
+        AUCell rank threshold percentile.
+    seed:int
+        Random seed for AUCell backend.
+    num_workers:int
+        Number of workers used in AUCell computation.
+    gene_overlap_threshold:float
+        Minimum fraction of pathway genes present in ``adata.var_names``.
 
-    Returns:
-        adata_aucs: AnnData object containing the pathway activity scores for each cell in the input AnnData object.
+    Returns
+    -------
+    anndata.AnnData
+        AnnData whose ``X`` stores pathway AUCell activity matrix.
     """
     from ..external.ctxcore.genesig import GeneSignature
 
@@ -211,16 +288,25 @@ def pathway_aucell_enrichment_tmp(adata, pathways_dict, AUC_threshold=0.01, seed
                               num_workers=1, chunk_size=10000):
     r"""Enrich cell annotations with pathway activity scores using the AUC-ell method.
 
-    Arguments:
-        adata: AnnData object containing the expression matrix.
-        pathways_dict: A dictionary where keys are pathway names and values are lists of genes associated with each pathway.
-        AUC_threshold: The threshold for calculating the area under the curve (AUC) values using the AUC-ell method. (0.01)
-        seed: The seed to use for the random number generator. (42)
-        num_workers: The number of workers to use for parallel processing. (1)
-        chunk_size: The number of cells to process in each chunk. (10000)
+    Parameters
+    ----------
+    adata:anndata.AnnData
+        AnnData containing expression matrix.
+    pathways_dict:dict
+        Mapping from pathway name to list of genes.
+    AUC_threshold:float
+        AUCell rank threshold percentile.
+    seed:int
+        Random seed for AUCell backend.
+    num_workers:int
+        Number of workers used in AUCell computation.
+    chunk_size:int
+        Number of cells processed per chunk.
 
-    Returns:
-        adata_aucs: AnnData object containing the pathway activity scores for each cell in the input AnnData object.
+    Returns
+    -------
+    anndata.AnnData
+        AnnData whose ``X`` stores pathway AUCell activity matrix.
     """
     from tqdm import tqdm
     from ..external.ctxcore.genesig import GeneSignature
@@ -256,22 +342,44 @@ def pathway_aucell_enrichment_tmp(adata, pathways_dict, AUC_threshold=0.01, seed
     return adata_aucs
 
 
+@register_function(
+    aliases=['差异通路富集', 'pathway_enrichment', 'deg pathway enrichment'],
+    category="single",
+    description="Run pathway enrichment on cluster/group differential genes to connect transcriptional changes with biological processes.",
+    prerequisites={'optional_functions': ['pp.neighbors', 'pp.leiden']},
+    requires={'obs': ['group labels'], 'var': ['gene names']},
+    produces={'uns': ['pathway_enrichment_results']},
+    auto_fix='escalate',
+    examples=['ov.single.pathway_enrichment(adata, pathways_dict=pathways, organism="Human", group_by="leiden")'],
+    related=['single.pathway_enrichment_plot', 'single.pathway_aucell_enrichment']
+)
 def pathway_enrichment(adata, pathways_dict,organism='Human',group_by='louvain', 
                        cutoff=0.05, logfc_threshold=2,pvalue_type='adjust',plot=True):
     r"""Perform pathway enrichment analysis on gene expression data.
     
-    Arguments:
-        adata: Annotated data matrix containing gene expression data.
-        pathways_dict: A dictionary of gene sets with their gene members.
-        organism: The organism to be used for the enrichment analysis. Can be either 'Human' or 'Mouse'. ('Human')
-        group_by: The group label of the cells in adata.obs to perform the enrichment analysis on. ('louvain')
-        cutoff: The adjusted p-value cutoff used to filter enriched pathways. (0.05)
-        logfc_threshold: The log2 fold change cutoff used to define differentially expressed genes. (2)
-        pvalue_type: The type of p-value used for filtering enriched pathways. Can be either 'adjust' or 'raw'. ('adjust')
-        plot: If True, generate a bar plot for each cluster of enriched pathways. (True)
+    Parameters
+    ----------
+    adata:anndata.AnnData
+        AnnData with ``rank_genes_groups`` results and cluster labels.
+    pathways_dict:dict
+        Mapping from pathway/set name to member genes.
+    organism:str
+        Organism name used by enrichment backend.
+    group_by:str
+        ``adata.obs`` key used as grouping variable.
+    cutoff:float
+        Significance cutoff for pathway filtering.
+    logfc_threshold:float
+        Minimum log2 fold-change threshold for DE genes.
+    pvalue_type:str
+        P-value type used for final filtering: ``'adjust'`` or ``'raw'``.
+    plot:bool
+        Whether to draw per-cluster barplots for enriched pathways.
     
-    Returns:
-        enrich_res: A pandas dataframe containing the enriched pathways information including term name, p-value, adjusted p-value, overlap genes, odds ratio, log2 fold change, and cluster name.
+    Returns
+    -------
+    pd.DataFrame
+        Enrichment result table with cluster labels and pathway statistics.
     
     Examples:
         >>> # Perform pathway enrichment analysis on adata using pathways_dict
@@ -350,19 +458,39 @@ def pathway_enrichment(adata, pathways_dict,organism='Human',group_by='louvain',
     
     return enrich_res
 
+@register_function(
+    aliases=['通路富集绘图', 'pathway_enrichment_plot', 'enrichment barplot'],
+    category="single",
+    description="Visualize top enriched pathways with effect size and significance to facilitate biological interpretation of DEG-derived signatures.",
+    prerequisites={'functions': ['pathway_enrichment']},
+    requires={'uns': ['pathway_enrichment_results']},
+    produces={},
+    auto_fix='none',
+    examples=['ov.single.pathway_enrichment_plot(enrich_res, term_num=20, figsize=(6,8))'],
+    related=['single.pathway_enrichment', 'bulk.geneset_plot']
+)
 def pathway_enrichment_plot(enrich_res,term_num=5,return_table=False,figsize=(3,10),plot_title='',**kwds):
     r"""Visualize the pathway enrichment analysis results as a heatmap.
 
-    Arguments:
-        enrich_res: The output from the pathway_enrichment() function.
-        term_num: The number of enriched terms to display for each cluster. (5)
-        return_table: Whether to return the heatmap table as a DataFrame. (False)
-        figsize: The size of the plot. ((3,10))
-        plot_title: The title of the plot. ('')
-        **kwds: Other keyword arguments to pass to the seaborn heatmap function.
+    Parameters
+    ----------
+    enrich_res:pd.DataFrame
+        DataFrame returned by ``pathway_enrichment``.
+    term_num:int
+        Number of top terms kept per cluster.
+    return_table:bool
+        Whether to return pivot/heatmap table instead of plotting.
+    figsize:tuple
+        Figure size for heatmap.
+    plot_title:str
+        Heatmap title.
+    **kwds
+        Additional keyword arguments forwarded to ``sns.heatmap``.
 
-    Returns:
-        ax: The heatmap plot.
+    Returns
+    -------
+    matplotlib.axes.Axes or pd.DataFrame
+        Heatmap axes, or table when ``return_table=True``.
 
     Examples:
         >>> res = pathway_enrichment(adata, pathways_dict)
@@ -395,6 +523,5 @@ def pathway_enrichment_plot(enrich_res,term_num=5,return_table=False,figsize=(3,
 
     
     return ax
-
 
 

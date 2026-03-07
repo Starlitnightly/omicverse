@@ -8,6 +8,7 @@ import base64
 from io import BytesIO
 import warnings
 import os
+from .._registry import register_function
 warnings.filterwarnings('ignore')
 
 from ..pl import *
@@ -187,28 +188,44 @@ class HTMLReportGenerator:
         return ''.join(logo_items)
 
 
+@register_function(
+    aliases=['单细胞分析报告', 'generate_scRNA_report', 'scRNA report'],
+    category="single",
+    description="Generate an HTML report summarizing single-cell QC, clustering, markers, and embedding views for reproducible interpretation.",
+    prerequisites={'optional_functions': ['lazy', 'pp.preprocess', 'pp.neighbors', 'pp.umap']},
+    requires={'obs': ['cluster labels'], 'obsm': ['X_umap (recommended)']},
+    produces={'uns': ['analysis_report']},
+    auto_fix='none',
+    examples=['ov.single.generate_scRNA_report(adata, output_path="reports/pbmc_report.html", species="human")'],
+    related=['single.lazy', 'utils.plot_embedding_celltype']
+)
 def generate_scRNA_report(adata, output_path="scRNA_analysis_report.html", 
                          species='human', sample_key=None, template_dir=None,
                          enable_analytics=True, analytics_id="OV-001"):
     """
-    Generate MultiQC-style HTML report for single-cell RNA-seq analysis
-    
-    Parameters:
-    -----------
-    adata : AnnData object
-        The analyzed single-cell data object from lazy function
-    output_path : str
-        Path to save the HTML report
-    species : str
-        Species information for the analysis
-    sample_key : str
-        Key for batch/sample information
-    template_dir : str
-        Directory containing HTML templates (optional)
-    enable_analytics : bool
-        Whether to enable analytics tracking
-    analytics_id : str
-        The ID for analytics tracking
+    Generate a MultiQC-style HTML report for single-cell RNA-seq analysis.
+
+    Parameters
+    ----------
+    adata:AnnData object
+        Analyzed single-cell AnnData, typically produced by ``ov.single.lazy``.
+    output_path:str
+        Output path of generated HTML report.
+    species:str
+        Species label shown in report metadata.
+    sample_key:str or None
+        Column in ``adata.obs`` used as sample/batch grouping.
+    template_dir:str or None
+        Directory containing HTML templates. If ``None``, built-in templates are used.
+    enable_analytics:bool
+        Whether analytics snippet is injected into final HTML.
+    analytics_id:str
+        Analytics identifier used when tracking is enabled.
+
+    Returns
+    -------
+    str
+        Path to saved report file.
     """
     
     # Initialize report generator
