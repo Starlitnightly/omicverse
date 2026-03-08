@@ -28,26 +28,48 @@ def _require_geopandas():
     return gpd, wkt
 
 
-def _process_background_image(spatial_info, img_key, data_coords_range=None):
-    """Process background image with scanpy-like scaling behavior."""
+def _process_background_image(spatial_info, img_key, scale_factor=None):
+    """Resolve background image and effective scale factor (scanpy-style)."""
     if img_key is None:
         img_key = "hires" if "hires" in spatial_info.get("images", {}) else None
 
+    scalefactors = spatial_info.get("scalefactors", {})
+    if scale_factor is None and img_key is not None:
+        scale_factor = float(scalefactors.get(f"tissue_{img_key}_scalef", 1.0))
+    elif scale_factor is None:
+        scale_factor = 1.0
+
     if not img_key or "images" not in spatial_info or img_key not in spatial_info["images"]:
-        return None, None
+        return None, scale_factor
 
     img = spatial_info["images"][img_key]
-    scalefactors = spatial_info.get("scalefactors", {})
-    scale_key = f"tissue_{img_key}_scalef"
-    scale_factor = scalefactors.get(scale_key, 1.0)
+    return img, scale_factor
 
-    img_height, img_width = img.shape[:2]
-    if scale_factor < 1.0:
-        img_extent = [0, img_width / scale_factor, img_height / scale_factor, 0]
-    else:
-        img_extent = [0, img_width, img_height, 0]
 
-    return img, img_extent
+def _compute_spatial_like_limits(spatial_coords):
+    """Compute axis limits following the same autoscale pattern as `ov.pl.spatial`."""
+    arr = np.asarray(spatial_coords, dtype=float)
+    if arr.ndim != 2 or arr.shape[0] == 0 or arr.shape[1] < 2:
+        return None
+    arr = arr[:, :2]
+    if not np.isfinite(arr).all():
+        return None
+
+    tmp_fig, tmp_ax = plt.subplots(1, 1)
+    try:
+        # Match `embedding` behavior where limits come from a scatter + autoscale_view.
+        tmp_ax.scatter(arr[:, 0], arr[:, 1], s=1.0, alpha=0.0)
+        tmp_ax.autoscale_view()
+        cur_coords = np.concatenate([tmp_ax.get_xlim(), tmp_ax.get_ylim()])
+    finally:
+        plt.close(tmp_fig)
+
+    return (
+        float(cur_coords[0]),
+        float(cur_coords[1]),
+        float(cur_coords[2]),
+        float(cur_coords[3]),
+    )
 
 
 def spatialseg(
@@ -64,6 +86,7 @@ def spatialseg(
     vmax: Optional[float] = None,
     img_key: Optional[str] = None,
     basis: str = "spatial",
+    scale_factor: Optional[float] = None,
     crop_coord: Optional[Union[tuple, Sequence[tuple]]] = None,
     edges_width: float = 0.5,
     edges_color: str = "black",
@@ -109,6 +132,7 @@ def spatialseg(
         edges_width = float(seg_contourpx)
 
     crop_bbox = None
+    crop_limits = None
     if crop_coord is not None:
         if (
             isinstance(crop_coord, (list, tuple))
@@ -121,9 +145,11 @@ def spatialseg(
             c0 = crop_coord
         else:
             raise ValueError(
-                "`crop_coord` must be `(x_min, y_min, x_max, y_max)` or a one-item list containing that tuple."
+                "`crop_coord` must be `(x0, x1, y0, y1)` (same as `ov.pl.spatial`) "
+                "or a one-item list containing that tuple."
             )
-        x0, y0, x1, y1 = [float(v) for v in c0]
+        x0, x1, y0, y1 = [float(v) for v in c0]
+        crop_limits = (x0, x1, y0, y1)
         crop_bbox = (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
 
     gpd, wkt = _require_geopandas()
@@ -155,6 +181,14 @@ def spatialseg(
             f"Available library_ids: {available_library_ids}"
         )
     spatial_info = spatial_uns[library_id]
+    img, resolved_scale_factor = _process_background_image(
+        spatial_info, img_key, scale_factor=scale_factor
+    )
+    if crop_limits is not None and resolved_scale_factor is not None:
+        sf = float(resolved_scale_factor)
+        crop_limits = tuple(float(v) * sf for v in crop_limits)
+        cx0, cx1, cy0, cy1 = crop_limits
+        crop_bbox = (min(cx0, cx1), min(cy0, cy1), max(cx0, cx1), max(cy0, cy1))
 
     library_filter_mask = pd.Series(True, index=adata.obs_names)
     if library_id is not None:
@@ -243,67 +277,66 @@ def spatialseg(
             axes_list.append(current_ax)
             continue
 
-        coords_list = []
-        for cell_id in cells_to_plot:
-            wkt_str = adata.obs.loc[cell_id, "geometry"] if cell_id in adata.obs.index else None
-            if wkt_str and pd.notna(wkt_str):
-                try:
-                    geom = wkt.loads(wkt_str)
-                    if hasattr(geom, "bounds"):
-                        bounds = geom.bounds
-                        if crop_bbox is not None:
+        if crop_limits is not None:
+            x0_disp, x1_disp, y0_disp, y1_disp = crop_limits
+        elif basis in adata.obsm and len(adata.obsm[basis]) > 0:
+            spatial_coords = adata.obsm[basis][mask.to_numpy()]
+            if resolved_scale_factor != 1.0:
+                spatial_coords = spatial_coords * float(resolved_scale_factor)
+            cur_coords = _compute_spatial_like_limits(spatial_coords)
+            if cur_coords is not None:
+                x0_disp, x1_disp, y0_disp, y1_disp = cur_coords
+            elif len(spatial_coords) > 0 and np.isfinite(spatial_coords).all():
+                x0_disp, y0_disp = spatial_coords.min(axis=0)
+                x1_disp, y1_disp = spatial_coords.max(axis=0)
+            else:
+                x0_disp = y0_disp = 0
+                x1_disp = y1_disp = 1
+        else:
+            coords_list = []
+            for cell_id in cells_to_plot:
+                wkt_str = adata.obs.loc[cell_id, "geometry"] if cell_id in adata.obs.index else None
+                if wkt_str and pd.notna(wkt_str):
+                    try:
+                        geom = wkt.loads(wkt_str)
+                        if resolved_scale_factor != 1.0:
+                            from shapely import affinity as shp_affinity
+                            geom = shp_affinity.scale(
+                                geom,
+                                xfact=float(resolved_scale_factor),
+                                yfact=float(resolved_scale_factor),
+                                origin=(0, 0),
+                            )
+                        if hasattr(geom, "bounds"):
+                            bounds = geom.bounds
                             if (
-                                bounds[2] < crop_bbox[0]
-                                or bounds[0] > crop_bbox[2]
-                                or bounds[3] < crop_bbox[1]
-                                or bounds[1] > crop_bbox[3]
+                                not all(np.isfinite(bounds))
+                                or bounds[2] <= bounds[0]
+                                or bounds[3] <= bounds[1]
                             ):
                                 continue
-                        coords_list.append(bounds)
-                except Exception:
-                    continue
-
-        if crop_bbox is not None:
-            x_min, y_min, x_max, y_max = crop_bbox
-        elif coords_list:
-            all_bounds = np.array(coords_list)
-            x_min = all_bounds[:, 0].min()
-            y_min = all_bounds[:, 1].min()
-            x_max = all_bounds[:, 2].max()
-            y_max = all_bounds[:, 3].max()
-        else:
-            if basis in adata.obsm and len(adata.obsm[basis]) > 0:
-                spatial_coords = adata.obsm[basis][mask]
-                if len(spatial_coords) > 0:
-                    x_min, y_min = spatial_coords.min(axis=0)
-                    x_max, y_max = spatial_coords.max(axis=0)
-                else:
-                    x_min = y_min = 0
-                    x_max = y_max = 1
+                            coords_list.append(bounds)
+                    except Exception:
+                        continue
+            if coords_list:
+                all_bounds = np.array(coords_list)
+                x0_disp = all_bounds[:, 0].min()
+                y0_disp = all_bounds[:, 1].min()
+                x1_disp = all_bounds[:, 2].max()
+                y1_disp = all_bounds[:, 3].max()
             else:
-                x_min = y_min = 0
-                x_max = y_max = 1
+                x0_disp = y0_disp = 0
+                x1_disp = y1_disp = 1
 
-        data_coords_range = (x_min, y_min, x_max, y_max)
-
-        img, img_extent = _process_background_image(spatial_info, img_key, data_coords_range)
-        if img is not None and img_extent is not None:
+        if img is not None:
             img_alpha = 1.0 if color_key is None else alpha_img
-            current_ax.imshow(img, extent=img_extent, origin="upper", alpha=img_alpha)
+            current_ax.imshow(img, origin="upper", alpha=img_alpha)
 
         if color_key is None:
-            if crop_bbox is not None:
-                current_ax.set_xlim(x_min, x_max)
-                current_ax.set_ylim(y_max, y_min)
-            elif img_extent is not None:
-                current_ax.set_xlim(img_extent[0], img_extent[1])
-                current_ax.set_ylim(img_extent[2], img_extent[3])
-            else:
-                current_ax.set_xlim(x_min, x_max)
-                current_ax.set_ylim(y_max, y_min)
+            current_ax.set_xlim(x0_disp, x1_disp)
+            current_ax.set_ylim(y1_disp, y0_disp)
 
             current_ax.set_aspect("equal")
-            current_ax.invert_yaxis()
 
             if xlabel is not None:
                 current_ax.set_xlabel(xlabel)
@@ -322,6 +355,14 @@ def spatialseg(
                 continue
             try:
                 geom = wkt.loads(wkt_str)
+                if resolved_scale_factor != 1.0:
+                    from shapely import affinity as shp_affinity
+                    geom = shp_affinity.scale(
+                        geom,
+                        xfact=float(resolved_scale_factor),
+                        yfact=float(resolved_scale_factor),
+                        origin=(0, 0),
+                    )
                 if geom is None or not hasattr(geom, "bounds"):
                     continue
                 if hasattr(geom, "is_valid") and not geom.is_valid:
@@ -630,19 +671,9 @@ def spatialseg(
                         cb.ax.tick_params(labelsize=legend_fontsize)
 
         current_ax.set_aspect("equal")
-        current_ax.invert_yaxis()
 
-        if crop_bbox is not None:
-            current_ax.set_xlim(x_min, x_max)
-            current_ax.set_ylim(y_max, y_min)
-        else:
-            x_range = x_max - x_min
-            y_range = y_max - y_min
-            x_padding = x_range * 0.05 if x_range > 0 else 1
-            y_padding = y_range * 0.05 if y_range > 0 else 1
-
-            current_ax.set_xlim(x_min - x_padding, x_max + x_padding)
-            current_ax.set_ylim(y_max + y_padding, y_min - y_padding)
+        current_ax.set_xlim(x0_disp, x1_disp)
+        current_ax.set_ylim(y1_disp, y0_disp)
 
         if xlabel is not None:
             current_ax.set_xlabel(xlabel)
