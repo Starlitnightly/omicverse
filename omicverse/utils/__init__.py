@@ -70,7 +70,7 @@ from ._data import (
     correlation_pseudotime,store_layers,retrieve_layers,easter_egg,
     save,load,convert_adata_for_rust,
     anndata_sparse,np_mean,np_std,
-    load_signatures_from_file,predefined_signatures
+    load_signatures_from_file,predefined_signatures,print_tree
     )
 from ._anndata_rust_patch import patch_rust_adata
 from ._plot import (
@@ -192,6 +192,7 @@ __all__ = [
     "np_std",
     "load_signatures_from_file",
     "predefined_signatures",
+    "print_tree",
     # @ _anndata_rust_patch
     "patch_rust_adata",
     # @ _plot
