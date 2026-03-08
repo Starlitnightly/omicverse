@@ -78,6 +78,7 @@ _LAZY_MODULES = {
     'llm',
     'fm',
     'agent',
+    'mcp',
 }
 
 # Lazy attribute mappings: {attribute_name: (module_path, attr_name)}
