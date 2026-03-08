@@ -1,0 +1,29 @@
+include README.md
+include LICENSE
+include pyproject.toml
+include setup.py
+include setup.cfg
+include requirements.txt
+include requirements-latest.txt
+
+recursive-include omicverse *.py *.pyi *.json *.txt *.yaml *.yml *.csv *.tsv *.md *.ipynb *.html *.css *.js *.png *.jpg *.jpeg *.svg *.ico *.db *.npz *.gz
+
+prune .git
+prune .github
+prune .claude
+prune .pytest_cache
+prune .ruff_cache
+prune .vscode
+prune docs
+prune tests
+prune OvIntelligence
+prune READMEM
+prune omicverse_guide
+prune omicverse_web
+prune tmp
+prune tmp_omicverse
+prune Skill_Seekers
+
+global-exclude .DS_Store
+global-exclude *.py[cod]
+global-exclude __pycache__
