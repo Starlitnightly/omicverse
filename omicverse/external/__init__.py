@@ -97,6 +97,9 @@ __all__ = [
     'datacollect',
     'spaco',
     'nocd',
+    'SpatialDE',
+    'NaiveDE',
+    'somde'
 ]
 
 

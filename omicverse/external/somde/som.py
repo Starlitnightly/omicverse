@@ -89,32 +89,31 @@ class SomNode:
     
 
     
-    def Sparun(self,X, exp_tab, kernel_space=None):
-    #Perform SpatialDE test 
-        if kernel_space == None:
+    def Sparun(self, X, exp_tab, kernel_space=None, n_jobs=1):
+        '''Perform SpatialDE test.'''
+        if kernel_space is None:
             l_min, l_max = get_l_limits(X)
             kernel_space = {
                 'SE': np.logspace(np.log10(l_min), np.log10(l_max), 10),
-                'const': 0
+                'const': 0,
             }
 
         logging.info('Performing DE test')
-        results = dyn_de(X, exp_tab, kernel_space)
+        results = dyn_de(X, exp_tab, kernel_space, n_jobs=n_jobs)
         mll_results = get_mll_results(results)
 
-        # Perform significance test
         mll_results['pval'] = 1 - stats.chi2.cdf(mll_results['LLR'], df=1)
         mll_results['qval'] = qvalue(mll_results['pval'])
 
         return mll_results
-    
-    def run(self):
+
+    def run(self, n_jobs=1):
         if self.nres is None:
             print('norm mtx first')
             self.norm()
-        X=self.ninfo[['x','y']].values.astype(float)
-        result = self.Sparun(X, self.nres)
-        result.sort_values('LLR',inplace=True,ascending=False)
-        number_q = result[result.qval<0.05].shape[0]
+        X = self.ninfo[['x', 'y']].values.astype(float)
+        result = self.Sparun(X, self.nres, n_jobs=n_jobs)
+        result.sort_values('LLR', inplace=True, ascending=False)
+        number_q = result[result.qval < 0.05].shape[0]
         return result, number_q
 
