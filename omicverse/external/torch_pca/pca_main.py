@@ -15,6 +15,10 @@ import warnings
 from .ncompo import NComponentsType, find_ncomponents
 from .svd import choose_svd_solver, randomized_svd, svd_flip
 
+HIGH_DENSITY_AUTO_DENSE_THRESHOLD = 0.2
+MAX_AUTO_DENSE_ELEMENTS = 80_000_000
+AUTO_DENSE_COV_EIGH_MAX_FEATURES = 4096
+
 
 class PCA:
     """Principal Component Analysis (PCA).
@@ -82,7 +86,7 @@ class PCA:
         n_components: NComponentsType = None,
         *,
         whiten: bool = False,
-        svd_solver: str = "auto",
+        svd_solver: str = "covariance_eigh",
         iterated_power: Union[str, int] = "auto",
         n_oversamples: int = 10,
         power_iteration_normalizer: str = "auto",
@@ -119,6 +123,7 @@ class PCA:
         self._input_is_sparse: bool = False
         self._original_device: Optional[torch.device] = None
         self._original_dtype: Optional[torch.dtype] = None
+        self._auto_densified_from_sparse: bool = False
 
         if self.svd_solver_ not in ["auto", "full", "covariance_eigh", "randomized", "lobpcg", "arpack"]:
             raise ValueError(
@@ -160,6 +165,64 @@ class PCA:
         transformed = self.transform(inputs)
         return transformed
 
+    def _compute_sparse_gram_matrix(self, inputs: Tensor) -> Tensor:
+        """Compute X^T X for sparse inputs with robust fallback paths."""
+        x_t = inputs.transpose(0, 1)
+        try:
+            # Fast path: sparse@sparse -> sparse (then densify, small n_features x n_features)
+            return torch.sparse.mm(x_t, inputs).to_dense()
+        except RuntimeError as err:
+            err_msg = str(err).lower()
+
+            # Older/newer torch builds may require dense mat2 for sparse.mm.
+            if "dense" in err_msg or "strided" in err_msg:
+                return torch.sparse.mm(x_t, inputs.to_dense())
+
+            # CUDA sparse SpGEMM can fail with insufficient resources on large nnz.
+            if any(tok in err_msg for tok in ("cusparse", "spgemm", "insufficient resources")):
+                warnings.warn(
+                    "Sparse GPU SpGEMM failed while building PCA Gram matrix; "
+                    "falling back to CPU sparse multiplication in torch.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                x_t_cpu = x_t.cpu()
+                inputs_cpu = inputs.cpu()
+                try:
+                    gram_cpu = torch.sparse.mm(x_t_cpu, inputs_cpu).to_dense()
+                except RuntimeError as cpu_err:
+                    cpu_err_msg = str(cpu_err).lower()
+                    if "dense" not in cpu_err_msg and "strided" not in cpu_err_msg:
+                        raise
+                    gram_cpu = torch.sparse.mm(x_t_cpu, inputs_cpu.to_dense())
+                return gram_cpu.to(device=inputs.device, dtype=inputs.dtype)
+
+            raise
+
+    def _maybe_auto_densify_sparse(self, inputs: Tensor) -> Tensor:
+        """Auto-convert high-density sparse tensors to dense for better performance."""
+        n_samples, n_features = inputs.shape
+        total = int(n_samples) * int(n_features)
+        if total <= 0 or total > MAX_AUTO_DENSE_ELEMENTS:
+            return inputs
+
+        # inputs is coalesced sparse COO in our pipeline
+        nnz = int(inputs._nnz())
+        density = nnz / total
+        if density < HIGH_DENSITY_AUTO_DENSE_THRESHOLD:
+            return inputs
+
+        warnings.warn(
+            "High-density sparse input detected "
+            f"(density={density * 100:.2f}%, shape={tuple(inputs.shape)}); "
+            "converting to dense tensor for faster torch PCA path.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        self._input_is_sparse = False
+        self._auto_densified_from_sparse = True
+        return inputs.to_dense()
+
     def fit(self, inputs: Union[Tensor, sp.csr_matrix, sp.csc_matrix], *, determinist: bool = True) -> "PCA":
         """Fit the PCA model and return it.
 
@@ -182,6 +245,7 @@ class PCA:
             The PCA model fitted on the input data.
         """
         # Detect and validate input type, convert to torch tensor
+        self._auto_densified_from_sparse = False
         if sp.issparse(inputs):
             self._input_is_sparse = True
             if not isinstance(inputs, (sp.csr_matrix, sp.csc_matrix)):
@@ -211,12 +275,24 @@ class PCA:
             if inputs.dtype == torch.float16:
                 inputs = inputs.to(torch.float32)
 
+        if self._input_is_sparse and isinstance(inputs, Tensor):
+            inputs = self._maybe_auto_densify_sparse(inputs)
+
         if self.svd_solver_ == "auto":
-            self.svd_solver_ = choose_svd_solver(
-                inputs=inputs,
-                n_components=self.n_components_,
-                is_sparse=self._input_is_sparse,
-            )
+            # For sparse inputs auto-densified due to high density, prefer
+            # covariance_eigh when feature dimensionality is moderate.
+            if (
+                self._auto_densified_from_sparse
+                and inputs.shape[-1] <= AUTO_DENSE_COV_EIGH_MAX_FEATURES
+                and inputs.shape[-2] >= inputs.shape[-1]
+            ):
+                self.svd_solver_ = "covariance_eigh"
+            else:
+                self.svd_solver_ = choose_svd_solver(
+                    inputs=inputs,
+                    n_components=self.n_components_,
+                    is_sparse=self._input_is_sparse,
+                )
         elif self.svd_solver_ == "arpack":
             warnings.warn(
                 "svd_solver='arpack' is deprecated in torch_pca sparse mode and "
@@ -268,14 +344,7 @@ class PCA:
             self.n_components_ = int(self.n_components_)
 
             if self._input_is_sparse:
-                x_t = inputs.transpose(0, 1)
-                try:
-                    gram = torch.sparse.mm(x_t, inputs).to_dense()
-                except RuntimeError as err:
-                    err_msg = str(err).lower()
-                    if "dense" not in err_msg and "strided" not in err_msg:
-                        raise
-                    gram = torch.sparse.mm(x_t, inputs.to_dense())
+                gram = self._compute_sparse_gram_matrix(inputs)
                 mean_vec = self.mean_.reshape(-1)
                 covariance = (
                     gram - self.n_samples_ * torch.outer(mean_vec, mean_vec)
