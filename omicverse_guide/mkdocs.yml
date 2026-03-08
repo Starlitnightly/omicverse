@@ -77,6 +77,8 @@ nav:
         - Preprocess:
             - Crop and Rotation of spatial transcriptomic data: Tutorials-space/t_crop_rotate.ipynb
             - Visium 10x HD Cellpose: Tutorials-space/t_cellpose.ipynb
+            - Analyze Nanostring data: Tutorials-space/t_nanostring_preprocess.ipynb
+            - Analyze Visium HD data: Tutorials-space/t_visium_hd_preprocess.ipynb
             - Spatial clustering and denoising expressions: Tutorials-space/t_cluster_space.ipynb
             - Spatial integration and clustering : Tutorials-space/t_staligner.ipynb
         - Deconvolution:
