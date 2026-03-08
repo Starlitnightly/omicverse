@@ -430,6 +430,125 @@
     color: #283c50;
 }
 
+.agent-harness-panel {
+    border-bottom: 1px solid #e5e7eb;
+    padding: 12px 18px;
+    background: #fcfcfd;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.agent-harness-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.agent-harness-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #475569;
+}
+
+.agent-harness-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.agent-harness-meta {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.agent-harness-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.agent-harness-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #4338ca;
+    border: 1px solid #c7d2fe;
+}
+
+.agent-harness-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+}
+
+.agent-harness-column {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+}
+
+.agent-harness-subtitle {
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    padding: 10px 12px 6px;
+}
+
+.agent-harness-list,
+.agent-harness-trace {
+    padding: 0 12px 12px;
+    overflow: auto;
+    font-size: 12px;
+    color: #334155;
+}
+
+.agent-harness-empty {
+    color: #94a3b8;
+    font-style: italic;
+}
+
+.agent-harness-approval {
+    border: 1px solid #dbeafe;
+    background: #eff6ff;
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-top: 8px;
+}
+
+.agent-harness-approval:first-child {
+    margin-top: 0;
+}
+
+.agent-harness-approval-title {
+    font-weight: 600;
+    color: #1d4ed8;
+    margin-bottom: 4px;
+}
+
+.agent-harness-approval-actions {
+    margin-top: 8px;
+    display: flex;
+    gap: 6px;
+}
+
+.agent-harness-trace pre {
+    background: #0f172a;
+    color: #e5e7eb;
+    border-radius: 8px;
+    padding: 10px;
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 .agent-messages {
     flex: 1;
     padding: 18px;
@@ -523,6 +642,108 @@
 
 .agent-input .btn {
     white-space: nowrap;
+}
+
+.agent-panel-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.agent-session-badge {
+    font-size: 10px;
+    color: #6b7280;
+    background: #f3f4f6;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    cursor: default;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Streaming cursor ---- */
+.agent-streaming .agent-llm-text::after {
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 14px;
+    margin-left: 2px;
+    background: #065f46;
+    border-radius: 1px;
+    animation: agent-blink 0.7s step-end infinite;
+    vertical-align: text-bottom;
+}
+
+@keyframes agent-blink {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0; }
+}
+
+/* ---- Inline event cards ---- */
+.agent-card {
+    margin: 8px 0 0;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.agent-card-tool {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1e40af;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.agent-card-label {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.agent-card-detail {
+    color: #6b7280;
+    word-break: break-all;
+}
+
+.agent-card-code {
+    background: #0f172a;
+    color: #e5e7eb;
+    padding: 0;
+    overflow: hidden;
+}
+
+.agent-card-code pre {
+    margin: 0;
+    padding: 8px 10px;
+    font-size: 12px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.agent-card-result {
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #065f46;
+    font-weight: 500;
+}
+
+.agent-card-error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+}
+
+@media (max-width: 992px) {
+    .agent-harness-columns {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* ========================================

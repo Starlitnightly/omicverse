@@ -39,16 +39,22 @@ from scipy.sparse import issparse
 
 ### Import from Scanpy
 def select_groups(adata, groups_order_subset='all', key='groups'):
-    r"""Get subset of groups in adata.obs[key].
-    
-    Arguments:
-        adata: AnnData object
-        groups_order_subset: Groups to subset, can be 'all' or list of group names. ('all')
-        key: Key in adata.obs to use for grouping. ('groups')
-    
-    Returns:
-        groups_order_subset: Selected group names
-        groups_masks: Boolean masks for each group
+    r"""Select groups and generate per-group cell masks.
+
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Annotated data matrix with categorical grouping labels.
+    groups_order_subset : str or sequence, default='all'
+        Group subset to keep. Use ``'all'`` to include all categories.
+    key : str, default='groups'
+        Obs column used for grouping.
+
+    Returns
+    -------
+    tuple
+        ``(groups_order_subset, groups_masks)`` where ``groups_masks`` is a
+        boolean matrix of shape ``(n_groups, n_cells)``.
     """
     groups_order = adata.obs[key].cat.categories
     if key + '_masks' in adata.uns:
@@ -123,13 +129,17 @@ def sparse_mean_variance_axis(mtx: sparse.spmatrix, axis: int):
     * This doesn't currently implement support for null values, but could.
     * Uses numba not cython
     
-    Arguments:
-        mtx: Sparse matrix (CSR or CSC format)
-        axis: Axis along which to compute statistics (0 or 1)
-    
-    Returns:
-        mean: Mean values along specified axis
-        variance: Variance values along specified axis
+    Parameters
+    ----------
+    mtx : scipy.sparse.spmatrix
+        Sparse matrix in CSR or CSC format.
+    axis : int
+        Axis over which to compute statistics (0 or 1).
+
+    Returns
+    -------
+    tuple[numpy.ndarray, numpy.ndarray]
+        Mean and variance vectors.
     """
     assert axis in (0, 1)
     if isinstance(mtx, sparse.csr_matrix):
@@ -387,32 +397,42 @@ def cosg(
 
     copy:bool=False
 ):
-    r"""Marker gene identification for single-cell sequencing data using COSG.
-    
-    Arguments:
-        adata: Annotated data matrix. Note: input parameters are similar to the parameters used for scanpy's rank_genes_groups() function.
-        groupby: The key of the cell groups in .obs. ('CellTypes')
-        groups: Subset of cell groups, e.g. ['g1', 'g2', 'g3'], to which comparison shall be restricted. ('all')
-        mu: The penalty restricting marker genes expressing in non-target cell groups. Larger value represents more strict restrictions. mu should be >= 0. (1)
-        remove_lowly_expressed: If True, genes that express a percentage of target cells smaller than a specific value (expressed_pct) are not considered as marker genes for the target cells. (False)
-        expressed_pct: When remove_lowly_expressed is set to True, genes that express a percentage of target cells smaller than a specific value (expressed_pct) are not considered as marker genes for the target cells. (0.1)
-        n_genes_user: The number of genes that appear in the returned tables. (50)
-        key_added: The key in adata.uns information is saved to.
-        calculate_logfoldchanges: Calculate logfoldchanges. (True)
-        use_raw: Use raw attribute of adata if present. (True)
-        layer: Key from adata.layers whose value will be used to perform tests on.
-        reference: If 'rest', compare each group to the union of the rest of the group. If a group identifier, compare with respect to this group. ('rest')
-        copy: Return a copy instead of writing to adata. (False)
+    r"""Identify cluster-specific marker genes with COSG.
 
-    Returns:
-        adata: AnnData object with marker gene results stored in .uns['rank_genes_groups'] or specified key_added.
-        
-    Examples:
-        >>> import omicverse as ov
-        >>> import scanpy as sc
-        >>> adata = sc.datasets.pbmc68k_reduced()
-        >>> ov.single.cosg(adata, key_added='cosg', groupby='bulk_labels')
-        >>> sc.pl.rank_genes_groups(adata, key='cosg')
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Annotated data matrix for marker detection.
+    groupby : str, default='CellTypes'
+        Obs column containing cluster/group labels.
+    groups : {'all'} or Iterable[str], default='all'
+        Group subset to analyze.
+    mu : float, default=1
+        Specificity penalty against expression in non-target groups.
+    remove_lowly_expressed : bool, default=False
+        Whether to remove genes with low detection rates in target groups.
+    expressed_pct : float, default=0.1
+        Minimum fraction of expressing cells when low-expression filtering is enabled.
+    n_genes_user : int, default=50
+        Number of top marker genes retained per group.
+    key_added : str or None, default=None
+        Key in ``adata.uns`` used to store COSG results.
+    calculate_logfoldchanges : bool, default=True
+        Whether to compute log-fold changes.
+    use_raw : bool, default=True
+        Whether to use ``adata.raw`` expression values when available.
+    layer : str or None, default=None
+        Layer key used as expression matrix.
+    reference : str, default='rest'
+        Reference strategy for differential comparison.
+    copy : bool, default=False
+        If ``True``, run on a copy and return it.
+
+    Returns
+    -------
+    anndata.AnnData or None
+        Returns modified copy when ``copy=True``; otherwise updates input
+        object in place.
 
     """
     

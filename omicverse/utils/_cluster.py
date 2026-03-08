@@ -28,17 +28,28 @@ def get_initial_means(X, n_components,init_params, r):
 
 def mclust_py(adata,  n_components=None,use_rep:str='X_pca',
               modelNames='EEE',  random_seed=2020):
-    r"""Clustering using Gaussian Mixture Model (GMM), similar to mclust in R.
-    
-    Arguments:
-        adata: AnnData object
-        n_components: Number of components for GMM. (None)
-        use_rep: Representation to use for clustering. ('X_pca')
-        modelNames: Model covariance type. ('EEE')
-        random_seed: Random seed for reproducibility. (2020)
-    
-    Returns:
-        adata: Updated AnnData object with cluster labels
+    r"""Cluster cells with a Gaussian mixture model.
+
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Annotated data matrix containing a low-dimensional embedding in
+        ``adata.obsm[use_rep]``.
+    n_components : int or None, default=None
+        Number of Gaussian components (clusters). Required for model fitting.
+    use_rep : str, default='X_pca'
+        Key in ``adata.obsm`` used as input features for clustering.
+    modelNames : str, default='EEE'
+        Covariance structure code inspired by R ``mclust`` naming.
+        Supported mappings include ``EEE``, ``VVV``, ``EEV``, and ``VVI``.
+    random_seed : int, default=2020
+        Random seed for reproducible model initialization and fitting.
+
+    Returns
+    -------
+    anndata.AnnData
+        Input object with cluster assignments stored in
+        ``adata.obs['mclust']`` and ``adata.obs['gmm_cluster']``.
     """
 
     if n_components is None:
@@ -117,28 +128,39 @@ def mclust_py(adata,  n_components=None,use_rep:str='X_pca',
 def cluster(adata:anndata.AnnData,method:str='leiden',
             use_rep:str='X_pca',random_state:int=1024,
             n_components=None, **kwargs):
-    r"""Perform clustering using various algorithms including Leiden, Louvain, GMM, K-means, and scICE.
+    r"""Run a selected clustering backend on single-cell data.
 
-    Arguments:
-        adata: AnnData object containing single-cell data.
-        method: Clustering algorithm to use - 'leiden', 'louvain', 'GMM', 'kmeans', 'mclust', 'schist', or 'scICE'. Default: 'leiden'.
-        use_rep: Representation in adata.obsm to use for clustering. Default: 'X_pca'.
-        random_state: Random seed for reproducibility. Default: 1024.
-        n_components: Number of clusters (required for GMM and kmeans). Default: None.
-        **kwargs: Additional arguments passed to the clustering algorithm.
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Annotated data matrix to be clustered.
+    method : str, default='leiden'
+        Clustering backend. Supported values include ``'leiden'``,
+        ``'louvain'``, ``'kmeans'``, ``'GMM'``, ``'mclust'``,
+        ``'mclust_R'``, ``'schist'``, and ``'scICE'``.
+    use_rep : str, default='X_pca'
+        Key in ``adata.obsm`` used for embedding-based methods such as GMM,
+        K-means, and scICE.
+    random_state : int, default=1024
+        Random seed used by stochastic clustering methods.
+    n_components : int or None, default=None
+        Number of clusters/components for ``'kmeans'``, ``'GMM'``, and
+        ``'mclust'``.
+    **kwargs
+        Extra keyword arguments forwarded to the selected backend.
 
-    Returns:
-        For scICE method, returns the scICE model object. Otherwise returns None and adds cluster labels to adata.obs.
+    Returns
+    -------
+    object or None
+        Returns a fitted scICE model instance when ``method='scICE'``.
+        Other methods write labels to ``adata.obs`` and return ``None``.
 
-    Examples:
-        >>> import omicverse as ov
-        >>> # Leiden clustering (recommended)
-        >>> sc.pp.neighbors(adata, n_neighbors=15, n_pcs=50)
-        >>> ov.utils.cluster(adata, method='leiden', resolution=1.0)
-        >>> # Gaussian Mixture Model clustering
-        >>> ov.utils.cluster(adata, method='GMM', n_components=10)
-        >>> # scICE ensemble clustering
-        >>> model = ov.utils.cluster(adata, method='scICE', resolution_range=(5,20))
+    Examples
+    --------
+    >>> sc.pp.neighbors(adata, n_neighbors=15, n_pcs=50)
+    >>> cluster(adata, method='leiden', resolution=1.0)
+    >>> cluster(adata, method='GMM', n_components=10, use_rep='X_pca')
+    >>> scice_model = cluster(adata, method='scICE', use_rep='X_pca')
     """
 
     if method=='leiden':
@@ -249,13 +271,23 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
     related=["utils.cluster", "space.merge_cluster", "space.clusters"]
 )
 def refine_label(adata, use_rep='spatial',radius=50, key='label'):
-    """
-    Optimize the label by majority voting in the neighborhood.
+    """Refine labels with neighborhood majority voting.
 
-    Args:
-        adata: an Anndata object, after normalization.
-        radius: the radius of the neighborhood.
-        key: the key in `.obs` that corresponds to the cluster labels.
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Annotated data matrix containing labels and coordinates.
+    use_rep : str, default='spatial'
+        Key in ``adata.obsm`` containing coordinates for neighborhood search.
+    radius : int, default=50
+        Number of nearest neighbors used for voting (excluding the cell itself).
+    key : str, default='label'
+        Column name in ``adata.obs`` containing original labels.
+
+    Returns
+    -------
+    list of str
+        Refined labels for all cells in ``adata``.
     """
     from scipy.spatial import distance
     from tqdm import tqdm
@@ -286,6 +318,23 @@ def refine_label(adata, use_rep='spatial',radius=50, key='label'):
 def filtered(adata:anndata.AnnData,
              cluster_key:str,
              cluster_minsize:int=10):
+    """Collapse small clusters to an outlier label.
+
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Annotated data matrix with categorical cluster labels in ``adata.obs``.
+    cluster_key : str
+        Column in ``adata.obs`` to be filtered by cluster size.
+    cluster_minsize : int, default=10
+        Minimum number of cells required to keep a cluster label.
+        Clusters smaller than this threshold are reassigned to ``'-1'``.
+
+    Returns
+    -------
+    None
+        Operates in place by updating ``adata.obs[cluster_key]``.
+    """
     new_num=adata.obs[cluster_key].value_counts()[adata.obs[cluster_key].value_counts()<cluster_minsize].shape[0]
     adata.obs['gmm_cluster']=adata.obs['gmm_cluster'].astype(str)
     adata.obs.loc[adata.obs[cluster_key].isin(adata.obs[cluster_key].value_counts()[adata.obs[cluster_key].value_counts()<cluster_minsize].index.tolist()),cluster_key]='-1'
@@ -319,17 +368,27 @@ def filtered(adata:anndata.AnnData,
 class LDA_topic(object):
     r"""Latent Dirichlet Allocation (LDA) topic modeling for single-cell data using MIRA.
 
-    Arguments:
-        adata: AnnData object containing single-cell data.
-        feature_type: Type of features to use. Default: 'expression'.
-        highly_variable_key: Key in adata.var for highly variable features. Default: 'highly_variable_features'.
-        layers: Layer in adata.layers containing count data. Default: 'counts'.
-        batch_key: Column in adata.obs for batch correction. Default: None.
-        learning_rate: Learning rate for optimization. Default: 1e-3.
-        ondisk: Whether to use on-disk datasets for large data. Default: False.
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Single-cell data object.
+    feature_type : str
+        Feature modality passed to MIRA topic model.
+    highly_variable_key : str
+        Var column indicating highly variable features.
+    layers : str
+        Layer key containing count matrix.
+    batch_key : str or None
+        Optional obs covariate for batch-aware modeling.
+    learning_rate : float
+        Learning rate for model optimization.
+    ondisk : bool
+        Whether to use on-disk dataset mode for large datasets.
 
-    Returns:
-        LDA_topic: Object with methods for topic modeling analysis.
+    Returns
+    -------
+    LDA_topic
+        Topic-model wrapper object.
 
     Examples:
         >>> import omicverse as ov

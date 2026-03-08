@@ -618,7 +618,8 @@ def find_markers(
     :func:`omicverse.single.get_markers` and
     :func:`omicverse.pl.markers_dotplot`) work out of the box.
 
-    Arguments:
+    Parameters
+    ----------
         adata: Annotated data matrix. **Data must be log-normalised** for
             statistical tests; raw counts are expected for ``method='cosg'``.
         groupby: Key in ``adata.obs`` to group cells by (e.g. ``'leiden'``).
@@ -655,7 +656,8 @@ def find_markers(
         **kwargs: Forwarded to the underlying method (e.g. ``mu`` for cosg,
             or sklearn parameters for logreg).
 
-    Returns:
+    Returns
+    -------
         ``None``.  Results are written to ``adata.uns[key_added]``.
 
     Examples:
@@ -817,7 +819,8 @@ def get_markers(
     Works with results produced by :func:`find_markers`,
     :func:`omicverse.single.cosg`, or ``sc.tl.rank_genes_groups``.
 
-    Arguments:
+    Parameters
+    ----------
         adata: Annotated data matrix.
         n_genes: Maximum number of top marker genes to return per group.
             Default: ``10``.
@@ -842,7 +845,8 @@ def get_markers(
         min_pval_adj: Keep only genes with ``pvals_adj ≤ min_pval_adj``.
             Default: ``None``.
 
-    Returns:
+    Returns
+    -------
         :class:`pandas.DataFrame` or ``dict`` depending on ``return_type``.
 
     Examples:

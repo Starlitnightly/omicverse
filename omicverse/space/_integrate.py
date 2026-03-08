@@ -79,32 +79,25 @@ def Cal_Spatial_Net(adata, rad_cutoff=None, k_cutoff=None,
     on their physical distances. It supports both radius-based and k-nearest
     neighbor approaches for network construction.
 
-    Arguments:
-        adata: AnnData
-            Input spatial data containing:
-            - Spatial coordinates in obsm['spatial']
-            - Gene expression data in X
-        rad_cutoff: float, optional (default=None)
-            Maximum distance between neighbors for 'Radius' model.
-            Only used when model='Radius'.
-        k_cutoff: int, optional (default=None)
-            Number of nearest neighbors to connect for 'KNN' model.
-            Only used when model='KNN'.
-        max_neigh: int, optional (default=50)
-            Maximum number of neighbors to consider during graph construction.
-            Helps limit memory usage for large datasets.
-        model: str, optional (default='Radius')
-            Network construction method:
-            - 'Radius': Connect spots within rad_cutoff distance
-            - 'KNN': Connect k_cutoff nearest neighbors
-        verbose: bool, optional (default=True)
-            Whether to print network statistics.
-        
-    Returns:
-        None
-            Updates adata with:
-            - adata.uns['Spatial_Net']: DataFrame of edges and distances
-            - adata.uns['adj']: Sparse adjacency matrix
+    Parameters
+    ----------
+    adata : AnnData
+        Spatial AnnData containing coordinates in ``obsm['spatial']``.
+    rad_cutoff : float, optional
+        Radius threshold when ``model='Radius'``.
+    k_cutoff : int, optional
+        Number of nearest neighbors when ``model='KNN'``.
+    max_neigh : int, default=50
+        Maximum neighbors queried before filtering by model.
+    model : {'Radius', 'KNN'}, default='Radius'
+        Strategy for building spatial edges.
+    verbose : bool, default=True
+        Whether to print graph statistics.
+
+    Returns
+    -------
+    None
+        Writes ``adata.uns['Spatial_Net']`` and ``adata.uns['adj']``.
 
     Notes:
         - For STAligner, adjust rad_cutoff to ensure 5-10 neighbors per spot
@@ -211,6 +204,39 @@ class pySTAligner(object):
     4. Preserving spatial organization
     5. Enabling cross-condition comparison
 
+    Parameters
+    ----------
+    adata : AnnData
+        Combined multi-batch AnnData for integration.
+    hidden_dims : list, default=[512, 30]
+        Hidden dimensions of STAligner encoder.
+    n_epochs : int, default=1000
+        Total training epochs.
+    lr : float, default=0.001
+        Optimizer learning rate.
+    batch_key : str, default='batch_name'
+        Batch column in ``adata.obs``.
+    key_added : str, default='STAligner'
+        Output embedding key in ``adata.obsm``.
+    gradient_clipping : float, default=5
+        Max norm for gradient clipping.
+    weight_decay : float, default=0.0001
+        L2 regularization term.
+    margin : float, default=1
+        Margin used in triplet loss during alignment.
+    verbose : bool, default=False
+        Whether to print detailed training logs.
+    random_seed : int, default=666
+        Random seed for reproducibility.
+    iter_comb : list, optional
+        Batch-pair list for MNN comparison.
+    knn_neigh : int, default=100
+        K for mutual nearest-neighbor search.
+    Batch_list : list, optional
+        Per-batch AnnData list aligned to ``batch_key``.
+    device : torch.device, default=auto cuda/cpu
+        Device used for model training.
+
     Attributes:
         adata: AnnData
             Combined data containing all batches
@@ -270,45 +296,38 @@ class pySTAligner(object):
         3. Initializing optimization parameters
         4. Preparing batch alignment strategy
 
-        Arguments:
-            adata: AnnData
-                Combined data containing all batches to integrate.
-                Must have batch information in obs[batch_key].
-            hidden_dims: list, optional (default=[512, 30])
-                Dimensions of hidden layers in the neural network.
-                The final dimension determines embedding size.
-            n_epochs: int, optional (default=1000)
-                Number of training epochs.
-                More epochs may improve integration but take longer.
-            lr: float, optional (default=0.001)
-                Learning rate for Adam optimizer.
-                Adjust if training is unstable.
-            batch_key: str, optional (default='batch_name')
-                Column in adata.obs containing batch information.
-            key_added: str, optional (default='STAligner')
-                Key for storing embeddings in adata.obsm.
-            gradient_clipping: float, optional (default=5)
-                Maximum gradient norm for stability.
-            weight_decay: float, optional (default=0.0001)
-                L2 regularization strength.
-            margin: float, optional (default=1)
-                Margin for triplet loss function.
-                Larger values enforce stronger separation.
-            verbose: bool, optional (default=False)
-                Whether to print training progress.
-            random_seed: int, optional (default=666)
-                Random seed for reproducibility.
-            iter_comb: list, optional (default=None)
-                List of batch pairs to compare.
-                If None, compares all pairs.
-            knn_neigh: int, optional (default=100)
-                Number of neighbors for mutual nearest neighbors.
-            Batch_list: list, optional (default=None)
-                List of individual batch AnnData objects.
-                Must be in same order as in combined adata.
-            device: torch.device, optional (default=auto)
-                Computing device to use.
-                Automatically uses GPU if available.
+        Parameters
+        ----------
+        adata : AnnData
+            Combined AnnData with batch labels in ``obs[batch_key]``.
+        hidden_dims : list, default=[512, 30]
+            Hidden dimensions of STAligner neural network.
+        n_epochs : int, default=1000
+            Number of training epochs.
+        lr : float, default=0.001
+            Learning rate for Adam.
+        batch_key : str, default='batch_name'
+            Batch label column in ``adata.obs``.
+        key_added : str, default='STAligner'
+            Output key for final embedding in ``adata.obsm``.
+        gradient_clipping : float, default=5
+            Maximum gradient norm.
+        weight_decay : float, default=0.0001
+            L2 regularization coefficient.
+        margin : float, default=1
+            Triplet-loss margin.
+        verbose : bool, default=False
+            Print detailed logs when ``True``.
+        random_seed : int, default=666
+            Random seed.
+        iter_comb : list, optional
+            Batch combinations for pairwise alignment.
+        knn_neigh : int, default=100
+            MNN neighbor count.
+        Batch_list : list, optional
+            List of per-batch AnnData objects.
+        device : torch.device, default=auto cuda/cpu
+            Compute device for model.
 
         Notes:
             - Requires pre-computed spatial networks
@@ -374,6 +393,14 @@ class pySTAligner(object):
         4. Optimizes embeddings with triplet loss
         5. Monitors training progress
         6. Saves final embeddings
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
 
         Notes:
             - Progress shown if verbose=True
@@ -509,9 +536,15 @@ class pySTAligner(object):
 
     def predicted(self):
         r"""Generate and store the final embedding from trained STAligner model.
-        
-        Returns:
-            AnnData object with STAligner embedding stored in obsm[key_added].
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        AnnData
+            AnnData with integrated embedding in ``obsm[key_added]``.
         """ 
         self.model.eval()
         with torch.no_grad():

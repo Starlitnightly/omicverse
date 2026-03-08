@@ -21,26 +21,33 @@ def optimal_resolution(
     random_state: int = 42,
     copy: bool = False
 ) -> Union[float, AnnData]:
-    """
-    Find optimal clustering resolution by scanning different values and evaluating clustering quality.
-    
-    This function tests multiple resolution values and selects the one that optimizes
-    the chosen clustering quality metric (silhouette score or modularity).
-    
-    Arguments:
-        adata: AnnData object with computed neighborhood graph.
-        resolution_range: Tuple of (min_resolution, max_resolution) to test.
-        n_resolutions: Number of resolution values to test within the range.
-        clustering_method: Clustering algorithm to use ('leiden' or 'louvain').
-        metric: Evaluation metric ('silhouette', 'modularity', or 'both').
-        use_rep: Representation to use for silhouette calculation (e.g., 'X_pca', 'X_umap').
-        key_added: Key to store optimal clustering results in adata.obs.
-        random_state: Random state for reproducibility.
-        copy: Whether to return a copy of adata.
-    
-    Returns:
-        If copy=True, returns AnnData object with optimal clustering.
-        If copy=False, modifies adata in place and returns optimal resolution value.
+    """Find an empirically optimal clustering resolution.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Input object with neighborhood graph already computed in ``adata.uns``.
+    resolution_range : Tuple[float, float], default=(0.1, 2.0)
+        Minimum and maximum resolution values to scan.
+    n_resolutions : int, default=20
+        Number of evenly spaced resolution values in the scan range.
+    clustering_method : str, default='leiden'
+        Clustering backend, either ``'leiden'`` or ``'louvain'``.
+    metric : str, default='silhouette'
+        Optimization metric: ``'silhouette'``, ``'modularity'``, or ``'both'``.
+    use_rep : str, default='X_pca'
+        Embedding key used for silhouette computation.
+    key_added : str or None, default=None
+        Obs key used to store clustering at the selected resolution.
+    random_state : int, default=42
+        Random seed for clustering.
+    copy : bool, default=False
+        Whether to run on and return a copied ``AnnData`` object.
+
+    Returns
+    -------
+    float or AnnData
+        Best resolution if ``copy=False``; otherwise modified copied object.
         
     Examples:
         >>> import omicverse as ov
@@ -229,13 +236,21 @@ def plot_resolution_optimization(
     figsize: Tuple[int, int] = (12, 5),
     save_path: Optional[str] = None
 ) -> None:
-    """
-    Plot resolution optimization results showing metrics vs resolution values.
-    
-    Arguments:
-        adata: AnnData object with resolution optimization results in .uns.
-        figsize: Figure size as (width, height).
-        save_path: Path to save the figure.
+    """Visualize metric curves from resolution optimization.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Object containing ``optimal_resolution_results`` in ``adata.uns``.
+    figsize : Tuple[int, int], default=(12, 5)
+        Figure size in inches.
+    save_path : str or None, default=None
+        Optional output path for saving the figure.
+
+    Returns
+    -------
+    None
+        Displays the plot and optionally saves it to disk.
     """
     
     if 'optimal_resolution_results' not in adata.uns:
@@ -338,23 +353,29 @@ def resolution_stability_analysis(
     use_rep: str = 'X_pca',
     random_state: int = 42
 ) -> pd.DataFrame:
-    """
-    Analyze clustering stability across different resolutions and random seeds.
-    
-    This function tests clustering reproducibility by running the same resolution
-    multiple times with different random seeds and measuring consistency.
-    
-    Arguments:
-        adata: AnnData object with computed neighborhood graph.
-        resolution_range: Tuple of (min_resolution, max_resolution) to test.
-        n_resolutions: Number of resolution values to test.
-        clustering_method: Clustering algorithm to use ('leiden' or 'louvain').
-        n_iterations: Number of random iterations per resolution.
-        use_rep: Representation to use for consistency calculations.
-        random_state: Base random state.
-    
-    Returns:
-        DataFrame with stability metrics for each resolution.
+    """Evaluate clustering stability across resolutions and random seeds.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Input object with precomputed neighbor graph.
+    resolution_range : Tuple[float, float], default=(0.1, 2.0)
+        Scan range for resolution.
+    n_resolutions : int, default=20
+        Number of tested resolution values.
+    clustering_method : str, default='leiden'
+        Clustering backend, ``'leiden'`` or ``'louvain'``.
+    n_iterations : int, default=10
+        Number of repeated clustering runs per resolution.
+    use_rep : str, default='X_pca'
+        Reserved for future extension; currently not used.
+    random_state : int, default=42
+        Base seed for repeated runs.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Per-resolution stability metrics including mean ARI.
     """
     
     # Check if neighbors graph exists

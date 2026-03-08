@@ -5,7 +5,9 @@ import os
 import re
 import shutil
 import sys
+import tarfile
 import tempfile
+import zipfile
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -37,6 +39,8 @@ class ModelSpec:
 
     # Direct URL(s). If multiple, all will be fetched into the target directory.
     urls: Optional[Sequence[str]] = None
+    url_filenames: Dict[str, str] = field(default_factory=dict)
+    extract_archives: bool = False
 
     # Google Drive
     gdrive_id: Optional[str] = None  # file or folder id
@@ -83,12 +87,48 @@ MODEL_REGISTRY: Dict[str, ModelSpec] = {
         hf_repo_id="ctheodoris/Geneformer",
         description="Geneformer V1 10M parameters.",
     ),
+    "scfoundation": ModelSpec(
+        name="scfoundation",
+        source_type=ModelSourceType.HF,
+        hf_repo_id="genbio-ai/scFoundation",
+        hf_allow_patterns=["models.ckpt"],
+        description="scFoundation checkpoint (models.ckpt) from Hugging Face.",
+    ),
+    "uce": ModelSpec(
+        name="uce",
+        source_type=ModelSourceType.URL,
+        urls=[
+            "https://figshare.com/ndownloader/files/42706558",
+            "https://figshare.com/ndownloader/files/42706555",
+            "https://figshare.com/ndownloader/files/42706585",
+            "https://figshare.com/ndownloader/files/42706576",
+            "https://figshare.com/ndownloader/files/42715213",
+        ],
+        url_filenames={
+            "https://figshare.com/ndownloader/files/42706558": "species_chrom.csv",
+            "https://figshare.com/ndownloader/files/42706555": "species_offsets.pkl",
+            "https://figshare.com/ndownloader/files/42706585": "token_to_pos.torch",
+            "https://figshare.com/ndownloader/files/42706576": "4layer_model.torch",
+            "https://figshare.com/ndownloader/files/42715213": "protein_embeddings.tar.gz",
+        },
+        extract_archives=True,
+        description="UCE checkpoint bundle from figshare including protein embeddings archive.",
+    ),
     # scCello on HF
     "sccello-zeroshot": ModelSpec(
         name="sccello-zeroshot",
         source_type=ModelSourceType.HF,
         hf_repo_id="katarinayuan/scCello-zeroshot",
         description="scCello zero-shot checkpoint on Hugging Face",
+    ),
+    "scmulan": ModelSpec(
+        name="scmulan",
+        source_type=ModelSourceType.URL,
+        urls=["https://cloud.tsinghua.edu.cn/f/2250c5df51034b2e9a85/?dl=1"],
+        url_filenames={
+            "https://cloud.tsinghua.edu.cn/f/2250c5df51034b2e9a85/?dl=1": "ckpt_scMulan.pt",
+        },
+        description="scMulan checkpoint from the upstream Tsinghua sharing link.",
     ),
     # scGPT checkpoints (Google Drive folders provided by authors)
     "scgpt-whole-human": ModelSpec(
@@ -186,6 +226,20 @@ def _verify_checksums(target_dir: Path, checksums: Mapping[str, str]) -> None:
             raise ValueError(
                 f"Checksum mismatch for {file_path}\nExpected: {expected}\nActual:   {actual}"
             )
+
+
+def _extract_downloaded_archives(target_dir: Path) -> None:
+    """Extract any supported archives already present in ``target_dir``."""
+    for archive_path in sorted(target_dir.iterdir()):
+        if archive_path.is_dir():
+            continue
+        name = archive_path.name.lower()
+        if name.endswith((".tar.gz", ".tgz", ".tar")):
+            with tarfile.open(archive_path, "r:*") as tar:
+                tar.extractall(target_dir)
+        elif name.endswith(".zip"):
+            with zipfile.ZipFile(archive_path, "r") as zf:
+                zf.extractall(target_dir)
 
 
 def _download_hf_snapshot(
@@ -337,10 +391,13 @@ def download_model(
     elif spec.source_type == ModelSourceType.URL:
         if not spec.urls:
             raise ValueError("URL model spec missing urls")
+        effective_url_filenames = dict(spec.url_filenames)
+        if url_filenames:
+            effective_url_filenames.update(url_filenames)
         for url in spec.urls:
             # infer filename or use provided mapping
-            if url_filenames and url in url_filenames:
-                filename = url_filenames[url]
+            if url in effective_url_filenames:
+                filename = effective_url_filenames[url]
             else:
                 # Use the last non-empty segment of the URL path
                 parsed_name = re.sub(r"[?#].*$", "", url.rstrip("/"))
@@ -354,6 +411,9 @@ def download_model(
         _download_gdrive(file_or_folder_id=spec.gdrive_id, target_dir=final_target_dir, is_folder=spec.gdrive_is_folder)
     else:
         raise ValueError(f"Unsupported source type: {spec.source_type}")
+
+    if spec.extract_archives:
+        _extract_downloaded_archives(final_target_dir)
 
     if verify_checksums and spec.checksums:
         _verify_checksums(final_target_dir, spec.checksums)

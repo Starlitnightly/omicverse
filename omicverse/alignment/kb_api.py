@@ -122,6 +122,17 @@ def _include_exclude_to_flags(include: Optional[List[Dict[str, str]]],
     return out
 
 
+@register_function(
+    aliases=['构建转录组索引', 'alignment ref', 'kb ref', 'kallisto bustools ref'],
+    category="alignment",
+    description="Build a kallisto|bustools-compatible reference index and transcript-to-gene map from FASTA/GTF resources for RNA-seq quantification.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.alignment.single.ref(index_path="index.idx", t2g_path="t2g.tsv", fasta_paths=["transcripts.fa"], gtf_paths=["genes.gtf"])'],
+    related=['alignment.count', 'alignment.STAR']
+)
 def ref(
     index_path: str,
     t2g_path: str,
@@ -155,8 +166,69 @@ def ref(
     **kwargs
 ) -> Dict[str, str]:
     """
-    Build kallisto index and transcript-to-gene mapping via `kb ref`.
-    Returns a dict with metadata and common output paths.
+    Build kallisto index and transcript-to-gene mapping files via ``kb ref``.
+
+    Parameters
+    ----------
+    index_path:str
+        Output path for generated kallisto index file.
+    t2g_path:str
+        Output path for transcript-to-gene mapping table.
+    fasta_paths:str|list[str]|None, optional
+        Input transcript/genome FASTA file(s) used to build the reference.
+    gtf_paths:str|list[str]|None, optional
+        Input GTF annotation file(s) aligned with ``fasta_paths``.
+    cdna_path:str|None, optional
+        Optional cDNA FASTA output path required by some workflows.
+    workflow:str, optional
+        kb workflow mode (for example ``standard``, ``nucleus``, ``lamanno``, ``kite``).
+    d:str|None, optional
+        Prebuilt reference bundle shortcut (``kb ref -d``).
+    k:int|None, optional
+        K-mer length for kallisto index construction.
+    threads:int, optional
+        Number of threads for ``kb`` execution.
+    overwrite:bool, optional
+        Whether to overwrite existing output files.
+    temp_dir:str, optional
+        Temporary directory root for kb intermediate files.
+    make_unique:bool, optional
+        Make feature IDs unique when duplicate names are detected.
+    include:list[dict[str,str]]|None, optional
+        Attribute filters to include specific transcript/gene records.
+    exclude:list[dict[str,str]]|None, optional
+        Attribute filters to exclude records.
+    dlist:str|None, optional
+        Decoy list file for selective-alignment workflows.
+    dlist_overhang:int, optional
+        Overhang length used when generating decoy targets.
+    aa:bool, optional
+        Enable amino-acid mode where supported by kb workflow.
+    max_ec_size:int|None, optional
+        Maximum equivalence-class size for index generation.
+    nucleus:bool, optional
+        Shortcut to switch from ``standard`` to ``nucleus`` workflow.
+    f2:str|None, optional
+        Secondary FASTA output/input path for nucleus/velocity workflows.
+    c1:str|None, optional
+        Spliced transcript capture output path for velocity workflows.
+    c2:str|None, optional
+        Intronic transcript capture output path for velocity workflows.
+    flank:int|None, optional
+        Flanking sequence length for selected workflows.
+    feature:str|None, optional
+        Feature FASTA path used by ``kite`` workflow.
+    no_mismatches:bool, optional
+        Disable mismatches for feature barcoding workflows.
+    distinguish:bool, optional
+        Distinguish overlapping features when supported by kb.
+    **kwargs
+        Additional kb flags passed through (for example ``kallisto``, ``bustools``, ``opt_off``).
+
+    Returns
+    -------
+    dict[str,str]
+        Metadata dictionary with workflow info and generated output paths.
     """
     print(f"[kb ref] Starting ref workflow: {workflow}", flush=True)
 
@@ -302,6 +374,17 @@ def ref(
     return result  # type: ignore[return-value]
 
 
+@register_function(
+    aliases=['定量计数', 'alignment count', 'kb count', 'kallisto bustools count'],
+    category="alignment",
+    description="Quantify gene expression matrices from FASTQ data using a prebuilt kallisto|bustools reference and sequencing technology presets.",
+    prerequisites={'functions': ['ref']},
+    requires={},
+    produces={},
+    auto_fix='escalate',
+    examples=['ov.alignment.single.count(index_path="index.idx", t2g_path="t2g.tsv", technology="10XV3", fastq_paths=["R1.fastq.gz", "R2.fastq.gz"], output_path="./kb_out")'],
+    related=['alignment.ref', 'alignment.fqdump', 'alignment.fastp']
+)
 def count(
     index_path: str,
     t2g_path: str,
@@ -354,8 +437,99 @@ def count(
     **kwargs
 ) -> Dict[str, str]:
     """
-    Generate count matrix from single-cell FASTQ files via `kb count`.
-    Returns a dict with metadata and commonly generated output files if present.
+    Quantify expression matrices from FASTQ files via ``kb count``.
+
+    Parameters
+    ----------
+    index_path:str
+        Path to kallisto index produced by ``kb ref``.
+    t2g_path:str
+        Transcript-to-gene mapping table used for gene-level aggregation.
+    technology:str
+        Sequencing technology preset (for example ``10XV3``, ``BULK``).
+    fastq_paths:str|list[str]
+        One or more FASTQ file paths passed to kb count.
+    output_path:str, optional
+        Output directory for count matrices and intermediate files.
+    whitelist_path:str|None, optional
+        Optional custom barcode whitelist.
+    replacement_path:str|None, optional
+        Optional barcode replacement file.
+    threads:int, optional
+        Number of threads used by kb.
+    memory:str, optional
+        Memory request string passed to kb (for example ``2G``).
+    workflow:str, optional
+        kb workflow mode (``standard``, ``nucleus``, ``lamanno`` etc.).
+    overwrite:bool, optional
+        Whether to overwrite existing output directory contents.
+    temp_dir:str, optional
+        Temporary directory root for kb intermediate files.
+    tcc:bool, optional
+        Output transcript compatibility counts instead of gene matrix.
+    mm:bool, optional
+        Use memory-mapped mode when supported.
+    filter_barcodes:bool, optional
+        Enable barcode filtering (not valid for ``technology='BULK'``).
+    filter_threshold:int|None, optional
+        Barcode filter threshold used by bustools filtering.
+    loom:bool, optional
+        Export loom matrix.
+    loom_names:str|list[str]|None, optional
+        Custom loom row/column naming behavior.
+    h5ad:bool, optional
+        Export H5AD matrix output.
+    cellranger:bool, optional
+        Emit Cell Ranger-compatible output structure.
+    gene_names:bool, optional
+        Prefer gene symbols over IDs when possible.
+    report:bool, optional
+        Generate additional kb report files.
+    strand:str|None, optional
+        Strand option for long-read/technology-specific modes.
+    parity:str|None, optional
+        Read parity setting for specific technologies.
+    fragment_l:int|None, optional
+        Mean fragment length for bulk-like protocols.
+    fragment_s:int|None, optional
+        Fragment length standard deviation.
+    bootstraps:int|None, optional
+        Number of kallisto bootstrap rounds.
+    em:bool, optional
+        Enable EM optimization.
+    aa:bool, optional
+        Enable amino-acid mode where supported.
+    genomebam:bool, optional
+        Request genome BAM generation (version-dependent support).
+    inleaved:bool, optional
+        Treat reads as interleaved input.
+    batch_barcodes:bool, optional
+        Enable batched barcode handling.
+    exact_barcodes:bool, optional
+        Require exact barcode matching.
+    numreads:int|None, optional
+        Limit number of reads processed.
+    store_num:bool, optional
+        Store BUS record counts in output metadata.
+    long_read:bool, optional
+        Enable long-read mode.
+    threshold:float, optional
+        Long-read assignment threshold.
+    platform:str, optional
+        Long-read platform label (for example ``ONT``).
+    c1:str|None, optional
+        Spliced capture file path for velocity workflows.
+    c2:str|None, optional
+        Intronic capture file path for velocity workflows.
+    nucleus:bool, optional
+        Shortcut to switch workflow from ``standard`` to ``nucleus``.
+    **kwargs
+        Extra kb flags forwarded verbatim.
+
+    Returns
+    -------
+    dict[str,str]
+        Metadata dictionary including workflow settings and discovered output files.
     """
     print(f"[kb count] Starting count workflow: {workflow}", flush=True)
     print(f"[kb count] Technology: {technology}", flush=True)
@@ -639,20 +813,31 @@ def parallel_fastq_dump(
     This function wraps the parallel-fastq-dump tool to download sequencing data
     from NCBI SRA (Sequence Read Archive) in parallel for faster downloads.
 
-    Arguments:
-        sra_id: SRA accession ID (e.g., 'SRR2244401').
-        threads: Number of threads to use for parallel download. Default: 1.
-        outdir: Output directory for downloaded FASTQ files. Default: '.'.
-        tmpdir: Temporary directory for intermediate files. Default: None.
-        min_spot_id: Minimum spot ID to download. Default: 1.
-        max_spot_id: Maximum spot ID to download. Default: None (all spots).
-        split_files: Split paired-end reads into separate files. Default: False.
-        gzip: Compress output files with gzip. Default: False.
-        **kwargs: Additional arguments to pass to parallel-fastq-dump.
+    Parameters
+    ----------
+    sra_id:str
+        SRA accession ID (for example ``SRR2244401``).
+    threads:int, optional
+        Number of parallel threads used by ``parallel-fastq-dump``.
+    outdir:str, optional
+        Output directory for downloaded FASTQ files.
+    tmpdir:str|None, optional
+        Temporary directory for chunk/intermediate files.
+    min_spot_id:int, optional
+        Minimum SRA spot ID to download.
+    max_spot_id:int|None, optional
+        Maximum SRA spot ID to download. ``None`` downloads all remaining spots.
+    split_files:bool, optional
+        Split paired-end reads into separate ``*_1``/``*_2`` FASTQ files.
+    gzip:bool, optional
+        Compress output FASTQ files using gzip.
+    **kwargs
+        Additional flags passed through to ``parallel-fastq-dump``.
 
-    Returns:
-        result: Dictionary containing download metadata including sra_id, threads,
-                outdir, and output file paths.
+    Returns
+    -------
+    dict[str,str|int]
+        Download metadata including input parameters and discovered output FASTQ paths.
 
     Examples:
         >>> import omicverse as ov

@@ -52,20 +52,41 @@ def _safe_to_df_copy(arr):
 # Emoji map for UMAP status reporting
 
 @monitor
+@register_function(
+    aliases=["稳健基因", "robust_genes", "identify_robust_genes", "基因过滤", "expressed_genes"],
+    category="preprocessing",
+    description="Identify robust genes expressed in enough cells and initialize HVG candidates",
+    prerequisites={
+        "optional_functions": ["qc", "filter_cells", "filter_genes"]
+    },
+    requires={},
+    produces={
+        "var": ["n_cells", "percent_cells", "robust", "highly_variable_features"]
+    },
+    auto_fix="none",
+    examples=[
+        "ov.pp.identify_robust_genes(adata, percent_cells=0.05)",
+        "adata.var['robust'].value_counts()",
+    ],
+    related=["highly_variable_features", "select_hvf_pegasus", "qc"],
+)
 def identify_robust_genes(data: anndata.AnnData, percent_cells: float = 0.05) -> None:
-    r"""Identify robust genes as candidates for HVG selection and remove genes that are not expressed in any cells.
+    r"""Identify robust genes for downstream HVG selection.
 
-    Arguments:
-        data: Use current selected modality in data, which should contain one RNA expression matrix.
-        percent_cells: Only assign genes to be ``robust`` that are expressed in at least ``percent_cells`` % of cells. (0.05)
+    Parameters
+    ----------
+    data : anndata.AnnData
+        AnnData object containing a gene expression matrix in ``.X``.
+        Genes with zero counts across all cells are removed.
+    percent_cells : float, default=0.05
+        Minimum percentage of cells in which a gene must be detected to be
+        marked as ``robust``.
 
-    Returns:
-        None: Updates ``data.var`` with new columns:
-            * ``n_cells``: Total number of cells in which each gene is measured.
-            * ``percent_cells``: Percent of cells in which each gene is measured.
-            * ``robust``: Boolean type indicating if a gene is robust based on the QC metrics.
-            * ``highly_variable_features``: Boolean type indicating if a gene is a highly variable feature.
-
+    Returns
+    -------
+    None
+        Updates ``data.var`` with ``n_cells``, ``percent_cells``, ``robust``,
+        and initializes ``highly_variable_features`` from ``robust``.
     """
 
     prior_n = data.shape[1]
@@ -140,19 +161,49 @@ def estimate_feature_statistics(data: anndata.AnnData, batch: str) -> None:
 
 
 
+@register_function(
+    aliases=["HVG选择", "pegasus_hvg", "select_hvf_pegasus", "高变基因选择", "高变特征"],
+    category="preprocessing",
+    description="Select highly variable features using Pegasus loess-based variance modeling",
+    prerequisites={
+        "functions": ["identify_robust_genes"],
+        "optional_functions": ["log1p"],
+    },
+    requires={
+        "var": ["robust"]
+    },
+    produces={
+        "var": ["hvf_loess", "hvf_rank", "highly_variable_features"]
+    },
+    auto_fix="none",
+    examples=[
+        "ov.pp.identify_robust_genes(adata, percent_cells=0.05)",
+        "ov.pp.select_hvf_pegasus(adata, batch='sample', n_top=2000, span=0.02)",
+    ],
+    related=["highly_variable_features", "select_hvf_seurat", "remove_cc_genes"],
+)
 def select_hvf_pegasus(
     data: anndata.AnnData, batch: str, n_top: int = 2000, span: float = 0.02
 ) -> None:
-    r"""Select highly variable features using the pegasus method.
-    
-    Arguments:
-        data: AnnData object
-        batch: Batch column name in data.obs
-        n_top: Number of top variable features to select. (2000)
-        span: Loess span parameter. (0.02)
-    
-    Returns:
-        None: Updates data.var with highly variable feature annotations
+    r"""Select highly variable features with the Pegasus strategy.
+
+    Parameters
+    ----------
+    data : anndata.AnnData
+        AnnData object with robust-gene annotations in ``data.var['robust']``.
+    batch : str
+        Batch column in ``data.obs`` used for cross-batch statistics. Set to
+        ``None`` to ignore batch effects.
+    n_top : int, default=2000
+        Number of top-ranked highly variable features to retain.
+    span : float, default=0.02
+        Loess smoothing span for fitting the mean-variance trend.
+
+    Returns
+    -------
+    None
+        Writes ``hvf_loess``, ``hvf_rank`` and ``highly_variable_features`` to
+        ``data.var``.
     """
     if "robust" not in data.var:
         raise ValueError("Please run `identify_robust_genes` to identify robust genes")
@@ -291,6 +342,28 @@ def select_hvf_seurat(
     data.var["highly_variable_features"] = False
     data.var.loc[robust_idx, "highly_variable_features"] = hvf_index
 
+@register_function(
+    aliases=["高变基因", "highly_variable_features", "hvg", "hvf", "高变特征筛选"],
+    category="preprocessing",
+    description="Compute highly variable features using Pegasus or Seurat flavor",
+    prerequisites={
+        "functions": ["identify_robust_genes"],
+        "optional_functions": ["log1p", "qc"],
+    },
+    requires={
+        "var": ["robust"]
+    },
+    produces={
+        "var": ["hvf_rank", "highly_variable_features"]
+    },
+    auto_fix="none",
+    examples=[
+        "ov.pp.identify_robust_genes(adata)",
+        "ov.pp.highly_variable_features(adata, flavor='pegasus', n_top=2000)",
+        "ov.pp.highly_variable_features(adata, flavor='Seurat', n_top=3000)",
+    ],
+    related=["select_hvf_pegasus", "highly_variable_genes", "remove_cc_genes"],
+)
 def highly_variable_features(
     data: anndata.AnnData,
     batch: str = None,
@@ -303,36 +376,35 @@ def highly_variable_features(
     max_mean: float = 7,
     n_jobs: int = -1,
 ) -> None:
-    """ Highly variable features (HVF) selection. The input data should be logarithmized.
+    """Select highly variable features (HVF/HVG) for downstream modeling.
 
-    Arguments:
-        data: Annotated data matrix with rows for cells and columns for genes.
-        batch: A key in data.obs specifying batch information. 
-        If `batch` is not set, do not consider batch effects in selecting highly variable features. 
-        Otherwise, if `data.obs[batch]` is not categorical, 
-        `data.obs[batch]` will be automatically converted into categorical 
-        before highly variable feature selection.
-        flavor: The HVF selection method to use. 
-        Available choices are ``"pegasus"`` or ``"Seurat"``.
-        n_top: Number of genes to be selected as HVF. if ``None``, no gene will be selected.
-        span: Only applicable when ``flavor`` is ``"pegasus"``. 
-        The smoothing factor used by *scikit-learn loess* model in pegasus HVF selection method.
-        min_disp: Minimum normalized dispersion.
-        max_disp: Maximum normalized dispersion. Set it to ``np.inf`` for infinity bound.
-        min_mean: Minimum mean.
-        max_mean: Maximum mean.
-        n_jobs: Number of threads to be used during calculation. 
-        If ``-1``, all physical CPU cores will be used.
+    Parameters
+    ----------
+    data : anndata.AnnData
+        AnnData matrix with genes in columns.
+    batch : str, optional
+        Column name in ``data.obs`` for batch-aware HVF selection.
+    flavor : {"pegasus", "Seurat"}, default="pegasus"
+        Algorithm used to rank variable genes.
+    n_top : int, default=2000
+        Number of top genes to keep.
+    span : float, default=0.02
+        Loess span used by Pegasus flavor.
+    min_disp : float, default=0.5
+        Lower bound of normalized dispersion for Seurat flavor.
+    max_disp : float, default=np.inf
+        Upper bound of normalized dispersion for Seurat flavor.
+    min_mean : float, default=0.0125
+        Lower bound of mean expression for Seurat flavor.
+    max_mean : float, default=7
+        Upper bound of mean expression for Seurat flavor.
+    n_jobs : int, default=-1
+        Number of worker threads for computations where applicable.
 
-
-    Update ``adata.var``:
-        * ``highly_variable_features``: replace with Boolean type array 
-        indicating the selected highly variable features.
-
-    Examples
-    --------
-    >>> ov.pp.highly_variable_features(data)
-    >>> ov.pp.highly_variable_features(data, batch="Channel")
+    Returns
+    -------
+    None
+        Updates ``data.var['highly_variable_features']`` and ranking fields.
     """
 
     if flavor == "pegasus":
@@ -387,16 +459,44 @@ def corr2_coeff(a, b):
 
     return corr
 
+@register_function(
+    aliases=["去除细胞周期基因", "remove_cc_genes", "cell_cycle_filter", "去除CC相关基因", "cc_genes"],
+    category="preprocessing",
+    description="Remove cell-cycle-correlated genes from the selected HVG set",
+    prerequisites={
+        "functions": ["highly_variable_features"],
+        "optional_functions": ["score_genes_cell_cycle"],
+    },
+    requires={
+        "var": ["highly_variable_features"]
+    },
+    produces={
+        "var": ["highly_variable_features"]
+    },
+    auto_fix="none",
+    examples=[
+        "ov.pp.highly_variable_features(adata, n_top=3000)",
+        "ov.pp.remove_cc_genes(adata, organism='human', corr_threshold=0.1)",
+    ],
+    related=["highly_variable_features", "score_genes_cell_cycle", "pca"],
+)
 def remove_cc_genes(adata:anndata.AnnData, organism:str='human', corr_threshold:float=0.1):
-    """
-    Update adata.var['highly_variable_features'] discarding cc correlated genes. 
-    Taken from Cospar, Wang et al., 2023.
+    """Remove cell-cycle-correlated genes from ``highly_variable_features``.
 
-    Arguments:
-        adata: Annotated data matrix with rows for cells and columns for genes.
-        organism: Organism of the dataset. Available choices are ``"human"`` or ``"mouse"``.
-        corr_threshold: Threshold for correlation with cc genes. 
-        Genes having a correlation with cc genes > corr_threshold will be discarded.
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        AnnData object containing HVG annotations.
+    organism : {"human", "mouse"}, default="human"
+        Species used to load canonical cell-cycle signatures.
+    corr_threshold : float, default=0.1
+        Absolute correlation cutoff. HVGs with maximal correlation to
+        cell-cycle genes above this threshold are removed.
+
+    Returns
+    -------
+    None
+        Rewrites ``adata.var['highly_variable_features']`` after filtering.
     """
     # Get cc genes
     cycling_genes = load_signatures_from_file(predefined_signatures[f'cell_cycle_{organism}'])
@@ -508,7 +608,7 @@ def anndata_to_CPU(adata,layer=None, convert_all=True, copy=False):
 
 @monitor
 @register_function(
-    aliases=["预处理", "preprocess", "preprocessing", "数据预处理"],
+    aliases=["预处理", "preprocess", "preprocessing", "数据预处理","HVG","HVGs","高变基因","高变基因选择"],
     category="preprocessing",
     description="Complete preprocessing pipeline including normalization, HVG selection, scaling, and PCA",
     prerequisites={
@@ -698,18 +798,79 @@ def preprocess(
         adata = original_adata
 
     return adata
+
+@register_function(
+    aliases=["pearson残差归一化", "normalize_pearson_residuals", "pearson_normalization", "皮尔逊残差", "sctransform_like"],
+    category="preprocessing",
+    description="Normalize counts using analytic Pearson residuals for variance stabilization",
+    prerequisites={
+        "optional_functions": ["qc", "filter_cells", "filter_genes"]
+    },
+    requires={},
+    produces={},
+    auto_fix="none",
+    examples=[
+        "ov.pp.normalize_pearson_residuals(adata, theta=100)",
+        "ov.pp.normalize_pearson_residuals(adata, clip=30)",
+    ],
+    related=["highly_variable_genes", "scale", "pca"],
+)
 def normalize_pearson_residuals(adata,**kwargs):
-    '''
-    normalize
-    '''
+    """Normalize count matrix using Pearson residuals.
+
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        AnnData object containing raw or count-like expression values in
+        ``adata.X``.
+    **kwargs
+        Additional keyword arguments passed to
+        ``scanpy.experimental.pp.normalize_pearson_residuals``.
+
+    Returns
+    -------
+    None
+        Updates ``adata.X`` in place with Pearson residual-normalized values.
+    """
 
     sc.experimental.pp.normalize_pearson_residuals(adata,**kwargs)
 
 @monitor
+@register_function(
+    aliases=["高变基因识别", "highly_variable_genes", "hvg_scanpy", "HVG", "高变基因检测"],
+    category="preprocessing",
+    description="Identify highly variable genes using Scanpy-compatible methods",
+    prerequisites={
+        "optional_functions": ["normalize_pearson_residuals", "log1p", "qc"]
+    },
+    requires={},
+    produces={
+        "var": ["highly_variable", "means", "dispersions", "dispersions_norm"]
+    },
+    auto_fix="none",
+    examples=[
+        "ov.pp.highly_variable_genes(adata, flavor='seurat_v3', n_top_genes=2000)",
+        "ov.pp.highly_variable_genes(adata, layer='log1p', flavor='seurat')",
+    ],
+    related=["highly_variable_features", "normalize_pearson_residuals", "pca"],
+)
 def highly_variable_genes(adata, **kwargs):
-    '''
-    highly_variable_genes calculation
-    '''
+    """Run HVG detection and write flags/statistics into ``adata.var``.
+
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        AnnData object with expression matrix and optional layers.
+    **kwargs
+        Keyword arguments forwarded to ``omicverse.pp._highly_variable_genes``.
+        Typical options include ``flavor``, ``n_top_genes``, ``layer`` and
+        ``batch_key``.
+
+    Returns
+    -------
+    Any
+        Returns the wrapped HVG function result while mutating ``adata.var``.
+    """
     from ._highly_variable_genes import highly_variable_genes as _hvg
     return _hvg(adata, **kwargs)
 
@@ -788,20 +949,41 @@ def scale(adata, max_value=10, layers_add='scaled', to_sparse=True, **kwargs):
     adata.uns['status']['scaled'] = True
 
 @monitor
+@register_function(
+    aliases=["回归校正", "regress", "regress_out", "去除技术效应", "协变量回归"],
+    category="preprocessing",
+    description="Regress out technical covariates (mitochondrial ratio and UMI counts)",
+    prerequisites={
+        "optional_functions": ["qc", "normalize_pearson_residuals"]
+    },
+    requires={
+        "obs": ["mito_perc", "nUMIs"]
+    },
+    produces={
+        "layers": ["regressed"]
+    },
+    auto_fix="none",
+    examples=[
+        "ov.pp.regress(adata)",
+        "ov.pp.regress(adata, n_jobs=4)",
+    ],
+    related=["scale", "regress_and_scale", "pca"],
+)
 def regress(adata,**kwargs):
-    """
-    Regress out covariates from the input AnnData object.
+    """Regress out technical covariates from each gene.
 
-    Arguments:
-        adata : Annotated data matrix with n_obs x n_vars shape. 
-        Should contain columns 'mito_perc' and 'nUMIs'that represent the percentage of 
-        mitochondrial genes and the total number of UMI counts, respectively.
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        AnnData object with ``adata.obs['mito_perc']`` and
+        ``adata.obs['nUMIs']`` already computed.
+    **kwargs
+        Extra options passed to backend regressors, e.g. ``n_jobs``.
 
-    Returns:
-        adata : Annotated data matrix with n_obs x n_vars shape. 
-        Adds a new layer called 'regressed' that stores
-            the expression matrix with covariates regressed out.
-
+    Returns
+    -------
+    None
+        Writes regressed expression values to ``adata.layers['regressed']``.
     """
     if settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
         adata_mock = sc.pp.regress_out(adata, ['mito_perc', 'nUMIs'], n_jobs=8, copy=True,**kwargs)
@@ -813,20 +995,39 @@ def regress(adata,**kwargs):
     add_reference(adata,'scanpy','regressing out covariates with scanpy')
 
 @monitor
+@register_function(
+    aliases=["回归并标准化", "regress_and_scale", "regress_scale", "校正后标准化", "regressed_scaled"],
+    category="preprocessing",
+    description="Apply covariate regression and z-score scaling in one convenience step",
+    prerequisites={
+        "functions": ["regress"],
+        "optional_functions": ["scale"],
+    },
+    requires={
+        "layers": ["regressed"]
+    },
+    produces={
+        "layers": ["regressed_and_scaled"]
+    },
+    auto_fix="none",
+    examples=[
+        "ov.pp.regress(adata)",
+        "ov.pp.regress_and_scale(adata)",
+    ],
+    related=["regress", "scale", "pca"],
+)
 def regress_and_scale(adata):
-    """
-    Regress out covariates from the input AnnData object and scale the resulting expression matrix.
+    """Scale the regressed layer and store it as a new analysis layer.
 
-    Arguments:
-        adata : Annotated data matrix with n_obs x n_vars shape. 
-        Should contain a layer called 'regressed'
-            that stores the expression matrix with covariates regressed out.
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        AnnData object containing ``adata.layers['regressed']``.
 
-    Returns:
-        adata : Annotated data matrix with n_obs x n_vars shape. 
-        Adds a new layer called 'regressed_and_scaled'
-            that stores the expression matrix with covariates regressed out and then scaled.
-
+    Returns
+    -------
+    anndata.AnnData
+        The same object with ``adata.layers['regressed_and_scaled']`` added.
     """
     if 'regressed' not in adata.layers:
         raise KeyError('Regress out covariates first!')
@@ -1232,10 +1433,44 @@ def umap(adata, **kwargs):
         raise
 
 @monitor
+@register_function(
+    aliases=["Louvain聚类", "louvain", "community_detection", "图聚类", "louvain_clustering"],
+    category="preprocessing",
+    description="Cluster cells by Louvain community detection on the neighborhood graph",
+    prerequisites={
+        "functions": ["neighbors"],
+        "optional_functions": ["pca", "umap"],
+    },
+    requires={
+        "uns": ["neighbors"],
+        "obsp": ["connectivities"],
+    },
+    produces={
+        "obs": ["louvain"]
+    },
+    auto_fix="auto",
+    examples=[
+        "ov.pp.neighbors(adata, n_neighbors=15, n_pcs=50)",
+        "ov.pp.louvain(adata, resolution=1.0)",
+    ],
+    related=["leiden", "neighbors", "umap"],
+)
 def louvain(adata, **kwargs):
-    '''
-    Louvain clustering
-    '''
+    """Run Louvain clustering on the precomputed kNN graph.
+
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        AnnData object with neighborhood graph already computed.
+    **kwargs
+        Parameters passed to backend Louvain implementations, e.g.
+        ``resolution`` and ``key_added``.
+
+    Returns
+    -------
+    None
+        Adds Louvain labels to ``adata.obs``.
+    """
 
     if settings.mode =='cpu' or settings.mode == 'cpu-gpu-mixed':
         print(f"{EMOJI['cpu']} Using Scanpy CPU Louvain...")
@@ -1399,10 +1634,43 @@ def score_genes_cell_cycle(adata,species='human',s_genes=None, g2m_genes=None):
     }
 
 @monitor
+@register_function(
+    aliases=["tSNE", "tsne", "t-sne", "非线性降维", "细胞可视化嵌入"],
+    category="preprocessing",
+    description="Compute t-SNE embedding for nonlinear visualization of cell states",
+    prerequisites={
+        "functions": ["pca"],
+        "optional_functions": ["neighbors"],
+    },
+    requires={
+        "obsm": ["X_pca"]
+    },
+    produces={
+        "obsm": ["X_tsne"]
+    },
+    auto_fix="auto",
+    examples=[
+        "ov.pp.tsne(adata, n_pcs=50)",
+        "ov.pp.tsne(adata, perplexity=30, random_state=0)",
+    ],
+    related=["umap", "mde", "pca"],
+)
 def tsne(adata,**kwargs):
-    '''
-    t-SNE
-    '''
+    """Compute t-SNE coordinates for cells.
+
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        AnnData object with PCA representation available.
+    **kwargs
+        Backend-specific t-SNE parameters, such as ``perplexity``,
+        ``random_state`` and ``n_pcs``.
+
+    Returns
+    -------
+    None
+        Stores embedding in ``adata.obsm['X_tsne']``.
+    """
     if settings.mode == 'cpu':
         print(f"{EMOJI['cpu']} Using Scanpy CPU t-SNE...")
         sc.tl.tsne(adata, **kwargs)
@@ -1420,12 +1688,68 @@ def tsne(adata,**kwargs):
         add_reference(adata,'tsne','t-SNE with RAPIDS')
 
 
+@register_function(
+    aliases=["MDE降维", "mde", "minimum_distortion_embedding", "嵌入优化", "低维嵌入"],
+    category="preprocessing",
+    description="Compute PyMDE embedding to preserve neighborhood geometry in low dimensions",
+    prerequisites={
+        "functions": ["pca"],
+        "optional_functions": ["neighbors", "umap"],
+    },
+    requires={
+        "obsm": ["X_pca"]
+    },
+    produces={
+        "obsm": ["X_mde"]
+    },
+    auto_fix="auto",
+    examples=[
+        "ov.pp.mde(adata, embedding_dim=2, n_neighbors=15, use_rep='X_pca')",
+        "ov.pp.mde(adata, repulsive_fraction=0.7, basis='X_mde')",
+    ],
+    related=["umap", "tsne", "pca"],
+)
 def mde(adata,embedding_dim=2,n_neighbors=15, basis='X_mde',n_pcs=None, use_rep=None, knn=True, 
         transformer=None, metric='euclidean',verbose=False,
         key_added=None,random_state=0,repulsive_fraction=0.7,constraint=None):
-    '''
-    MDE
-    '''
+    """Run MDE (Minimum Distortion Embedding) from a latent representation.
+
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        AnnData object containing a latent representation in ``adata.obsm``.
+    embedding_dim : int, default=2
+        Number of dimensions in the output embedding.
+    n_neighbors : int, default=15
+        Number of neighbors used for graph construction in MDE.
+    basis : str, default="X_mde"
+        Key in ``adata.obsm`` where the result is stored.
+    n_pcs : int, optional
+        Number of principal components used from ``use_rep``.
+    use_rep : str, optional
+        Input representation key in ``adata.obsm``. Defaults to ``'X_pca'``.
+    knn : bool, default=True
+        Whether to use k-nearest-neighbor graph initialization.
+    transformer : object, optional
+        Optional neighbor transformer object.
+    metric : str, default="euclidean"
+        Distance metric for neighborhood search.
+    verbose : bool, default=False
+        Whether to print detailed optimization logs.
+    key_added : str, optional
+        Optional key alias for metadata outputs.
+    random_state : int, default=0
+        Random seed for reproducibility.
+    repulsive_fraction : float, default=0.7
+        Repulsion weight controlling global separation.
+    constraint : object, optional
+        PyMDE constraint object. Uses ``pymde.Standardized()`` when ``None``.
+
+    Returns
+    -------
+    None
+        Stores the low-dimensional embedding in ``adata.obsm[basis]``.
+    """
     import pymde
     import logging
     import time

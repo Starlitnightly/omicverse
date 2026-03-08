@@ -153,6 +153,10 @@
                             <div class="mb-2">
                                 <label class="form-label mb-1" for="agent-api-key" data-i18n="agent.apiKey">API Key</label>
                                 <input type="password" class="form-control form-control-sm" id="agent-api-key" placeholder="sk-...">
+                                <div class="form-check mt-1">
+                                    <input class="form-check-input" type="checkbox" id="agent-remember-key">
+                                    <label class="form-check-label small text-muted" for="agent-remember-key" data-i18n="agent.rememberKey">Remember key across sessions</label>
+                                </div>
                             </div>
                             <div class="mb-2">
                                 <label class="form-label mb-1" for="agent-model" data-i18n="agent.model">Model</label>
@@ -182,7 +186,7 @@
                                 <button class="btn btn-sm btn-primary" type="button" onclick="singleCellApp.saveAgentConfig()" data-i18n="agent.save">Save</button>
                                 <button class="btn btn-sm btn-light" type="button" onclick="singleCellApp.resetAgentConfig()" data-i18n="agent.reset">Reset</button>
                             </div>
-                            <small class="text-muted d-block mt-2" data-i18n="agent.localNotice">Saved in browser storage</small>
+                            <small class="text-muted d-block mt-2" data-i18n="agent.keyNotice">API key is stored in session memory only. Check "Remember" to persist across browser sessions.</small>
                         </div>
                     </li>
                 </ul>
@@ -373,7 +377,7 @@
                             <button type="button" class="btn btn-sm btn-outline-primary" id="view-terminal-btn" onclick="singleCellApp.switchView('terminal')">
                                 <i class="feather-terminal me-1"></i><span data-i18n="view.terminal">Terminal</span>
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-primary" id="view-agent-btn" onclick="singleCellApp.switchView('agent')" style="display: none;">
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="view-agent-btn" onclick="singleCellApp.switchView('agent')">
                                 <i class="feather-message-circle me-1"></i>Agent
                             </button>
                         </div>
@@ -1429,14 +1433,65 @@
                         <div class="agent-panel">
                             <div class="agent-panel-header">
                                 <div class="agent-panel-title" data-i18n="agent.title">Single-cell Agent</div>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.showAgentConfig()" data-i18n="agent.configButton">Configure</button>
+                                <div class="agent-panel-actions">
+                                    <span id="agent-session-indicator" class="agent-session-badge" title="Session"></span>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.newAgentChat()" data-i18n="agent.newChat">New Chat</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.showAgentConfig()" data-i18n="agent.configButton">Configure</button>
+                                </div>
+                            </div>
+                            <div class="agent-harness-panel">
+                                <div class="agent-harness-header">
+                                    <div class="agent-harness-title">Harness</div>
+                                    <div class="agent-harness-actions">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.refreshAgentHarnessPanel()">Refresh</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.replayLatestAgentTrace()">Replay Trace</button>
+                                    </div>
+                                </div>
+                                <div class="agent-harness-meta">
+                                    <span id="agent-turn-indicator" class="agent-session-badge" title="Turn"></span>
+                                    <span id="agent-trace-indicator" class="agent-session-badge" title="Trace"></span>
+                                    <span id="agent-approval-indicator" class="agent-session-badge" title="Pending approvals"></span>
+                                    <span id="agent-question-indicator" class="agent-session-badge" title="Pending questions"></span>
+                                    <span id="agent-task-indicator" class="agent-session-badge" title="Recent tasks"></span>
+                                    <span id="agent-plan-indicator" class="agent-session-badge" title="Plan mode"></span>
+                                    <span id="agent-worktree-indicator" class="agent-session-badge" title="Worktree"></span>
+                                </div>
+                                <div id="agent-harness-capabilities" class="agent-harness-badges"></div>
+                                <div id="agent-runtime-state" class="agent-harness-list">
+                                    <div class="agent-harness-empty">No runtime state yet</div>
+                                </div>
+                                <div class="agent-harness-columns">
+                                    <div class="agent-harness-column">
+                                        <div class="agent-harness-subtitle">Pending approvals</div>
+                                        <div id="agent-approval-list" class="agent-harness-list">
+                                            <div class="agent-harness-empty">No pending approvals</div>
+                                        </div>
+                                        <div class="agent-harness-subtitle" style="margin-top: 0.75rem;">Pending questions</div>
+                                        <div id="agent-question-list" class="agent-harness-list">
+                                            <div class="agent-harness-empty">No pending questions</div>
+                                        </div>
+                                    </div>
+                                    <div class="agent-harness-column">
+                                        <div class="agent-harness-subtitle">Runtime tasks</div>
+                                        <div id="agent-task-list" class="agent-harness-list">
+                                            <div class="agent-harness-empty">No tasks yet</div>
+                                        </div>
+                                    </div>
+                                    <div class="agent-harness-column">
+                                        <div class="agent-harness-subtitle">Latest trace</div>
+                                        <div id="agent-trace-preview" class="agent-harness-trace">
+                                            <div class="agent-harness-empty">No trace loaded</div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="agent-messages" id="agent-messages">
                                 <div class="agent-message assistant" data-i18n="agent.greeting">Hi, I can help analyze single-cell data. Tell me what you want to do.</div>
                             </div>
                             <div class="agent-input">
                                 <textarea id="agent-input" placeholder="Ask a question, e.g. suggest cell type annotation" data-i18n-placeholder="agent.inputPlaceholder"></textarea>
-                                <button type="button" class="btn btn-sm btn-primary" onclick="singleCellApp.sendAgentMessage()" data-i18n="agent.send">Send</button>
+                                <button type="button" id="agent-send-btn" class="btn btn-sm btn-primary" onclick="singleCellApp.sendAgentMessage()" data-i18n="agent.send">Send</button>
+                                <button type="button" id="agent-stop-btn" class="btn btn-sm btn-danger" onclick="singleCellApp.stopAgentStream()" style="display:none;" data-i18n="agent.stop">Stop</button>
                             </div>
                         </div>
                     </div>

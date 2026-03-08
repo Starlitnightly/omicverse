@@ -168,7 +168,14 @@ nav:
         - Domain Research (dr) — Live Web: Tutorials-llm/t_dr_web.md
         - ov.Agent PBMC3k: Tutorials-llm/t_ov_agent_pbmc3k.ipynb
         - ov.Agent Ten-Task Suite: Tutorials-llm/ov_agent_ten_task_suite.ipynb
-
+        - UCE: Tutorials-llm/t_uce.ipynb
+        - scGPT: Tutorials-llm/t_scgpt.ipynb
+        - scFoundation: Tutorials-llm/t_scfoundation.ipynb
+        - GeneFormer: Tutorials-llm/t_geneformer.ipynb
+        - CellPlm: Tutorials-llm/t_cellplm.ipynb
+        - Foundation Model (fm):
+            - Overview & API: Tutorials-llm/t_fm_guide.md
+            - Tutorial (PBMC3k + scGPT): Tutorials-llm/t_fm.ipynb
     - Plotting:
         - Visualization of single cell RNA-seq: Tutorials-plotting/t_visualize_single.ipynb
         - Visualization of bulk RNA-seq: Tutorials-plotting/t_visualize_bulk.ipynb

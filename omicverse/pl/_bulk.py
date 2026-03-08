@@ -32,61 +32,64 @@ def volcano(result,pval_name='qvalue',fc_name='log2FC',pval_max=None,FC_max=None
     r"""
     Create a volcano plot for differential expression analysis.
     
-    Args:
-        result: pandas.DataFrame
-            Dataframe containing differential expression results with 'sig' column
-        pval_name: str, optional (default='qvalue')
-            Column name for p-values/q-values
-        fc_name: str, optional (default='log2FC')
-            Column name for fold change values  
-        pval_max: float, optional (default=None)
-            Maximum p-value for y-axis scaling
-        FC_max: float, optional (default=None)
-            Maximum fold change for x-axis scaling
-        figsize: tuple, optional (default=(4,4))
-            Figure size (width, height)
-        title: str, optional (default='')
-            Plot title
-        titlefont: dict, optional (default={'weight':'normal','size':14})
-            Font settings for title and axis labels
-        up_color: str, optional (default='#e25d5d')
-            Color for upregulated genes
-        down_color: str, optional (default='#7388c1')
-            Color for downregulated genes
-        normal_color: str, optional (default='#d7d7d7')
-            Color for non-significant genes
-        up_fontcolor: str, optional (default='#e25d5d')
-            Font color for upregulated gene labels
-        down_fontcolor: str, optional (default='#7388c1')
-            Font color for downregulated gene labels
-        normal_fontcolor: str, optional (default='#d7d7d7')
-            Font color for normal gene labels
-        legend_bbox: tuple, optional (default=(0.8, -0.2))
-            Legend bounding box position
-        legend_ncol: int, optional (default=2)
-            Number of legend columns
-        legend_fontsize: int, optional (default=12)
-            Legend font size
-        plot_genes: list, optional (default=None)
-            Specific genes to label on plot
-        plot_genes_num: int, optional (default=10)
-            Number of top genes to label automatically
-        plot_genes_fontsize: int, optional (default=10)
-            Font size for gene labels
-        ticks_fontsize: int, optional (default=12)
-            Font size for axis ticks
-        pval_threshold: float, optional (default=0.05)
-            P-value threshold for significance
-        fc_max: float, optional (default=1.5)
-            Upper fold change threshold
-        fc_min: float, optional (default=-1.5)
-            Lower fold change threshold
-        ax: matplotlib.axes, optional (default=None)
-            Existing axes to plot on
+    Parameters
+    ----------
+    result : pd.DataFrame
+        Differential-expression result table containing at least p-value,
+        fold-change, and ``sig`` classification columns.
+    pval_name : str
+        Column name of adjusted p-values or q-values.
+    fc_name : str
+        Column name of log fold-change values.
+    pval_max : float or None
+        Optional y-axis upper bound in transformed p-value scale.
+    FC_max : float or None
+        Optional x-axis absolute range cap.
+    figsize : tuple
+        Figure size passed to matplotlib.
+    title : str
+        Plot title.
+    titlefont : dict
+        Font dict for title/axis labels.
+    up_color : str
+        Point color for up-regulated genes.
+    down_color : str
+        Point color for down-regulated genes.
+    normal_color : str
+        Point color for non-significant genes.
+    up_fontcolor : str
+        Label color for up-regulated genes.
+    down_fontcolor : str
+        Label color for down-regulated genes.
+    normal_fontcolor : str
+        Label color for non-significant genes.
+    legend_bbox : tuple
+        Legend anchor position.
+    legend_ncol : int
+        Number of legend columns.
+    legend_fontsize : int
+        Legend font size.
+    plot_genes : list or None
+        Explicit gene list to annotate.
+    plot_genes_num : int
+        Number of top genes automatically annotated when ``plot_genes`` is None.
+    plot_genes_fontsize : int
+        Font size for annotated gene labels.
+    ticks_fontsize : int
+        Tick label font size.
+    pval_threshold : float
+        Significance threshold used to define highlighted genes.
+    fc_max : float
+        Positive fold-change cutoff.
+    fc_min : float
+        Negative fold-change cutoff.
+    ax : matplotlib.axes.Axes or None
+        Existing axes object to draw on.
         
-    Returns:
-        ax: matplotlib.axes
-            The plot axes object
+    Returns
+    -------
+    matplotlib.axes.Axes
+        Axes containing the volcano plot.
     """
     
     # Color codes for terminal output
@@ -359,20 +362,33 @@ def venn(sets={}, out='./', palette='bgrc',
     r"""
     Create a Venn diagram to visualize set overlaps.
     
-    Args:
-        sets: Dictionary with set names as keys and sets as values ({})
-        out: Output directory path ('./')
-        palette: Color palette for sets ('bgrc')
-        ax: Matplotlib axes object or False to create new (False)
-        ext: File extension for output ('png')
-        dpi: Resolution for output image (300)
-        fontsize: Font size for text (3.5)
-        bbox_to_anchor: Legend position ((.5, .99))
-        nc: Number of legend columns (2)
-        cs: Font size for legend (4)
+    Parameters
+    ----------
+    sets : dict
+        Dictionary mapping set names to Python sets.
+    out : str
+        Output directory for saved figure.
+    palette : str or list
+        Color palette passed to backend venn renderer.
+    ax : matplotlib.axes.Axes or bool
+        Existing axes; if ``False`` a new figure/axes is created.
+    ext : str
+        Output file extension.
+    dpi : int
+        Resolution of saved image.
+    fontsize : float
+        Font size for labels.
+    bbox_to_anchor : tuple
+        Legend anchor position.
+    nc : int
+        Number of legend columns.
+    cs : float
+        Legend font size.
         
-    Returns:
-        ax: matplotlib.axes.Axes object
+    Returns
+    -------
+    matplotlib.axes.Axes or bool
+        Axes handle returned by caller/backend context.
     """
     
     from ..utils import venny4py
@@ -406,23 +422,37 @@ def boxplot(data,hue,x_value,y_value,width=0.3,title='',
     r"""
     Create a boxplot with jittered points to visualize data distribution across categories.
     
-    Args:
-        data: DataFrame containing the data to plot
-        hue: Column name for grouping variable (color coding)
-        x_value: Column name for x-axis categories
-        y_value: Column name for y-axis values
-        width: Width of each boxplot (0.3)
-        title: Plot title ('')
-        figsize: Figure dimensions as (width, height) ((6,3))
-        palette: Color palette for groups (None, uses default)
-        fontsize: Font size for labels and ticks (10)
-        legend_bbox: Legend position as (x, y) ((1, 0.55))
-        legend_ncol: Number of legend columns (1)
-        hue_order: Custom order for hue categories (None, uses alphabetical)
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Input table containing grouping and numeric columns.
+    hue : str
+        Column name used for color grouping.
+    x_value : str
+        Column name used as x-axis category.
+    y_value : str
+        Column name containing numeric values.
+    width : float
+        Width of each box element.
+    title : str
+        Plot title.
+    figsize : tuple
+        Figure size passed to matplotlib.
+    palette : list or None
+        Color list for hue groups; default palette is used when ``None``.
+    fontsize : int
+        Base font size for ticks/labels.
+    legend_bbox : tuple
+        Legend anchor position.
+    legend_ncol : int
+        Number of legend columns.
+    hue_order : list or None
+        Explicit order of hue categories.
         
-    Returns:
-        fig: matplotlib.figure.Figure object
-        ax: matplotlib.axes.Axes object
+    Returns
+    -------
+    Tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+        Figure and axes of generated boxplot.
     """
 
     # Color codes for terminal output
@@ -462,15 +492,17 @@ def boxplot(data,hue,x_value,y_value,width=0.3,title='',
         """
         Calculate evenly distributed positions for boxes within the range [-0.5, 0.5].
         
-        Args:
-            n_hues: int
-                Number of hue categories
-            spacing: float
-                Fraction of the total range to use for spacing boxes (0.8 means use 80% of [-0.5, 0.5])
+        Parameters
+        ----------
+        n_hues : int
+            Number of hue categories.
+        spacing : float
+            Fraction of interval ``[-0.5, 0.5]`` occupied by boxes.
             
-        Returns:
-            positions: list
-                List of positions for each hue
+        Returns
+        -------
+        list
+            Relative x-offsets for each hue group.
         """
         if n_hues == 1:
             return [0.0]
@@ -687,16 +719,45 @@ def boxplot(data,hue,x_value,y_value,width=0.3,title='',
     return fig,ax
 
 
+@register_function(
+    aliases=['分组比例图', 'plot_grouped_fractions', 'grouped fractions'],
+    category="pl",
+    description="Plot grouped cell-fraction summaries (e.g., by sample, condition, or response) for compositional comparison.",
+    prerequisites={},
+    requires={'obs': ['group labels', 'fraction columns']},
+    produces={},
+    auto_fix='none',
+    examples=['ov.pl.plot_grouped_fractions(res, obs=adata.obs, group_key="condition")'],
+    related=['pl.boxplot', 'utils.plot_cellproportion']
+)
 def plot_grouped_fractions(res, obs, group_key, 
                            color_dict=None,agg='mean', normalize=True,
                            figsize=(4, 4),
                           ):
     """
-    res: 行为 sample、列为 cell type 的预测比例表（你现在的 res）
-    obs: bulk_ad.obs
-    group_key: 例如 'severity' / 'disease_state' / 'gender' / 任意 obs 列
-    agg: 'mean' / 'median' / 'sum'
-    normalize: 是否把每组的细胞类型比例归一化到和为1
+    Plot grouped cell-fraction summaries as stacked bars.
+
+    Parameters
+    ----------
+    res : pd.DataFrame
+        Predicted cell-fraction matrix with samples as rows and cell types as columns.
+    obs : pd.DataFrame
+        Sample metadata table aligned to ``res`` index.
+    group_key : str
+        Metadata column used to group samples (for example severity/condition).
+    color_dict : dict or None
+        Mapping from cell-type names to colors. If provided, column order follows keys.
+    agg : str
+        Group aggregation method: ``'mean'``, ``'median'``, or ``'sum'``.
+    normalize : bool
+        Whether each grouped row is normalized to sum to 1.
+    figsize : tuple
+        Figure size passed to pandas/matplotlib plotting backend.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+        Axes containing the grouped stacked-bar chart.
     """
     # 1) 对齐索引（样本名）
     common = res.index.intersection(obs.index)

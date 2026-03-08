@@ -2,16 +2,23 @@ import numpy as np
 
 
 def mahalanobis(X1, X2, S1, S2):
-    r"""Calculate Mahalanobis distance between two points with covariance matrices.
-    
-    Arguments:
-        X1: First point coordinates
-        X2: Second point coordinates
-        S1: Covariance matrix for first point
-        S2: Covariance matrix for second point
-        
-    Returns:
-        float: Mahalanobis distance
+    r"""Compute Mahalanobis distance between two cluster centers.
+
+    Parameters
+    ----------
+    X1 : numpy.ndarray
+        Coordinates of the first center.
+    X2 : numpy.ndarray
+        Coordinates of the second center.
+    S1 : numpy.ndarray
+        Covariance matrix of the first cluster.
+    S2 : numpy.ndarray
+        Covariance matrix of the second cluster.
+
+    Returns
+    -------
+    numpy.ndarray
+        Squared Mahalanobis distance as a ``1x1`` array.
     """
     S_inv = np.linalg.inv(S1 + S2)
     diff = (X1 - X2).reshape(-1, 1)
@@ -34,23 +41,31 @@ def isstr(x):
     return isinstance(x, str)
 
 def scale_to_range(x, a=0, b=1):
-    r"""Scale array values to specified range.
-    
-    Arguments:
-        x: Input array to scale
-        a (float): Lower bound of target range (default: 0)
-        b (float): Upper bound of target range (default: 1)
-        
-    Returns:
-        np.ndarray: Scaled array
+    r"""Linearly rescale values to a target interval.
+
+    Parameters
+    ----------
+    x : numpy.ndarray
+        Input numeric array.
+    a : float, default=0
+        Lower bound of the output range.
+    b : float, default=1
+        Upper bound of the output range.
+
+    Returns
+    -------
+    numpy.ndarray
+        Rescaled array with values mapped into ``[a, b]``.
     """
     return ((x - x.min()) / (x.max() - x.min())) * (b - a) + a
 
 class Lineage:
-    r"""Represents a lineage trajectory through clusters.
-    
-    Arguments:
-        clusters: List of cluster IDs forming the lineage
+    r"""Represent one lineage as an ordered cluster path.
+
+    Parameters
+    ----------
+    clusters : list[int]
+        Ordered cluster IDs defining one root-to-terminal trajectory.
     """
     def __init__(self, clusters):
         self.clusters = clusters
@@ -239,16 +254,27 @@ class Slingshot:
             end_nodes=None,
             debug_level=None
     ):
-        r"""Initialize Slingshot trajectory inference object.
-        
-        Arguments:
-            data: AnnData object or numpy array with dimensionality-reduced data (num_cells, 2)
-            cluster_labels_onehot: One-hot encoded cluster labels (default: None)
-            celltype_key (str): Key in AnnData.obs for cell type labels (default: None)
-            obsm_key (str): Key in AnnData.obsm for dimensionality-reduced data (default: 'X_umap')
-            start_node: Starting cluster for trajectory (default: 0)
-            end_nodes: List of terminal clusters (default: None)
-            debug_level: Debug verbosity level (default: None)
+        r"""Initialize a Slingshot trajectory inference model.
+
+        Parameters
+        ----------
+        data : anndata.AnnData or numpy.ndarray
+            Input embedding. If ``AnnData`` is provided, embedding is read from
+            ``data.obsm[obsm_key]``.
+        cluster_labels_onehot : numpy.ndarray or None, default=None
+            One-hot cluster assignment matrix of shape ``(n_cells, n_clusters)``
+            when ``data`` is a NumPy array.
+        celltype_key : str or None, default=None
+            Column in ``adata.obs`` containing cluster labels when ``data`` is
+            an ``AnnData`` object.
+        obsm_key : str, default='X_umap'
+            Embedding key in ``adata.obsm`` used for trajectory fitting.
+        start_node : int or str, default=0
+            Root cluster label.
+        end_nodes : list or None, default=None
+            Optional terminal cluster labels to constrain lineage ends.
+        debug_level : str or None, default=None
+            Debug verbosity option. Use ``'verbose'`` to print lineage details.
         """
         if isinstance(data, AnnData):
             assert celltype_key is not None, "Must provide celltype key if data is an AnnData object"
@@ -329,13 +355,17 @@ class Slingshot:
         self.debug_plot_avg = axes is not None
 
     def construct_mst(self, start_node):
-        r"""Construct minimum spanning tree for trajectory inference.
-        
-        Arguments:
-            start_node: Starting cluster node for the MST
-            
-        Returns:
-            dict: Dictionary mapping clusters to their children in the MST
+        r"""Construct a cluster-level minimum spanning tree.
+
+        Parameters
+        ----------
+        start_node : int
+            Root node index used to orient tree edges.
+
+        Returns
+        -------
+        dict[int, list[int]]
+            Directed adjacency mapping from each cluster to downstream children.
         """
         # Calculate empirical covariance of clusters
         emp_covs = np.stack([np.cov(self.data[self.cluster_label_indices == i].T) for i in range(self.num_clusters)])
@@ -654,14 +684,21 @@ class Slingshot:
         return shrinkage_percentages, cluster_children, cluster_avg_curves
 
     def shrink_curves(self, cluster_children, shrinkage_percentages, cluster_avg_curves):
-        """
-        Starting at root, shrink curves for each branch
+        """Shrink lineage curves toward branch-average curves.
 
-        Parameters:
-            cluster_children:
-            shrinkage_percentages:
-            cluster_avg_curves:
-        :return:
+        Parameters
+        ----------
+        cluster_children : dict[int, set]
+            Mapping from branch cluster to its member lineage curves.
+        shrinkage_percentages : list[dict]
+            Per-branch shrinkage schedules for each curve.
+        cluster_avg_curves : dict[int, object]
+            Average principal curves computed for branch points.
+
+        Returns
+        -------
+        None
+            Updates ``self.curves`` in place.
         """
         branch_clusters = self.branch_clusters.copy()
         while len(branch_clusters) > 0:
@@ -677,14 +714,21 @@ class Slingshot:
             self.shrink_branch_curves(branch_curves, cluster_avg_curve, shrinkage_percent)
 
     def shrink_branch_curves(self, branch_curves, avg_curve, shrinkage_percent):
-        """
-        Shrinks curves through a branch to the average curve.
-        
-        Arguments:
-            branch_curves: list of `PrincipalCurve`s associated with the branch.
-            avg_curve: `PrincipalCurve` for average curve.
-            shrinkage_percent: percentage shrinkage, in same order as curve.pseudotimes
-       
+        """Shrink branch curves toward an average trajectory.
+
+        Parameters
+        ----------
+        branch_curves : list
+            Principal curve objects associated with one branch.
+        avg_curve : object
+            Average principal curve for the branch.
+        shrinkage_percent : dict
+            Mapping from curve object to shrinkage proportion along pseudotime.
+
+        Returns
+        -------
+        None
+            Modifies branch curves in place by reprojecting them.
         """
         num_dims_reduced = branch_curves[0].points_interp.shape[1]
 

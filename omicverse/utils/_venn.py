@@ -5,13 +5,18 @@ from matplotlib.patches import Ellipse
 
 
 def get_shared(sets):
-    r"""Get shared elements for each combination of sets.
-    
-    Arguments:
-        sets: Dictionary of set names to sets
-        
-    Returns:
-        Dictionary of shared elements for each combination
+    r"""Compute intersection sets for all combinations.
+
+    Parameters
+    ----------
+    sets : dict[str, set]
+        Mapping from group names to Python ``set`` objects.
+
+    Returns
+    -------
+    dict[str, set]
+        Dictionary keyed by combined names such as ``"A and B"``, where each
+        value is the intersection for that combination.
     """
     IDs = sets.keys()
     combs = sum([list(map(list, combinations(IDs, i))) for i in range(1, len(IDs) + 1)], [])
@@ -29,13 +34,17 @@ def get_shared(sets):
 
 
 def get_unique(shared):
-    r"""Get unique elements for each combination of sets.
-    
-    Arguments:
-        shared: Dictionary of shared elements
-        
-    Returns:
-        Dictionary of unique elements for each combination
+    r"""Compute exclusive elements for each intersection key.
+
+    Parameters
+    ----------
+    shared : dict[str, set]
+        Output from :func:`get_shared` containing raw intersections.
+
+    Returns
+    -------
+    dict[str, set]
+        Dictionary with overlap-exclusive elements for each key.
     """
     unique = {}
     for shar in shared:
@@ -57,22 +66,46 @@ def get_unique(shared):
 def venny4py(sets={}, out='./', ce='bgrc',
              asax=False, ext='png', dpi=300, size=3.5,
              bbox_to_anchor=(.5, .99),nc=2,cs=4):
-    r"""Create Venn diagram for 2-4 sets.
-    
-    Arguments:
-        sets: Dictionary of set names to sets ({})
-        out: Output directory ('./')
-        ce: Colors for ellipses ('bgrc')
-        asax: Use existing axes (False)
-        ext: File extension ('png')
-        dpi: Resolution for saved figure (300)
-        size: Figure size (3.5)
-        bbox_to_anchor: Legend position ((.5, .99))
-        nc: Number of legend columns (2)
-        cs: Column spacing (4)
-        
-    Returns:
-        Matplotlib figure and axes objects
+    r"""Draw and optionally save a 2/3/4-set Venn-style diagram.
+
+    Parameters
+    ----------
+    sets : dict[str, set], default={}
+        Mapping of set names to gene/protein/feature sets. Supports 2 to 4 sets.
+    out : str, default='./'
+        Output directory used to save overlap table and figure file.
+    ce : str or sequence, default='bgrc'
+        Colors used for set patches.
+    asax : matplotlib.axes.Axes or bool, default=False
+        Existing axes object to draw on. If ``False``, a new figure is created.
+    ext : str, default='png'
+        Figure file extension.
+    dpi : int, default=300
+        DPI used when saving the figure.
+    size : float, default=3.5
+        Base figure size scaling factor.
+    bbox_to_anchor : tuple[float, float], default=(0.5, 0.99)
+        Anchor position of the legend in axes coordinates.
+    nc : int, default=2
+        Number of legend columns.
+    cs : float, default=4
+        Legend column spacing.
+
+    Returns
+    -------
+    None
+        The function writes intersection summaries to
+        ``Intersections_<n>.txt`` and saves ``Venn_<n>.<ext>`` when
+        ``asax=False``.
+
+    Examples
+    --------
+    >>> sets = {
+    ...     "Control": {"GeneA", "GeneB", "GeneC"},
+    ...     "Case": {"GeneB", "GeneD"},
+    ...     "Validation": {"GeneA", "GeneD"},
+    ... }
+    >>> venny4py(sets=sets, out=".", ext="png", dpi=300)
     """
     shared = get_shared(sets)
     unique = get_unique(shared)

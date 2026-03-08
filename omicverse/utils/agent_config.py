@@ -77,7 +77,8 @@ class SubagentConfig:
 SUBAGENT_CONFIGS = {
     "explore": SubagentConfig(
         agent_type="explore",
-        allowed_tools=["inspect_data", "run_snippet", "search_functions", "finish"],
+        allowed_tools=["inspect_data", "run_snippet", "search_functions",
+                       "web_fetch", "web_search", "finish"],
         max_turns=5,
         can_mutate_adata=False,
         temperature=0.1,
@@ -86,7 +87,7 @@ SUBAGENT_CONFIGS = {
         agent_type="plan",
         allowed_tools=[
             "inspect_data", "run_snippet", "search_functions",
-            "search_skills", "finish",
+            "search_skills", "web_fetch", "web_search", "finish",
         ],
         max_turns=8,
         can_mutate_adata=False,
@@ -96,7 +97,8 @@ SUBAGENT_CONFIGS = {
         agent_type="execute",
         allowed_tools=[
             "inspect_data", "execute_code", "run_snippet",
-            "search_functions", "finish",
+            "search_functions", "web_fetch", "web_search",
+            "web_download", "finish",
         ],
         max_turns=10,
         can_mutate_adata=True,
@@ -113,12 +115,30 @@ class ContextConfig:
 
 
 @dataclass
+class HarnessConfig:
+    """Harness tracing and replay settings."""
+    enable_traces: bool = True
+    trace_dir: Optional[Path] = None
+    record_artifacts: bool = True
+    server_only_validation: bool = True
+    server_tool_mode: bool = True
+    enable_claude_tool_catalog: bool = True
+    deferred_tool_loading: bool = True
+    cleanup_reports_dir: Optional[Path] = None
+    include_recent_failures_in_prompt: bool = True
+    max_recent_failures: int = 3
+    enable_context_compaction: bool = True
+    enable_mcp_registry: bool = True
+
+
+@dataclass
 class AgentConfig:
     """Aggregated agent configuration."""
     llm: LLMConfig = field(default_factory=LLMConfig)
     reflection: ReflectionConfig = field(default_factory=ReflectionConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     context: ContextConfig = field(default_factory=ContextConfig)
+    harness: HarnessConfig = field(default_factory=HarnessConfig)
     security: SecurityConfig = field(default_factory=SecurityConfig)
     verbose: bool = True
     history_enabled: bool = False
@@ -131,6 +151,8 @@ class AgentConfig:
         """Build from the original OmicVerseAgent.__init__ keyword args."""
         sd = kw.get("notebook_storage_dir")
         cd = kw.get("context_storage_dir")
+        td = kw.get("harness_trace_dir")
+        rd = kw.get("harness_cleanup_reports_dir")
 
         # Security config from flat kwargs
         approval_raw = kw.get("approval_mode", "never")
@@ -163,6 +185,20 @@ class AgentConfig:
             context=ContextConfig(
                 enabled=kw.get("enable_filesystem_context", True),
                 storage_dir=Path(cd) if cd else None,
+            ),
+            harness=HarnessConfig(
+                enable_traces=kw.get("enable_harness_traces", True),
+                trace_dir=Path(td) if td else None,
+                record_artifacts=kw.get("record_harness_artifacts", True),
+                server_only_validation=kw.get("server_only_validation", True),
+                server_tool_mode=kw.get("server_tool_mode", True),
+                enable_claude_tool_catalog=kw.get("enable_claude_tool_catalog", True),
+                deferred_tool_loading=kw.get("deferred_tool_loading", True),
+                cleanup_reports_dir=Path(rd) if rd else None,
+                include_recent_failures_in_prompt=kw.get("include_recent_failures_in_prompt", True),
+                max_recent_failures=kw.get("max_recent_failures", 3),
+                enable_context_compaction=kw.get("enable_context_compaction", True),
+                enable_mcp_registry=kw.get("enable_mcp_registry", True),
             ),
             security=cls._build_security_config(kw, approval_raw),
         )

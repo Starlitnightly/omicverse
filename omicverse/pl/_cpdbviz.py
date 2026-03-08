@@ -9,6 +9,7 @@ import matplotlib.patches as mpatches
 from sklearn.cluster import KMeans
 from sklearn.metrics.pairwise import cosine_similarity
 import warnings
+from .._registry import register_function
 warnings.filterwarnings('ignore')
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.colors as mcolors
@@ -22,26 +23,50 @@ except ImportError:
 
 from ._cpdbviz_plus import CellChatVizPlus
 
+@register_function(
+    aliases=['CellPhoneDB可视化器', 'CellChatViz', 'cell chat visualization'],
+    category="pl",
+    description="Visualization class for CellPhoneDB communication outputs, including interaction networks and pathway-centric summaries.",
+    prerequisites={'functions': ['run_cellphonedb_v5']},
+    requires={'uns': ['cellphonedb_results']},
+    produces={},
+    auto_fix='none',
+    examples=['viz = ov.pl.CellChatViz(adata_cpdb, palette=color_dict)', 'viz.plot_interactions()'],
+    related=['single.run_cellphonedb_v5', 'pl.plot_flowsig_network']
+)
 class CellChatViz(CellChatVizPlus):
     """
-    CellChat-like visualization for CellPhoneDB AnnData
+    Visualization helper for CellPhoneDB cell-cell communication outputs.
+    
+    Parameters
+    ----------
+    adata:AnnData
+        AnnData containing CellPhoneDB interaction results.
+    palette:dict or sequence or None
+        Color mapping used for sender/receiver cell types.
+    
+    Returns
+    -------
+    None
+        Initializes visualization state for interaction and pathway-level plotting.
+    
+    Examples
+    --------
+    >>> viz = ov.pl.CellChatViz(adata_cpdb, palette=color_dict)
     """
     
     def __init__(self, adata, palette=None):
         """
         Initialize with CellPhoneDB AnnData object
         
-        Args:
-            adata: AnnData
-                AnnData object with CellPhoneDB results
-                - obs: 'sender', 'receiver'
-                - var: interaction information including 'classification'
-                - layers: 'pvalues', 'means'
-            palette: dict or list, optional
-                Color palette for cell types. Can be:
-                - dict: mapping cell type names to colors
-                - list: list of colors (will be mapped to cell types in alphabetical order)
-                - None: use default color scheme
+        Parameters
+        ----------
+        adata:AnnData
+            AnnData with CellPhoneDB outputs:
+            ``obs`` includes sender/receiver, ``layers`` includes pvalues/means.
+        palette:dict or list or None
+            Optional color mapping. Dict uses explicit cell-type keys; list is
+            mapped to sorted cell types.
         """
         self.adata = adata
         self.cell_types = self._get_unique_cell_types()
@@ -59,13 +84,15 @@ class CellChatViz(CellChatVizPlus):
         """
         Validate and process the palette parameter
         
-        Args:
-            palette: dict, list, or None
-                Color palette specification
+        Parameters
+        ----------
+        palette:dict or list or None
+            Palette specification from user input.
             
-        Returns:
-            dict or None
-            Validated palette as dict mapping cell types to colors, or None
+        Returns
+        -------
+        dict or None
+            Normalized palette dictionary or ``None``.
         """
         if palette is None:
             return None
@@ -150,13 +177,15 @@ class CellChatViz(CellChatVizPlus):
         """
         Create a custom colormap based on cell type color
         
-        Args:
-            cell_color: str
-                Base color for the cell type
+        Parameters
+        ----------
+        cell_color:str or tuple
+            Base color for one sender cell type.
         
-        Returns:
-            cmap: matplotlib.colors.LinearSegmentedColormap
-                Custom colormap
+        Returns
+        -------
+        matplotlib.colors.LinearSegmentedColormap
+            Color gradient colormap.
         """
         from matplotlib.colors import LinearSegmentedColormap
         import matplotlib.colors as mcolors
@@ -178,25 +207,26 @@ class CellChatViz(CellChatVizPlus):
         """
         Draw curved arrows, mimicking CellChat's rotated blooming effect
         
-        Args:
-            ax: matplotlib.axes.Axes
-                Matplotlib axes object
-            start_pos: tuple
-                Starting position (x, y)
-            end_pos: tuple
-                Ending position (x, y)
-            weight: float
-                Edge weight
-            max_weight: float
-                Maximum weight for normalization
-            color: str or tuple
-                Edge color
-            edge_width_max: float
-                Maximum edge width
-            curve_strength: float
-                Strength of the curve (0 = straight, higher = more curved)
-            arrowsize: float
-                Size of the arrow head
+        Parameters
+        ----------
+        ax:matplotlib.axes.Axes
+            Target axes.
+        start_pos:tuple
+            Edge start coordinates.
+        end_pos:tuple
+            Edge end coordinates.
+        weight:float
+            Edge weight.
+        max_weight:float
+            Maximum edge weight for normalization.
+        color:str or tuple
+            Edge color.
+        edge_width_max:float
+            Maximum rendered line width.
+        curve_strength:float
+            Curvature intensity of arrow path.
+        arrowsize:float
+            Arrow-head size.
         """
         from matplotlib.patches import FancyArrowPatch
         from matplotlib.patches import ConnectionPatch
@@ -291,19 +321,20 @@ class CellChatViz(CellChatVizPlus):
         """
         Draw self-loops (connections from cell type to itself)
         
-        Args:
-            ax: matplotlib.axes.Axes
-                Matplotlib axes object
-            pos: tuple
-                Position (x, y)
-            weight: float
-                Edge weight
-            max_weight: float
-                Maximum weight for normalization
-            color: str or tuple
-                Edge color
-            edge_width_max: float
-                Maximum edge width
+        Parameters
+        ----------
+        ax:matplotlib.axes.Axes
+            Target axes.
+        pos:tuple
+            Node position.
+        weight:float
+            Self-loop weight.
+        max_weight:float
+            Maximum edge weight for normalization.
+        color:str or tuple
+            Self-loop color.
+        edge_width_max:float
+            Maximum rendered line width.
         """
         import matplotlib.patches as patches
         
@@ -328,17 +359,17 @@ class CellChatViz(CellChatVizPlus):
         """
         Compute aggregated cell communication network
         
-        Args:
-            pvalue_threshold: float
-                P-value threshold for significant interactions
-            use_means: bool
-                Whether to use mean expression values as weights
+        Parameters
+        ----------
+        pvalue_threshold:float
+            Significance threshold for interaction filtering.
+        use_means:bool
+            Whether to accumulate means as edge strength.
         
-        Returns:
-            count_matrix: np.array
-                Number of interactions between cell types
-            weight_matrix: np.array
-                Sum of interaction strengths between cell types
+        Returns
+        -------
+        Tuple[np.ndarray,np.ndarray]
+            Interaction count matrix and weighted-strength matrix.
         """
         # Initialize matrices
         count_matrix = np.zeros((self.n_cell_types, self.n_cell_types))
@@ -370,30 +401,30 @@ class CellChatViz(CellChatVizPlus):
         Circular network visualization (similar to CellChat's circle plot)
         Uses sender cell type colors as edge gradient colors
         
-        Args:
-            matrix: np.array
-                Interaction matrix (count or weight)
-            title: str
-                Plot title
-            edge_width_max: float
-                Maximum edge width
-            vertex_size_max: float
-                Maximum vertex size
-            show_labels: bool
-                Whether to show cell type labels
-            cmap: str
-                Colormap for edges (used when use_sender_colors=False)
-            figsize: tuple
-                Figure size
-            use_sender_colors: bool
-                Whether to use different colors for different sender cell types (default: True)
-            use_curved_arrows: bool
-                Whether to use curved arrows like CellChat (default: True)
-            curve_strength: float
-                Strength of the curve (0 = straight, higher = more curved)
-            adjust_text: bool
-                Whether to use adjust_text library to prevent label overlapping (default: False)
-                If True, uses plt.text instead of nx.draw_networkx_labels
+        Parameters
+        ----------
+        matrix:np.ndarray
+            Interaction matrix (count or weighted strength).
+        title:str
+            Plot title.
+        edge_width_max:float
+            Maximum edge width.
+        vertex_size_max:float
+            Maximum node size.
+        show_labels:bool
+            Whether to show cell-type labels.
+        cmap:str
+            Colormap used when sender colors are disabled.
+        figsize:tuple
+            Figure size.
+        use_sender_colors:bool
+            Whether edge colors follow sender cell type.
+        use_curved_arrows:bool
+            Whether to draw curved directional arrows.
+        curve_strength:float
+            Curvature strength for arrows.
+        adjust_text:bool
+            Whether to use adjustText for label collision handling.
         """
         fig, ax = plt.subplots(figsize=figsize)
         
@@ -588,17 +619,17 @@ class CellChatViz(CellChatVizPlus):
         """
         Get all significant ligand-receptor pair lists
         
-        Args:
-            min_interactions: int
-                Minimum interaction count threshold
-            pvalue_threshold: float
-                P-value threshold for significance
+        Parameters
+        ----------
+        min_interactions:int
+            Minimum number of significant interactions required per L-R pair.
+        pvalue_threshold:float
+            Significance threshold applied to CellPhoneDB p-values.
         
-        Returns:
-            lr_pairs: list
-                Significant ligand-receptor pair list
-            lr_stats: dict
-                Statistics for each ligand-receptor pair
+        Returns
+        -------
+        Tuple[list,dict]
+            Significant L-R pairs and their summary statistics.
         """
         # Determine ligand-receptor pair column name
         if 'gene_name' in self.adata.var.columns:
@@ -650,13 +681,15 @@ class CellChatViz(CellChatVizPlus):
         """
         Compute mean expression matrix for cell-cell interactions (like CellChat)
         
-        Args:
-            count_min: int
-                Minimum count threshold to filter interactions (default: 1)
+        Parameters
+        ----------
+        count_min:float
+            Minimum interaction mean retained in aggregation.
             
-        Returns:
-            mean_matrix: pd.DataFrame
-                Mean expression matrix with senders as index and receivers as columns
+        Returns
+        -------
+        pd.DataFrame
+            Sender-by-receiver matrix of aggregated means.
         """
         # Initialize matrix
         mean_matrix = np.zeros((self.n_cell_types, self.n_cell_types))
@@ -685,13 +718,15 @@ class CellChatViz(CellChatVizPlus):
         """
         Compute p-value matrix for cell-cell interactions (like CellChat)
         
-        Args:
-            count_min: int
-                Minimum count threshold to filter interactions (default: 1)
+        Parameters
+        ----------
+        count_min:float
+            Minimum interaction mean retained when averaging p-values.
             
-        Returns:
-            pvalue_matrix: pd.DataFrame
-                Average p-value matrix with senders as index and receivers as columns
+        Returns
+        -------
+        pd.DataFrame
+            Sender-by-receiver matrix of aggregated p-values.
         """
         # Initialize matrix
         pvalue_matrix = np.ones((self.n_cell_types, self.n_cell_types))  # Default p=1
@@ -729,15 +764,17 @@ class CellChatViz(CellChatVizPlus):
         """
         Analyze and display detailed pathway statistics
         
-        Args:
-            pathway_stats: dict
-                Dictionary returned from get_signaling_pathways
-            show_details: bool
-                Whether to show detailed statistics for each pathway
+        Parameters
+        ----------
+        pathway_stats:dict
+            Pathway statistics dictionary from signaling-pathway analysis.
+        show_details:bool
+            Whether to print detailed per-pathway summary.
         
-        Returns:
-            summary_df: pd.DataFrame
-                Summary statistics for all pathways
+        Returns
+        -------
+        pd.DataFrame
+            Summary table for all pathways.
         """
         if not pathway_stats:
             print("No pathway statistics available. Run get_signaling_pathways() first.")
@@ -791,17 +828,19 @@ class CellChatViz(CellChatVizPlus):
         """
         Calculate pathway-level cell communication strength (similar to CellChat methods)
         
-        Args:
-            method: str
-                Aggregation method: 'mean', 'sum', 'max', 'median' (default: 'mean')
-            min_lr_pairs: int
-                Minimum L-R pair count in pathway (default: 1)  
-            min_expression: float
-                Minimum expression threshold (default: 0.1)
+        Parameters
+        ----------
+        method:str
+            Aggregation method: ``'mean'``, ``'sum'``, ``'max'`` or ``'median'``.
+        min_lr_pairs:int
+            Minimum number of L-R pairs required for a pathway.
+        min_expression:float
+            Minimum expression threshold for valid interactions.
             
-        Returns:
-            pathway_communication: dict
-                Contains communication matrix and statistics for each pathway
+        Returns
+        -------
+        dict
+            Pathway-level communication matrices and summary statistics.
         """
         pathways = [p for p in self.adata.var['classification'].unique() if pd.notna(p)]
         pathway_communication = {}
@@ -890,21 +929,21 @@ class CellChatViz(CellChatVizPlus):
         """
         Determine significant pathways based on pathway-level communication strength (more aligned with CellChat logic)
         
-        Args:
-            pathway_communication: dict or None
-                Pathway communication results, if None then recalculate
-            strength_threshold: float
-                Pathway strength threshold (default: 0.1)
-            pvalue_threshold: float  
-                p-value threshold (default: 0.05)
-            min_significant_pairs: int
-                Minimum significant cell pair count (default: 1)
+        Parameters
+        ----------
+        pathway_communication:dict or None
+            Precomputed pathway communication results.
+        strength_threshold:float
+            Minimum pathway total strength.
+        pvalue_threshold:float
+            P-value threshold for significant cell-pair interactions.
+        min_significant_pairs:int
+            Minimum number of significant cell pairs.
             
-        Returns:
-            significant_pathways: list
-                Significant pathway list
-            pathway_summary: pd.DataFrame
-                Pathway statistics summary
+        Returns
+        -------
+        Tuple[list,pd.DataFrame]
+            Significant pathway list and pathway summary table.
         """
         if pathway_communication is None:
             pathway_communication = self.compute_pathway_communication()
@@ -975,17 +1014,19 @@ class CellChatViz(CellChatVizPlus):
         """
         Demo function to show curved arrow effects
         
-        Args:
-            signaling_pathway: str or None
-                Signaling pathway to visualize, if None use aggregated network
-            curve_strength: float
-                Arrow curvature strength (0-1), 0 for straight lines, higher values for more curvature
-            figsize: tuple
-                Figure size
+        Parameters
+        ----------
+        signaling_pathway:str or None
+            Pathway name to visualize; if ``None`` uses aggregated network.
+        curve_strength:float
+            Curvature strength for arrows.
+        figsize:tuple
+            Figure size.
         
-        Returns:
-            fig: matplotlib.figure.Figure
-            ax: matplotlib.axes.Axes
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure,matplotlib.axes.Axes]
+            Figure and axes of demo visualization.
         """
         print("🌸 Demonstrating CellChat-style curved arrow effects...")
         print(f"📏 Curvature strength: {curve_strength} (recommended range: 0.2-0.6)")
@@ -1030,33 +1071,35 @@ class CellChatViz(CellChatVizPlus):
         """
         Draw focused circular network diagram, showing only cell types with actual interactions
         
-        Args:
-            matrix: np.array
-                Interaction matrix (count or weight)
-            title: str
-                Plot title
-            edge_width_max: float
-                Maximum edge width
-            vertex_size_max: float
-                Maximum vertex size
-            show_labels: bool
-                Whether to show cell type labels
-            cmap: str
-                Colormap for edges (used when use_sender_colors=False)
-            figsize: tuple
-                Figure size
-            min_interaction_threshold: float
-                Minimum interaction strength to include cell type
-            use_sender_colors: bool
-                Whether to use different colors for different sender cell types
-            use_curved_arrows: bool
-                Whether to use curved arrows like CellChat (default: True)
-            curve_strength: float
-                Strength of the curve (0 = straight, higher = more curved)
+        Parameters
+        ----------
+        matrix:np.ndarray
+            Interaction matrix (count or weighted strength).
+        title:str
+            Plot title.
+        edge_width_max:float
+            Maximum edge width.
+        vertex_size_max:float
+            Maximum node size.
+        show_labels:bool
+            Whether to display cell-type labels.
+        cmap:str
+            Colormap used when sender colors are disabled.
+        figsize:tuple
+            Figure size.
+        min_interaction_threshold:float
+            Minimum interaction strength for including a cell type.
+        use_sender_colors:bool
+            Whether edge colors follow sender cell type.
+        use_curved_arrows:bool
+            Whether to render curved directional arrows.
+        curve_strength:float
+            Curvature strength for arrows.
             
-        Returns:
-            fig: matplotlib.figure.Figure
-            ax: matplotlib.axes.Axes
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure,matplotlib.axes.Axes]
+            Figure and axes of focused circular network.
         """
         # Find cell types with actual interactions
         interaction_mask = (matrix.sum(axis=0) + matrix.sum(axis=1)) > min_interaction_threshold
@@ -1241,30 +1284,39 @@ class CellChatViz(CellChatVizPlus):
                                    edge_width_max=10, show_labels=True, cmap='Blues', 
                                    figsize=(20, 15), ncols=4, use_sender_colors=True):
         """
-        Draw individual circular network diagrams for each cell type, showing its outgoing signals
-        Mimics CellChat functionality, using sender cell type colors as edge gradients
+        Plot one outgoing communication circle per cell type.
+
+        Each subplot keeps only edges emitted by one sender cell type and shares
+        a global edge-width scale, making sender-specific communication patterns
+        directly comparable across panels.
         
-        Args:
-            pvalue_threshold: float
-                P-value threshold for significant interactions
-            vertex_size_max: float
-                Maximum vertex size
-            edge_width_max: float
-                Maximum edge width (consistent across all plots for comparison)
-            show_labels: bool
-                Whether to show cell type labels
-            cmap: str
-                Colormap for edges (used when use_sender_colors=False)
-            figsize: tuple
-                Figure size
-            ncols: int
-                Number of columns in subplot layout
-            use_sender_colors: bool
-                Whether to use sender cell type colors for edges (default: True)
+        Parameters
+        ----------
+        pvalue_threshold : float
+            Significance cutoff applied to ligand-receptor p-values when
+            constructing communication strengths.
+        vertex_size_max : float
+            Upper scaling factor for node sizes (nodes reflect total incoming +
+            outgoing activity).
+        edge_width_max : float
+            Upper scaling factor for edge widths, shared across all subplots.
+        show_labels : bool
+            If ``True``, draw cell-type labels around the circle in each panel.
+        cmap : str
+            Matplotlib colormap used for edge coloring when
+            ``use_sender_colors=False``.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+        ncols : int
+            Number of columns in the subplot grid.
+        use_sender_colors : bool
+            If ``True``, color each edge by sender cell type (CellChat-like
+            style); otherwise use the numeric colormap from ``cmap``.
         
-        Returns:
-            fig: matplotlib.figure.Figure
-                Figure containing all subplots
+        Returns
+        -------
+        matplotlib.figure.Figure
+            Figure containing one outgoing-network subplot per cell type.
         """
         # Compute weight matrix
         _, weight_matrix = self.compute_aggregated_network(pvalue_threshold)
@@ -1405,30 +1457,39 @@ class CellChatViz(CellChatVizPlus):
                                            edge_width_max=10, show_labels=True, cmap='Reds', 
                                            figsize=(20, 15), ncols=4, use_sender_colors=True):
         """
-        Draw individual circular network diagrams for each cell type, showing its incoming signals
-        Uses sender cell type colors as edge gradients
+        Plot one incoming communication circle per cell type.
+
+        Each subplot keeps only edges received by one target cell type. This is
+        useful for identifying which senders dominate the incoming signal of each
+        receiver population.
         
-        Args:
-            pvalue_threshold: float
-                P-value threshold for significant interactions
-            vertex_size_max: float
-                Maximum vertex size
-            edge_width_max: float
-                Maximum edge width
-            show_labels: bool
-                Whether to show cell type labels
-            cmap: str
-                Colormap for edges (used when use_sender_colors=False)
-            figsize: tuple
-                Figure size
-            ncols: int
-                Number of columns in subplot layout
-            use_sender_colors: bool
-                Whether to use sender cell type colors for edges (default: True)
+        Parameters
+        ----------
+        pvalue_threshold : float
+            Significance cutoff applied to ligand-receptor p-values when
+            constructing communication strengths.
+        vertex_size_max : float
+            Upper scaling factor for node sizes (nodes reflect total incoming +
+            outgoing activity).
+        edge_width_max : float
+            Upper scaling factor for edge widths, shared across all subplots.
+        show_labels : bool
+            If ``True``, draw cell-type labels around the circle in each panel.
+        cmap : str
+            Matplotlib colormap used for edge coloring when
+            ``use_sender_colors=False``.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+        ncols : int
+            Number of columns in the subplot grid.
+        use_sender_colors : bool
+            If ``True``, color edges by sender identity so incoming signal origin
+            is visually explicit.
         
-        Returns:
-            fig: matplotlib.figure.Figure
-                Figure containing all subplots
+        Returns
+        -------
+        matplotlib.figure.Figure
+            Figure containing one incoming-network subplot per cell type.
         """
         # Compute weight matrix
         _, weight_matrix = self.compute_aggregated_network(pvalue_threshold)
@@ -1578,17 +1639,27 @@ class CellChatViz(CellChatVizPlus):
     def netVisual_heatmap(self, matrix, title="Communication Heatmap", 
                          cmap='Reds', figsize=(10, 8), show_values=True):
         """
-        Heatmap visualization of cell-cell communication
+        Visualize a communication matrix as a sender-receiver heatmap.
         
-        Args:
-            matrix: np.array
-                Interaction matrix
-            title: str
-                Plot title
-            cmap: str
-                Colormap
-            show_values: bool
-                Whether to show values in cells
+        Parameters
+        ----------
+        matrix : np.ndarray
+            2D matrix of communication strength with shape
+            ``(n_cell_types, n_cell_types)`` where rows are senders and columns
+            are receivers.
+        title : str
+            Figure title.
+        cmap : str
+            Matplotlib/seaborn colormap used for heat intensity.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+        show_values : bool
+            If ``True``, annotate each heatmap tile with the numeric value.
+
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+            Figure and axes containing the rendered heatmap.
         """
         fig, ax = plt.subplots(figsize=figsize)
         
@@ -1611,30 +1682,38 @@ class CellChatViz(CellChatVizPlus):
                                 add_row_sum=True, add_col_sum=True, 
                                 linewidth=0.5, figsize=(8, 6), title="Communication Heatmap"):
         """
-        Use marsilea package to draw cell-cell communication heatmap (mimicking CellChat's netVisual_heatmap function)
+        Draw a CellChat-style communication heatmap with Marsilea.
+
+        The function can either visualize the full aggregated network or restrict
+        to one/multiple signaling pathway classifications.
         
-        Args:
-            signaling: str, list or None
-                Specific signaling pathway names. If None, show aggregated results of all pathways
-            pvalue_threshold: float
-                P-value threshold for significant interactions
-            color_heatmap: str
-                Heatmap colormap
-            add_dendrogram: bool
-                Whether to add dendrogram
-            add_row_sum: bool
-                Whether to show row sums on the left
-            add_col_sum: bool
-                Whether to show column sums on top  
-            linewidth: float
-                Grid line width
-            figsize: tuple
-                Figure size
-            title: str
-                Heatmap title
+        Parameters
+        ----------
+        signaling : str or list or None
+            Pathway name(s) in ``adata.var['classification']``. If ``None``, use
+            all pathways and plot the global aggregated network.
+        pvalue_threshold : float
+            P-value threshold used to decide significant ligand-receptor pairs.
+        color_heatmap : str
+            Colormap for the communication intensity heatmap.
+        add_dendrogram : bool
+            If ``True``, add hierarchical clustering dendrograms for rows/columns.
+        add_row_sum : bool
+            If ``True``, annotate outgoing total strength per sender cell type.
+        add_col_sum : bool
+            If ``True``, annotate incoming total strength per receiver cell type.
+        linewidth : float
+            Cell border width in the heatmap.
+        figsize : tuple
+            Reserved for API compatibility; Marsilea handles actual canvas size
+            at render time.
+        title : str
+            Base title displayed on the Marsilea heatmap.
             
-        Returns:
-            h: marsilea heatmap object
+        Returns
+        -------
+        marsilea.Heatmap
+            Configured Marsilea heatmap object; call ``render()`` to display.
         """
         if not MARSILEA_AVAILABLE:
             raise ImportError("marsilea package is not available. Please install it: pip install marsilea")
@@ -1734,32 +1813,41 @@ class CellChatViz(CellChatVizPlus):
                                           add_dendrogram=True, add_row_sum=True, add_col_sum=True,
                                           linewidth=0.5, figsize=(8, 6), title="Communication Heatmap"):
         """
-        Use marsilea package to draw focused cell-cell communication heatmap, showing only cell types with actual interactions
+        Draw a focused Marsilea heatmap keeping only active cell types.
+
+        Cell types with total incoming + outgoing strength below
+        ``min_interaction_threshold`` are removed to emphasize meaningful
+        communication structure.
         
-        Args:
-            signaling: str, list or None
-                Specific signaling pathway names
-            pvalue_threshold: float
-                P-value threshold for significant interactions
-            min_interaction_threshold: float
-                Minimum interaction strength threshold for filtering cell types
-            color_heatmap: str
-                Heatmap colormap
-            add_dendrogram: bool
-                Whether to add dendrogram
-            add_row_sum: bool
-                Whether to show row sums on the left
-            add_col_sum: bool
-                Whether to show column sums on top
-            linewidth: float
-                Grid line width
-            figsize: tuple
-                Figure size
-            title: str
-                Heatmap title
+        Parameters
+        ----------
+        signaling : str or list or None
+            Pathway name(s) in ``adata.var['classification']``. If ``None``, use
+            the globally aggregated network.
+        pvalue_threshold : float
+            P-value threshold used to define significant ligand-receptor pairs.
+        min_interaction_threshold : float
+            Minimum total communication strength required to retain a cell type.
+        color_heatmap : str
+            Colormap for the communication intensity heatmap.
+        add_dendrogram : bool
+            If ``True``, add hierarchical clustering dendrograms.
+        add_row_sum : bool
+            If ``True``, show outgoing totals as side annotations.
+        add_col_sum : bool
+            If ``True``, show incoming totals as top annotations.
+        linewidth : float
+            Cell border width in the heatmap.
+        figsize : tuple
+            Reserved for API compatibility; Marsilea handles actual canvas size
+            at render time.
+        title : str
+            Base title for the figure.
             
-        Returns:
-            h: marsilea heatmap object
+        Returns
+        -------
+        marsilea.Heatmap
+            Focused Marsilea heatmap object; call ``render()`` to display.
         """
         if not MARSILEA_AVAILABLE:
             raise ImportError("marsilea package is not available. Please install it: pip install marsilea")
@@ -1865,15 +1953,26 @@ class CellChatViz(CellChatVizPlus):
     def netVisual_chord(self, matrix, title="Chord Diagram", threshold=0, 
                        cmap='tab20', figsize=(12, 12)):
         """
-        Chord diagram visualization
+        Plot a polar chord-like diagram for cell-cell communication.
         
-        Args:
-            matrix: np.array
-                Interaction matrix
-            title: str
-                Plot title
-            threshold: float
-                Minimum value to show connection
+        Parameters
+        ----------
+        matrix : np.ndarray
+            Communication matrix with senders as rows and receivers as columns.
+        title : str
+            Figure title.
+        threshold : float
+            Minimum edge weight to draw a connection.
+        cmap : str
+            Reserved for compatibility; node colors are currently derived from
+            cell-type palette.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+            Figure and polar axes for the chord-style plot.
         """
         from matplotlib.path import Path
         import matplotlib.patches as patches
@@ -1946,15 +2045,29 @@ class CellChatViz(CellChatVizPlus):
     def netVisual_hierarchy(self, pathway_name=None, sources=None, targets=None,
                            pvalue_threshold=0.05, figsize=(14, 10)):
         """
-        Hierarchy plot visualization
+        Visualize directed communication as a two-layer hierarchy plot.
+
+        Source cell types are drawn on the left and target cell types on the
+        right, with arrow width proportional to communication strength.
         
-        Args:
-            pathway_name: str
-                Specific pathway to visualize (from classification)
-            sources: list
-                Source cell types to show
-            targets: list  
-                Target cell types to show
+        Parameters
+        ----------
+        pathway_name : str or None
+            Pathway in ``adata.var['classification']`` to visualize. If ``None``,
+            use all pathways.
+        sources : list or None
+            Optional sender cell types to keep.
+        targets : list or None
+            Optional receiver cell types to keep.
+        pvalue_threshold : float
+            P-value threshold for selecting significant ligand-receptor pairs.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+            Figure and axes containing the hierarchy diagram.
         """
         fig, ax = plt.subplots(figsize=figsize)
         
@@ -2062,15 +2175,29 @@ class CellChatViz(CellChatVizPlus):
     def netVisual_bubble(self, sources=None, targets=None, pathways=None,
                         pvalue_threshold=0.05, figsize=(12, 10)):
         """
-        Bubble plot visualization
+        Plot pathway-level communication as a bubble matrix.
+
+        Y-axis shows sender->receiver pairs, X-axis shows signaling pathways,
+        bubble size encodes mean communication strength, and color encodes
+        significance as ``-log10(p-value)``.
         
-        Args:
-            sources: list
-                Source cell types to include
-            targets: list
-                Target cell types to include  
-            pathways: list
-                Pathways to include
+        Parameters
+        ----------
+        sources : list or None
+            Optional sender cell types to include.
+        targets : list or None
+            Optional receiver cell types to include.
+        pathways : list or None
+            Optional pathway names in ``adata.var['classification']``.
+        pvalue_threshold : float
+            P-value threshold for significant ligand-receptor pairs.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+            Figure and axes containing the communication bubble plot.
         """
         # Prepare data
         data_list = []
@@ -2183,11 +2310,22 @@ class CellChatViz(CellChatVizPlus):
     
     def compute_pathway_network(self, pvalue_threshold=0.05):
         """
-        Compute pathway-level communication networks
+        Compute one sender-receiver matrix per signaling pathway.
+
+        For each pathway in ``adata.var['classification']``, the matrix entry
+        ``[sender, receiver]`` stores the sum of mean values from significant
+        ligand-receptor pairs for that cell pair.
+
+        Parameters
+        ----------
+        pvalue_threshold : float
+            P-value threshold used to define significant interactions.
         
-        Returns:
-            pathway_networks: dict
-                Dictionary with pathway names as keys and communication matrices as values
+        Returns
+        -------
+        Dict[str, np.ndarray]
+            Mapping from pathway name to communication matrix of shape
+            ``(n_cell_types, n_cell_types)``.
         """
         pathways = self.adata.var['classification'].unique()
         pathway_networks = {}
@@ -2221,11 +2359,22 @@ class CellChatViz(CellChatVizPlus):
     
     def identify_signaling_role(self, pattern="all", pvalue_threshold=0.05):
         """
-        Identify cellular signaling roles (sender, receiver, mediator, influencer)
+        Score cell types by their signaling roles in the communication network.
         
-        Args:
-            pattern: str
-                "outgoing" for sender, "incoming" for receiver, "all" for overall
+        Parameters
+        ----------
+        pattern : str
+            Scoring mode. ``'outgoing'`` uses row sums (sender role),
+            ``'incoming'`` uses column sums (receiver role), and ``'all'`` uses
+            total communication strength.
+        pvalue_threshold : float
+            P-value threshold for selecting significant interactions.
+
+        Returns
+        -------
+        Tuple[pd.DataFrame, matplotlib.figure.Figure]
+            DataFrame with absolute/relative role scores and the corresponding
+            barplot figure.
         """
         count_matrix, weight_matrix = self.compute_aggregated_network(pvalue_threshold)
         
@@ -2280,11 +2429,19 @@ class CellChatViz(CellChatVizPlus):
     
     def compute_network_similarity(self, method='functional'):
         """
-        Compute pathway similarity (functional or structural similarity)
+        Compute pairwise similarity between pathway-specific networks.
         
-        Args:
-            method: str
-                'functional' or 'structural'
+        Parameters
+        ----------
+        method : str
+            Similarity definition. ``'functional'`` uses cosine similarity of
+            flattened weighted matrices. ``'structural'`` uses Jaccard similarity
+            of binary edge-presence patterns.
+
+        Returns
+        -------
+        Tuple[np.ndarray, list]
+            Symmetric similarity matrix and corresponding ordered pathway names.
         """
         pathway_networks = self.compute_pathway_network()
         pathways = list(pathway_networks.keys())
@@ -2318,13 +2475,24 @@ class CellChatViz(CellChatVizPlus):
     
     def netEmbedding(self, method='functional', n_components=2, figsize=(10, 8)):
         """
-        Pathway embedding and clustering visualization (UMAP)
+        Embed pathway similarity into low-dimensional space and cluster pathways.
+
+        UMAP is used when available; otherwise PCA is used as a fallback.
         
-        Args:
-            method: str
-                'functional' or 'structural'
-            n_components: int
-                Number of UMAP components
+        Parameters
+        ----------
+        method : str
+            Similarity definition forwarded to
+            :meth:`compute_network_similarity`.
+        n_components : int
+            Number of embedding dimensions.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+
+        Returns
+        -------
+        Tuple[np.ndarray, np.ndarray, matplotlib.figure.Figure]
+            Embedding coordinates, KMeans cluster assignments, and scatter plot.
         """
         try:
             from umap import UMAP
@@ -2390,32 +2558,37 @@ class CellChatViz(CellChatVizPlus):
                                vertex_size_max=50, edge_width_max=10, show_labels=True, 
                                cmap='Blues', figsize=(8, 8), use_sender_colors=True):
         """
-        Draw circular network diagram for a single specified cell type
-        Uses sender cell type colors as edge gradients
+        Plot communication circle for one selected cell type.
+
+        Depending on ``direction``, the plot keeps either outgoing edges from the
+        chosen sender or incoming edges to the chosen receiver.
         
-        Args:
-            cell_type: str
-                Cell type name to draw
-            direction: str
-                'outgoing' shows signals sent by this cell type, 'incoming' shows signals received
-            pvalue_threshold: float
-                P-value threshold for significant interactions
-            vertex_size_max: float
-                Maximum vertex size
-            edge_width_max: float
-                Maximum edge width
-            show_labels: bool
-                Whether to show cell type labels
-            cmap: str
-                Colormap for edges (used when use_sender_colors=False)
-            figsize: tuple
-                Figure size
-            use_sender_colors: bool
-                Whether to use sender cell type colors for edges (default: True)
+        Parameters
+        ----------
+        cell_type : str
+            Cell type name to visualize.
+        direction : str
+            ``'outgoing'`` to view emitted signals, ``'incoming'`` to view
+            received signals.
+        pvalue_threshold : float
+            P-value threshold for significant interactions.
+        vertex_size_max : float
+            Upper scaling factor for node size.
+        edge_width_max : float
+            Upper scaling factor for edge width.
+        show_labels : bool
+            If ``True``, annotate cell-type labels.
+        cmap : str
+            Colormap used when ``use_sender_colors=False``.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+        use_sender_colors : bool
+            If ``True``, edge color follows sender identity.
         
-        Returns:
-            fig: matplotlib.figure.Figure
-            ax: matplotlib.axes.Axes
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+            Figure and axes for the single-cell-type communication view.
         """
         if cell_type not in self.cell_types:
             raise ValueError(f"Cell type '{cell_type}' not found in data. Available cell types: {self.cell_types}")
@@ -2460,43 +2633,50 @@ class CellChatViz(CellChatVizPlus):
                            show_labels=True, cmap='Blues', figsize=(10, 8), focused_view=True,
                            use_sender_colors=True, use_curved_arrows=True, curve_strength=0.3, adjust_text=False):
         """
-        Draw aggregated network diagram for specific signaling pathways (mimicking CellChat's netVisual_aggregate function)
+        Draw an aggregated communication network for selected signaling pathways.
+
+        Ligand-receptor pairs belonging to ``signaling`` are filtered from
+        ``adata.var['classification']`` and summarized into a single cell-cell
+        communication matrix for visualization.
         
-        Args:
-            signaling: str or list
-                Signaling pathway names (from adata.var['classification'])
-            layout: str
-                Layout type: 'circle' or 'hierarchy'
-            vertex_receiver: list or None
-                Receiver cell type names list (for hierarchy layout)
-            vertex_sender: list or None
-                Sender cell type names list (for hierarchy layout)
-            pvalue_threshold: float
-                P-value threshold for significant interactions
-            vertex_size_max: float
-                Maximum vertex size
-            edge_width_max: float
-                Maximum edge width
-            show_labels: bool
-                Whether to show cell type labels
-            cmap: str
-                Colormap for edges (used when use_sender_colors=False)
-            figsize: tuple
-                Figure size
-            focused_view: bool
-                Whether to use focused view (only show cell types with interactions) for circle layout
-            use_sender_colors: bool
-                Whether to use different colors for different sender cell types
-            use_curved_arrows: bool
-                Whether to use curved arrows like CellChat (default: True)
-            curve_strength: float
-                Strength of the curve (0 = straight, higher = more curved)
-            adjust_text: bool
-                Whether to use adjust_text library to prevent label overlapping (default: False)
-                If True, uses plt.text instead of nx.draw_networkx_labels
-        Returns:
-            fig: matplotlib.figure.Figure
-            ax: matplotlib.axes.Axes
+        Parameters
+        ----------
+        signaling : str or list
+            Pathway name(s) in ``adata.var['classification']``.
+        layout : str
+            Visualization style. Supported values are ``'circle'`` and
+            ``'hierarchy'``.
+        vertex_receiver : list or None
+            Receiver cell types to display in hierarchy layout.
+        vertex_sender : list or None
+            Sender cell types to display in hierarchy layout.
+        pvalue_threshold : float
+            P-value threshold for significant ligand-receptor pairs.
+        vertex_size_max : float
+            Upper scaling factor for node size.
+        edge_width_max : float
+            Upper scaling factor for edge width.
+        show_labels : bool
+            Whether to display node labels.
+        cmap : str
+            Colormap used when ``use_sender_colors=False``.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+        focused_view : bool
+            In circle layout, if ``True`` keep only cell types with non-zero
+            interactions.
+        use_sender_colors : bool
+            If ``True``, edge color follows sender cell identity.
+        use_curved_arrows : bool
+            Whether to use curved directed edges in circle layout.
+        curve_strength : float
+            Curvature intensity for curved arrows.
+        adjust_text : bool
+            If ``True``, run ``adjustText`` to reduce label overlap.
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+            Figure and axes containing the aggregated network view.
         """
         # Ensure signaling is in list format
         if isinstance(signaling, str):
@@ -2656,7 +2836,8 @@ class CellChatViz(CellChatVizPlus):
         """
         Get all significant signaling pathway lists using statistically more reliable methods to combine p-values from multiple L-R pairs
         
-        Args:
+        Parameters
+        ----------
             min_interactions: int
                 Minimum L-R pair count threshold per pathway (default: 1)
             pathway_pvalue_threshold: float
@@ -2668,7 +2849,8 @@ class CellChatViz(CellChatVizPlus):
             min_expression: float
                 Minimum expression threshold (default: 0.1)
         
-        Returns:
+        Returns
+        -------
             pathways: list
                 Significant signaling pathway list
             pathway_stats: dict
@@ -2807,7 +2989,8 @@ class CellChatViz(CellChatVizPlus):
         """
         Generate all major visualization plots
         
-        Args:
+        Parameters
+        ----------
             pvalue_threshold: float
                 P-value threshold
             save_prefix: str
@@ -2900,7 +3083,8 @@ class CellChatViz(CellChatVizPlus):
         """
         Create chord diagram visualization using mpl-chord-diagram (mimicking CellChat's netVisual_chord_cell function)
         
-        Args:
+        Parameters
+        ----------
             signaling: str, list or None
                 Specific signaling pathway names. If None, show aggregated results of all pathways
             group_celltype: dict or None
@@ -2951,7 +3135,8 @@ class CellChatViz(CellChatVizPlus):
             normalize_to_sender: bool
                 Whether to normalize to sender for equal arc widths (True)
             
-        Returns:
+        Returns
+        -------
             fig: matplotlib.figure.Figure
             ax: matplotlib.axes.Axes
         """
@@ -3210,7 +3395,8 @@ class CellChatViz(CellChatVizPlus):
         """
         Create chord diagram visualization for specific ligand-receptor pairs (mimicking CellChat's ligand-receptor level analysis)
         
-        Args:
+        Parameters
+        ----------
             ligand_receptor_pairs: str, list or None
                 Specific ligand-receptor pair names. Supports following formats:
                 - Single string: "LIGAND_RECEPTOR" (e.g.: "TGFB1_TGFBR1")  
@@ -3261,7 +3447,8 @@ class CellChatViz(CellChatVizPlus):
             normalize_to_sender: bool
                 Whether to hide names of cell types without received signals (True)
             
-        Returns:
+        Returns
+        -------
             fig: matplotlib.figure.Figure
             ax: matplotlib.axes.Axes
         """
@@ -3451,6 +3638,3 @@ class CellChatViz(CellChatVizPlus):
         
         return fig, ax
     
-
-
-
