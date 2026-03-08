@@ -1,0 +1,10 @@
+# MCP scientific-runtime profile dependencies
+# These constrain versions to reduce install drift from upstream releases.
+# Update version ranges when compatibility is confirmed with newer releases.
+
+scvelo>=0.3.0,<0.4
+squidpy>=1.3.0,<1.7
+
+# Known transitive constraints:
+# scvelo requires anndata, scanpy (provided by core package deps)
+# squidpy requires anndata, scanpy, scikit-image (provided by core package deps)

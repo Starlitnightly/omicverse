@@ -1,0 +1,143 @@
+name: MCP Tests
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "omicverse/mcp/**"
+      - "tests/mcp/**"
+      - "scripts/ci/mcp-*.sh"
+      - "scripts/ci/mcp-report-versions.py"
+      - "requirements/mcp-*.txt"
+  pull_request:
+    branches: [master]
+    paths:
+      - "omicverse/mcp/**"
+      - "tests/mcp/**"
+      - "scripts/ci/mcp-*.sh"
+      - "scripts/ci/mcp-report-versions.py"
+      - "requirements/mcp-*.txt"
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Profile to run"
+        default: "fast-mock"
+        type: choice
+        options:
+          - fast-mock
+          - core-runtime
+          - scientific-runtime
+          - extended-runtime
+          - all
+  schedule:
+    - cron: "0 6 * * 1"  # Weekly Monday 6 AM UTC
+
+jobs:
+  fast-mock:
+    name: "MCP fast-mock"
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.profile == 'fast-mock' ||
+      github.event.inputs.profile == 'all'
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: bash scripts/ci/mcp-fast-mock.sh --install
+      - name: Upload version snapshot
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mcp-versions-fast-mock-py${{ matrix.python-version }}
+          path: .ci-artifacts/mcp-fast-mock-versions.json
+          if-no-files-found: warn
+          retention-days: 90
+
+  core-runtime:
+    name: "MCP core-runtime"
+    # Primary candidate for first "verified" profile.
+    # See docs/mcp_verified_process.md for promotion checklist.
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'push' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' &&
+       (github.event.inputs.profile == 'core-runtime' ||
+        github.event.inputs.profile == 'all'))
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: bash scripts/ci/mcp-core-runtime.sh --install
+      - name: Upload version snapshot
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mcp-versions-core-runtime-py${{ matrix.python-version }}
+          path: .ci-artifacts/mcp-core-runtime-versions.json
+          if-no-files-found: warn
+          retention-days: 90
+
+  scientific-runtime:
+    name: "MCP scientific-runtime"
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' &&
+       (github.event.inputs.profile == 'scientific-runtime' ||
+        github.event.inputs.profile == 'all'))
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: bash scripts/ci/mcp-scientific-runtime.sh --install
+      - name: Upload version snapshot
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mcp-versions-scientific-runtime-py${{ matrix.python-version }}
+          path: .ci-artifacts/mcp-scientific-runtime-versions.json
+          if-no-files-found: warn
+          retention-days: 90
+
+  extended-runtime:
+    name: "MCP extended-runtime"
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.profile == 'extended-runtime' ||
+       github.event.inputs.profile == 'all')
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: bash scripts/ci/mcp-extended-runtime.sh --install
+      - name: Upload version snapshot
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mcp-versions-extended-runtime-py${{ matrix.python-version }}
+          path: .ci-artifacts/mcp-extended-runtime-versions.json
+          if-no-files-found: warn
+          retention-days: 90
