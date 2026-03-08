@@ -6,7 +6,6 @@ particularly from SpaceRanger output (both bin-level and cell segmentation data)
 """
 
 import pandas as pd
-from shapely import wkt, geometry
 import numpy as np
 import json
 from pathlib import Path
@@ -17,6 +16,33 @@ from anndata import AnnData
 from PIL import Image
 from ..._registry import register_function
 from ..single import read_10x_h5, read_10x_mtx
+
+try:
+    from ..._settings import Colors
+except Exception:
+    class Colors:
+        """Fallback ANSI color codes when omicverse._settings import is unavailable."""
+        HEADER = '\033[95m'
+        BLUE = '\033[94m'
+        CYAN = '\033[96m'
+        GREEN = '\033[92m'
+        WARNING = '\033[93m'
+        FAIL = '\033[91m'
+        ENDC = '\033[0m'
+        BOLD = '\033[1m'
+        UNDERLINE = '\033[4m'
+
+def _require_geopandas():
+    try:
+        import geopandas as gpd
+        from shapely import wkt
+    except ImportError as exc:
+        raise ImportError(
+            "`read_visium_hd_seg` requires `geopandas` and `shapely`. "
+            "Install with: pip install geopandas shapely"
+        ) from exc
+    return gpd, wkt
+
 
 def _infer_sample_name(path: Path) -> str:
     if path.name == "segmented_outputs" and path.parent.name == "outs":
@@ -109,6 +135,15 @@ def _init_spatial_slot(
     adata.uns["spatial"][sample]["scalefactors"] = scalefactors
 
 
+def _progress(message: str, level: str = "info") -> None:
+    color = Colors.CYAN
+    if level == "success":
+        color = Colors.GREEN
+    elif level == "warn":
+        color = Colors.WARNING
+    print(f"{color}[VisiumHD] {message}{Colors.ENDC}")
+
+
 @register_function(
     aliases=["read_visium_hd_bin", "visium hd bin", "读取visium hd bin", "10x spatial bin", "space ranger bin"],
     category="io",
@@ -166,14 +201,18 @@ def read_visium_hd_bin(
     root = Path(path).resolve()
     if sample is None:
         sample = _infer_sample_name(root)
+    _progress(f"Reading bin-level data from: {root}")
+    _progress(f"Sample key: {sample}")
 
     h5_path = root / count_h5_path
     mtx_path = root / count_mtx_dir
+    _progress(f"Loading count matrix (h5='{count_h5_path}', mtx='{count_mtx_dir}')")
     if h5_path.exists():
         try:
             adata = read_10x_h5(h5_path)
         except Exception as exc:
             warnings.warn(f"Failed to read H5 matrix ({h5_path}): {exc}. Falling back to MTX directory.")
+            _progress("H5 read failed, falling back to MTX directory", level="warn")
             if not mtx_path.exists():
                 raise FileNotFoundError(f"Neither count_h5_path nor count_mtx_dir exists under {root}")
             adata = read_10x_mtx(mtx_path)
@@ -189,6 +228,7 @@ def read_visium_hd_bin(
             tissue_path = csv_fallback
     if not tissue_path.exists():
         raise FileNotFoundError(f"Tissue positions file not found: {tissue_path}")
+    _progress(f"Loading tissue positions: {tissue_path}")
 
     try:
         tissue_df = _read_table_with_auto_sep(tissue_path)
@@ -220,10 +260,12 @@ def read_visium_hd_bin(
         )
     adata.obsm["spatial"] = adata.obs[coord_cols].values
 
+    _progress("Loading images and scale factors")
     hires_img, lowres_img = _read_spatial_images(root, hires_image_path, lowres_image_path)
     scalefactors = _read_scalefactors(root, scalefactors_path)
     _init_spatial_slot(adata, sample, hires_img, lowres_img, scalefactors)
     adata.uns["spatial"][sample]["binsize"] = binsize
+    _progress(f"Done (n_obs={adata.n_obs}, n_vars={adata.n_vars})", level="success")
     return adata
 
 
@@ -278,13 +320,9 @@ def read_visium_hd_seg(
     root = Path(path).resolve()
     if sample is None:
         sample = _infer_sample_name(root)
-    try:
-        import geopandas as gpd
-    except ImportError as exc:
-        raise ImportError(
-            "`read_visium_hd_seg` requires `geopandas`. "
-            "Please install it with: pip install geopandas"
-        ) from exc
+    _progress(f"Reading cell-segmentation data from: {root}")
+    _progress(f"Sample key: {sample}")
+    gpd, wkt = _require_geopandas()
 
     seg_path = root / cell_segmentations_path
     if not seg_path.exists():
@@ -310,6 +348,7 @@ def read_visium_hd_seg(
             )
         seg_path = fallback
 
+    _progress(f"Loading segmentation geometry: {seg_path}")
     gdf_seg = gpd.read_file(seg_path)
     df = pd.DataFrame(gdf_seg)
     if "cell_id" in df.columns:
@@ -320,6 +359,7 @@ def read_visium_hd_seg(
     matrix_path = root / count_h5_path
     if not matrix_path.exists():
         raise FileNotFoundError(f"Cell matrix file not found: {matrix_path}")
+    _progress(f"Loading count matrix: {matrix_path}")
     adata = read_10x_h5(matrix_path)
 
     adata = adata[adata.obs_names.isin(df["cellid"]), :]
@@ -338,6 +378,7 @@ def read_visium_hd_seg(
     adata.obsm["spatial"] = np.array(df[["x", "y"]])
 
 
+    _progress("Loading images and scale factors")
     hires_img, lowres_img = _read_spatial_images(root, hires_image_path, lowres_image_path)
     scalefactors = _read_scalefactors(root, scalefactors_path)
 
@@ -350,6 +391,7 @@ def read_visium_hd_seg(
     _init_spatial_slot(adata, sample, hires_img, lowres_img, scalefactors)
     adata.uns["spatial"][sample]["geometries"] = gpd.GeoDataFrame(df[["geometry"]], geometry="geometry")
     adata.obs["geometry"] = df["geometry"].apply(lambda g: wkt.dumps(g) if g is not None else None)
+    _progress(f"Done (n_obs={adata.n_obs}, n_vars={adata.n_vars})", level="success")
     return adata
 
 
@@ -433,6 +475,7 @@ def read_visium_hd(
     >>> adata_bin = read_visium_hd("outs", data_type="bin", binsize=16)
     >>> adata_cell = read_visium_hd("outs/segmented_outputs", data_type="cellseg")
     """
+    _progress(f"read_visium_hd entry (data_type='{data_type}')")
     if data_type == "bin":
         return read_visium_hd_bin(
             path=path,
