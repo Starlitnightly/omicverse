@@ -207,7 +207,6 @@ def __getattr__(name):
             except Exception:
                 _lazy_modules[name] = None
                 return None
-
         # utils needs special handling: cannot use `from . import utils` here
         # because _handle_fromlist would call __getattr__('utils') again → recursion.
         elif name == 'utils':

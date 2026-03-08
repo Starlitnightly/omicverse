@@ -43,8 +43,8 @@ def lazy_checkpoint(
     This function saves intermediate results at each step to avoid memory crashes
     on large datasets. Each step is saved as an .h5ad file and can be resumed
     if the process crashes.
-
-    Arguments:
+    Parameters
+    ----------
         adata: the data to analysis
         species: 'human' or 'mouse' for cell cycle scoring
         reforce_steps: we can reforce run lazy step, because some step have been run and will be skipped.
@@ -57,8 +57,8 @@ def lazy_checkpoint(
         pca_kwargs: arguments for pca step
         harmony_kwargs: arguments for harmony step
         scvi_kwargs: arguments for scVI step
-
-    Returns:
+    Returns
+    -------
         adata: processed AnnData object
     """
 
@@ -597,14 +597,14 @@ def lazy_checkpoint(
 def resume_from_checkpoint(checkpoint_dir, step_name):
     """
     Resume processing from a specific checkpoint.
-
-    Arguments:
+    Parameters
+    ----------
         checkpoint_dir: directory containing checkpoints
         step_name: name of the step to resume from
                   ('qc', 'preprocess', 'scaled', 'pca', 'cell_cycle',
                    'harmony', 'scvi', 'eval_bench', 'clustering', 'final_embeddings')
-
-    Returns:
+    Returns
+    -------
         adata: AnnData object from the checkpoint
     """
     step_map = {
@@ -646,11 +646,11 @@ def resume_from_checkpoint(checkpoint_dir, step_name):
 def list_checkpoints(checkpoint_dir):
     """
     List available checkpoints in the directory.
-
-    Arguments:
+    Parameters
+    ----------
         checkpoint_dir: directory containing checkpoints
-
-    Returns:
+    Returns
+    -------
         list: available checkpoint files
     """
     if not os.path.exists(checkpoint_dir):
@@ -676,8 +676,8 @@ def list_checkpoints(checkpoint_dir):
 def cleanup_checkpoints(checkpoint_dir, keep_final=True):
     """
     Clean up intermediate checkpoint files to save disk space.
-
-    Arguments:
+    Parameters
+    ----------
         checkpoint_dir: directory containing checkpoints
         keep_final: whether to keep the final result file
     """

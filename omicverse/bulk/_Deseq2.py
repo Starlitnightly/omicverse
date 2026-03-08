@@ -218,6 +218,13 @@ def data_drop_duplicates_index(data:pd.DataFrame)->pd.DataFrame:
     related=["bulk.deseq2_normalize", "single.rank_genes_groups", "utils.volcano_plot"]
 )
 class pyDEG(object):
+    """Differential-expression analysis helper for bulk RNA-seq count tables.
+
+    Parameters
+    ----------
+    raw_data : pd.DataFrame
+        Raw count matrix with genes in rows and samples in columns.
+    """
 
 
     def __init__(self,raw_data:pd.DataFrame) -> None:

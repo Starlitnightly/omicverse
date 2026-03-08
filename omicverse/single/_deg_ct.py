@@ -45,6 +45,23 @@ from .._registry import register_function
     related=["single.DEG", "external.pertpy", "pp.neighbors"]
 )
 class DCT:
+    """Differential cell-type abundance testing wrapper.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Input single-cell AnnData.
+    condition : str
+        Condition column in ``adata.obs``.
+    ctrl_group : str
+        Control-group label.
+    test_group : str
+        Test-group label.
+    cell_type_key : str
+        Cell-type annotation column.
+    method : str, default='sccoda'
+        Differential-abundance backend.
+    """
     def __init__(self, 
                  adata: AnnData, 
                  condition: str,
@@ -56,21 +73,30 @@ class DCT:
                  use_rep=None,
     ):
         """
-        Init the differential cell type abundance analysis
+        Initialize differential cell-type abundance analysis.
 
-        Arguments:
-            adata: AnnData object containing the single-cell data
-            condition: The column name in adata.obs containing condition information
-            ctrl_group: The control group name in the condition column
-            test_group: The test group name in the condition column
-            cell_type_key: The column name in adata.obs containing cell type information
-            method: Method for differential abundance analysis, either 'sccoda' or 'milo'.
-                    The 'milo' method uses OmicVerse's pure Python implementation with edgepy solver.
-            sample_key: The column name in adata.obs containing sample information (required for 'milo')
-            use_rep: The representation in adata.obsm to use for Milo analysis (required for 'milo', e.g., 'X_pca')
+        Parameters
+        ----------
+        adata : AnnData
+            Single-cell AnnData object.
+        condition : str
+            Obs column containing condition labels.
+        ctrl_group : str
+            Control condition label.
+        test_group : str
+            Test condition label.
+        cell_type_key : str
+            Obs column containing cell-type annotations.
+        method : str, default='sccoda'
+            Differential abundance method: ``'sccoda'``, ``'milo'``, or ``'milopy'``.
+        sample_key : str or None, default=None
+            Obs column containing sample IDs (required for Milo methods).
+        use_rep : str or None, default=None
+            Embedding key in ``adata.obsm`` used for neighborhood graph in Milo.
 
-        Returns:
-            None
+        Returns
+        -------
+        None
         """
         # filter adata for condition and test group
         self.adata = adata
@@ -134,13 +160,16 @@ class DCT:
 
     def run(self,**kwargs):
         """
-        Run the differential cell type abundance analysis
+        Run differential abundance testing.
 
-        Arguments:
-            **kwargs: Additional arguments to pass to the differential abundance method
+        Parameters
+        ----------
+        **kwargs
+            Additional method-specific keyword arguments.
 
-        Returns:
-            None
+        Returns
+        -------
+        None
         """
         if self.method == 'sccoda':
             self.model.run_nuts(self.sccoda_data, modality_key="coda", **kwargs)
@@ -173,13 +202,18 @@ class DCT:
 
     def get_results(self,mix_threshold: float=0.6):
         """
-        Get the results of the differential cell type abundance analysis
+        Retrieve differential abundance results.
 
-        Arguments:
-            mix_threshold: The threshold for determining mixed neighborhoods in Milo analysis
+        Parameters
+        ----------
+        mix_threshold : float, default=0.6
+            Minimum neighborhood purity for Milo annotations; lower-purity
+            neighborhoods are labeled ``'Mixed'``.
 
-        Returns:
-            DataFrame: Results of the differential abundance analysis
+        Returns
+        -------
+        pandas.DataFrame
+            Differential abundance result table.
         """
         if self.method == 'sccoda':
             return self.model.get_effect_df(self.sccoda_data, modality_key="coda")
@@ -233,6 +267,23 @@ class DCT:
     related=["single.DCT", "bulk.pyDEG", "tl.rank_genes_groups"]
 )
 class DEG:
+    """Differential gene-expression testing wrapper for single-cell datasets.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Input single-cell AnnData.
+    condition : str
+        Condition column in ``adata.obs``.
+    ctrl_group : str
+        Control-group label.
+    test_group : str
+        Test-group label.
+    method : str, default='wilcoxon'
+        DEG method name.
+    use_raw : bool or None, default=None
+        Whether to use ``adata.raw`` as expression matrix.
+    """
     def __init__(self,
                  adata: AnnData,
                  condition: str,
@@ -242,18 +293,27 @@ class DEG:
                  use_raw: bool=None,
                  ):
         """
-        Init the differential expression gene analysis
+        Initialize differential expression analysis.
 
-        Arguments:
-            adata: AnnData object containing the single-cell data
-            condition: The column name in adata.obs containing condition information
-            ctrl_group: The control group name in the condition column
-            test_group: The test group name in the condition column
-            method: Method for differential expression analysis, either 'wilcoxon', 't-test', or 'memento-de'
-            use_raw: Whether to use adata.raw for DEG analysis. If None, will auto-detect (use raw if it exists)
+        Parameters
+        ----------
+        adata : AnnData
+            Single-cell AnnData object.
+        condition : str
+            Obs column containing condition labels.
+        ctrl_group : str
+            Control condition label.
+        test_group : str
+            Test condition label.
+        method : str, default='wilcoxon'
+            DEG method: ``'wilcoxon'``, ``'t-test'``, or ``'memento-de'``.
+        use_raw : bool or None, default=None
+            Whether to use ``adata.raw`` as expression matrix. If ``None``,
+            auto-detects based on availability.
 
-        Returns:
-            None
+        Returns
+        -------
+        None
         """
         # Auto-detect use_raw
         if use_raw is None:
@@ -301,23 +361,23 @@ class DEG:
             max_cells: int=100000,
             **kwargs):
         """
-        Run the differential expression analysis
+        Run differential expression testing.
 
-        Arguments:
-            celltype_key: The column name in adata.obs containing cell type information
-            celltype_group: List of cell types to analyze, if None, all cell types will be analyzed
-            **kwargs: Additional arguments for the differential expression method
-                capture_rate: float, default=0.07
-                    The capture rate for the DE analysis
-                treatment_col: str, default='stim'
-                    The column name of the treatment variable
-                num_cpus: int, default=12
-                    The number of CPUs to use for the DE analysis
-                num_boot: int, default=5000
-                    The number of bootstraps to use for the DE analysis
+        Parameters
+        ----------
+        celltype_key : str
+            Obs column containing cell-type labels.
+        celltype_group : list or None, default=None
+            Cell types to include. If ``None``, uses all cell types.
+        max_cells : int, default=100000
+            Maximum number of cells used for testing (downsamples if exceeded).
+        **kwargs
+            Additional method-specific arguments, e.g. memento parameters
+            ``capture_rate``, ``num_cpus``, and ``num_boot``.
 
-        Returns:
-            None
+        Returns
+        -------
+        None
         """
         if celltype_group is None:
             celltype_group = self.adata.obs[celltype_key].unique()
@@ -416,13 +476,12 @@ class DEG:
         
     def get_results(self):
         """
-        Get the results of the differential expression analysis
+        Get DEG result table.
 
-        Arguments:
-            None
-
-        Returns:
-            DataFrame: Results of the differential expression analysis
+        Returns
+        -------
+        pandas.DataFrame
+            Differential expression results in OmicVerse DEG format.
         """
         if self.method == 'wilcoxon' or self.method == 't-test':
             md_d = (

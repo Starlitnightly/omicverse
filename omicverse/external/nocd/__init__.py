@@ -30,21 +30,21 @@ Applications:
 Examples:
     >>> import omicverse as ov
     >>> # Load and preprocess data
-    >>> loader = ov.nocd.data.load_data(adata)
+    >>> loader = ov.external.nocd.data.load_data(adata)
     >>> 
     >>> # Initialize neural network model
-    >>> model = ov.nocd.nn.CommunityDetectionNet(
+    >>> model = ov.external.nocd.nn.CommunityDetectionNet(
     ...     input_dim=adata.n_vars,
     ...     hidden_dim=64,
     ...     n_communities=10
     ... )
     >>> 
     >>> # Train the model
-    >>> trainer = ov.nocd.train.Trainer(model, loader)
+    >>> trainer = ov.external.nocd.train.Trainer(model, loader)
     >>> trainer.fit()
     >>> 
     >>> # Evaluate results
-    >>> metrics = ov.nocd.metrics.evaluate_clustering(
+    >>> metrics = ov.external.nocd.metrics.evaluate_clustering(
     ...     predictions, ground_truth
     ... )
 

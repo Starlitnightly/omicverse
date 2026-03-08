@@ -2144,6 +2144,17 @@ Forbiddencity = get_forbidden()
     related=["pl.embedding", "pl.volcano", "pl.boxplot"]
 )
 class ForbiddenCity:
+    """Forbidden City traditional-color palette utility.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+        Initializes internal color lookup tables and grouped palettes.
+    """
 
     green1=Forbidden_Cmap(range(1,19))
     green2=Forbidden_Cmap(range(19,41))

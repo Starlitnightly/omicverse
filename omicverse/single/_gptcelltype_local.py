@@ -24,16 +24,32 @@ from .._registry import register_function
 )
 def gptcelltype_local(input, tissuename=None, speciename='human',
                 model_name='Qwen/Qwen2-7B-Instruct', topgenenumber=10):
-    """
-    Annotation of cell types using a local LLM model.
+    """Annotate cell types with a local instruction-tuned LLM.
 
-    Arguments:
-        input: dict, input dictionary with clusters as keys and gene markers as values. \
-            e.g. {'cluster1': ['gene1', 'gene2'], 'cluster2': ['gene3']}
-        tissuename: str, tissue name.
-        speciename: str, species name. Default: 'human'.
-        model_name: str, the name or path of the local model to be used.
-        topgenenumber: int, the number of top genes to consider for each cluster. Default: 10.
+    Parameters
+    ----------
+    input : dict or pandas.DataFrame
+        Marker definition per cluster. Accepted formats:
+        1) ``dict[cluster_id -> list[str]]`` marker genes, or
+        2) DE table with ``cluster``, ``names``, ``logfoldchanges`` columns.
+    tissuename : str or None, default=None
+        Tissue context included in the prompt.
+    speciename : str, default='human'
+        Species context string included in the prompt.
+    model_name : str, default='Qwen/Qwen2-7B-Instruct'
+        Local Hugging Face model name or path used for generation.
+    topgenenumber : int, default=10
+        Maximum number of marker genes retained per cluster.
+
+    Returns
+    -------
+    dict
+        Mapping from cluster ID to predicted cell type name.
+
+    Examples
+    --------
+    >>> markers = {"0": ["CD3D", "IL7R"], "1": ["NKG7", "GNLY"]}
+    >>> res = gptcelltype_local(markers, tissuename="PBMC", speciename="human")
     """
     import re
     import numpy as np

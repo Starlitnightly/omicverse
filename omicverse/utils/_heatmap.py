@@ -33,8 +33,8 @@ def plot_heatmap(
     **kwargs,
 ):
     r"""Plot time series for genes as heatmap.
-
-    Arguments:
+    Parameters
+    ----------
         adata: Annotated data matrix
         var_names: Names of variables to use for the plot
         sortby: Observation key to extract time data from ('latent_time')
@@ -54,8 +54,8 @@ def plot_heatmap(
         show: Show the plot, do not return axis (None)
         save: If True or str, save the figure (None)
         kwargs: Arguments passed to seaborn's clustermap
-
-    Returns:
+    Returns
+    -------
         Matplotlib clustermap object
 
     """
@@ -148,12 +148,12 @@ def plot_heatmap(
 # TODO: Add docstrings
 def default_color(adata, add_outline=None):
     r"""Get default color for plotting based on available metadata.
-    
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
         add_outline: Outline parameter (None)
-        
-    Returns:
+    Returns
+    -------
         Default color key string
     """
     if (
@@ -174,11 +174,11 @@ def default_color(adata, add_outline=None):
 # TODO: Add docstrings
 def make_dense(X):
     r"""Convert sparse matrix to dense array.
-    
-    Arguments:
+    Parameters
+    ----------
         X: Input matrix (sparse or dense)
-        
-    Returns:
+    Returns
+    -------
         Dense numpy array
     """
     if issparse(X):
@@ -190,11 +190,11 @@ def make_dense(X):
 # TODO: Add docstrings
 def default_palette(palette=None):
     r"""Get default color palette for plotting.
-    
-    Arguments:
+    Parameters
+    ----------
         palette: Input palette (None)
-        
-    Returns:
+    Returns
+    -------
         Cycler object with color palette
     """
     from cycler import Cycler, cycler
@@ -208,12 +208,12 @@ def default_palette(palette=None):
 # TODO: Add docstrings
 def adjust_palette(palette, length):
     r"""Adjust palette to match required length.
-    
-    Arguments:
+    Parameters
+    ----------
         palette: Input color palette
         length: Required number of colors
-        
-    Returns:
+    Returns
+    -------
         Adjusted color palette
     """
     from cycler import Cycler, cycler
@@ -241,12 +241,12 @@ def adjust_palette(palette, length):
 # TODO: Add docstrings
 def get_colors(adata, c):
     r"""Get colors for categorical or continuous variables.
-    
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
         c: Color specification
-        
-    Returns:
+    Returns
+    -------
         Array of colors
     """
     if is_color_like(c):
@@ -273,15 +273,15 @@ def get_colors(adata, c):
 # TODO: Add docstrings
 def interpret_colorkey(adata, c=None, layer=None, perc=None, use_raw=None):
     r"""Interpret color key specification for plotting.
-    
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
         c: Color key specification (None)
         layer: Layer to use for gene expression (None)
         perc: Percentile clipping values (None)
         use_raw: Whether to use raw data (None)
-        
-    Returns:
+    Returns
+    -------
         Interpreted color values
     """
     if c is None:
@@ -356,12 +356,12 @@ def interpret_colorkey(adata, c=None, layer=None, perc=None, use_raw=None):
 # TODO: Add docstrings
 def clip(c, perc):
     r"""Clip values to specified percentile range.
-    
-    Arguments:
+    Parameters
+    ----------
         c: Values to clip
         perc: Percentile range for clipping
-        
-    Returns:
+    Returns
+    -------
         Clipped values
     """
     if np.size(perc) < 2:
@@ -372,11 +372,11 @@ def clip(c, perc):
 # TODO: Finish docstrings
 def strings_to_categoricals(adata):
     r"""Transform string annotations to categoricals.
-    
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
-        
-    Returns:
+    Returns
+    -------
         None (modifies adata in place)
     """
     from pandas import Categorical
@@ -406,11 +406,11 @@ def strings_to_categoricals(adata):
 # TODO: Add docstrings
 def is_list(key):
     r"""Check if key is a list-like object.
-    
-    Arguments:
+    Parameters
+    ----------
         key: Object to check
-        
-    Returns:
+    Returns
+    -------
         Boolean indicating if key is list-like
     """
     return isinstance(key, (list, tuple, np.record))
@@ -418,12 +418,12 @@ def is_list(key):
 # TODO: Add docstrings
 def is_list_of_str(key, max_len=None):
     r"""Check if key is a list of strings.
-    
-    Arguments:
+    Parameters
+    ----------
         key: Object to check
         max_len: Maximum length allowed (None)
-        
-    Returns:
+    Returns
+    -------
         Boolean indicating if key is list of strings
     """
     if max_len is not None:
@@ -438,11 +438,11 @@ def is_list_of_str(key, max_len=None):
 # TODO: Add docstrings
 def is_list_or_array(key):
     r"""Check if key is a list or array-like object.
-    
-    Arguments:
+    Parameters
+    ----------
         key: Object to check
-        
-    Returns:
+    Returns
+    -------
         Boolean indicating if key is list or array-like
     """
     return isinstance(key, (list, tuple, np.record, np.ndarray))
@@ -451,12 +451,12 @@ def is_list_or_array(key):
 # TODO: Add docstrings
 def to_list(key, max_len=20):
     r"""Convert key to list format.
-    
-    Arguments:
+    Parameters
+    ----------
         key: Object to convert
         max_len: Maximum length allowed (20)
-        
-    Returns:
+    Returns
+    -------
         List representation of key
     """
     from pandas import Index
@@ -467,11 +467,11 @@ def to_list(key, max_len=20):
 # TODO: Add docstrings
 def is_view(adata):
     r"""Check if AnnData object is a view.
-    
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
-        
-    Returns:
+    Returns
+    -------
         Boolean indicating if adata is a view
     """
     return (
@@ -487,12 +487,12 @@ def is_view(adata):
 # TODO: Add docstrings
 def is_categorical(data, c=None):
     r"""Check if data or column is categorical.
-    
-    Arguments:
+    Parameters
+    ----------
         data: Data object to check
         c: Column name to check (None)
-        
-    Returns:
+    Returns
+    -------
         Boolean indicating if data/column is categorical
     """
     from pandas.api.types import is_categorical_dtype as cat
@@ -522,15 +522,15 @@ additional_colors = {
 # adapted from scanpy
 def set_colors_for_categorical_obs(adata, value_to_plot, palette=None):
     r"""Set colors for categorical observation in AnnData object.
-
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
         value_to_plot: Name of valid categorical observation
         palette: Color palette specification (None)
             Can be matplotlib colormap string, sequence of colors,
             or cycler object with 'color' key
-            
-    Returns:
+    Returns
+    -------
         None (modifies adata.uns in place)
     """
     from matplotlib.colors import to_hex
