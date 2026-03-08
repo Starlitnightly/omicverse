@@ -22,9 +22,10 @@ if [[ "$INSTALL" == true ]]; then
     pip install -e "$REPO_ROOT[tests,mcp]"
 fi
 
-python -m pytest tests/mcp/ -m "core" -v --tb=short "${PYTEST_EXTRA_ARGS[@]}"
+PYTEST_EXIT=0
+python -m pytest tests/mcp/ -m "core" -v --tb=short "${PYTEST_EXTRA_ARGS[@]}" || PYTEST_EXIT=$?
 
-# --- Version snapshot (non-blocking) ---
+# --- Version snapshot (always runs, even if tests fail) ---
 echo "--- Generating version snapshot ---"
 mkdir -p "$REPO_ROOT/.ci-artifacts"
 SOURCE_FLAG="local"
@@ -36,3 +37,5 @@ python "$REPO_ROOT/scripts/ci/mcp-report-versions.py" \
     --source "$SOURCE_FLAG" \
     --output "$REPO_ROOT/.ci-artifacts/mcp-core-runtime-versions.json" \
     || true
+
+exit $PYTEST_EXIT
