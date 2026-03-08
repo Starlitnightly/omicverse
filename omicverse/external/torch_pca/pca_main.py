@@ -16,8 +16,10 @@ from .ncompo import NComponentsType, find_ncomponents
 from .svd import choose_svd_solver, randomized_svd, svd_flip
 
 HIGH_DENSITY_AUTO_DENSE_THRESHOLD = 0.2
-MAX_AUTO_DENSE_ELEMENTS = 80_000_000
+MAX_AUTO_DENSE_ELEMENTS = 250_000_000
 AUTO_DENSE_COV_EIGH_MAX_FEATURES = 4096
+AUTO_DENSE_CPU_MAX_BYTES = 2_500_000_000
+AUTO_DENSE_CUDA_FREE_MEM_FRACTION = 0.4
 
 
 class PCA:
@@ -210,6 +212,18 @@ class PCA:
         nnz = int(inputs._nnz())
         density = nnz / total
         if density < HIGH_DENSITY_AUTO_DENSE_THRESHOLD:
+            return inputs
+
+        element_size = torch.empty((), dtype=inputs.dtype).element_size()
+        dense_bytes = total * element_size
+        if inputs.is_cuda:
+            try:
+                free_mem, _ = torch.cuda.mem_get_info(inputs.device)
+            except Exception:
+                return inputs
+            if dense_bytes > int(free_mem * AUTO_DENSE_CUDA_FREE_MEM_FRACTION):
+                return inputs
+        elif dense_bytes > AUTO_DENSE_CPU_MAX_BYTES:
             return inputs
 
         warnings.warn(
