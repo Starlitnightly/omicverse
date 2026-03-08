@@ -17,6 +17,9 @@ class TestBuildToolName:
     def test_utils_read(self):
         assert build_tool_name("omicverse.utils._data.read") == "ov.utils.read"
 
+    def test_io_read_override(self):
+        assert build_tool_name("omicverse.io.single._read.read") == "ov.utils.read"
+
     def test_single_find_markers(self):
         assert build_tool_name("omicverse.single._markers.find_markers") == "ov.single.find_markers"
 

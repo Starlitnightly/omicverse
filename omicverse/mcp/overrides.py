@@ -18,6 +18,7 @@ from typing import Dict, List, Optional
 
 PHASE_WHITELIST: Dict[str, List[str]] = {
     "P0": [
+        "omicverse.io.single._read.read",
         "omicverse.utils._data.read",
         "omicverse.utils._data.store_layers",
         "omicverse.utils._data.retrieve_layers",
@@ -53,6 +54,9 @@ NAME_OVERRIDES: Dict[str, str] = {
     # gpu/cpu init live under core, not utils
     "omicverse._settings.gpu_init": "ov.core.gpu_init",
     "omicverse._settings.cpu_gpu_mixed_init": "ov.core.cpu_gpu_mixed_init",
+    # read() is implemented in io.single but exposed as a core utility tool
+    "omicverse.io.single._read.read": "ov.utils.read",
+    "omicverse.utils._data.read": "ov.utils.read",
 }
 
 # ---------------------------------------------------------------------------
@@ -62,6 +66,21 @@ NAME_OVERRIDES: Dict[str, str] = {
 MANIFEST_OVERRIDES: Dict[str, dict] = {
     # read() creates a new adata_id rather than consuming one
     "omicverse.utils._data.read": {
+        "state_contract": {
+            "needs_session": False,
+            "session_inputs": [],
+            "mutates_state": False,
+            "returns_updated_adata_ref": True,
+        },
+        "return_contract": {
+            "primary_output": "object_ref",
+            "secondary_outputs": ["json"],
+            "emits_artifacts": False,
+            "artifact_types": [],
+        },
+        "risk_level": "low",
+    },
+    "omicverse.io.single._read.read": {
         "state_contract": {
             "needs_session": False,
             "session_inputs": [],
@@ -139,6 +158,18 @@ SCHEMA_OVERRIDES: Dict[str, dict] = {
     },
     # read() — path is required, backend optional
     "omicverse.utils._data.read": {
+        "properties": {
+            "path": {"type": "string", "description": "File path to read (h5ad, csv, tsv, txt)"},
+            "backend": {
+                "type": "string",
+                "enum": ["python", "rust"],
+                "default": "python",
+            },
+        },
+        "required": ["path"],
+        "additionalProperties": True,
+    },
+    "omicverse.io.single._read.read": {
         "properties": {
             "path": {"type": "string", "description": "File path to read (h5ad, csv, tsv, txt)"},
             "backend": {
