@@ -101,7 +101,6 @@ nav:
         - Foundation Model (fm):
             - Overview & API: Tutorials-llm/t_fm_guide.md
             - Tutorial (PBMC3k + scGPT): Tutorials-llm/t_fm.ipynb
-
     - Plotting:
         - Visualization of single cell RNA-seq: Tutorials-plotting/t_visualize_single.ipynb
         - Visualization of bulk RNA-seq: Tutorials-plotting/t_visualize_bulk.ipynb

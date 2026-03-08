@@ -90,7 +90,10 @@ class SubagentController:
                 self._ctx.last_usage = response.usage
 
             if response.raw_message:
-                messages.append(response.raw_message)
+                if isinstance(response.raw_message, list):
+                    messages.extend(response.raw_message)
+                else:
+                    messages.append(response.raw_message)
             elif response.content:
                 messages.append(
                     {"role": "assistant", "content": response.content}

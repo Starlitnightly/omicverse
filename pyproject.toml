@@ -141,14 +141,6 @@ skillseeker = [
   "PyMuPDF>=1.24",
 ]
 
-jarvis = [
-  "python-telegram-bot>=20.0",
-  "requests>=2.0",
-  "pillow>=9.0",
-  "nbformat>=5.0",
-  "lark-oapi>=1.0",
-]
-
 tests = [
   "pytest>=7.0",
   "pytest-asyncio>=0.23",
