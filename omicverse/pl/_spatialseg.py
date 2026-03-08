@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib import patheffects
+from matplotlib import colors as mcolors
 
 
 def _require_geopandas():
@@ -63,8 +64,11 @@ def spatialseg(
     vmax: Optional[float] = None,
     img_key: Optional[str] = None,
     basis: str = "spatial",
+    crop_coord: Optional[Union[tuple, Sequence[tuple]]] = None,
     edges_width: float = 0.5,
     edges_color: str = "black",
+    seg_contourpx: Optional[float] = None,
+    seg_outline: bool = False,
     alpha: float = 0.8,
     alpha_img: float = 0.5,
     show: bool = True,
@@ -96,6 +100,31 @@ def spatialseg(
             if palette is not None:
                 warnings.warn("Both `palette` and legacy `color_dict` were provided. Using `color_dict`.")
             palette = legacy_color_dict
+    # Prevent passing segmentation-specific arguments into geopandas internals.
+    kwargs.pop("seg_contourpx", None)
+    kwargs.pop("seg_outline", None)
+    kwargs.pop("crop_coord", None)
+    outline_only = bool(seg_outline or (seg_contourpx is not None))
+    if seg_contourpx is not None:
+        edges_width = float(seg_contourpx)
+
+    crop_bbox = None
+    if crop_coord is not None:
+        if (
+            isinstance(crop_coord, (list, tuple))
+            and len(crop_coord) == 1
+            and isinstance(crop_coord[0], (list, tuple))
+            and len(crop_coord[0]) == 4
+        ):
+            c0 = crop_coord[0]
+        elif isinstance(crop_coord, (list, tuple)) and len(crop_coord) == 4 and not isinstance(crop_coord[0], (list, tuple)):
+            c0 = crop_coord
+        else:
+            raise ValueError(
+                "`crop_coord` must be `(x_min, y_min, x_max, y_max)` or a one-item list containing that tuple."
+            )
+        x0, y0, x1, y1 = [float(v) for v in c0]
+        crop_bbox = (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
 
     gpd, wkt = _require_geopandas()
 
@@ -221,11 +250,22 @@ def spatialseg(
                 try:
                     geom = wkt.loads(wkt_str)
                     if hasattr(geom, "bounds"):
-                        coords_list.append(geom.bounds)
+                        bounds = geom.bounds
+                        if crop_bbox is not None:
+                            if (
+                                bounds[2] < crop_bbox[0]
+                                or bounds[0] > crop_bbox[2]
+                                or bounds[3] < crop_bbox[1]
+                                or bounds[1] > crop_bbox[3]
+                            ):
+                                continue
+                        coords_list.append(bounds)
                 except Exception:
                     continue
 
-        if coords_list:
+        if crop_bbox is not None:
+            x_min, y_min, x_max, y_max = crop_bbox
+        elif coords_list:
             all_bounds = np.array(coords_list)
             x_min = all_bounds[:, 0].min()
             y_min = all_bounds[:, 1].min()
@@ -252,7 +292,10 @@ def spatialseg(
             current_ax.imshow(img, extent=img_extent, origin="upper", alpha=img_alpha)
 
         if color_key is None:
-            if img_extent is not None:
+            if crop_bbox is not None:
+                current_ax.set_xlim(x_min, x_max)
+                current_ax.set_ylim(y_max, y_min)
+            elif img_extent is not None:
                 current_ax.set_xlim(img_extent[0], img_extent[1])
                 current_ax.set_ylim(img_extent[2], img_extent[3])
             else:
@@ -286,6 +329,14 @@ def spatialseg(
                 bounds = geom.bounds
                 if not all(np.isfinite(bounds)) or bounds[2] <= bounds[0] or bounds[3] <= bounds[1]:
                     continue
+                if crop_bbox is not None:
+                    if (
+                        bounds[2] < crop_bbox[0]
+                        or bounds[0] > crop_bbox[2]
+                        or bounds[3] < crop_bbox[1]
+                        or bounds[1] > crop_bbox[3]
+                    ):
+                        continue
                 geom_list.append(geom)
                 valid_cells.append(cell_id)
             except Exception:
@@ -428,7 +479,11 @@ def spatialseg(
             else:
                 face_colors = np.asarray(color_vector, dtype=object)
 
-            plot_kwargs["color"] = face_colors
+            if outline_only:
+                plot_kwargs["facecolor"] = "none"
+                plot_kwargs["edgecolor"] = face_colors
+            else:
+                plot_kwargs["color"] = face_colors
             plot_kwargs["legend"] = False
             if use_equal_aspect:
                 plot_kwargs["aspect"] = "equal"
@@ -477,54 +532,117 @@ def spatialseg(
                     multi_panel=len(colors_to_plot) > 1,
                 )
         else:
-            plot_kwargs["column"] = plot_column
-            plot_kwargs["cmap"] = cmap
-            plot_kwargs["legend"] = False
-            if vmin is not None:
-                plot_kwargs["vmin"] = vmin
-            if vmax is not None:
-                plot_kwargs["vmax"] = vmax
-            if use_equal_aspect:
-                plot_kwargs["aspect"] = "equal"
-            try:
-                temp_gdf.plot(**plot_kwargs)
-            except ValueError as e:
-                if "aspect must be finite and positive" in str(e):
-                    plot_kwargs["aspect"] = "equal"
-                    temp_gdf.plot(**plot_kwargs)
+            if outline_only:
+                values = pd.to_numeric(temp_gdf[plot_column], errors="coerce").to_numpy()
+                if vmin is None:
+                    vmin_val = float(np.nanmin(values)) if np.isfinite(np.nanmin(values)) else 0.0
                 else:
-                    raise
-            if legend and colorbar_loc is not None and len(current_ax.collections) > 0:
+                    vmin_val = float(vmin)
+                if vmax is None:
+                    vmax_val = float(np.nanmax(values)) if np.isfinite(np.nanmax(values)) else 1.0
+                else:
+                    vmax_val = float(vmax)
+                if not np.isfinite(vmin_val) or not np.isfinite(vmax_val) or vmax_val <= vmin_val:
+                    vmin_val, vmax_val = 0.0, 1.0
+
+                cmap_obj = plt.get_cmap(cmap)
+                norm_obj = mcolors.Normalize(vmin=vmin_val, vmax=vmax_val)
+                edge_colors = []
+                for val in values:
+                    if pd.isna(val):
+                        edge_colors.append(na_color)
+                    else:
+                        edge_colors.append(cmap_obj(norm_obj(float(val))))
+
+                plot_kwargs["facecolor"] = "none"
+                plot_kwargs["edgecolor"] = edge_colors
+                plot_kwargs["legend"] = False
+                if use_equal_aspect:
+                    plot_kwargs["aspect"] = "equal"
                 try:
-                    cb = plt.colorbar(
-                        current_ax.collections[-1],
-                        ax=current_ax,
-                        pad=0.01,
-                        fraction=0.08,
-                        aspect=30,
-                        location=colorbar_loc,
-                    )
-                except TypeError:
-                    cb = plt.colorbar(
-                        current_ax.collections[-1],
-                        ax=current_ax,
-                        pad=0.01,
-                        fraction=0.08,
-                        aspect=30,
-                    )
-                if legend_fontsize is not None:
-                    cb.ax.tick_params(labelsize=legend_fontsize)
+                    temp_gdf.plot(**plot_kwargs)
+                except ValueError as e:
+                    if "aspect must be finite and positive" in str(e):
+                        plot_kwargs["aspect"] = "equal"
+                        temp_gdf.plot(**plot_kwargs)
+                    else:
+                        raise
+
+                if legend and colorbar_loc is not None:
+                    sm = plt.cm.ScalarMappable(norm=norm_obj, cmap=cmap_obj)
+                    sm.set_array([])
+                    try:
+                        cb = plt.colorbar(
+                            sm,
+                            ax=current_ax,
+                            pad=0.01,
+                            fraction=0.08,
+                            aspect=30,
+                            location=colorbar_loc,
+                        )
+                    except TypeError:
+                        cb = plt.colorbar(
+                            sm,
+                            ax=current_ax,
+                            pad=0.01,
+                            fraction=0.08,
+                            aspect=30,
+                        )
+                    if legend_fontsize is not None:
+                        cb.ax.tick_params(labelsize=legend_fontsize)
+            else:
+                plot_kwargs["column"] = plot_column
+                plot_kwargs["cmap"] = cmap
+                plot_kwargs["legend"] = False
+                if vmin is not None:
+                    plot_kwargs["vmin"] = vmin
+                if vmax is not None:
+                    plot_kwargs["vmax"] = vmax
+                if use_equal_aspect:
+                    plot_kwargs["aspect"] = "equal"
+                try:
+                    temp_gdf.plot(**plot_kwargs)
+                except ValueError as e:
+                    if "aspect must be finite and positive" in str(e):
+                        plot_kwargs["aspect"] = "equal"
+                        temp_gdf.plot(**plot_kwargs)
+                    else:
+                        raise
+                if legend and colorbar_loc is not None and len(current_ax.collections) > 0:
+                    try:
+                        cb = plt.colorbar(
+                            current_ax.collections[-1],
+                            ax=current_ax,
+                            pad=0.01,
+                            fraction=0.08,
+                            aspect=30,
+                            location=colorbar_loc,
+                        )
+                    except TypeError:
+                        cb = plt.colorbar(
+                            current_ax.collections[-1],
+                            ax=current_ax,
+                            pad=0.01,
+                            fraction=0.08,
+                            aspect=30,
+                        )
+                    if legend_fontsize is not None:
+                        cb.ax.tick_params(labelsize=legend_fontsize)
 
         current_ax.set_aspect("equal")
         current_ax.invert_yaxis()
 
-        x_range = x_max - x_min
-        y_range = y_max - y_min
-        x_padding = x_range * 0.05 if x_range > 0 else 1
-        y_padding = y_range * 0.05 if y_range > 0 else 1
+        if crop_bbox is not None:
+            current_ax.set_xlim(x_min, x_max)
+            current_ax.set_ylim(y_max, y_min)
+        else:
+            x_range = x_max - x_min
+            y_range = y_max - y_min
+            x_padding = x_range * 0.05 if x_range > 0 else 1
+            y_padding = y_range * 0.05 if y_range > 0 else 1
 
-        current_ax.set_xlim(x_min - x_padding, x_max + x_padding)
-        current_ax.set_ylim(y_max + y_padding, y_min - y_padding)
+            current_ax.set_xlim(x_min - x_padding, x_max + x_padding)
+            current_ax.set_ylim(y_max + y_padding, y_min - y_padding)
 
         if xlabel is not None:
             current_ax.set_xlabel(xlabel)
