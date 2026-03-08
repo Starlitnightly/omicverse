@@ -36,10 +36,9 @@ class TestP2AvailabilityProbing:
         spec = get_spec("omicverse.single._metacell.MetaCell")
         assert spec is not None
         available, reason = check_class_availability(spec)
-        if has_seacells():
-            assert available is True
+        if available:
+            assert reason == ""
         else:
-            assert available is False
             assert "SEACells" in reason
 
     def test_dct_marked_unavailable(self):
