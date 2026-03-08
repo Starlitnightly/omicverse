@@ -18,14 +18,16 @@ echo "=== MCP CI Profile: extended-runtime ==="
 echo "Scope: extended-tier tests (requires SEACells, pertpy, mira)"
 
 if [[ "$INSTALL" == true ]]; then
-    echo "--- Installing dependencies ---"
-    pip install -e "$REPO_ROOT[tests,mcp]"
+    echo "--- Installing extended deps first ---"
     pip install -r "$REPO_ROOT/requirements/mcp-extended-runtime.txt"
+    echo "--- Installing omicverse + test deps ---"
+    pip install -e "$REPO_ROOT[tests,mcp]"
 fi
 
-python -m pytest tests/mcp/ -m "extended" -v --tb=short "${PYTEST_EXTRA_ARGS[@]}"
+PYTEST_EXIT=0
+python -m pytest tests/mcp/ -m "extended" -v --tb=short "${PYTEST_EXTRA_ARGS[@]}" || PYTEST_EXIT=$?
 
-# --- Version snapshot (non-blocking) ---
+# --- Version snapshot (always runs, even if tests fail) ---
 echo "--- Generating version snapshot ---"
 mkdir -p "$REPO_ROOT/.ci-artifacts"
 SOURCE_FLAG="local"
@@ -37,3 +39,5 @@ python "$REPO_ROOT/scripts/ci/mcp-report-versions.py" \
     --source "$SOURCE_FLAG" \
     --output "$REPO_ROOT/.ci-artifacts/mcp-extended-runtime-versions.json" \
     || true
+
+exit $PYTEST_EXIT
