@@ -1,20 +1,18 @@
 """Spatial segmentation plotting utilities for OmicVerse.
 
-This module provides polygon-based plotting for spatial segmentation outputs.
+This module provides polygon-based visualization for spatial transcriptomics
+cell-segmentation results.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import List, Optional, Sequence, Union
 import warnings
-from typing import Any, List, Mapping, Optional, Sequence, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from anndata import AnnData
 from matplotlib.colors import ListedColormap
-from matplotlib.patches import Patch, Rectangle
 
 
 def _require_geopandas():
@@ -29,483 +27,463 @@ def _require_geopandas():
     return gpd, wkt
 
 
-def _get_background_image(spatial_info: Mapping, img_key: Optional[str]):
+def _process_background_image(spatial_info, img_key, data_coords_range=None):
+    """Process background image with scanpy-like scaling behavior."""
     if img_key is None:
-        images = spatial_info.get("images", {})
-        img_key = "hires" if "hires" in images else None
+        img_key = "hires" if "hires" in spatial_info.get("images", {}) else None
 
-    images = spatial_info.get("images", {})
-    if img_key is None or img_key not in images:
+    if not img_key or "images" not in spatial_info or img_key not in spatial_info["images"]:
         return None, None
 
-    img = images[img_key]
+    img = spatial_info["images"][img_key]
+    scalefactors = spatial_info.get("scalefactors", {})
     scale_key = f"tissue_{img_key}_scalef"
-    scale_factor = spatial_info.get("scalefactors", {}).get(scale_key, 1.0)
+    scale_factor = scalefactors.get(scale_key, 1.0)
 
-    height, width = img.shape[:2]
+    img_height, img_width = img.shape[:2]
     if scale_factor < 1.0:
-        extent = [0, width / scale_factor, height / scale_factor, 0]
+        img_extent = [0, img_width / scale_factor, img_height / scale_factor, 0]
     else:
-        extent = [0, width, height, 0]
-    return img, extent
+        img_extent = [0, img_width, img_height, 0]
+
+    return img, img_extent
 
 
-def _resolve_library_id(adata, library_id: Union[str, Sequence[str], None]) -> str:
+def spatialseg(
+    adata,
+    color: Optional[Union[str, List[str]]] = None,
+    groups: Optional[List[str]] = None,
+    groupby: Optional[str] = None,
+    library_id: Optional[str] = None,
+    size: float = 1.0,
+    figsize: Optional[tuple] = None,
+    cmap: str = "viridis",
+    palette: Optional[Union[dict, list, np.ndarray]] = None,
+    vmin: Optional[float] = None,
+    vmax: Optional[float] = None,
+    img_key: Optional[str] = None,
+    basis: str = "spatial",
+    edges_width: float = 0.5,
+    edges_color: str = "black",
+    alpha: float = 0.8,
+    alpha_img: float = 0.5,
+    show: bool = True,
+    ax: Optional[plt.Axes] = None,
+    legend: bool = True,
+    xlabel: Optional[str] = "spatial 1",
+    ylabel: Optional[str] = "spatial 2",
+    show_ticks: bool = False,
+    **kwargs,
+):
+    """Plot spatial transcriptomics data with cell polygons instead of points.
+
+    This implementation follows the TrackCell plotting logic, including robust
+    geometry validation and retry behavior for invalid bounds.
+    """
+    _ = size  # kept for API compatibility with point-based plotting interfaces
+
+    gpd, wkt = _require_geopandas()
+
+    if "geometry" not in adata.obs.columns:
+        raise ValueError(
+            "Cell geometries not found. "
+            "Expected `adata.obs['geometry']` containing WKT polygon strings, "
+            "as produced by `ov.io.spatial.read_visium_hd_seg`."
+        )
+
     if "spatial" not in adata.uns:
         raise ValueError("`adata.uns['spatial']` is required but missing.")
 
-    available = list(adata.uns["spatial"].keys())
-    if isinstance(library_id, Sequence) and not isinstance(library_id, str):
-        if len(library_id) == 0:
-            raise ValueError("`library_id` sequence is empty.")
-        if len(library_id) > 1:
-            warnings.warn(
-                f"`spatialseg` currently supports one panel library at a time. "
-                f"Using the first library_id: '{library_id[0]}'."
-            )
-        library_id = library_id[0]
-
     if library_id is None:
-        if not available:
+        available_library_ids = list(adata.uns["spatial"].keys())
+        if len(available_library_ids) == 0:
             raise ValueError("No library_id found in `adata.uns['spatial']`.")
-        library_id = available[0]
-        if len(available) > 1:
+        library_id = available_library_ids[0]
+        if len(available_library_ids) > 1:
             warnings.warn(
-                f"Multiple library_ids found: {available}. Using '{library_id}'. "
-                "Specify `library_id` explicitly to select a different one."
+                f"Multiple library_ids found: {available_library_ids}. "
+                f"Using '{library_id}'. Specify `library_id` explicitly to use a different one."
             )
 
     if library_id not in adata.uns["spatial"]:
         raise ValueError(
             f"`library_id` '{library_id}' not found in `adata.uns['spatial']`. "
-            f"Available: {available}"
+            f"Available library_ids: {list(adata.uns['spatial'].keys())}"
         )
-    return library_id
 
+    spatial_info = adata.uns["spatial"][library_id]
 
-def _normalize_color_keys(color: Optional[Union[str, List[str]]]) -> List[Optional[str]]:
     if color is None:
-        return [None]
-    if isinstance(color, str):
-        return [color]
-    return list(color)
+        colors_to_plot = [None]
+    elif isinstance(color, str):
+        colors_to_plot = [color]
+    else:
+        colors_to_plot = color
 
-
-def _validate_color_keys(adata, color_keys: Sequence[Optional[str]]) -> None:
-    for key in color_keys:
-        if key is None:
+    for color_key in colors_to_plot:
+        if color_key is None:
             continue
-        if key in adata.obs.columns or key in adata.var_names:
+        if color_key in adata.obs.columns or color_key in adata.var_names:
             continue
-        if hasattr(adata, "layers") and key in adata.layers:
+        if hasattr(adata, "layers") and color_key in adata.layers:
             raise ValueError(
-                f"`color` key '{key}' is in `adata.layers`, which is not supported yet."
+                f"`color` key '{color_key}' found in `adata.layers`, but layers are not supported here."
             )
         raise ValueError(
-            f"`color` key '{key}' not found in `adata.obs.columns` or `adata.var_names`."
+            f"`color` key '{color_key}' not found in `adata.obs.columns` or `adata.var_names`."
         )
 
+    if ax is None:
+        if figsize is None:
+            figsize = (5 * len(colors_to_plot), 5) if len(colors_to_plot) > 1 else (10, 10)
 
-def _prepare_axes(
-    color_keys: List[Optional[str]],
-    ax: Optional[plt.Axes],
-    figsize: Optional[tuple],
-):
-    if ax is not None:
-        if len(color_keys) > 1:
-            warnings.warn(
-                "Multiple colors were provided with a single `ax`. "
-                "Only the first color will be plotted."
-            )
-            color_keys = [color_keys[0]]
-        return ax.figure, [ax], color_keys
-
-    if figsize is None:
-        figsize = (5 * len(color_keys), 5) if len(color_keys) > 1 else (10, 10)
-
-    fig, axes = plt.subplots(1, len(color_keys), figsize=figsize, sharex=True, sharey=True)
-    if len(color_keys) == 1:
-        axes = [axes]
-    return fig, list(axes), color_keys
-
-
-def _resolve_filter_column(adata, color_key: Optional[str], groupby: Optional[str]) -> str:
-    if groupby is not None:
-        if groupby not in adata.obs.columns:
-            raise ValueError(f"`groupby` column '{groupby}' not found in `adata.obs.columns`.")
-        return groupby
-    if color_key is not None and color_key in adata.obs.columns:
-        return color_key
-    raise ValueError(
-        "`groups` requires either a categorical `color` in `adata.obs` or an explicit `groupby`."
-    )
-
-
-def _build_cell_mask(adata, color_key: Optional[str], groups: Optional[List[str]], groupby: Optional[str]):
-    if groups is None:
-        return pd.Series(True, index=adata.obs_names)
-    filter_col = _resolve_filter_column(adata, color_key, groupby)
-    return adata.obs[filter_col].isin(groups)
-
-
-def _is_valid_geometry(geom) -> bool:
-    if geom is None:
-        return False
-    if not hasattr(geom, "bounds"):
-        return False
-    try:
-        b = geom.bounds
-        if len(b) != 4 or not np.all(np.isfinite(b)):
-            return False
-        if b[2] <= b[0] or b[3] <= b[1]:
-            return False
-    except Exception:
-        return False
-    if hasattr(geom, "is_valid") and not geom.is_valid:
-        return False
-    return True
-
-
-def _extract_geometries(gpd, wkt, adata, spatial_info, cell_ids: Sequence[str]):
-    if "geometries" in spatial_info:
-        source = spatial_info["geometries"]
-        if "geometry" in getattr(source, "columns", []):
-            source = source["geometry"]
-        source = source[source.index.isin(cell_ids)]
-        valid_index = [idx for idx in source.index if _is_valid_geometry(source.loc[idx])]
-        return gpd.GeoSeries(source.loc[valid_index], index=valid_index)
-
-    if "geometry" in adata.obs.columns:
-        warnings.warn(
-            "Using `adata.obs['geometry']` (WKT strings). "
-            "For better performance, store geometries in `adata.uns['spatial'][library_id]['geometries']`."
-        )
-        geometries = []
-        valid_index = []
-        for cell_id in cell_ids:
-            if cell_id not in adata.obs.index:
-                continue
-            value = adata.obs.loc[cell_id, "geometry"]
-            if pd.isna(value):
-                continue
-            try:
-                geom = wkt.loads(value)
-            except Exception:
-                continue
-            if _is_valid_geometry(geom):
-                geometries.append(geom)
-                valid_index.append(cell_id)
-        return gpd.GeoSeries(geometries, index=valid_index)
-
-    raise ValueError(
-        "Cell geometries not found. Expected either "
-        "`adata.uns['spatial'][library_id]['geometries']` or `adata.obs['geometry']`."
-    )
-
-
-def _compute_bounds(geometries, adata, basis: str, mask: pd.Series):
-    if len(geometries) > 0:
-        b = np.array([geometries.loc[idx].bounds for idx in geometries.index])
-        return float(b[:, 0].min()), float(b[:, 1].min()), float(b[:, 2].max()), float(b[:, 3].max())
-
-    if basis in adata.obsm and mask.any():
-        coords = adata.obsm[basis][mask.values]
-        if len(coords) > 0:
-            mins = coords.min(axis=0)
-            maxs = coords.max(axis=0)
-            return float(mins[0]), float(mins[1]), float(maxs[0]), float(maxs[1])
-
-    return 0.0, 0.0, 1.0, 1.0
-
-
-def _extract_color_series(adata, color_key: str, valid_cells: Sequence[str]) -> pd.Series:
-    if color_key in adata.obs.columns:
-        return adata.obs.loc[valid_cells, color_key]
-
-    gene_idx = adata.var_names.get_loc(color_key)
-    cell_idx = adata.obs_names.get_indexer(valid_cells)
-    if hasattr(adata.X, "toarray"):
-        values = adata.X[cell_idx, gene_idx].toarray().flatten()
-    else:
-        values = np.asarray(adata.X[cell_idx, gene_idx]).flatten()
-    return pd.Series(values, index=valid_cells, name=color_key)
-
-
-def _category_color_map(
-    series: pd.Series,
-    palette: Optional[Union[dict, list, np.ndarray]],
-):
-    if pd.api.types.is_categorical_dtype(series):
-        categories = series.cat.categories.tolist()
-    else:
-        categories = sorted(series.dropna().unique().tolist())
-
-    if palette is None:
-        cmap = plt.get_cmap("tab20" if len(categories) <= 20 else "tab20b")
-        return categories, {cat: cmap(i / max(len(categories), 1)) for i, cat in enumerate(categories)}
-
-    if isinstance(palette, Mapping):
-        missing = [cat for cat in categories if cat not in palette]
-        if missing:
-            warnings.warn(
-                f"Palette mapping is missing {len(missing)} categories; using gray for them."
-            )
-        return categories, {cat: palette.get(cat, "gray") for cat in categories}
-
-    palette_arr = np.asarray(palette)
-    if len(palette_arr) == 0:
-        raise ValueError("`palette` cannot be empty.")
-    if len(palette_arr) < len(categories):
-        warnings.warn(
-            f"Palette has {len(palette_arr)} colors for {len(categories)} categories; colors will cycle."
-        )
-    return categories, {cat: palette_arr[i % len(palette_arr)] for i, cat in enumerate(categories)}
-
-
-def _apply_axis_style(
-    ax: plt.Axes,
-    x_min: float,
-    y_min: float,
-    x_max: float,
-    y_max: float,
-    xlabel: Optional[str],
-    ylabel: Optional[str],
-    show_ticks: bool,
-    force_show_ticks: bool,
-    crop_coord: Optional[tuple[float, float, float, float]] = None,
-    frameon: Optional[bool] = None,
-):
-    ax.set_aspect("equal")
-    ax.invert_yaxis()
-    if crop_coord is None:
-        x_range = x_max - x_min
-        y_range = y_max - y_min
-        x_pad = x_range * 0.05 if x_range > 0 else 1.0
-        y_pad = y_range * 0.05 if y_range > 0 else 1.0
-        ax.set_xlim(x_min - x_pad, x_max + x_pad)
-        ax.set_ylim(y_max + y_pad, y_min - y_pad)
-    else:
-        ax.set_xlim(crop_coord[0], crop_coord[1])
-        ax.set_ylim(crop_coord[3], crop_coord[2])
-
-    if xlabel is not None:
-        ax.set_xlabel(xlabel)
-    if ylabel is not None:
-        ax.set_ylabel(ylabel)
-
-    if force_show_ticks:
-        ax.tick_params(axis="both", which="major", labelsize=10)
-    elif not show_ticks:
-        ax.set_xticks([])
-        ax.set_yticks([])
-
-    if frameon is False:
-        ax.set_frame_on(False)
-        ax.set_xticks([])
-        ax.set_yticks([])
-
-
-def _resolve_crop_coord(
-    crop_coord: tuple[int, int, int, int] | Sequence[tuple[int, int, int, int]] | None,
-    panel_index: int,
-) -> Optional[tuple[float, float, float, float]]:
-    if crop_coord is None:
-        return None
-
-    if (
-        isinstance(crop_coord, Sequence)
-        and len(crop_coord) == 4
-        and all(isinstance(v, (int, float)) for v in crop_coord)
-    ):
-        return float(crop_coord[0]), float(crop_coord[1]), float(crop_coord[2]), float(crop_coord[3])
-
-    if isinstance(crop_coord, Sequence) and len(crop_coord) > 0:
-        picked = crop_coord[min(panel_index, len(crop_coord) - 1)]
-        if len(picked) != 4:
-            raise ValueError("Each entry in `crop_coord` must be a 4-tuple: (left, right, top, bottom).")
-        return float(picked[0]), float(picked[1]), float(picked[2]), float(picked[3])
-
-    raise ValueError("`crop_coord` must be a 4-tuple or a sequence of 4-tuples.")
-
-
-def spatialseg(
-    adata: AnnData,
-    *,
-    color: Optional[Union[str, List[str]]] = None,
-    groups: Optional[List[str]] = None,
-    groupby: Optional[str] = None,
-    basis: str = "spatial",
-    img: np.ndarray | None = None,
-    img_key: str | None = "hires",
-    library_id: str | Sequence[str] | None = None,
-    crop_coord: tuple[int, int, int, int] | Sequence[tuple[int, int, int, int]] | None = None,
-    alpha_img: float = 0.5,
-    bw: bool | None = False,
-    size: float = 1.0,
-    scale_factor: float | Sequence[float] | None = None,
-    spot_size: float | None = None,
-    na_color: str | tuple[float, ...] | None = None,
-    cmap: str = "viridis",
-    palette: Optional[Union[dict, list, np.ndarray]] = None,
-    vmin: Optional[float] = None,
-    vmax: Optional[float] = None,
-    ax: Optional[plt.Axes] = None,
-    legend: bool = True,
-    frameon: bool | None = None,
-    linewidth: float = 0.5,
-    edgecolor: str = "black",
-    alpha: float = 0.8,
-    xlabel: Optional[str] = "spatial 1",
-    ylabel: Optional[str] = "spatial 2",
-    show_ticks: bool = False,
-    show: bool | None = None,
-    return_fig: bool | None = None,
-    save: str | Path | None = None,
-    figsize: Optional[tuple] = None,
-    edges_width: Optional[float] = None,
-    edges_color: Optional[str] = None,
-    **kwargs: Any,
-):
-    """Plot segmentation polygons in spatial coordinates using `ov.pl.spatial`-style arguments."""
-    gpd, wkt = _require_geopandas()
-
-    if edges_width is not None:
-        linewidth = edges_width
-    if edges_color is not None:
-        edgecolor = edges_color
-    if spot_size is not None:
-        size = size * spot_size
-    linewidth = linewidth * size
-
-    if isinstance(scale_factor, Sequence) and not isinstance(scale_factor, str):
-        scale_factor_val = float(scale_factor[0]) if len(scale_factor) > 0 else 1.0
-    else:
-        scale_factor_val = 1.0 if scale_factor is None else float(scale_factor)
-
-    lib_id = _resolve_library_id(adata, library_id)
-    spatial_info = adata.uns["spatial"][lib_id]
-
-    color_keys = _normalize_color_keys(color)
-    _validate_color_keys(adata, color_keys)
-    fig, axes, color_keys = _prepare_axes(color_keys, ax, figsize)
-
-    out_axes = []
-    for i, color_key in enumerate(color_keys):
-        if i >= len(axes):
-            break
-        cur_ax = axes[i]
-
-        mask = _build_cell_mask(adata, color_key, groups, groupby)
-        cells = adata.obs_names[mask].tolist()
-        if len(cells) == 0:
-            warnings.warn("No cells to plot after filtering.")
-            out_axes.append(cur_ax)
-            continue
-
-        geometries = _extract_geometries(gpd, wkt, adata, spatial_info, cells)
-        if len(geometries) == 0:
-            warnings.warn(
-                "No valid geometries found for selected cells. "
-                "Try re-syncing geometry metadata after subsetting."
-            )
-            out_axes.append(cur_ax)
-            continue
-
-        x_min, y_min, x_max, y_max = _compute_bounds(geometries, adata, basis, mask)
-
-        panel_crop = _resolve_crop_coord(crop_coord, i)
-        panel_img = img
-        panel_extent = None
-        if panel_img is None:
-            panel_img, panel_extent = _get_background_image(spatial_info, img_key)
+        if len(colors_to_plot) > 1:
+            fig, axes = plt.subplots(1, len(colors_to_plot), figsize=figsize, sharex=True, sharey=True)
+            if len(colors_to_plot) == 1:
+                axes = [axes]
         else:
-            h, w = panel_img.shape[:2]
-            if scale_factor_val < 1.0:
-                panel_extent = [0, w / scale_factor_val, h / scale_factor_val, 0]
-            else:
-                panel_extent = [0, w, h, 0]
+            fig, axes = plt.subplots(1, 1, figsize=figsize)
+            axes = [axes]
+    else:
+        fig = ax.figure
+        axes = [ax]
+        if len(colors_to_plot) > 1:
+            warnings.warn("Multiple colors specified but single ax provided. Only first color will be plotted.")
+            colors_to_plot = [colors_to_plot[0]]
 
-        if panel_img is not None and panel_extent is not None:
-            cur_ax.imshow(
-                panel_img,
-                extent=panel_extent,
-                origin="upper",
-                alpha=1.0 if color_key is None else alpha_img,
-                cmap="gray" if bw else None,
-            )
+    axes_list = []
+
+    for idx, color_key in enumerate(colors_to_plot):
+        if idx >= len(axes):
+            continue
+        current_ax = axes[idx]
+
+        if groups is not None:
+            filter_column = None
+            if groupby is not None:
+                if groupby not in adata.obs.columns:
+                    raise ValueError(f"`groupby` column '{groupby}' not found in `adata.obs.columns`.")
+                filter_column = groupby
+            elif color_key is not None and color_key in adata.obs.columns:
+                filter_column = color_key
+            else:
+                raise ValueError(
+                    "`groups` requires either:\n"
+                    "  - `color` to be a categorical column in `adata.obs`, or\n"
+                    "  - `groupby` to specify the column name for filtering."
+                )
+            mask = adata.obs[filter_column].isin(groups)
+        else:
+            mask = pd.Series(True, index=adata.obs_names)
+
+        cells_to_plot = adata.obs_names[mask]
+        if len(cells_to_plot) == 0:
+            warnings.warn("No cells to plot after filtering.")
+            axes_list.append(current_ax)
+            continue
+
+        coords_list = []
+        for cell_id in cells_to_plot:
+            wkt_str = adata.obs.loc[cell_id, "geometry"] if cell_id in adata.obs.index else None
+            if wkt_str and pd.notna(wkt_str):
+                try:
+                    geom = wkt.loads(wkt_str)
+                    if hasattr(geom, "bounds"):
+                        coords_list.append(geom.bounds)
+                except Exception:
+                    continue
+
+        if coords_list:
+            all_bounds = np.array(coords_list)
+            x_min = all_bounds[:, 0].min()
+            y_min = all_bounds[:, 1].min()
+            x_max = all_bounds[:, 2].max()
+            y_max = all_bounds[:, 3].max()
+        else:
+            if basis in adata.obsm and len(adata.obsm[basis]) > 0:
+                spatial_coords = adata.obsm[basis][mask]
+                if len(spatial_coords) > 0:
+                    x_min, y_min = spatial_coords.min(axis=0)
+                    x_max, y_max = spatial_coords.max(axis=0)
+                else:
+                    x_min = y_min = 0
+                    x_max = y_max = 1
+            else:
+                x_min = y_min = 0
+                x_max = y_max = 1
+
+        data_coords_range = (x_min, y_min, x_max, y_max)
+
+        img, img_extent = _process_background_image(spatial_info, img_key, data_coords_range)
+        if img is not None and img_extent is not None:
+            img_alpha = 1.0 if color_key is None else alpha_img
+            current_ax.imshow(img, extent=img_extent, origin="upper", alpha=img_alpha)
 
         if color_key is None:
-            _apply_axis_style(
-                cur_ax,
-                x_min,
-                y_min,
-                x_max,
-                y_max,
-                xlabel=xlabel,
-                ylabel=ylabel,
-                show_ticks=show_ticks,
-                force_show_ticks=True,
-                crop_coord=panel_crop,
-                frameon=frameon,
-            )
-            out_axes.append(cur_ax)
+            if img_extent is not None:
+                current_ax.set_xlim(img_extent[0], img_extent[1])
+                current_ax.set_ylim(img_extent[2], img_extent[3])
+            else:
+                current_ax.set_xlim(x_min, x_max)
+                current_ax.set_ylim(y_max, y_min)
+
+            current_ax.set_aspect("equal")
+            current_ax.invert_yaxis()
+
+            if xlabel is not None:
+                current_ax.set_xlabel(xlabel)
+            if ylabel is not None:
+                current_ax.set_ylabel(ylabel)
+
+            current_ax.tick_params(axis="both", which="major", labelsize=10)
+            axes_list.append(current_ax)
             continue
 
-        valid_cells = geometries.index.tolist()
-        color_series = _extract_color_series(adata, color_key, valid_cells)
-        plot_gdf = gpd.GeoDataFrame({color_key: color_series}, geometry=geometries, index=valid_cells)
+        geom_list = []
+        valid_cells = []
+        for cell_id in cells_to_plot:
+            wkt_str = adata.obs.loc[cell_id, "geometry"] if cell_id in adata.obs.index else None
+            if not wkt_str or pd.isna(wkt_str):
+                continue
+            try:
+                geom = wkt.loads(wkt_str)
+                if geom is None or not hasattr(geom, "bounds"):
+                    continue
+                if hasattr(geom, "is_valid") and not geom.is_valid:
+                    continue
+                bounds = geom.bounds
+                if not all(np.isfinite(bounds)) or bounds[2] <= bounds[0] or bounds[3] <= bounds[1]:
+                    continue
+                geom_list.append(geom)
+                valid_cells.append(cell_id)
+            except Exception:
+                continue
+
+        if len(valid_cells) == 0:
+            warnings.warn("No valid geometries found after filtering.")
+            axes_list.append(current_ax)
+            continue
+
+        temp_geometries = gpd.GeoSeries(geom_list, index=valid_cells)
+
+        if len(temp_geometries) == 0:
+            warnings.warn("No valid geometries found for plotting.")
+            axes_list.append(current_ax)
+            continue
+
+        try:
+            test_gdf = gpd.GeoDataFrame(geometry=temp_geometries)
+            bounds = test_gdf.total_bounds
+            if not all(np.isfinite(bounds)) or bounds[2] <= bounds[0] or bounds[3] <= bounds[1]:
+                warnings.warn(
+                    f"Invalid geometry bounds detected (bounds: {bounds}). "
+                    "This may cause plotting errors."
+                )
+        except Exception as e:
+            warnings.warn(f"Could not validate geometry bounds: {e}.")
+
+        if color_key in adata.obs.columns:
+            color_data = adata.obs.loc[valid_cells, color_key]
+            temp_gdf = gpd.GeoDataFrame({color_key: color_data}, geometry=temp_geometries, index=valid_cells)
+            plot_column = color_key
+        else:
+            gene_idx = adata.var_names.get_loc(color_key)
+            if hasattr(adata.X, "toarray"):
+                expression_values = adata.X[
+                    adata.obs_names.get_indexer(valid_cells), gene_idx
+                ].toarray().flatten()
+            else:
+                expression_values = adata.X[adata.obs_names.get_indexer(valid_cells), gene_idx]
+
+            color_data = pd.Series(expression_values, index=valid_cells, name=color_key)
+            temp_gdf = gpd.GeoDataFrame({color_key: color_data}, geometry=temp_geometries, index=valid_cells)
+            plot_column = color_key
+
+        max_retries = 2
+        retry_count = 0
+        while retry_count <= max_retries:
+            try:
+                bounds = temp_gdf.total_bounds
+                if not all(np.isfinite(bounds)) or bounds[2] <= bounds[0] or bounds[3] <= bounds[1]:
+                    if retry_count == 0:
+                        warnings.warn(
+                            f"Invalid geometry bounds detected (bounds: {bounds}). "
+                            "Filtering out problematic geometries."
+                        )
+
+                    valid_mask = pd.Series(True, index=temp_gdf.index)
+                    for idx2 in temp_gdf.index:
+                        try:
+                            geom = temp_gdf.loc[idx2, "geometry"]
+                            if geom is None or pd.isna(geom):
+                                valid_mask.loc[idx2] = False
+                                continue
+                            geom_bounds = geom.bounds
+                            if (
+                                not all(np.isfinite(geom_bounds))
+                                or geom_bounds[2] <= geom_bounds[0]
+                                or geom_bounds[3] <= geom_bounds[1]
+                            ):
+                                valid_mask.loc[idx2] = False
+                        except Exception:
+                            valid_mask.loc[idx2] = False
+
+                    temp_gdf = temp_gdf[valid_mask]
+                    if len(temp_gdf) == 0:
+                        warnings.warn("No valid geometries remaining after filtering. Skipping plot.")
+                        axes_list.append(current_ax)
+                        break
+
+                    valid_cells = temp_gdf.index.tolist()
+                    bounds = temp_gdf.total_bounds
+                    if not all(np.isfinite(bounds)) or bounds[2] <= bounds[0] or bounds[3] <= bounds[1]:
+                        retry_count += 1
+                        continue
+                    break
+                break
+            except Exception as e:
+                if retry_count == 0:
+                    warnings.warn(f"Error validating geometry bounds: {e}. Will use aspect='equal' fallback.")
+                retry_count += 1
+                continue
+
+        use_equal_aspect = False
+        if retry_count > max_retries:
+            try:
+                bounds = temp_gdf.total_bounds
+                if not all(np.isfinite(bounds)) or bounds[2] <= bounds[0] or bounds[3] <= bounds[1]:
+                    use_equal_aspect = True
+            except Exception:
+                use_equal_aspect = True
+
+        is_categorical = not pd.api.types.is_numeric_dtype(temp_gdf[plot_column])
+        use_custom_palette = False
+        custom_cmap = None
+        categories = None
+        color_list_for_legend = None
+
+        if is_categorical:
+            if pd.api.types.is_categorical_dtype(temp_gdf[plot_column]):
+                categories = temp_gdf[plot_column].cat.categories.tolist()
+            else:
+                categories = sorted(temp_gdf[plot_column].dropna().unique())
+
+            color_list = []
+            if palette is not None:
+                use_custom_palette = True
+                if isinstance(palette, dict):
+                    missing_cats = [cat for cat in categories if cat not in palette]
+                    if missing_cats:
+                        warnings.warn(
+                            f"Palette dictionary is missing colors for {len(missing_cats)} categories; using gray fallback."
+                        )
+                    color_list = [palette.get(cat, "gray") for cat in categories]
+                elif isinstance(palette, (list, np.ndarray)):
+                    palette_array = np.asarray(palette)
+                    if len(palette_array) < len(categories):
+                        warnings.warn(
+                            f"Palette has {len(palette_array)} colors but there are {len(categories)} categories. "
+                            "Colors will be cycled."
+                        )
+                    color_list = [palette_array[i % len(palette_array)] for i in range(len(categories))]
+                else:
+                    raise ValueError(f"Unsupported palette type: {type(palette)}")
+
+                custom_cmap = ListedColormap(color_list)
+                color_list_for_legend = color_list
 
         plot_kwargs = {
-            "ax": cur_ax,
-            "edgecolor": edgecolor,
-            "linewidth": linewidth,
+            "ax": current_ax,
+            "edgecolor": edges_color,
+            "linewidth": edges_width,
             "alpha": alpha,
             **kwargs,
         }
 
-        is_categorical = not pd.api.types.is_numeric_dtype(plot_gdf[color_key])
+        plot_kwargs["column"] = plot_column
+
         if is_categorical:
-            categories, color_map = _category_color_map(plot_gdf[color_key], palette)
-            face_colors = plot_gdf[color_key].map(color_map).fillna("gray" if na_color is None else na_color)
-            plot_gdf.plot(color=face_colors, **plot_kwargs)
+            plot_kwargs["legend"] = False
+            if use_custom_palette:
+                plot_kwargs["cmap"] = custom_cmap
+            if use_equal_aspect:
+                plot_kwargs["aspect"] = "equal"
+            try:
+                temp_gdf.plot(**plot_kwargs)
+            except ValueError as e:
+                if "aspect must be finite and positive" in str(e):
+                    plot_kwargs["aspect"] = "equal"
+                    temp_gdf.plot(**plot_kwargs)
+                else:
+                    raise
 
             if legend:
-                handles = [Patch(facecolor=color_map[c], label=str(c)) for c in categories]
-                if handles:
-                    cur_ax.legend(handles=handles, bbox_to_anchor=(1.05, 1), loc="upper left", frameon=True)
+                from matplotlib.patches import Patch
+
+                if use_custom_palette:
+                    legend_elements = [
+                        Patch(facecolor=color_list_for_legend[i], label=str(cat))
+                        for i, cat in enumerate(categories)
+                    ]
+                else:
+                    n_cats = len(categories)
+                    default_cmap = plt.get_cmap("tab20" if n_cats <= 20 else "tab20b")
+                    legend_elements = [
+                        Patch(facecolor=default_cmap(i / n_cats), label=str(cat))
+                        for i, cat in enumerate(categories)
+                    ]
+
+                if legend_elements:
+                    current_ax.legend(
+                        handles=legend_elements,
+                        bbox_to_anchor=(1.05, 1),
+                        loc="upper left",
+                        frameon=True,
+                    )
         else:
-            plot_kwargs["column"] = color_key
-            plot_kwargs["cmap"] = cmap if palette is None else ListedColormap(np.asarray(palette))
+            plot_kwargs["cmap"] = cmap
             plot_kwargs["legend"] = legend
-            if na_color is not None:
-                plot_kwargs["missing_kwds"] = {"color": na_color}
             if vmin is not None:
                 plot_kwargs["vmin"] = vmin
             if vmax is not None:
                 plot_kwargs["vmax"] = vmax
-            plot_gdf.plot(**plot_kwargs)
+            if use_equal_aspect:
+                plot_kwargs["aspect"] = "equal"
+            try:
+                temp_gdf.plot(**plot_kwargs)
+            except ValueError as e:
+                if "aspect must be finite and positive" in str(e):
+                    plot_kwargs["aspect"] = "equal"
+                    temp_gdf.plot(**plot_kwargs)
+                else:
+                    raise
 
-        _apply_axis_style(
-            cur_ax,
-            x_min,
-            y_min,
-            x_max,
-            y_max,
-            xlabel=xlabel,
-            ylabel=ylabel,
-            show_ticks=show_ticks,
-            force_show_ticks=False,
-            crop_coord=panel_crop,
-            frameon=frameon,
-        )
-        cur_ax.set_title(color_key)
-        out_axes.append(cur_ax)
+        current_ax.set_aspect("equal")
+        current_ax.invert_yaxis()
 
-    if save is not None:
-        fig.savefig(save, bbox_inches="tight")
+        x_range = x_max - x_min
+        y_range = y_max - y_min
+        x_padding = x_range * 0.05 if x_range > 0 else 1
+        y_padding = y_range * 0.05 if y_range > 0 else 1
 
-    if return_fig:
-        return fig
+        current_ax.set_xlim(x_min - x_padding, x_max + x_padding)
+        current_ax.set_ylim(y_max + y_padding, y_min - y_padding)
+
+        if xlabel is not None:
+            current_ax.set_xlabel(xlabel)
+        if ylabel is not None:
+            current_ax.set_ylabel(ylabel)
+
+        if color_key is None:
+            current_ax.tick_params(axis="both", which="major", labelsize=10)
+        elif not show_ticks:
+            current_ax.set_xticks([])
+            current_ax.set_yticks([])
+
+        if color_key:
+            current_ax.set_title(color_key)
+
+        axes_list.append(current_ax)
 
     if show:
         if ax is None:
@@ -513,11 +491,10 @@ def spatialseg(
         else:
             fig.tight_layout()
         plt.show()
-        return None
 
-    if len(out_axes) == 1:
-        return out_axes[0]
-    return out_axes
+    if len(axes_list) == 1:
+        return axes_list[0]
+    return axes_list
 
 
 def highlight_spatial_region(
@@ -527,7 +504,9 @@ def highlight_spatial_region(
     edges_color: str = "red",
     edges_width: float = 1.0,
 ):
-    """Draw a rectangular region of interest on an existing spatial axis."""
+    """Mark a rectangular region on a spatial plot."""
+    from matplotlib.patches import Rectangle
+
     if xlim is None:
         xlim = ax.get_xlim()
     if ylim is None:
@@ -545,10 +524,8 @@ def highlight_spatial_region(
         facecolor="none",
     )
     ax.add_patch(rect)
+
     return rect
 
 
-__all__ = [
-    "spatialseg",
-    "highlight_spatial_region",
-]
+__all__ = ["spatialseg", "highlight_spatial_region"]

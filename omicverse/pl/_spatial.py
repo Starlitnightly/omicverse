@@ -1714,18 +1714,96 @@ def _wrap_signature(wrapper: Callable[[Any], Any]) -> Callable[[Any], Any]:
     return wrapper
 
 
+_empty = object()
+
+
+def _check_spot_size(spatial_data: Mapping | None, spot_size: float | None) -> float:
+    if spatial_data is None and spot_size is None:
+        raise ValueError(
+            "When `.uns['spatial'][library_id]` is missing, `spot_size` must be provided."
+        )
+    if spot_size is None:
+        return float(spatial_data["scalefactors"]["spot_diameter_fullres"])
+    return float(spot_size)
+
+
+def _check_scale_factor(
+    spatial_data: Mapping | None,
+    img_key: str | None,
+    scale_factor: float | None,
+) -> float:
+    if scale_factor is not None:
+        return float(scale_factor)
+    if spatial_data is not None and img_key is not None:
+        return float(spatial_data["scalefactors"][f"tissue_{img_key}_scalef"])
+    return 1.0
+
+
+def _check_spatial_data(uns: Mapping, library_id: Any) -> tuple[str | None, Mapping | None]:
+    spatial_mapping = uns.get("spatial", {})
+    if library_id is _empty:
+        if len(spatial_mapping) > 1:
+            raise ValueError(
+                "Found multiple possible libraries in `.uns['spatial']`. "
+                f"Please specify one explicitly. Options: {list(spatial_mapping.keys())}"
+            )
+        if len(spatial_mapping) == 1:
+            library_id = next(iter(spatial_mapping.keys()))
+        else:
+            library_id = None
+    spatial_data = spatial_mapping[library_id] if library_id is not None else None
+    return library_id, spatial_data
+
+
+def _check_img(
+    spatial_data: Mapping | None,
+    img: np.ndarray | None,
+    img_key: Any,
+    *,
+    bw: bool = False,
+) -> tuple[np.ndarray | None, str | None]:
+    if img is None and spatial_data is not None and img_key is _empty:
+        img_key = next((k for k in ["hires", "lowres"] if k in spatial_data.get("images", {})), None)
+    if img is None and spatial_data is not None and img_key is not None:
+        img = spatial_data["images"][img_key]
+    if bw and img is not None:
+        img = np.dot(img[..., :3], [0.2989, 0.5870, 0.1140])
+    return img, img_key
+
+
+def _check_crop_coord(
+    crop_coord: tuple[int, int, int, int] | None,
+    scale_factor: float,
+) -> tuple[float, float, float, float] | None:
+    if crop_coord is None:
+        return None
+    if len(crop_coord) != 4:
+        raise ValueError(f"Invalid `crop_coord` length: {len(crop_coord)} (!= 4).")
+    return tuple(float(c) * scale_factor for c in crop_coord)
+
+
+def _check_na_color(
+    na_color: str | tuple[float, ...] | None,
+    *,
+    img: np.ndarray | None = None,
+) -> str | tuple[float, ...]:
+    if na_color is None:
+        return (0.0, 0.0, 0.0, 0.0) if img is not None else "lightgray"
+    return na_color
+
+
 def spatial(  # noqa: PLR0913
     adata: AnnData,
     *,
     basis: str = "spatial",
     img: np.ndarray | None = None,
-    img_key: str | None = "hires",
-    library_id: str | Sequence[str] | None = None,
-    crop_coord: tuple[int, int, int, int] | Sequence[tuple[int, int, int, int]] | None = None,
+    img_key: str | None | Any = _empty,
+    library_id: str | None | Any = _empty,
+    crop_coord: tuple[int, int, int, int] | None = None,
     alpha_img: float = 1.0,
     bw: bool | None = False,
     size: float = 1.0,
-    scale_factor: float | Sequence[float] | None = None,
+    scale_factor: float | None = None,
     spot_size: float | None = None,
     na_color: str | tuple[float, ...] | None = None,
     show: bool | None = None,
@@ -1734,48 +1812,53 @@ def spatial(  # noqa: PLR0913
     **kwargs: Any,
 ) -> Figure | Axes | Sequence[Axes] | None:
     """
-    Scanpy-style spatial plot compatibility wrapper.
-
-    This function mirrors ``scanpy.pl.spatial`` style arguments while delegating
-    rendering to :func:`spatial_scatter`.
+    Scatter plot in spatial coordinates, aligned with ``scanpy.pl.spatial`` behavior.
     """
-    if basis != "spatial":
-        kwargs["spatial_key"] = basis
+    library_id, spatial_data = _check_spatial_data(adata.uns, library_id)
+    img, img_key = _check_img(spatial_data, img, img_key, bw=bool(bw))
+    spot_size = _check_spot_size(spatial_data, spot_size)
+    scale_factor = _check_scale_factor(spatial_data, img_key=img_key, scale_factor=scale_factor)
+    crop_coord = _check_crop_coord(crop_coord, scale_factor)
+    na_color = _check_na_color(na_color, img=img)
 
-    if bw and "img_cmap" not in kwargs:
-        kwargs["img_cmap"] = "gray"
-
-    # Keep behavior close to scanpy.pl.spatial: `size` scales the spot radius.
-    if spot_size is not None:
-        size = size * spot_size
-
-    # Mimic scanpy's return behavior.
-    return_ax = bool(return_fig) or show is False
-    axs = spatial_scatter(
+    circle_radius = size * scale_factor * spot_size * 0.5
+    from ._single import embedding
+    axs = embedding(
         adata,
-        shape="circle",
-        img=img,
-        img_res_key=img_key,
-        library_id=library_id,
-        crop_coord=crop_coord,
-        img_alpha=alpha_img,
-        size=size,
+        basis=basis,
         scale_factor=scale_factor,
+        size=circle_radius,
         na_color=na_color,
-        save=save,
-        return_ax=return_ax,
+        show=False,
+        save=False,
         **kwargs,
     )
+    if not isinstance(axs, list):
+        axs = [axs]
 
+    for ax in axs:
+        cur_coords = np.concatenate([ax.get_xlim(), ax.get_ylim()])
+        if img is not None:
+            ax.imshow(img, cmap="gray" if bw else None, alpha=alpha_img)
+        else:
+            ax.set_aspect("equal")
+            ax.invert_yaxis()
+        if crop_coord is not None:
+            ax.set_xlim(crop_coord[0], crop_coord[1])
+            ax.set_ylim(crop_coord[3], crop_coord[2])
+        else:
+            ax.set_xlim(cur_coords[0], cur_coords[1])
+            ax.set_ylim(cur_coords[3], cur_coords[2])
+
+    if save is not None and len(axs) > 0:
+        axs[0].figure.savefig(save, bbox_inches="tight")
     if return_fig:
-        if isinstance(axs, Sequence):
-            return axs[0].figure if len(axs) else None
-        return None if axs is None else axs.figure
+        return axs[0].figure if len(axs) > 0 else None
 
+    show = sc_settings.autoshow if show is None else show
     if show:
         plt.show()
         return None
-
     return axs
 
 

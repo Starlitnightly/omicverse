@@ -389,8 +389,12 @@ def read_visium_hd_seg(
             scalefactors["spot_diameter_fullres"] = 20.0
 
     _init_spatial_slot(adata, sample, hires_img, lowres_img, scalefactors)
-    adata.uns["spatial"][sample]["geometries"] = gpd.GeoDataFrame(df[["geometry"]], geometry="geometry")
-    adata.obs["geometry"] = df["geometry"].apply(lambda g: wkt.dumps(g) if g is not None else None)
+    # WKT 字符串存入 obs（h5ad 可序列化），是几何信息的唯一持久化存储
+    adata.obs["geometry"] = df["geometry"].apply(lambda g: wkt.dumps(g) if g is not None else "")
+    # 写入标记，供 ov.read_h5ad 读取时自动重建 GeoDataFrame
+    adata.uns["omicverse_io"] = {"type": "visium_hd_seg", "sample": sample}
+    # GeoDataFrame 不存入 uns（无法序列化到 h5ad）
+    # 需要时调用 ov.io.spatial.load_geometries(adata, sample) 或直接用 obs["geometry"]
     _progress(f"Done (n_obs={adata.n_obs}, n_vars={adata.n_vars})", level="success")
     return adata
 
@@ -501,3 +505,5 @@ def read_visium_hd(
         )
 
     raise ValueError("`data_type` must be one of {'bin', 'cellseg'}.")
+
+

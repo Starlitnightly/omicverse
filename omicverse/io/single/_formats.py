@@ -47,7 +47,9 @@ def read_h5ad(filename, **kwargs):
     Returns
     -------
     anndata.AnnData
-        Loaded AnnData object.
+        Loaded AnnData object. 若文件由 :func:`~omicverse.io.spatial.read_visium_hd_seg`
+        生成，将自动从 ``obs['geometry']`` 重建 GeoDataFrame 并写入
+        ``uns['spatial'][sample]['geometries']``（需安装 geopandas）。
     """
     return _anndata_read_h5ad(filename, **kwargs)
 
