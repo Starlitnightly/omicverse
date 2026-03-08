@@ -126,12 +126,6 @@ class TestRestoreAdata:
         result = store.persist_adata(adata_id)
         path = result["path"]
 
-        # restore_adata requires anndata.read_h5ad — mock it
-        mock_restored = _make_mock_adata(10, 20)
-        with patch("omicverse.mcp.session_store.SessionStore.restore_adata") as mock_restore:
-            # Don't mock — test the real path with anndata mocked
-            pass
-
         # Actually test with a direct mock of anndata import
         import types
         mock_ad = types.ModuleType("anndata")
