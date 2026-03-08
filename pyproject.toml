@@ -164,6 +164,16 @@ omicverse = "omicverse.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["omicverse*"]
+exclude = [
+  "tests*",
+  "docs*",
+  "omicverse_web*",
+  "omicverse_guide*",
+  "OvIntelligence*",
+  "READMEM*",
+  "tmp*",
+  "Skill_Seekers*",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

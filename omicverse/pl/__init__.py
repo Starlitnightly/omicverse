@@ -134,7 +134,11 @@ from ._embedding import embedding_atlas
 from ._density import add_density_contour, calculate_gene_density
 from ._cpdbviz import CellChatViz
 from ._dotplot import dotplot, rank_genes_groups_dotplot, rank_genes_groups_df, markers_dotplot
-from ._spatial import spatial_segment,spatial_segment_overlay
+from ._spatial import spatial, spatial_segment, spatial_segment_overlay
+from ._spatialseg import (
+    highlight_spatial_region,
+    spatialseg,
+)
 from ._violin import violin
 from ._animation_lines import (
     Streamlines,
@@ -240,8 +244,12 @@ __all__ = [
     "rank_genes_groups_df",
     "markers_dotplot",
     # @ _spatial
+    "spatial",
     "spatial_segment",
     "spatial_segment_overlay",
+    # @ _spatialseg
+    "spatialseg",
+    "highlight_spatial_region",
     # @ _violin
     "violin",
     # @ _animation_lines
@@ -251,4 +259,3 @@ __all__ = [
     "compute_velocity_on_grid",
     "nan_helper",
 ]
-

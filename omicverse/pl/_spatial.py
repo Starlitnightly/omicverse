@@ -1714,6 +1714,71 @@ def _wrap_signature(wrapper: Callable[[Any], Any]) -> Callable[[Any], Any]:
     return wrapper
 
 
+def spatial(  # noqa: PLR0913
+    adata: AnnData,
+    *,
+    basis: str = "spatial",
+    img: np.ndarray | None = None,
+    img_key: str | None = "hires",
+    library_id: str | Sequence[str] | None = None,
+    crop_coord: tuple[int, int, int, int] | Sequence[tuple[int, int, int, int]] | None = None,
+    alpha_img: float = 1.0,
+    bw: bool | None = False,
+    size: float = 1.0,
+    scale_factor: float | Sequence[float] | None = None,
+    spot_size: float | None = None,
+    na_color: str | tuple[float, ...] | None = None,
+    show: bool | None = None,
+    return_fig: bool | None = None,
+    save: str | Path | None = None,
+    **kwargs: Any,
+) -> Figure | Axes | Sequence[Axes] | None:
+    """
+    Scanpy-style spatial plot compatibility wrapper.
+
+    This function mirrors ``scanpy.pl.spatial`` style arguments while delegating
+    rendering to :func:`spatial_scatter`.
+    """
+    if basis != "spatial":
+        kwargs["spatial_key"] = basis
+
+    if bw and "img_cmap" not in kwargs:
+        kwargs["img_cmap"] = "gray"
+
+    # Keep behavior close to scanpy.pl.spatial: `size` scales the spot radius.
+    if spot_size is not None:
+        size = size * spot_size
+
+    # Mimic scanpy's return behavior.
+    return_ax = bool(return_fig) or show is False
+    axs = spatial_scatter(
+        adata,
+        shape="circle",
+        img=img,
+        img_res_key=img_key,
+        library_id=library_id,
+        crop_coord=crop_coord,
+        img_alpha=alpha_img,
+        size=size,
+        scale_factor=scale_factor,
+        na_color=na_color,
+        save=save,
+        return_ax=return_ax,
+        **kwargs,
+    )
+
+    if return_fig:
+        if isinstance(axs, Sequence):
+            return axs[0].figure if len(axs) else None
+        return None if axs is None else axs.figure
+
+    if show:
+        plt.show()
+        return None
+
+    return axs
+
+
 def spatial_scatter(
     adata: AnnData,
     shape: str | None = "circle",
