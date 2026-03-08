@@ -19,9 +19,7 @@ Test Coverage:
 import asyncio
 import json
 import pytest
-from unittest.mock import Mock, MagicMock, patch, call
-from dataclasses import dataclass
-from typing import Optional
+from unittest.mock import Mock, patch
 
 # Import the backend to test
 import sys
@@ -57,6 +55,26 @@ def default_config():
         "max_tokens": 8192,
         "temperature": 0.2
     }
+
+
+def _invoke_backend(backend, user_prompt, disable_retry=True):
+    """Call the provider-specific sync path directly to keep tests lightweight."""
+    original_retry = getattr(backend, "_retry", None)
+    if disable_retry and original_retry is not None:
+        backend._retry = lambda func, *args, **kwargs: func(*args, **kwargs)
+
+    try:
+        provider = backend.config.provider
+        if provider == "anthropic":
+            return backend._chat_via_anthropic(user_prompt)
+        if provider == "gemini":
+            return backend._chat_via_gemini(user_prompt)
+        if provider == "dashscope":
+            return backend._chat_via_dashscope(user_prompt)
+        return backend._chat_via_openai_compatible(user_prompt)
+    finally:
+        if disable_retry and original_retry is not None:
+            backend._retry = original_retry
 
 
 # ============================================================================
@@ -95,8 +113,7 @@ class TestOpenAIProvider:
                 temperature=default_config["temperature"]
             )
 
-            # Run the backend
-            result = asyncio.run(backend.run(sample_user_prompt))
+            result = _invoke_backend(backend, sample_user_prompt)
 
             # Verify the SDK was called with correct parameters
             mock_client.chat.completions.create.assert_called_once()
@@ -147,7 +164,7 @@ class TestOpenAIProvider:
                     api_key="test-key"
                 )
 
-                result = asyncio.run(backend.run(sample_user_prompt))
+                result = _invoke_backend(backend, sample_user_prompt)
                 assert result == "HTTP fallback response"
 
     def test_openai_http_fallback_parameters(self, sample_system_prompt, sample_user_prompt, default_config):
@@ -194,7 +211,7 @@ class TestOpenAIResponsesAPI:
                 temperature=default_config["temperature"]
             )
 
-            result = asyncio.run(backend.run(sample_user_prompt))
+            result = _invoke_backend(backend, sample_user_prompt)
 
             # Verify responses.create was called (NOT chat.completions.create)
             mock_client.responses.create.assert_called_once()
@@ -262,7 +279,7 @@ class TestOpenAIResponsesAPI:
                     api_key="test-key"
                 )
 
-                result = asyncio.run(backend.run(sample_user_prompt))
+                result = _invoke_backend(backend, sample_user_prompt)
 
                 # Verify correct endpoint was called (/responses, not /chat/completions)
                 assert mock_urlopen.called
@@ -335,7 +352,7 @@ class TestOpenAIResponsesAPI:
                 temperature=default_config["temperature"]
             )
 
-            result = asyncio.run(backend.run(sample_user_prompt))
+            result = _invoke_backend(backend, sample_user_prompt)
 
             # Verify chat.completions.create was called (NOT responses.create)
             mock_client.chat.completions.create.assert_called_once()
@@ -371,7 +388,7 @@ class TestOpenAIResponsesAPI:
                 temperature=default_config["temperature"]
             )
 
-            result = asyncio.run(backend.run(sample_user_prompt))
+            result = _invoke_backend(backend, sample_user_prompt)
 
             # Verify responses.create was called
             mock_client.responses.create.assert_called_once()
@@ -426,7 +443,7 @@ class TestOpenAIResponsesAPI:
                 api_key="test-key"
             )
 
-            result = asyncio.run(backend.run(sample_user_prompt))
+            result = _invoke_backend(backend, sample_user_prompt)
             assert result == "Parsed from output_text"
 
     def test_output_text_parsing_http(self, sample_system_prompt, sample_user_prompt):
@@ -452,7 +469,7 @@ class TestOpenAIResponsesAPI:
                     api_key="test-key"
                 )
 
-                result = asyncio.run(backend.run(sample_user_prompt))
+                result = _invoke_backend(backend, sample_user_prompt)
                 assert result == "Parsed from output_text via HTTP"
 
     def test_gpt54_tool_chat_uses_responses_api(self, sample_system_prompt):
@@ -563,7 +580,7 @@ class TestAnthropicProvider:
                 temperature=default_config["temperature"]
             )
 
-            result = asyncio.run(backend.run(sample_user_prompt))
+            result = _invoke_backend(backend, sample_user_prompt)
 
             # CRITICAL: Verify system parameter is separate, not in messages
             mock_client.messages.create.assert_called_once()
@@ -610,7 +627,7 @@ class TestAnthropicProvider:
                 temperature=0.7   # Custom value
             )
 
-            asyncio.run(backend.run(sample_user_prompt))
+            _invoke_backend(backend, sample_user_prompt)
 
             call_kwargs = mock_client.messages.create.call_args[1]
             assert call_kwargs["max_tokens"] == 4096
@@ -655,7 +672,7 @@ class TestGeminiProvider:
                 temperature=default_config["temperature"]
             )
 
-            result = asyncio.run(backend.run(sample_user_prompt))
+            result = _invoke_backend(backend, sample_user_prompt)
 
             # BUG-002 FIX: Verify system_instruction is used in model construction
             mock_genai_module.GenerativeModel.assert_called_once()
@@ -710,7 +727,7 @@ class TestGeminiProvider:
                 temperature=0.5
             )
 
-            asyncio.run(backend.run(sample_user_prompt))
+            _invoke_backend(backend, sample_user_prompt)
 
             # Verify GenerationConfig was called with correct parameters
             mock_generation_config_class.assert_called_once()
@@ -762,7 +779,7 @@ class TestDashScopeProvider:
                 temperature=default_config["temperature"]
             )
 
-            result = asyncio.run(backend.run(sample_user_prompt))
+            result = _invoke_backend(backend, sample_user_prompt)
 
             # Verify Generation.call was invoked with correct parameters
             mock_generation.call.assert_called_once()
@@ -894,7 +911,7 @@ class TestErrorHandling:
             # Mock os.getenv to return None (no env variable set)
             with patch('os.getenv', return_value=None):
                 with pytest.raises(RuntimeError, match="Missing API key"):
-                    asyncio.run(backend.run(sample_user_prompt))
+                    _invoke_backend(backend, sample_user_prompt)
 
     def test_sdk_failure_logs_warning_before_fallback(self, sample_system_prompt, sample_user_prompt):
         """Verify SDK failure logs warning before HTTP fallback."""
@@ -921,7 +938,7 @@ class TestErrorHandling:
                         api_key="test-key"
                     )
 
-                    result = asyncio.run(backend.run(sample_user_prompt))
+                    result = _invoke_backend(backend, sample_user_prompt)
 
                     # Verify warning was issued
                     assert mock_warn.called
@@ -972,7 +989,7 @@ class TestRetryLogic:
                         api_key="test-key"
                     )
 
-                    result = asyncio.run(backend.run(sample_user_prompt))
+                    result = _invoke_backend(backend, sample_user_prompt, disable_retry=False)
 
                     # Verify retry occurred
                     assert result == "Success after retry"
@@ -1009,7 +1026,7 @@ class TestRetryLogic:
                         api_key="test-key"
                     )
 
-                    result = asyncio.run(backend.run(sample_user_prompt))
+                    result = _invoke_backend(backend, sample_user_prompt, disable_retry=False)
 
                     # Verify retry occurred
                     assert result == "Success after rate limit"
@@ -1045,7 +1062,7 @@ class TestRetryLogic:
                         api_key="test-key"
                     )
 
-                    result = asyncio.run(backend.run(sample_user_prompt))
+                    result = _invoke_backend(backend, sample_user_prompt, disable_retry=False)
 
                     assert result == "Success after server error"
                     assert call_count[0] == 2
@@ -1073,7 +1090,7 @@ class TestRetryLogic:
                     )
 
                     with pytest.raises(RuntimeError, match="All 3 attempts failed"):
-                        asyncio.run(backend.run(sample_user_prompt))
+                        _invoke_backend(backend, sample_user_prompt, disable_retry=False)
 
                     # Should only try once (no retries for 400)
                     assert call_count[0] == 1
@@ -1101,7 +1118,7 @@ class TestRetryLogic:
                     )
 
                     with pytest.raises(RuntimeError, match="All 3 attempts failed"):
-                        asyncio.run(backend.run(sample_user_prompt))
+                        _invoke_backend(backend, sample_user_prompt, disable_retry=False)
 
                     # Should only try once (no retries for auth errors)
                     assert call_count[0] == 1
@@ -1129,7 +1146,7 @@ class TestRetryLogic:
                     )
 
                     with pytest.raises(RuntimeError, match="All 3 attempts failed"):
-                        asyncio.run(backend.run(sample_user_prompt))
+                        _invoke_backend(backend, sample_user_prompt, disable_retry=False)
 
                     # Verify 3 attempts were made (default max_attempts=3)
                     assert call_count[0] == 3
@@ -1167,7 +1184,7 @@ class TestRetryLogic:
                     api_key="test-key"
                 )
 
-                result = asyncio.run(backend.run(sample_user_prompt))
+                result = _invoke_backend(backend, sample_user_prompt, disable_retry=False)
 
                 # Verify retry occurred
                 assert call_count[0] == 2
@@ -1210,7 +1227,7 @@ class TestRetryLogic:
                     api_key="test-key"
                 )
 
-                result = asyncio.run(backend.run(sample_user_prompt))
+                result = _invoke_backend(backend, sample_user_prompt, disable_retry=False)
 
                 # Verify retry occurred
                 assert call_count[0] == 2
@@ -1253,7 +1270,7 @@ class TestRetryLogic:
                     api_key="test-key"
                 )
 
-                result = asyncio.run(backend.run(sample_user_prompt))
+                result = _invoke_backend(backend, sample_user_prompt, disable_retry=False)
 
                 # Verify retry occurred
                 assert call_count[0] == 2
@@ -1292,7 +1309,7 @@ class TestRetryLogic:
                         api_key="test-key"
                     )
 
-                    result = asyncio.run(backend.run(sample_user_prompt))
+                    result = _invoke_backend(backend, sample_user_prompt, disable_retry=False)
                     assert result == "Success after rate limit"
                     assert call_count[0] == 2
 
@@ -1325,7 +1342,7 @@ class TestRetryLogic:
                         api_key="test-key"
                     )
 
-                    result = asyncio.run(backend.run(sample_user_prompt))
+                    result = _invoke_backend(backend, sample_user_prompt, disable_retry=False)
                     assert result == "Success after connection reset"
                     assert call_count[0] == 2
 
@@ -1359,7 +1376,7 @@ class TestRetryLogic:
                         api_key="test-key"
                     )
 
-                    result = asyncio.run(backend.run(sample_user_prompt))
+                    result = _invoke_backend(backend, sample_user_prompt, disable_retry=False)
                     assert result == "Success after SSL error"
                     assert call_count[0] == 2
 
@@ -1395,7 +1412,7 @@ class TestRetryLogic:
                         api_key="test-key"
                     )
 
-                    result = asyncio.run(backend.run(sample_user_prompt))
+                    result = _invoke_backend(backend, sample_user_prompt, disable_retry=False)
                     assert result == "Success after service unavailable"
                     assert call_count[0] == 2
 
@@ -1424,7 +1441,7 @@ class TestRetryLogic:
                     )
 
                     with pytest.raises(RuntimeError, match="All 5 attempts failed"):
-                        asyncio.run(backend.run(sample_user_prompt))
+                        _invoke_backend(backend, sample_user_prompt, disable_retry=False)
 
                     # Should try 5 times
                     assert call_count[0] == 5
@@ -1463,7 +1480,7 @@ class TestRetryLogic:
                         retry_jitter=0.1
                     )
 
-                    result = asyncio.run(backend.run(sample_user_prompt))
+                    result = _invoke_backend(backend, sample_user_prompt, disable_retry=False)
 
                     # Verify sleep was called with delay based on custom params
                     # First retry: base_delay * (factor ** 0) + jitter
