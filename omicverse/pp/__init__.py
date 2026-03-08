@@ -71,7 +71,7 @@ from ._sude import sude
 
 from ._qc import qc,filter_cells,filter_genes
 from ._recover import recover_counts,binary_search
-from ._normalization import log1p
+from ._normalization import log1p,normalize_total
 from ._scrublet import scrublet, scrublet_simulate_doublets
 
 __all__ = [
@@ -86,7 +86,7 @@ __all__ = [
     'scale',
     'regress',
     'regress_and_scale',
-
+    'normalize_total',
     
     # Dimensionality reduction
     'pca',
