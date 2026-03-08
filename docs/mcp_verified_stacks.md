@@ -14,13 +14,13 @@
 |---------|--------|-------------------|------------|
 | `fast-mock` | constrained | pyproject.toml (core deps only) | Every PR/push |
 | `core-runtime` | **verified** | pyproject.toml (`anndata<0.12.0`, `scanpy>=1.9`, `scipy>=1.8,<1.12`) | Push + weekly |
-| `scientific-runtime` | constrained | `requirements/mcp-scientific-runtime.txt` (`scvelo>=0.3.0,<0.4`, `squidpy>=1.3.0,<1.7`) | Weekly |
+| `scientific-runtime` | **verified** | `requirements/mcp-scientific-runtime.txt` (`scvelo>=0.3.0,<0.4`, `squidpy>=1.3.0,<1.7`) | Weekly |
 | `extended-runtime` | best_effort | `requirements/mcp-extended-runtime.txt` (SEACells/mira commented out) | Manual only |
 
-> **Note**: `core-runtime` was promoted to **verified** on 2026-03-08 after
-> all 32 core-marked tests passed on GitHub Actions CI run 22828299495
-> (`HendricksJudy/omicverse`, Python 3.10.19, Ubuntu).  See "Recorded
-> Snapshots" below for the exact version snapshot.
+> **Note**: `core-runtime` and `scientific-runtime` were both promoted to
+> **verified** on 2026-03-08 via real GitHub Actions CI runs on
+> `HendricksJudy/omicverse` (Python 3.10.19, Ubuntu).  See "Recorded
+> Snapshots" below for exact version snapshots.
 
 ## Pending Promotions
 
@@ -31,7 +31,14 @@ passed on GitHub Actions (run 22828299495, `HendricksJudy/omicverse` fork,
 Python 3.10.19, Linux 6.14.0-1017-azure) and a version snapshot artifact
 was recorded.
 
-**Next candidate**: `scientific-runtime` (requires scvelo + squidpy verification).
+### scientific-runtime — PROMOTED (2026-03-08)
+
+scientific-runtime has been promoted to **verified**.  All 3 scientific-marked
+tests passed on GitHub Actions (run 22829008242, `HendricksJudy/omicverse`
+fork, Python 3.10.19, Linux 6.14.0-1017-azure) and a version snapshot
+artifact was recorded.
+
+**Next candidate**: `extended-runtime` (requires pertpy/SEACells verification).
 
 ## Artifact Naming Convention
 
@@ -56,6 +63,22 @@ document for the full field reference.
 
 Status: **verified** (artifact: `mcp-versions-core-runtime-py3.10`, JSON: `.ci-artifacts/mcp-core-runtime-versions.json`)
 Source: ci (GitHub Actions run 22828299495, `HendricksJudy/omicverse`, 32/32 core tests passed)
+
+### scientific-runtime — 2026-03-08
+
+- Python: 3.10.19
+- omicverse: 1.7.10rc1
+- anndata: 0.11.4
+- scanpy: 1.11.5
+- scvelo: 0.3.4
+- squidpy: 1.6.5
+- numpy: 1.26.4
+- pandas: 2.3.3
+- scipy: 1.11.4
+- matplotlib: 3.10.8
+
+Status: **verified** (artifact: `mcp-versions-scientific-runtime-py3.10`, JSON: `.ci-artifacts/mcp-scientific-runtime-versions.json`)
+Source: ci (GitHub Actions run 22829008242, `HendricksJudy/omicverse`, 3/3 scientific tests passed)
 
 ### How to Record a Snapshot
 
