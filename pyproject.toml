@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools", "wheel", "flit_core >=3.4,<4","Cython"]
-build-backend = "flit_core.buildapi"
+requires = ["setuptools>=61", "wheel", "Cython"]
+build-backend = "setuptools.build_meta"
 
 
 
@@ -150,11 +150,12 @@ tests = [
 [project.urls]
 Github = 'https://github.com/Starlitnightly/omicverse'
 
-[tool.flit.sdist]
-exclude = [".*", "d*", "e*", "pa*", "s*", "t*"]
-
 [project.scripts]
 ov-skill-seeker = "omicverse.ov_skill_seeker.cli:main"
+omicverse = "omicverse.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["omicverse*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
