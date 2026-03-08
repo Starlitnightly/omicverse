@@ -1008,3 +1008,70 @@ class easter_egg(object):
 
 
 # Note: save/load/read-conversion routines were moved to `omicverse.io`.
+
+
+from pathlib import Path
+import re
+
+def split_pattern(name: str):
+    """
+    把文件名拆成:
+    prefix + number + suffix
+    例如:
+    CellOverlay_F001.jpg -> ('CellOverlay_F', 1, '.jpg')
+    """
+    m = re.match(r"^(.*?)(\d+)(\.[^.]+)$", name)
+    if m:
+        prefix, num, suffix = m.groups()
+        return prefix, int(num), suffix
+    return None
+
+def compress_files(files):
+    """
+    将同类文件压缩成:
+    [首个文件, '...', 末个文件]
+    """
+    groups = {}
+    others = []
+
+    for f in files:
+        pat = split_pattern(f.name)
+        if pat is None:
+            others.append(f)
+        else:
+            key = (pat[0], pat[2])  # prefix, suffix
+            groups.setdefault(key, []).append((pat[1], f))
+
+    result = []
+
+    for key in sorted(groups):
+        items = sorted(groups[key], key=lambda x: x[0])
+        only_files = [f for _, f in items]
+        if len(only_files) <= 2:
+            result.extend(only_files)
+        else:
+            result.extend([only_files[0], "...", only_files[-1]])
+
+    result.extend(sorted(others, key=lambda x: x.name.lower()))
+    return result
+
+def print_tree(path: Path, prefix: str = ""):
+    print(prefix + path.name + "/")
+
+    dirs = sorted([p for p in path.iterdir() if p.is_dir()], key=lambda x: x.name.lower())
+    files = sorted([p for p in path.iterdir() if p.is_file()], key=lambda x: x.name.lower())
+    files = compress_files(files)
+
+    children = dirs + files
+
+    for i, child in enumerate(children):
+        is_last = i == len(children) - 1
+        branch = "└── " if is_last else "├── "
+        next_prefix = prefix + ("    " if is_last else "│   ")
+
+        if child == "...":
+            print(prefix + branch + "...")
+        elif isinstance(child, Path) and child.is_dir():
+            print_tree(child, next_prefix)
+        else:
+            print(prefix + branch + child.name)
