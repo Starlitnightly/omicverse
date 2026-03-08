@@ -592,11 +592,12 @@ def svg(adata,mode='prost',n_svgs=3000,target_sum=50*1e4,platform="visium",
         #print(f'{n_svgs} SVGs are selected!')
     elif mode=='pearsonr':
         from ..pp import preprocess
-        bdata=preprocess(adata,mode='shiftlog|pearson',n_HVGs=n_svgs,target_sum=target_sum)
-        adata.var['space_variable_features']=bdata.var['highly_variable_features']
+        bdata=adata.copy()
+        bdata=preprocess(bdata,mode='shiftlog|pearson',n_HVGs=n_svgs,target_sum=target_sum)
+        adata.var['space_variable_features'] = False
+        both_genes = list(set(adata.var_names) & set(bdata.var_names))
+        adata.var.loc[both_genes, 'space_variable_features'] = bdata.var.loc[both_genes, 'highly_variable']
         add_reference(adata,'scanpy','spatial variable gene selection with pearsonr')
-        #adata.raw = adata
-        #adata = adata[:, adata.var.highly_variable_features]
     elif mode=='moranI':
         n_jobs        = kwargs.get('n_jobs', 1)
         n_perms       = kwargs.get('n_perms', 100)
