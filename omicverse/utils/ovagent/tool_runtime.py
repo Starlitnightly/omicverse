@@ -404,13 +404,9 @@ class ToolRuntime:
             return {"adata": adata, "output": error_output}
 
     def _tool_run_snippet(self, code: str, adata: Any) -> str:
+        """Read-only snippet — no adata copy, no serialisation round-trip."""
         try:
-            adata_copy = adata.copy() if hasattr(adata, "copy") else adata
-            result = self._executor.execute_generated_code(
-                code, adata_copy, capture_stdout=True
-            )
-            stdout = result.get("stdout", "")
-            return stdout if stdout.strip() else "(no stdout output)"
+            return self._executor.execute_snippet_readonly(code, adata)
         except Exception as e:
             return f"ERROR: {e}"
 
@@ -634,10 +630,6 @@ class ToolRuntime:
         import urllib.error
         import urllib.parse
         import urllib.request
-
-        query = (query or "").strip()
-        if not query:
-            return "Error: WebSearch requires a non-empty query."
 
         num_results = max(1, min(int(num_results), 10))
         encoded_q = urllib.parse.urlencode({"q": query})
@@ -1304,10 +1296,6 @@ class ToolRuntime:
         options: Optional[list[str]] = None,
     ) -> str:
         from ..harness.contracts import make_turn_id  # noqa: F811
-
-        question = (question or "").strip()
-        if not question:
-            return "Error: AskUserQuestion requires a non-empty question."
 
         session_id = self._ctx._get_runtime_session_id()
         trace = getattr(self._ctx, "_last_run_trace", None)

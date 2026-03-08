@@ -185,6 +185,127 @@ class FollowUpGate:
 
 
 # ---------------------------------------------------------------------------
+# Convergence monitor — soft steering for read-only tool plateaus
+# ---------------------------------------------------------------------------
+
+class ConvergenceMonitor:
+    """Detect read-only-tool plateaus and inject escalating steering messages.
+
+    Fires when the LLM calls only read-only tools (run_snippet, inspect_data,
+    search_functions, search_skills) for several consecutive turns without
+    ever using execute_code, and the output contract still has unproduced
+    artifacts.
+    """
+
+    READ_ONLY_TOOLS = frozenset({
+        "run_snippet", "inspect_data", "search_functions",
+        "search_skills", "RunSnippet", "InspectData",
+        "SearchFunctions", "SearchSkills",
+    })
+    ARTIFACT_TOOLS = frozenset({
+        "execute_code", "ExecuteCode",
+    })
+    THRESHOLD = 2
+    ESCALATION_LEVELS = 3
+
+    def __init__(self, initial_prompt: str):
+        self._consecutive_readonly = 0
+        self._execute_code_seen = False
+        self._escalation = 0
+        self._force_execute_next = False
+        self._required_artifacts = self._parse_output_contract(
+            initial_prompt
+        )
+
+    @staticmethod
+    def _parse_output_contract(prompt: str) -> List[str]:
+        """Extract artifact IDs from the OUTPUT CONTRACT block."""
+        artifacts: List[str] = []
+        in_contract = False
+        for line in prompt.split("\n"):
+            if "OUTPUT CONTRACT" in line:
+                in_contract = True
+                continue
+            if in_contract:
+                stripped = line.strip()
+                if stripped.startswith("* "):
+                    part = stripped[2:].split(":")[0].strip()
+                    if part:
+                        artifacts.append(part)
+                elif (
+                    stripped
+                    and not stripped.startswith("-")
+                    and not stripped.startswith("*")
+                ):
+                    in_contract = False
+        return artifacts
+
+    def record_turn(self, tool_names: List[str]) -> None:
+        """Call after each turn's tool dispatch completes."""
+        normalized = {
+            normalize_tool_name(n) or n for n in tool_names
+        }
+        if normalized & self.ARTIFACT_TOOLS:
+            self._execute_code_seen = True
+            self._consecutive_readonly = 0
+            return
+        if normalized and normalized <= self.READ_ONLY_TOOLS:
+            self._consecutive_readonly += 1
+        else:
+            self._consecutive_readonly = 0
+
+    def should_inject(self) -> bool:
+        """True when steering message should be injected."""
+        if self._execute_code_seen:
+            return False
+        if not self._required_artifacts:
+            return False
+        if self._consecutive_readonly < self.THRESHOLD:
+            return False
+        if self._escalation >= self.ESCALATION_LEVELS:
+            return False
+        return True
+
+    def should_force_tool_choice(self) -> bool:
+        """True when tool_choice should be forced to 'required'."""
+        if self._execute_code_seen:
+            return False
+        return self._force_execute_next
+
+    def build_steering_message(self) -> str:
+        """Return escalating steering text. Advances escalation level."""
+        self._escalation += 1
+        artifacts_str = ", ".join(self._required_artifacts)
+        if self._escalation == 1:
+            return (
+                "You have been exploring for several turns. The task "
+                f"requires producing these artifacts: [{artifacts_str}]. "
+                "You have enough context now. Call execute_code() with "
+                "the full analysis pipeline to generate these outputs. "
+                "Do NOT call run_snippet again — it cannot save files."
+            )
+        if self._escalation == 2:
+            return (
+                "IMPORTANT: You have explored extensively but have not "
+                "produced any required artifacts yet. The output "
+                f"contract requires: [{artifacts_str}]. Use "
+                "execute_code() NOW to generate these files. "
+                "run_snippet is read-only and CANNOT save files or "
+                "produce artifacts. Only execute_code() can do that."
+            )
+        # Level 3: set force flag for tool_choice override
+        self._force_execute_next = True
+        return (
+            "URGENT: No artifacts have been produced. The task WILL "
+            "FAIL unless you call execute_code() immediately to "
+            f"create: [{artifacts_str}]. You MUST call execute_code "
+            "with complete code that imports all needed libraries, "
+            "processes the data, and saves every required output file. "
+            "Do NOT call run_snippet or inspect_data."
+        )
+
+
+# ---------------------------------------------------------------------------
 # TurnController
 # ---------------------------------------------------------------------------
 
@@ -225,9 +346,15 @@ class TurnController:
         provider_info = None
         llm = self._ctx._llm
         if llm:
-            from ..model_config import get_provider
+            from ..model_config import ModelConfig, get_provider
 
             provider_info = get_provider(llm.config.provider)
+            is_openai_responses = (
+                llm.config.provider == "openai"
+                and ModelConfig.requires_responses_api(llm.config.model)
+            )
+        else:
+            is_openai_responses = False
 
         model_name = llm.config.model if llm else ""
         is_anthropic_wire = (
@@ -238,7 +365,16 @@ class TurnController:
             or "claude" in model_name.lower()
         )
 
-        if is_anthropic_wire:
+        if is_openai_responses:
+            for tc_id, tc_name, tc_output in tool_results:
+                messages.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": tc_id,
+                        "output": tc_output,
+                    }
+                )
+        elif is_anthropic_wire:
             content_blocks = []
             for tc_id, tc_name, tc_output in tool_results:
                 content_blocks.append(
@@ -587,6 +723,9 @@ class TurnController:
         completed_without_tool_calls = False
         meaningful_tool_call_seen = False
         no_tool_retry_count = 0
+        convergence_monitor = ConvergenceMonitor(
+            messages[-1]["content"] if messages else ""
+        )
         llm_model_name = (
             getattr(getattr(ctx._llm, "config", None), "model", None)
             or ctx.model
@@ -594,7 +733,7 @@ class TurnController:
         _is_anthropic_model = "claude" in str(llm_model_name).lower()
         max_no_tool_retries = 3 if _is_anthropic_model else 2
         chat_timeout = float(
-            os.environ.get("OV_AGENT_CHAT_TIMEOUT_SECONDS", "45")
+            os.environ.get("OV_AGENT_CHAT_TIMEOUT_SECONDS", "120")
         )
         ctx._approval_handler = approval_handler
 
@@ -641,6 +780,13 @@ class TurnController:
                     had_meaningful_tool_call=meaningful_tool_call_seen,
                     forced_retry=no_tool_retry_count > 0,
                 )
+                if convergence_monitor.should_force_tool_choice():
+                    tool_choice = "required"
+                    convergence_monitor._force_execute_next = False
+                    logger.info(
+                        "convergence_force_tool_choice turn=%d",
+                        turn + 1,
+                    )
 
                 logger.info(
                     "agentic_llm_call_start turn=%d/%d tool_choice=%s "
@@ -736,7 +882,10 @@ class TurnController:
                     ctx.last_usage = response.usage
 
                 if response.raw_message:
-                    messages.append(response.raw_message)
+                    if isinstance(response.raw_message, list):
+                        messages.extend(response.raw_message)
+                    else:
+                        messages.append(response.raw_message)
                 elif response.content:
                     messages.append(
                         {"role": "assistant", "content": response.content}
@@ -745,14 +894,18 @@ class TurnController:
                 # Text-only response
                 if not response.tool_calls:
                     if response.content:
-                        final_summary = response.content
+                        final_summary = (
+                            response.content
+                            if isinstance(response.content, str)
+                            else str(response.content)
+                        )
                         recorder.add_step(
                             "llm_chunk",
-                            summary=response.content[:200],
+                            summary=final_summary[:200],
                         )
                         print(
                             "   \U0001f4ac Agent response: "
-                            f"{response.content[:200]}"
+                            f"{final_summary[:200]}"
                         )
                         await emit(
                             build_stream_event(
@@ -767,7 +920,7 @@ class TurnController:
                     should_follow_up = (
                         FollowUpGate.should_continue_after_text(
                             request=request,
-                            response_content=response.content or "",
+                            response_content=final_summary or "",
                             adata=current_adata,
                             had_meaningful_tool_call=(
                                 meaningful_tool_call_seen
@@ -1124,21 +1277,6 @@ class TurnController:
                                 )
                             )
 
-                    await emit(
-                        build_stream_event(
-                            "tool_result",
-                            {
-                                "name": canonical or tc.name,
-                                "output": tool_output[:1200],
-                            },
-                            turn_id=recorder.trace.turn_id,
-                            trace_id=recorder.trace.trace_id,
-                            step_id=tool_step_id,
-                            session_id=recorder.trace.session_id,
-                            category="tool",
-                        )
-                    )
-
                     tool_results.append(
                         (tc.id, tc.name, tool_output)
                     )
@@ -1160,6 +1298,40 @@ class TurnController:
                     )
 
                 self._append_tool_results(messages, tool_results)
+
+                # --- Convergence steering ---
+                convergence_monitor.record_turn(
+                    [tc.name for tc in response.tool_calls]
+                )
+                if (
+                    not finished
+                    and convergence_monitor.should_inject()
+                ):
+                    steering = (
+                        convergence_monitor.build_steering_message()
+                    )
+                    messages.append(
+                        {"role": "user", "content": steering}
+                    )
+                    logger.info(
+                        "convergence_steering_injected turn=%d "
+                        "level=%d",
+                        turn + 1,
+                        convergence_monitor._escalation,
+                    )
+                    recorder.add_step(
+                        "status",
+                        summary="convergence_steering_injected",
+                        data={
+                            "escalation_level": (
+                                convergence_monitor._escalation
+                            ),
+                            "consecutive_readonly": (
+                                convergence_monitor
+                                ._consecutive_readonly
+                            ),
+                        },
+                    )
 
                 if finished:
                     summary = final_summary or tc.arguments.get(
