@@ -1147,7 +1147,9 @@ def bin2cell(
     )
 
     if add_geometry:
+        import os
         import warnings
+        from concurrent.futures import ThreadPoolExecutor, as_completed
         import pandas as pd
         import shapely
         from shapely.errors import GEOSException
@@ -1266,16 +1268,7 @@ def bin2cell(
                 coords_sorted[:, 1] + half,
             )
 
-        geometry_map = {}
-        label_iter = zip(unique_labels, starts, counts)
-        if show_progress:
-            label_iter = tqdm(
-                label_iter,
-                total=len(unique_labels),
-                desc="bin2cell geometry",
-                leave=False,
-            )
-        for lab, start, count in label_iter:
+        def _build_geometry(lab, start, count):
             part = boxes[start:start + count]
             try:
                 # Faster for grid-cell coverages (touching but non-overlapping polygons).
@@ -1290,7 +1283,37 @@ def bin2cell(
                     geom = max(geom.geoms, key=lambda g: g.area)
                 except Exception:
                     pass
-            geometry_map[str(int(lab))] = "" if geom.is_empty else geom.wkt
+            return str(int(lab)), "" if geom.is_empty else geom.wkt
+
+        geometry_map = {}
+        tasks = list(zip(unique_labels, starts, counts))
+        max_workers = min(len(tasks), max(1, os.cpu_count() or 1))
+        if max_workers <= 1:
+            label_iter = tasks
+            if show_progress:
+                label_iter = tqdm(
+                    label_iter,
+                    total=len(tasks),
+                    desc="bin2cell geometry",
+                    leave=False,
+                )
+            for lab, start, count in label_iter:
+                key, wkt = _build_geometry(lab, start, count)
+                geometry_map[key] = wkt
+        else:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [executor.submit(_build_geometry, lab, start, count) for lab, start, count in tasks]
+                done_iter = as_completed(futures)
+                if show_progress:
+                    done_iter = tqdm(
+                        done_iter,
+                        total=len(futures),
+                        desc="bin2cell geometry",
+                        leave=False,
+                    )
+                for future in done_iter:
+                    key, wkt = future.result()
+                    geometry_map[key] = wkt
 
         object_ids = cell_adata.obs["object_id"].astype(np.int64).astype(str)
         cell_adata.obs[geometry_key] = object_ids.map(geometry_map).fillna("")
