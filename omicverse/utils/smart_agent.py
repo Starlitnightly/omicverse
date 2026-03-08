@@ -41,11 +41,16 @@ from pathlib import Path
 _parent_pkg = sys.modules.get("omicverse")
 _utils_pkg = sys.modules.get("omicverse.utils")
 if _parent_pkg is not None and _utils_pkg is not None:
-    if not hasattr(_parent_pkg, "utils"):
+    # Avoid ``hasattr`` here: the real ``omicverse`` package implements
+    # ``__getattr__`` for lazy imports, and probing ``utils`` would re-enter the
+    # lazy loader while ``omicverse.utils.smart_agent`` is still importing.
+    parent_attrs = getattr(_parent_pkg, "__dict__", {})
+    if "utils" not in parent_attrs:
         setattr(_parent_pkg, "utils", _utils_pkg)
 
     module_name = __name__.split(".")[-1]
-    if not hasattr(_utils_pkg, module_name):
+    utils_attrs = getattr(_utils_pkg, "__dict__", {})
+    if module_name not in utils_attrs:
         setattr(_utils_pkg, module_name, sys.modules[__name__])
 
 # Internal LLM backend (Pantheon replacement)
