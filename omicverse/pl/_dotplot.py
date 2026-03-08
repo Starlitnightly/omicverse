@@ -784,29 +784,41 @@ def markers_dotplot(
     Wraps :func:`rank_genes_groups_dotplot` with more convenient defaults:
     ``standard_scale='var'``, ``cmap='Spectral_r'``, and ``dendrogram=False``.
 
-    Arguments:
-        adata: Annotated data matrix.
-        groupby: Key in ``adata.obs`` to group by. If ``None``, the value
-            stored in ``adata.uns[key]['params']['groupby']`` is used.
-        key: Key in ``adata.uns`` containing the ``rank_genes_groups`` results.
-            Default: ``'rank_genes_groups'``.
-        n_genes: Number of top marker genes per group to display. Default: ``5``.
-        groups: Groups to include in the plot. ``None`` shows all groups.
-            Default: ``None``.
-        standard_scale: Standardise colour values. ``'var'`` (per-gene) or
-            ``'group'`` (per-cell-type). Default: ``'var'``.
-        cmap: Colormap for mean expression. Default: ``'Spectral_r'``.
-        dendrogram: Add a dendrogram to the plot. Default: ``False``.
-        min_logfoldchange: Minimum absolute log fold change to filter genes.
-            Default: ``None``.
-        use_raw: Use ``adata.raw`` for expression values. ``None`` auto-detects.
-            Default: ``None``.
-        layer: Layer to use for expression. Default: ``None``.
-        figsize: Figure size ``(width, height)`` in inches. Default: ``None``.
-        show: Show the figure. Default: ``None``.
-        save: Path or ``True`` to save the figure. Default: ``None``.
-        return_fig: Return the figure object. Default: ``False``.
-        **kwds: Additional keyword arguments forwarded to :func:`dotplot`.
+    Parameters
+    ----------
+    adata : AnnData
+        Annotated data matrix.
+    groupby : str or None, default=None
+        Key in ``adata.obs`` to group by. If ``None``, uses
+        ``adata.uns[key]['params']['groupby']``.
+    key : str or None, default=None
+        Key in ``adata.uns`` containing ``rank_genes_groups`` results.
+    n_genes : int, default=5
+        Number of top marker genes shown per group.
+    groups : str or Sequence[str] or None, default=None
+        Subset of groups to include.
+    standard_scale : {'var', 'group'} or None, default='var'
+        Standardization mode for color values.
+    cmap : Colormap or str or None, default='Spectral_r'
+        Colormap for mean expression.
+    dendrogram : bool, default=False
+        Whether to include a dendrogram.
+    min_logfoldchange : float or None, default=None
+        Minimum log-fold-change threshold for marker inclusion.
+    use_raw : bool or None, default=None
+        Whether to use ``adata.raw`` values.
+    layer : str or None, default=None
+        Layer used for expression values.
+    figsize : tuple[float, float] or None, default=None
+        Figure size in inches.
+    show : bool or None, default=None
+        Whether to display the figure.
+    save : str or bool or None, default=None
+        Save option/path.
+    return_fig : bool, default=False
+        Whether to return the generated plot object.
+    **kwds
+        Additional keyword arguments forwarded to :func:`dotplot`.
 
     Returns:
         Figure or axes object when ``return_fig=True`` or ``show=False``;

@@ -27,7 +27,8 @@ class scANNORL(object):
         """
         Configure the GNN model of BulkTrajBlend.
 
-        Arguments:
+        Parameters
+        ----------
             gpu: The GPU ID for training the GNN model. Default is 0.
             hidden_size: The hidden size for the GNN model. Default is 128.
             weight_decay: The weight decay for the GNN model. Default is 1e-2.
@@ -41,6 +42,9 @@ class scANNORL(object):
             batch_size: The batch size for training the GNN model. Default is 2000.
             num_workers: The number of workers for training the GNN model. Default is 5.
 
+        Returns
+        -------
+        None
         """
         nocd_obj=ov.single.scnocd(self.adata,gpu=gpu)
         #nocd_obj.device = torch.device(f"cuda:{gpu}") if gpu >= 0 and torch.cuda.is_available() else torch.device('cpu')
@@ -60,11 +64,15 @@ class scANNORL(object):
         """
         Train the GNN model of BulkTrajBlend.
 
-        Arguments:
+        Parameters
+        ----------
             thresh: The threshold for the GNN model. Default is 0.5.
             gnn_save_dir: The directory for saving the GNN model. Default is 'save_model'.
             gnn_save_name: The name for saving the GNN model. Default is 'gnn'.
-        
+
+        Returns
+        -------
+        None
         """
         self.nocd_obj.GNN_model()
         self.nocd_obj.GNN_result(thresh=thresh)
@@ -74,10 +82,14 @@ class scANNORL(object):
         """
         Load the GNN model of BulkTrajBlend.
 
-        Arguments:
+        Parameters
+        ----------
             gnn_load_dir: The directory for loading the GNN model.
             thresh: The threshold for the GNN model. Default is 0.5.
-        
+
+        Returns
+        -------
+        None
         """
         self.nocd_obj.load(gnn_load_dir)
         self.nocd_obj.GNN_result(thresh=thresh)

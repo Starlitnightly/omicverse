@@ -748,7 +748,7 @@ class Deconvolution(object):
     description="Generate per-cell-type marker gene signatures from scRNA-seq references for spatial deconvolution methods such as Starfysh.",
     prerequisites={'optional_functions': ['single.get_celltype_marker']},
     requires={'obs': ['clustertype labels'], 'var': ['gene symbols']},
-    produces={'table': ['gene signature matrix (columns=cell types)']},
+    produces={},
     auto_fix='none',
     examples=[
         "gene_sig = ov.space.calculate_gene_signature(adata_sc, clustertype='celltype', topgenenumber=50)",

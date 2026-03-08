@@ -10,6 +10,7 @@ import numpy as np
 #from fast_array_utils import stats
 
 from .._settings import settings, EMOJI, Colors
+from .._registry import register_function
 from ._compat import CSBase, CSCBase, CSRBase, DaskArray, old_positionals
 
 # Import local implementations from _scale.py
@@ -463,6 +464,25 @@ def log1p_array(x: np.ndarray, *, base: Number | None = None, copy: bool = False
         x=np.divide(x, np.log(base))
     return x
 
+@register_function(
+    aliases=["log1p", "对数归一化", "log_transform", "log变换", "对数转换"],
+    category="preprocessing",
+    description="Apply log(1+x) transform to expression matrix or selected layer/obsm",
+    prerequisites={
+        "optional_functions": ["normalize_total", "qc"]
+    },
+    requires={},
+    produces={
+        "uns": ["log1p"]
+    },
+    auto_fix="none",
+    examples=[
+        "ov.pp.log1p(adata)",
+        "ov.pp.log1p(adata, layer='counts')",
+        "adata = ov.pp.log1p(adata, copy=True)",
+    ],
+    related=["normalize_total", "highly_variable_genes", "preprocess"],
+)
 def log1p(
     adata: AnnData,
     *,
@@ -473,6 +493,31 @@ def log1p(
     layer: str | None = None,
     obsm: str | None = None,
 ) -> AnnData | None:
+    """Log-transform expression values with ``log(1 + x)``.
+
+    Parameters
+    ----------
+    adata : AnnData
+        AnnData object containing expression values.
+    base : Number, optional
+        Logarithm base. Uses natural logarithm when ``None``.
+    copy : bool, default=False
+        If ``True``, return a transformed copy instead of modifying in place.
+    chunked : bool, default=False
+        Whether to transform ``adata.X`` by chunks for memory efficiency.
+    chunk_size : int, optional
+        Number of cells per chunk when ``chunked=True``.
+    layer : str, optional
+        Layer name to transform instead of ``adata.X``.
+    obsm : str, optional
+        ``adata.obsm`` key to transform instead of ``adata.X``.
+
+    Returns
+    -------
+    AnnData or None
+        Returns a transformed AnnData when ``copy=True``; otherwise modifies
+        ``adata`` in place and returns ``None``.
+    """
     if "log1p" in adata.uns:
         print(f"{Colors.WARNING}adata.X seems to be already log-transformed.{Colors.ENDC}")
 
