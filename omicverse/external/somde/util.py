@@ -1,8 +1,8 @@
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap
-import scipy as sp
 from scipy import interpolate
 
 import logging
@@ -13,7 +13,28 @@ from scipy import linalg
 from scipy import stats
 from scipy.misc import derivative
 from scipy.special import logsumexp
-from tqdm import tqdm
+
+try:
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        from tqdm.auto import tqdm as _tqdm
+except Exception:
+    _tqdm = None
+
+
+def _print_progress(current, total, desc='Genes'):
+    bar_len = 30
+    filled = int(bar_len * current / total)
+    bar = '█' * filled + '░' * (bar_len - filled)
+    print(f'\r  {desc} [{bar}] {current}/{total}', end='', flush=True)
+    if current == total:
+        print()
+
+
+def _progress_iter(iterable, total, desc, use_tqdm=True, leave=False):
+    if use_tqdm and _tqdm is not None:
+        return _tqdm(iterable, total=total, desc=desc, leave=leave)
+    return iterable
 
 
 def plotgene(X,mtx,draw_list,result,sp=10,lw=0.2,N=5,plotsize=5):
@@ -119,12 +140,12 @@ def qvalue(pv, pi0=None):
     else:
         # evaluate pi0 for different lambdas
         pi0 = []
-        lam = sp.arange(0, 0.90, 0.01)
-        counts = sp.array([(pv > i).sum() for i in sp.arange(0, 0.9, 0.01)])
+        lam = np.arange(0, 0.90, 0.01)
+        counts = np.array([(pv > i).sum() for i in np.arange(0, 0.9, 0.01)])
         for l in range(len(lam)):
             pi0.append(counts[l]/(m*(1-lam[l])))
 
-        pi0 = sp.array(pi0)
+        pi0 = np.array(pi0)
 
         # fit natural cubic spline
         tck = interpolate.splrep(lam, pi0, k=3)
@@ -135,7 +156,7 @@ def qvalue(pv, pi0=None):
 
     assert(pi0 >= 0 and pi0 <= 1), "pi0 is not between 0 and 1: %f" % pi0
 
-    p_ordered = sp.argsort(pv)
+    p_ordered = np.argsort(pv)
     pv = pv[p_ordered]
     qv = pi0 * m/len(pv) * pv
     qv[-1] = min(qv[-1], 1.0)
@@ -145,7 +166,7 @@ def qvalue(pv, pi0=None):
 
     # reorder qvalues
     qv_temp = qv.copy()
-    qv = sp.zeros_like(qv)
+    qv = np.zeros_like(qv)
     qv[p_ordered] = qv_temp
 
     # reshape qvalues
@@ -194,12 +215,10 @@ def gower_scaling_factor(K):
     ''' Gower normalization factor for covariance matric K
 
     Based on https://github.com/PMBio/limix/blob/master/limix/utils/preprocess.py
+    tr(PKP) = tr(K) - sum(K)/n  where P = I - 11^T/n
     '''
     n = K.shape[0]
-    P = np.eye(n) - np.ones((n, n)) / n
-    KP = K - K.mean(0)[:, np.newaxis]
-    trPKP = np.sum(P * KP)
-
+    trPKP = np.trace(K) - K.sum() / n
     return trPKP / (n - 1)
 
 
@@ -342,87 +361,80 @@ def make_FSV(UTy, S, n, Gower):
     return FSV
 
 
-def lengthscale_fits(exp_tab, U, UT1, S, Gower, num=64):
-    ''' Fit GPs after pre-processing for particular lengthscale
+def _fit_one_gene(g, gene_name, UTy, UT1, S, n, Gower):
+    """Fit a single gene; used by both serial and parallel paths."""
+    t0 = time()
+    max_reg_ll, max_delta, max_mu_hat, max_s2_t_hat, s2_logdelta = lbfgsb_max_LL(UTy, UT1, S, n)
+    t = time() - t0
+    FSV = make_FSV(UTy, S, n, Gower)
+    s2_FSV = derivative(FSV, np.log(max_delta), n=1) ** 2 * s2_logdelta
+    return {
+        'g': gene_name,
+        'max_ll': max_reg_ll,
+        'max_delta': max_delta,
+        'max_mu_hat': max_mu_hat,
+        'max_s2_t_hat': max_s2_t_hat,
+        'time': t,
+        'n': n,
+        'FSV': FSV(np.log(max_delta)),
+        's2_FSV': s2_FSV,
+        's2_logdelta': s2_logdelta,
+    }
+
+
+def lengthscale_fits(exp_tab, U, UT1, S, Gower, n_jobs=1, num=64, use_tqdm=True):
+    '''Fit GPs after pre-processing for particular lengthscale.
+
+    Optimizations: batch UTy via matrix multiply; optional joblib parallelism.
     '''
-    results = []
     n, G = exp_tab.shape
-    for g in tqdm(range(G), leave=False):
-        y = exp_tab.iloc[:, g]
-        UTy = get_UTy(U, y)
+    vals = exp_tab.values
+    UTY = vals.T.dot(U)          # G × n — one matrix mult instead of G dot products
+    gene_names = list(exp_tab.columns)
 
-        t0 = time()
-        max_reg_ll, max_delta, max_mu_hat, max_s2_t_hat, s2_logdelta = lbfgsb_max_LL(UTy, UT1, S, n)
-        max_ll = max_reg_ll
-        t = time() - t0
-
-        # Estimate standard error of Fraction Spatial Variance
-        FSV = make_FSV(UTy, S, n, Gower)
-        s2_FSV = derivative(FSV, np.log(max_delta), n=1) ** 2 * s2_logdelta
-        
-        results.append({
-            'g': exp_tab.columns[g],
-            'max_ll': max_ll,
-            'max_delta': max_delta,
-            'max_mu_hat': max_mu_hat,
-            'max_s2_t_hat': max_s2_t_hat,
-            'time': t,
-            'n': n,
-            'FSV': FSV(np.log(max_delta)),
-            's2_FSV': s2_FSV,
-            's2_logdelta': s2_logdelta
-        })
-        
+    if n_jobs == 1:
+        results = []
+        for g in _progress_iter(range(G), total=G, desc='Genes', use_tqdm=use_tqdm, leave=False):
+            results.append(_fit_one_gene(g, gene_names[g], UTY[g], UT1, S, n, Gower))
+            if not use_tqdm:
+                _print_progress(g + 1, G)
+    else:
+        from joblib import Parallel, delayed
+        results = Parallel(n_jobs=n_jobs, prefer='threads')(
+            delayed(_fit_one_gene)(g, gene_names[g], UTY[g], UT1, S, n, Gower)
+            for g in _progress_iter(range(G), total=G, desc='Genes', use_tqdm=use_tqdm, leave=False)
+        )
+        if not use_tqdm:
+            _print_progress(G, G)
     return pd.DataFrame(results)
 
 
 def null_fits(exp_tab):
-    ''' Get maximum LL for null model
-    '''
-    results = []
+    '''Get maximum LL for null model (vectorized).'''
     n, G = exp_tab.shape
-    for g in range(G):
-        y = exp_tab.iloc[:, g]
-        max_mu_hat = 0.
-        max_s2_e_hat = np.square(y).sum() / n  # mll estimate
-        max_ll = -0.5 * (n * np.log(2 * np.pi) + n + n * np.log(max_s2_e_hat))
-
-        results.append({
-            'g': exp_tab.columns[g],
-            'max_ll': max_ll,
-            'max_delta': np.inf,
-            'max_mu_hat': max_mu_hat,
-            'max_s2_t_hat': 0.,
-            'time': 0,
-            'n': n
-        })
-    
-    return pd.DataFrame(results)
+    vals = exp_tab.values
+    max_s2_e = np.square(vals).sum(0) / n
+    max_ll = -0.5 * (n * np.log(2 * np.pi) + n + n * np.log(max_s2_e))
+    return pd.DataFrame({
+        'g': exp_tab.columns, 'max_ll': max_ll,
+        'max_delta': np.inf, 'max_mu_hat': 0.,
+        'max_s2_t_hat': 0., 'time': 0, 'n': n,
+    })
 
 
 def const_fits(exp_tab):
-    ''' Get maximum LL for const model
-    '''
-    results = []
+    '''Get maximum LL for const model (vectorized).'''
     n, G = exp_tab.shape
-    for g in range(G):
-        y = exp_tab.iloc[:, g]
-        max_mu_hat = y.mean()
-        max_s2_e_hat = y.var()
-        sum1 = np.square(y - max_mu_hat).sum()
-        max_ll = -0.5 * ( n * np.log(max_s2_e_hat) + sum1 / max_s2_e_hat + n * np.log(2 * np.pi) )
-
-        results.append({
-            'g': exp_tab.columns[g],
-            'max_ll': max_ll,
-            'max_delta': np.inf,
-            'max_mu_hat': max_mu_hat,
-            'max_s2_t_hat': 0.,
-            'time': 0,
-            'n': n
-        })
-    
-    return pd.DataFrame(results)
+    vals = exp_tab.values
+    means = vals.mean(0)
+    vars_ = np.where(vals.var(0) == 0, 1e-10, vals.var(0))
+    sum1 = np.square(vals - means).sum(0)
+    max_ll = -0.5 * (n * np.log(vars_) + sum1 / vars_ + n * np.log(2 * np.pi))
+    return pd.DataFrame({
+        'g': exp_tab.columns, 'max_ll': max_ll,
+        'max_delta': np.inf, 'max_mu_hat': means,
+        'max_s2_t_hat': 0., 'time': 0, 'n': n,
+    })
 
 
 def simulate_const_model(MLL_params, N):
@@ -445,65 +457,45 @@ def get_mll_results(results, null_model='const'):
 
     return mll_results
 
-def dyn_de(X, exp_tab, kernel_space=None):
-    if kernel_space == None:
-        kernel_space = {
-            'SE': [5., 25., 50.]
-        }
+def dyn_de(X, exp_tab, kernel_space=None, n_jobs=1, use_tqdm=True):
+    if kernel_space is None:
+        kernel_space = {'SE': [5., 25., 50.]}
 
     results = []
 
     if 'null' in kernel_space:
         result = null_fits(exp_tab)
-        result['l'] = np.nan
-        result['M'] = 1
-        result['model'] = 'null'
+        result['l'] = np.nan; result['M'] = 1; result['model'] = 'null'
         results.append(result)
 
     if 'const' in kernel_space:
         result = const_fits(exp_tab)
-        result['l'] = np.nan
-        result['M'] = 2
-        result['model'] = 'const'
+        result['l'] = np.nan; result['M'] = 2; result['model'] = 'const'
         results.append(result)
 
-    logging.info('Pre-calculating USU^T = K\'s ...')
+    logging.info("Pre-calculating USU^T = K's ...")
     US_mats = []
     t0 = time()
     if 'SE' in kernel_space:
         for lengthscale in kernel_space['SE']:
             K = SE_kernel(X, lengthscale)
             U, S = factor(K)
-            gower = gower_scaling_factor(K)
-            UT1 = get_UT1(U)
-            US_mats.append({
-                'model': 'SE',
-                'M': 4,
-                'l': lengthscale,
-                'U': U,
-                'S': S,
-                'UT1': UT1,
-                'Gower': gower
-            })
+            US_mats.append({'model': 'SE', 'M': 4, 'l': lengthscale,
+                            'U': U, 'S': S, 'UT1': get_UT1(U),
+                            'Gower': gower_scaling_factor(K)})
 
-    t = time() - t0
-    logging.info('Done: {0:.2}s'.format(t))
+    logging.info('Done: {0:.2f}s'.format(time() - t0))
     logging.info('Fitting gene models')
-    n_models = len(US_mats)
-    for i, cov in enumerate(tqdm(US_mats, desc='Models: ')):
-        result = lengthscale_fits(exp_tab, cov['U'], cov['UT1'], cov['S'], cov['Gower'])
-        result['l'] = cov['l']
-        result['M'] = cov['M']
-        result['model'] = cov['model']
+    for cov in _progress_iter(US_mats, total=len(US_mats), desc='Models', use_tqdm=use_tqdm, leave=False):
+        result = lengthscale_fits(exp_tab, cov['U'], cov['UT1'], cov['S'], cov['Gower'],
+                                  n_jobs=n_jobs, use_tqdm=use_tqdm)
+        result['l'] = cov['l']; result['M'] = cov['M']; result['model'] = cov['model']
         results.append(result)
-
-    n_genes = exp_tab.shape[1]
-    logging.info('Finished fitting {} models to {} genes'.format(n_models, n_genes))
 
     results = pd.concat(results, sort=True).reset_index(drop=True)
     results['BIC'] = -2 * results['max_ll'] + results['M'] * np.log(results['n'])
-
     return results
+
 
 def get_mll_results(results, null_model='const'):
     null_lls = results.query('model == "{}"'.format(null_model))[['g', 'max_ll']]
@@ -511,7 +503,6 @@ def get_mll_results(results, null_model='const'):
     model_results = model_results[model_results.groupby(['g'])['max_ll'].transform(max) == model_results['max_ll']]
     mll_results = model_results.merge(null_lls, on='g', suffixes=('', '_null'))
     mll_results['LLR'] = mll_results['max_ll'] - mll_results['max_ll_null']
-
     return mll_results
 
 def stabilize(expression_matrix):
