@@ -18,8 +18,10 @@ echo "=== MCP CI Profile: scientific-runtime ==="
 echo "Scope: scientific-tier tests (requires scvelo + squidpy)"
 
 if [[ "$INSTALL" == true ]]; then
-    echo "--- Installing dependencies ---"
-    pip install -e "$REPO_ROOT[tests,mcp]" -r "$REPO_ROOT/requirements/mcp-scientific-runtime.txt"
+    echo "--- Installing scientific deps first ---"
+    pip install -r "$REPO_ROOT/requirements/mcp-scientific-runtime.txt"
+    echo "--- Installing omicverse + test deps ---"
+    pip install -e "$REPO_ROOT[tests,mcp]"
 fi
 
 PYTEST_EXIT=0
