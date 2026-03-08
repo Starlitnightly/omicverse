@@ -3,7 +3,5 @@
 # and may fail to install on some platforms.
 
 pertpy>=0.7.0
-# SEACells and mira have limited PyPI availability and strict deps.
-# Install failures here are expected in some environments.
-# SEACells  # uncomment when available on target platform
-# mira      # uncomment when available on target platform
+SEACells>=0.3.0,<0.4
+# mira-multiome  # BLOCKED: requires torch>=1.8 (~300MB), pyro-ppl, MOODS-python (C build); no extended tests exercise mira

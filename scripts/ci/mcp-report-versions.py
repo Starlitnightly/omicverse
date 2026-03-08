@@ -34,7 +34,7 @@ PROFILE_PACKAGES = {
     ],
     "extended-runtime": [
         "omicverse", "anndata", "scanpy", "numpy", "pandas", "scipy",
-        "matplotlib", "scvelo", "squidpy", "pertpy", "SEACells", "mira",
+        "matplotlib", "scvelo", "squidpy", "pertpy", "SEACells", "mira-multiome",
     ],
 }
 
