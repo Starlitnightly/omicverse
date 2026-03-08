@@ -191,22 +191,39 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
              ):
     r"""Configure plotting settings for OmicVerse.
     
-    Arguments:
-        verbosity: Scanpy verbosity level. Default: 3.
-        dpi: Resolution for matplotlib figures. Default: 80.
-        facecolor: Background color for figures. Default: 'white'.
-        font_path: Path to font for custom fonts. Default: None.
-        ipython_format: IPython display format. Default: 'retina'.
-        dpi_save: Resolution for saved figures. Default: 300.
-        transparent: Whether to use transparent background. Default: None.
-        scanpy: Whether to apply scanpy settings. Default: True.
-        fontsize: Default font size for plots. Default: 14.
-        color_map: Default color map for plots. Default: None.
-        figsize: Default figure size. Default: None.
-        vector_friendly: Control rasterization for vector-friendly plots. Default: True.
+    Parameters
+    ----------
+    verbosity:int
+        Scanpy verbosity level.
+    dpi:int
+        Figure DPI for on-screen rendering.
+    facecolor:str
+        Figure and axes background color.
+    font_path:str or None
+        Optional custom font path or keyword (for example ``'arial'``).
+    ipython_format:str
+        Inline backend display format in IPython.
+    dpi_save:int
+        DPI for saved figures.
+    transparent:bool or None
+        Whether saved figures use transparent background.
+    scanpy:bool
+        Whether to apply scanpy rcParams preset.
+    fontsize:int
+        Global font size used in plotting styles.
+    color_map:str or None
+        Default colormap.
+    figsize:int or None
+        Default figure size; scalar values are converted to square tuple.
+    vector_friendly:bool
+        Whether to prefer vector-friendly rasterization behavior.
+    show_monitor:bool
+        Whether runtime monitor messages are shown.
         
-    Returns:
-        None: The function configures global plotting settings and displays initialization information.
+    Returns
+    -------
+    None
+        Applies global plotting configuration.
     """
     global _has_printed_logo
 
@@ -398,26 +415,51 @@ style=plot_set
 
 
 
+@register_function(
+    aliases=['调色板', 'pyomic_palette', 'omicverse palette'],
+    category="utils",
+    description="Return a high-contrast categorical color palette commonly used for cell-type and cluster visualization in OmicVerse.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['colors = ov.utils.pyomic_palette()'],
+    related=['utils.palette', 'utils.plot_cellproportion']
+)
 def pyomic_palette()->list:
     r"""Returns the default OmicVerse color palette.
     
-    Returns:
+    Returns
+    -------
         List of hex color codes for plotting
-    """ 
+    """
     return sc_color
 
+@register_function(
+    aliases=['颜色方案', 'palette', 'categorical palette'],
+    category="utils",
+    description="Return standardized categorical color maps for consistent annotation coloring across plots and reports.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['colors = ov.utils.palette()'],
+    related=['utils.pyomic_palette', 'pl.embedding']
+)
 def palette()->list:
     r"""Returns the default OmicVerse color palette.
     
-    Returns:
+    Returns
+    -------
         List of hex color codes for plotting
-    """ 
+    """
     return sc_color
 
 def red_palette()->list:
     r"""Returns a red-themed color palette.
     
-    Returns:
+    Returns
+    -------
         List of red-themed hex color codes
     """ 
     return red_color
@@ -425,7 +467,8 @@ def red_palette()->list:
 def green_palette()->list:
     r"""Returns a green-themed color palette.
     
-    Returns:
+    Returns
+    -------
         List of green-themed hex color codes
     """ 
     return green_color
@@ -433,7 +476,8 @@ def green_palette()->list:
 def orange_palette()->list:
     r"""Returns an orange-themed color palette.
     
-    Returns:
+    Returns
+    -------
         List of orange-themed hex color codes
     """ 
     return orange_color
@@ -441,21 +485,39 @@ def orange_palette()->list:
 def blue_palette()->list:
     r"""Returns a blue-themed color palette.
     
-    Returns:
+    Returns
+    -------
         List of blue-themed hex color codes
     """ 
     return blue_color
 
+@register_function(
+    aliases=['文本标注避让', 'plot_text_set', 'adjust plot text'],
+    category="utils",
+    description="Post-process overlapping text labels in figures to improve readability of pathway, gene, or cluster annotations.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['texts = ov.utils.plot_text_set(texts, text_knock=0.6, text_maxsize=12)'],
+    related=['bulk.geneset_plot_multi', 'utils.plot_cellproportion']
+)
 def plot_text_set(text, text_knock=2, text_maxsize=20):
     r"""Format text for plotting by adding line breaks.
     
-    Arguments:
-        text: Text string to format
-        text_knock: Number of words between line breaks (2)
-        text_maxsize: Maximum text length before formatting (20)
+    Parameters
+    ----------
+    text:str
+        Text string to reformat.
+    text_knock:int
+        Word interval used when inserting line breaks.
+    text_maxsize:int
+        Maximum text length before reformatting.
         
-    Returns:
-        Formatted text string with line breaks
+    Returns
+    -------
+    str
+        Formatted text with inserted line breaks.
     """
     if len(text) <= text_maxsize:
         return text
@@ -473,12 +535,17 @@ def plot_text_set(text, text_knock=2, text_maxsize=20):
 def ticks_range(x,width):
     r"""Generate tick positions for multi-group plots.
     
-    Arguments:
-        x: Number of ticks
-        width: Width spacing between ticks
+    Parameters
+    ----------
+    x:int
+        Number of grouped categories.
+    width:float
+        Offset spacing between groups.
         
-    Returns:
-        List of tick positions
+    Returns
+    -------
+    list
+        Relative tick offsets for grouped plotting.
     """
     nticks=[]
     pticks=[]
@@ -500,21 +567,35 @@ def plot_boxplot(data,hue,x_value,y_value,width=0.6,title='',
                  legend_bbox=(1, 0.55),legend_ncol=1,):
     r"""Create boxplot with jittered points for grouped data.
     
-    Arguments:
-        data: DataFrame containing the data to plot
-        hue: Column name for grouping variable
-        x_value: Column name for x-axis categories
-        y_value: Column name for y-axis values
-        width: Width of boxplots (0.6)
-        title: Plot title ('')
-        figsize: Figure size ((6,3))
-        palette: List of colors (None)
-        fontsize: Font size for labels (10)
-        legend_bbox: Legend bounding box ((1, 0.55))
-        legend_ncol: Number of legend columns (1)
+    Parameters
+    ----------
+    data:pd.DataFrame
+        Input table containing numeric values and grouping columns.
+    hue:str
+        Column name used for color grouping.
+    x_value:str
+        Column name used for x-axis category.
+    y_value:str
+        Column name containing numeric values.
+    width:float
+        Width of each box element.
+    title:str
+        Plot title.
+    figsize:tuple
+        Figure size.
+    palette:list or None
+        Color list for hue groups.
+    fontsize:int
+        Font size for labels and ticks.
+    legend_bbox:tuple
+        Legend anchor location.
+    legend_ncol:int
+        Number of legend columns.
         
-    Returns:
-        Tuple of (figure, axes) objects
+    Returns
+    -------
+    Tuple[matplotlib.figure.Figure,matplotlib.axes.Axes]
+        Figure and axes containing grouped boxplot.
     """
 
     #获取需要分割的数据
@@ -608,7 +689,8 @@ def plot_network(G:nx.Graph,G_type_dict:dict,G_color_dict:dict,pos_type:str='spr
                 legend_fontweight:str='bold'):
     r"""Plot network graph with customizable node and edge properties.
     
-    Arguments:
+    Parameters
+    ----------
         G: NetworkX graph object
         G_type_dict: Dictionary mapping nodes to types
         G_color_dict: Dictionary mapping nodes to colors
@@ -633,7 +715,8 @@ def plot_network(G:nx.Graph,G_type_dict:dict,G_color_dict:dict,pos_type:str='spr
         legend_fontsize: Legend font size (12)
         legend_fontweight: Legend font weight ('bold')
         
-    Returns:
+    Returns
+    -------
         Tuple of (figure, axes) objects
     """
     
@@ -706,13 +789,25 @@ def plot_network(G:nx.Graph,G_type_dict:dict,G_color_dict:dict,pos_type:str='spr
     
     return fig,ax
 
+@register_function(
+    aliases=['细胞比例可视化', 'plot_cellproportion', 'cell proportion plot'],
+    category="utils",
+    description="Visualize cell-type composition across groups/samples to compare immune or stromal shifts between conditions.",
+    prerequisites={},
+    requires={'obs': ['cell type labels', 'group labels']},
+    produces={},
+    auto_fix='none',
+    examples=['ov.utils.plot_cellproportion(adata, celltype_clusters="celltype", visual_clusters="condition")'],
+    related=['pl.plot_grouped_fractions', 'pl.add_pie2spatial']
+)
 def plot_cellproportion(adata:anndata.AnnData,celltype_clusters:str,visual_clusters:str,
                        visual_li=None,visual_name:str='',figsize:tuple=(4,6),
                        ticks_fontsize:int=12,labels_fontsize:int=12,
                        legend:bool=False):
     r"""Plot stacked bar chart showing cell type proportions across groups.
     
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
         celltype_clusters: Column name for cell types
         visual_clusters: Column name for grouping variable
@@ -723,7 +818,8 @@ def plot_cellproportion(adata:anndata.AnnData,celltype_clusters:str,visual_clust
         labels_fontsize: Font size for axis labels (12)
         legend: Whether to show legend (False)
         
-    Returns:
+    Returns
+    -------
         Tuple of (figure, axes) objects
     """
 
@@ -793,6 +889,17 @@ def plot_cellproportion(adata:anndata.AnnData,celltype_clusters:str,visual_clust
     fig.tight_layout()
     return fig,ax
 
+@register_function(
+    aliases=['细胞类型嵌入图', 'plot_embedding_celltype', 'embedding celltype visualization'],
+    category="utils",
+    description="Plot embedding coordinates with cell-type annotations for rapid inspection of cluster separation and annotation quality.",
+    prerequisites={'optional_functions': ['pp.umap', 'pp.pca']},
+    requires={'obsm': ['X_umap or selected basis'], 'obs': ['cell type labels']},
+    produces={},
+    auto_fix='none',
+    examples=['ov.utils.plot_embedding_celltype(adata, basis="umap", celltype_key="celltype")'],
+    related=['pl.embedding', 'single.generate_scRNA_report']
+)
 def plot_embedding_celltype(adata:anndata.AnnData,figsize:tuple=(6,4),basis:str='umap',
                             celltype_key:str='major_celltype',title:str=None,
                             celltype_range:tuple=(2,9),
@@ -800,7 +907,8 @@ def plot_embedding_celltype(adata:anndata.AnnData,figsize:tuple=(6,4),basis:str=
                             xlim:int=-1000)->tuple:
     r"""Create combined embedding plot with cell type legend and counts.
     
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
         figsize: Figure size ((6,4))
         basis: Embedding basis name ('umap')
@@ -810,7 +918,8 @@ def plot_embedding_celltype(adata:anndata.AnnData,figsize:tuple=(6,4),basis:str=
         embedding_range: Grid range for embedding panel ((3,10))
         xlim: X-axis limit for counts (-1000)
         
-    Returns:
+    Returns
+    -------
         Tuple of (figure, [embedding_axis, celltype_axis])
     """
 
@@ -900,7 +1009,8 @@ def gen_mpl_labels(
 ):
     """Add cluster labels at median positions in embedding plots with automatic text positioning.
     
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object containing single-cell data.
         groupby: Column name for grouping in adata.obs.
         exclude: Groups to exclude from labeling. Default: ().
@@ -909,7 +1019,8 @@ def gen_mpl_labels(
         adjust_kwargs: Parameters for adjustText text adjustment. Default: None.
         text_kwargs: Parameters for text styling (None)
         
-    Returns:
+    Returns
+    -------
         None
     """
     if adjust_kwargs is None:
@@ -937,15 +1048,17 @@ def plot_embedding(adata:anndata.AnnData,basis:str,color:str,color_dict=None,
                    figsize:tuple=(4,4),**kwargs):
     r"""Create embedding plot with customizable colors.
     
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object
         basis: Embedding basis name
         color: Column name for coloring
         color_dict: Custom color mapping (None)
         figsize: Figure size ((4,4))
-        **kwargs: Additional parameters for sc.pl.embedding
+        **kwargs:Additional parameters for sc.pl.embedding
         
-    Returns:
+    Returns
+    -------
         Tuple of (figure, axes) objects
     """
     if type(color)!=str:
@@ -1019,7 +1132,8 @@ def stacking_vol(data_dict:dict,color_dict:dict,
                 plot_genes_weight:str='bold')->tuple:
     """Create stacked volcano plots for comparing differential expression across multiple datasets.
     
-    Arguments:
+    Parameters
+    ----------
         data_dict: Dictionary with DataFrames containing 'logfoldchanges', 'pvals_adj', 'names' columns.
         color_dict: Dictionary mapping dataset names to colors
         pval_threshold: P-value significance threshold (0.01)
@@ -1031,7 +1145,8 @@ def stacking_vol(data_dict:dict,color_dict:dict,
         plot_genes_fontsize: Font size for gene labels (8)
         plot_genes_weight: Font weight for gene labels ('bold')
         
-    Returns:
+    Returns
+    -------
         Tuple of (figure, axes_dict)
     """
     
@@ -1128,7 +1243,8 @@ def plot_ConvexHull(adata:anndata.AnnData,basis:str,cluster_key:str,
                     hull_cluster:str,ax,color=None,alpha:float=0.2):
     """Add convex hull outline for a specific cluster in embedding plot.
     
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object containing single-cell data.
         basis: Embedding basis name in adata.obsm (e.g., 'X_umap', 'X_tsne').
         cluster_key: Column name for cluster assignments in adata.obs.
@@ -1137,7 +1253,8 @@ def plot_ConvexHull(adata:anndata.AnnData,basis:str,cluster_key:str,
         color: Hull color. Default: None (automatic).
         alpha: Hull transparency level. Default: 0.2.
         
-    Returns:
+    Returns
+    -------
         ax: Modified matplotlib axes object with convex hull added.
 
     Examples:
@@ -1176,9 +1293,46 @@ def plot_ConvexHull(adata:anndata.AnnData,basis:str,cluster_key:str,
 
 
 
+@register_function(
+    aliases=['基因集词云', 'geneset_wordcloud', 'gene wordcloud'],
+    category="utils",
+    description="Generate cluster-resolved word clouds from dominant genes/gene sets to summarize pseudotime-associated programs visually.",
+    prerequisites={'optional_functions': ['single.gene_trends']},
+    requires={'obs': ['cluster labels'], 'var': ['gene names']},
+    produces={},
+    auto_fix='none',
+    examples=['gw_obj = ov.utils.geneset_wordcloud(adata=adata_aucs[:, var_name], cluster_key="g1", pseudotime="pt_via")', 'gw_obj.get()'],
+    related=['single.gene_trends', 'utils.plot_text_set']
+)
 class geneset_wordcloud(object):
+    """
+    Build cluster-wise gene-set word clouds along pseudotime.
+
+    Parameters
+    ----------
+    adata:AnnData
+        AnnData containing feature scores (for example pathway activity or gene programs).
+    cluster_key:str
+        ``adata.obs`` key defining cell clusters/groups.
+    pseudotime:str
+        ``adata.obs`` key defining pseudotime ordering.
+    resolution:int, optional
+        Vertical grid resolution for stacked plotting.
+    figsize:tuple, optional
+        Figure size for word-cloud visualization.
+
+    Returns
+    -------
+    None
+        Initializes word-cloud construction settings.
+
+    Examples
+    --------
+    >>> gw_obj = ov.utils.geneset_wordcloud(adata=adata_aucs[:, var_name], cluster_key="g1", pseudotime="pt_via")
+    """
 
     def __init__(self,adata,cluster_key,pseudotime,resolution=1000,figsize=(4,10)):
+        """Initialize word-cloud builder from AnnData and grouping metadata."""
         self.adata=adata
         self.cluster_key=cluster_key
         self.pseudotime=pseudotime
@@ -1186,6 +1340,18 @@ class geneset_wordcloud(object):
         self.resolution=resolution
 
     def get(self,):
+        """
+        Build per-cluster word-cloud objects from dominant features.
+
+        Returns
+        -------
+        dict
+            Mapping from cluster label to ``wordcloud.WordCloud`` object.
+
+        Examples
+        --------
+        >>> wc = gw.get()
+        """
         from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
         #Get the DataFrame of anndata
         test_df=self.adata.to_df()
@@ -1239,12 +1405,36 @@ class geneset_wordcloud(object):
         return wc_dict
 
     def get_geneset(self):
+        """
+        Return the feature-to-cluster assignment table used for word-cloud generation.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Table with feature names and their dominant cluster.
+        """
         return self.result_df
 
     def get_wordcloud(self):
+        """
+        Return generated word-cloud objects.
+
+        Returns
+        -------
+        dict
+            Mapping from cluster label to ``wordcloud.WordCloud`` object.
+        """
         return self.wc_dict
 
     def plot(self):
+        """
+        Plot stacked cluster word clouds ordered by mean pseudotime.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+            Figure containing stacked cluster word clouds.
+        """
         fig = plt.figure(figsize=self.figsize)
         grid = plt.GridSpec(self.resolution, 10)
         
@@ -1276,6 +1466,34 @@ class geneset_wordcloud(object):
         return fig
     def plot_heatmap(self,n_convolve=10,figwidth=10,cmap='RdBu_r',
                      cbar=False,cbar_kws=None,cbar_fontsize=12):
+        """
+        Plot cluster word clouds together with a pseudotime-smoothed heatmap.
+
+        Parameters
+        ----------
+        n_convolve:int, optional
+            Convolution window size for smoothing.
+        figwidth:int, optional
+            Output figure width.
+        cmap:str, optional
+            Colormap for the heatmap.
+        cbar:bool, optional
+            Whether to display colorbar.
+        cbar_kws:dict or None, optional
+            Keyword arguments for seaborn/matplotlib colorbar.
+        cbar_fontsize:int, optional
+            Colorbar tick label size.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+            Combined word-cloud and heatmap figure.
+
+        Examples
+        --------
+        >>> gw.get()
+        >>> fig = gw.plot_heatmap(n_convolve=20, cmap='RdBu_r')
+        """
         if cbar_kws==None:
             cbar_kws={'shrink':0.5,'location':'left'}
 
@@ -1385,7 +1603,8 @@ def plot_pca_variance_ratio(
 ):
     r"""Plot PCA variance ratio to determine optimal number of principal components.
 
-    Arguments:
+    Parameters
+    ----------
         adata: AnnData object containing PCA results.
         use_rep: Key in adata.uns for variance ratios. Default: 'scaled|original|pca_var_ratios'.
         n_pcs: Number of principal components to plot. Default: 30.
@@ -1393,7 +1612,8 @@ def plot_pca_variance_ratio(
         show: Show the figure. Default: None.
         save: Save the figure to file. Default: None.
 
-    Returns:
+    Returns
+    -------
         None: Displays or saves the PCA variance ratio plot.
 
     Examples:
@@ -1431,11 +1651,13 @@ def plot_pca_variance_ratio1(adata,threshold=0.85):
 def check_dependencies(dependencies=None, check_full=False):
     r"""Check if installed package versions match requirements.
     
-    Arguments:
+    Parameters
+    ----------
         dependencies: List of dependency strings (None)
         check_full: Whether to check optional dependencies (False)
         
-    Returns:
+    Returns
+    -------
         None
     """
     if dependencies is None:

@@ -18,6 +18,7 @@ import re
 import inspect
 import ast
 import textwrap
+import time
 import builtins
 import warnings
 import threading
@@ -82,6 +83,35 @@ from .agent_reporter import (
     Reporter,
     make_reporter,
 )
+from .harness import (
+    RunTraceRecorder,
+    RunTraceStore,
+    build_stream_event,
+    coerce_usage_payload,
+    hash_code_block,
+    make_turn_id,
+)
+from .harness.runtime_state import runtime_state
+from .harness.tool_catalog import (
+    get_default_loaded_tool_names,
+    get_tool_spec,
+    get_visible_tool_schemas,
+    normalize_tool_name,
+)
+from .context_compactor import ContextCompactor
+from .ovagent.runtime import OmicVerseRuntime
+from .ovagent.prompt_builder import PromptBuilder as _PromptBuilder, CODE_QUALITY_RULES as _CODE_QUALITY_RULES_EXT
+from .ovagent.analysis_executor import (
+    AnalysisExecutor as _AnalysisExecutor,
+    ProactiveCodeTransformer as _ProactiveCodeTransformerExt,
+)
+from .ovagent.tool_runtime import ToolRuntime as _ToolRuntime
+from .ovagent.subagent_controller import SubagentController as _SubagentController
+from .ovagent.turn_controller import (
+    TurnController as _TurnController,
+    FollowUpGate as _FollowUpGate,
+)
+from .session_history import HistoryEntry, SessionHistory
 from .skill_registry import (
     SkillMatch,
     SkillMetadata,
@@ -100,185 +130,9 @@ from .filesystem_context import FilesystemContextManager
 logger = logging.getLogger(__name__)
 
 
-class ProactiveCodeTransformer:
-    """Transform LLM-generated code to prevent common errors before execution.
-
-    This class applies AST-based transformations to fix known error patterns
-    that the LLM may generate due to stochasticity, such as:
-    - In-place function assignments: `adata = ov.pp.pca(adata)` → `ov.pp.pca(adata)`
-    - F-strings in print statements: Converted to string concatenation
-    - .cat accessor without validation: Adds hasattr() guards
-    """
-
-    # In-place OmicVerse functions that return None (or adata if copy=True)
-    INPLACE_FUNCTIONS = {
-        'pca', 'scale', 'neighbors', 'leiden', 'umap', 'tsne', 'sude',
-        'scrublet', 'mde', 'louvain', 'phate'
-    }
-
-    # Known keyword renames: {(module_pattern, old_kwarg): new_kwarg}
-    # These fix common LLM hallucinations where the parameter name differs
-    # from what the installed library version actually accepts.
-    KWARG_RENAMES = {
-        # muon 0.1.x: mu.atac.tl.lsi() uses n_comps, not n_components
-        (r'mu(?:on)?\.atac\.tl\.lsi', 'n_components'): 'n_comps',
-    }
-
-    def transform(self, code: str) -> str:
-        """Apply all proactive transformations to the code.
-
-        Parameters
-        ----------
-        code : str
-            The LLM-generated Python code
-
-        Returns
-        -------
-        str
-            Transformed code with error patterns fixed
-        """
-        try:
-            # Apply regex-based transforms first (safer, handles syntax variations)
-            code = self._fix_inplace_assignments_regex(code)
-            code = self._fix_fstring_print_regex(code)
-            code = self._fix_cat_accessor_regex(code)
-            code = self._fix_kwarg_renames(code)
-
-            # Validate the transformed code is still valid Python
-            ast.parse(code)
-            return code
-        except SyntaxError:
-            # If transformation breaks syntax, return original
-            logger.debug("ProactiveCodeTransformer: transformation produced invalid syntax, returning original")
-            return code
-        except Exception as e:
-            logger.debug(f"ProactiveCodeTransformer: unexpected error {e}, returning original")
-            return code
-
-    def _fix_inplace_assignments_regex(self, code: str) -> str:
-        """Remove assignments from in-place function calls using regex.
-
-        Transform: `adata = ov.pp.pca(adata, ...)` → `ov.pp.pca(adata, ...)`
-        """
-        inplace_pattern = '|'.join(self.INPLACE_FUNCTIONS)
-        # Match: adata = ov.pp.func(adata, ...) or adata=ov.pp.func(adata)
-        pattern = r'adata\s*=\s*(ov\.pp\.(?:' + inplace_pattern + r')\s*\([^)]*\))'
-
-        # Replace with just the function call
-        fixed = re.sub(pattern, r'\1', code)
-
-        if fixed != code:
-            logger.debug(f"ProactiveCodeTransformer: fixed in-place function assignment")
-
-        return fixed
-
-    def _fix_fstring_print_regex(self, code: str) -> str:
-        """Convert f-strings in print statements to string concatenation.
-
-        This is a simple heuristic - converts common patterns.
-        """
-        # Pattern to match print(f"...{var}...") and similar
-        # We'll handle simple cases like print(f"Text: {var}")
-
-        lines = code.split('\n')
-        fixed_lines = []
-
-        for line in lines:
-            stripped = line.lstrip()
-            if stripped.startswith('print(f"') or stripped.startswith("print(f'"):
-                # Try to convert simple f-string patterns
-                try:
-                    fixed_line = self._convert_fstring_line(line)
-                    if fixed_line != line:
-                        logger.debug(f"ProactiveCodeTransformer: converted f-string in print")
-                    fixed_lines.append(fixed_line)
-                except Exception:
-                    fixed_lines.append(line)
-            else:
-                fixed_lines.append(line)
-
-        return '\n'.join(fixed_lines)
-
-    def _convert_fstring_line(self, line: str) -> str:
-        """Convert a single line with f-string print to concatenation."""
-        indent = len(line) - len(line.lstrip())
-        indent_str = line[:indent]
-        content = line.strip()
-
-        # Match print(f"...") or print(f'...')
-        match = re.match(r'print\(f(["\'])(.*)\1\)', content)
-        if not match:
-            return line
-
-        quote = match.group(1)
-        fstring_content = match.group(2)
-
-        # Find {var} patterns and convert
-        parts = []
-        last_end = 0
-
-        for m in re.finditer(r'\{([^}:]+)(?::[^}]*)?\}', fstring_content):
-            # Add text before this variable
-            if m.start() > last_end:
-                text_part = fstring_content[last_end:m.start()]
-                if text_part:
-                    parts.append(f'"{text_part}"')
-
-            # Add the variable wrapped in str()
-            var_name = m.group(1).strip()
-            parts.append(f'str({var_name})')
-
-            last_end = m.end()
-
-        # Add remaining text
-        if last_end < len(fstring_content):
-            remaining = fstring_content[last_end:]
-            if remaining:
-                parts.append(f'"{remaining}"')
-
-        if not parts:
-            return line
-
-        # Join with +
-        concatenated = ' + '.join(parts)
-        return f'{indent_str}print({concatenated})'
-
-    def _fix_cat_accessor_regex(self, code: str) -> str:
-        """Add guards around .cat accessor usage.
-
-        Transform: `col.cat.categories` → `col.value_counts().index.tolist()`
-        (Only for simple patterns where we want category values)
-        """
-        # Pattern: adata.obs['col'].cat.categories or .cat.codes
-        # These often fail if column is not categorical
-
-        # Simple replacement: .cat.categories → .value_counts().index.tolist()
-        code = re.sub(
-            r"\.cat\.categories",
-            ".value_counts().index.tolist()",
-            code
-        )
-
-        return code
-
-    def _fix_kwarg_renames(self, code: str) -> str:
-        """Rename keyword arguments that LLMs hallucinate for known APIs.
-
-        For example, muon 0.1.x uses ``n_comps`` in ``mu.atac.tl.lsi()``
-        but GPT-5.2 consistently generates ``n_components``.
-        """
-        for (func_pat, old_kw), new_kw in self.KWARG_RENAMES.items():
-            # Match: func_call(..., old_kw=value, ...)
-            # re.DOTALL allows matching across multi-line function calls
-            pattern = rf'({func_pat}\s*\([^)]*)\b{old_kw}\s*='
-            replacement = rf'\1{new_kw}='
-            new_code = re.sub(pattern, replacement, code, flags=re.DOTALL)
-            if new_code != code:
-                logger.debug(
-                    f"ProactiveCodeTransformer: renamed kwarg {old_kw} -> {new_kw}"
-                )
-                code = new_code
-        return code
+# ProactiveCodeTransformer is now in ovagent/analysis_executor.py — keep a
+# backward-compatible alias so existing code/tests referencing it still work.
+ProactiveCodeTransformer = _ProactiveCodeTransformerExt
 
 
 class OmicVerseAgent:
@@ -387,20 +241,25 @@ class OmicVerseAgent:
 
         _emit(EventLevel.INFO, "Initializing OmicVerse Smart Agent (internal backend)...", "init")
         
-        # Normalize model ID for aliases and variations, then validate
-        original_model = model
-        try:
-            model = ModelConfig.normalize_model_id(model)  # type: ignore[attr-defined]
-        except Exception:
-            # Older ModelConfig without normalization: proceed as-is
-            model = model
-        if model != original_model:
-            print(f"   📝 Model ID normalized: {original_model} → {model}")
+        # When using a custom endpoint (proxy), keep the model name as-is.
+        # Proxies expect the exact model name the user typed.
+        if endpoint:
+            print(f"   🔌 Proxy mode: model={model}, endpoint={endpoint}")
+        else:
+            # Normalize model ID for aliases and variations, then validate
+            original_model = model
+            try:
+                model = ModelConfig.normalize_model_id(model)  # type: ignore[attr-defined]
+            except Exception:
+                # Older ModelConfig without normalization: proceed as-is
+                model = model
+            if model != original_model:
+                print(f"   📝 Model ID normalized: {original_model} → {model}")
 
-        is_valid, validation_msg = ModelConfig.validate_model_setup(model, api_key)
-        if not is_valid:
-            print(f"❌ {validation_msg}")
-            raise ValueError(validation_msg)
+            is_valid, validation_msg = ModelConfig.validate_model_setup(model, api_key)
+            if not is_valid:
+                print(f"❌ {validation_msg}")
+                raise ValueError(validation_msg)
         
         self.model = model
         self.api_key = api_key
@@ -432,6 +291,14 @@ class OmicVerseAgent:
             'review': [],
             'total': None
         }
+        self._session_history: Optional[SessionHistory] = None
+        self._trace_store: Optional[RunTraceStore] = None
+        self._context_compactor: Optional[ContextCompactor] = None
+        self._last_run_trace = None
+        self._approval_handler = None
+        self._web_session_id = ""
+        self._ov_runtime: Optional[OmicVerseRuntime] = None
+        self._active_run_id = ""
         try:
             self._managed_api_env = self._collect_api_key_env(api_key)
         except Exception as exc:  # pragma: no cover - defensive logging
@@ -517,12 +384,44 @@ class OmicVerseAgent:
             else:
                 print(f"   ⚡ Filesystem context disabled")
 
+            if getattr(self._config, "history_enabled", False):
+                self._session_history = SessionHistory(path=self._config.history_path)
+                print(f"   📝 Session history enabled")
+
+            harness_config = getattr(self._config, "harness", None)
+            if harness_config is not None and getattr(harness_config, "enable_traces", False):
+                self._trace_store = RunTraceStore(root=harness_config.trace_dir)
+                print(f"   🧰 Harness tracing enabled")
+            if harness_config is not None and getattr(harness_config, "enable_context_compaction", False) and self._llm:
+                self._context_compactor = ContextCompactor(self._llm, self.model)
+                print(f"   🗜️  Harness context compaction enabled")
+
             # Initialize security scanner
             self._security_config: SecurityConfig = getattr(
                 self._config, "security", SecurityConfig()
             )
             self._security_scanner = CodeSecurityScanner(self._security_config)
             print(f"   🛡️  Security scanner enabled (approval: {self._security_config.approval_mode.value})")
+
+            try:
+                self._ov_runtime = OmicVerseRuntime(repo_root=self._detect_repo_root())
+                if self._ov_runtime.workflow.exists:
+                    print(f"   📋 Workflow policy loaded: {self._ov_runtime.workflow.path}")
+            except Exception as exc:
+                logger.warning("OVAgent runtime initialization failed: %s", exc)
+                self._ov_runtime = None
+
+            # Extracted module delegates
+            self._prompt_builder = _PromptBuilder(self)
+            self._analysis_executor = _AnalysisExecutor(self)
+            self._tool_runtime = _ToolRuntime(self, self._analysis_executor)
+            self._subagent_controller = _SubagentController(
+                self, self._prompt_builder, self._tool_runtime,
+            )
+            self._tool_runtime.set_subagent_controller(self._subagent_controller)
+            self._turn_controller = _TurnController(
+                self, self._prompt_builder, self._tool_runtime,
+            )
 
             print(f"✅ Smart Agent initialized successfully!")
         except Exception as e:
@@ -1012,836 +911,431 @@ User request: "quality control with nUMI>500, mito<0.2"
     # Agentic Loop: Tool-calling based autonomous execution
     # =====================================================================
 
-    AGENT_TOOLS = [
+    LEGACY_AGENT_TOOLS = [
         {
             "name": "inspect_data",
-            "description": "Inspect the AnnData object. Returns structural info without modifying data.",
+            "description": "Inspect the AnnData or MuData object without modifying it.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "aspect": {
                         "type": "string",
                         "enum": ["shape", "obs", "var", "obsm", "uns", "layers", "full"],
-                        "description": "What aspect to inspect. 'full' returns all aspects."
                     }
                 },
-                "required": ["aspect"]
-            }
+                "required": ["aspect"],
+            },
         },
         {
             "name": "execute_code",
-            "description": (
-                "Execute Python code in the sandbox. Code has access to: adata, ov (omicverse), "
-                "np (numpy), pd (pandas), sc (scanpy), matplotlib, seaborn, scipy, sklearn. "
-                "Code CAN modify adata. Use for actual data processing steps."
-            ),
+            "description": "Execute Python code against the current dataset.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "code": {"type": "string", "description": "Python code to execute"},
-                    "description": {"type": "string", "description": "Brief description of what this code does"}
+                    "code": {"type": "string"},
+                    "description": {"type": "string"},
                 },
-                "required": ["code", "description"]
-            }
+                "required": ["code", "description"],
+            },
         },
         {
             "name": "run_snippet",
-            "description": (
-                "Run a read-only code snippet for exploration/debugging. Returns stdout output. "
-                "Does NOT modify adata (runs on a shallow copy). Good for checking values, "
-                "shapes, column names, or testing small operations."
-            ),
+            "description": "Run read-only Python code on a shallow copy of the current dataset.",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "code": {"type": "string", "description": "Python code to run (read-only)"}
-                },
-                "required": ["code"]
-            }
+                "properties": {"code": {"type": "string"}},
+                "required": ["code"],
+            },
         },
         {
             "name": "search_functions",
-            "description": "Search OmicVerse's function registry for relevant functions by keyword.",
+            "description": "Search the OmicVerse function registry.",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "What you're looking for (e.g. 'normalize', 'PCA', 'leiden clustering')"
-                    }
-                },
-                "required": ["query"]
-            }
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"],
+            },
         },
         {
             "name": "search_skills",
-            "description": (
-                "Search for domain-specific workflow guidance. Returns step-by-step "
-                "instructions, code patterns, and troubleshooting tips for complex "
-                "bioinformatics tasks like preprocessing, clustering, trajectory analysis, "
-                "batch integration, DEG analysis, etc. Use when you need detailed workflow "
-                "guidance beyond what search_functions provides."
-            ),
+            "description": "Search installed domain-specific skills.",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": (
-                            "Domain or workflow to search (e.g. 'preprocessing', "
-                            "'batch correction', 'trajectory analysis', 'DEG')"
-                        )
-                    }
-                },
-                "required": ["query"]
-            }
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"],
+            },
         },
         {
             "name": "delegate",
-            "description": (
-                "Delegate a sub-task to a specialized subagent with its own context window. "
-                "Types: 'explore' (read-only data characterization, fast), "
-                "'plan' (design multi-step workflow, read-only), "
-                "'execute' (focused code execution of a well-defined step, can modify data). "
-                "The subagent's result is returned as a single message."
-            ),
+            "description": "Delegate to an explore, plan, or execute subagent.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "agent_type": {
-                        "type": "string",
-                        "enum": ["explore", "plan", "execute"],
-                        "description": "Type of subagent"
-                    },
-                    "task": {
-                        "type": "string",
-                        "description": "Specific task for the subagent"
-                    },
-                    "context": {
-                        "type": "string",
-                        "description": "Additional context (previous findings, error messages, constraints)"
-                    }
+                    "agent_type": {"type": "string", "enum": ["explore", "plan", "execute"]},
+                    "task": {"type": "string"},
+                    "context": {"type": "string"},
                 },
-                "required": ["agent_type", "task"]
-            }
+                "required": ["agent_type", "task"],
+            },
+        },
+        {
+            "name": "web_fetch",
+            "description": "Fetch a URL and return readable content.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string"},
+                    "prompt": {"type": "string"},
+                },
+                "required": ["url"],
+            },
+        },
+        {
+            "name": "web_search",
+            "description": "Search the web and return results.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "num_results": {"type": "number"},
+                },
+                "required": ["query"],
+            },
+        },
+        {
+            "name": "web_download",
+            "description": "Download a file from a URL to disk.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string"},
+                    "filename": {"type": "string"},
+                    "directory": {"type": "string"},
+                },
+                "required": ["url"],
+            },
         },
         {
             "name": "finish",
-            "description": "Declare the task complete and return the current adata.",
+            "description": "Declare the task complete and return the summary.",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "summary": {"type": "string", "description": "Brief summary of what was done"}
-                },
-                "required": ["summary"]
-            }
+                "properties": {"summary": {"type": "string"}},
+                "required": ["summary"],
+            },
         },
     ]
 
+    AGENT_TOOLS = get_visible_tool_schemas(get_default_loaded_tool_names()) + LEGACY_AGENT_TOOLS
+    _URL_PATTERN = re.compile(r"https?://|www\.", re.IGNORECASE)
+    _ACTION_REQUEST_PATTERN = re.compile(
+        r"\b(analy[sz]e|download|fetch|get|open|read|inspect|load|run|execute|search|lookup|look up|find|process|parse|clone|fix|edit|write)\b",
+        re.IGNORECASE,
+    )
+    _PROMISSORY_PATTERN = re.compile(
+        r"\b(let me|i(?:'ll| will| can)|going to|start by|first(?:,)?\s+i(?:'ll| will)|can continue\?|could continue\?|re-?start)\b",
+        re.IGNORECASE,
+    )
+    _BLOCKER_PATTERN = re.compile(
+        r"\b(can(?:not|'t)|unable|failed|error|need your|please provide|approval required|missing|not installed|permission denied)\b",
+        re.IGNORECASE,
+    )
+    _RESULT_PATTERN = re.compile(
+        r"\b(found|fetched|downloaded|loaded|read|parsed|here (?:is|are)|summary|supplementary|links?)\b",
+        re.IGNORECASE,
+    )
+
     def _tool_inspect_data(self, adata: Any, aspect: str) -> str:
-        """Handle inspect_data tool call. Returns formatted string."""
-        try:
-            parts = []
-            dtype = type(adata).__name__
-            is_mudata = dtype == "MuData"
-
-            # MuData top-level summary
-            if is_mudata and aspect in ("full", "shape"):
-                parts.append(f"Type: MuData")
-                if hasattr(adata, 'mod'):
-                    mod_keys = list(adata.mod.keys())
-                    parts.append(f"Modalities: {mod_keys}")
-                    for mk in mod_keys:
-                        mod = adata.mod[mk]
-                        layers_keys = list(mod.layers.keys()) if getattr(mod, 'layers', None) is not None else []
-                        parts.append(f"  {mk}: {mod.shape[0]} cells x {mod.shape[1]} features, layers={layers_keys}")
-                if hasattr(adata, 'shape'):
-                    parts.append(f"Combined shape: {adata.shape[0]} obs x {adata.shape[1]} vars")
-
-            if aspect in ("shape", "full") and not is_mudata:
-                parts.append(f"Shape: {adata.shape[0]} cells x {adata.shape[1]} genes")
-            if aspect in ("obs", "full"):
-                cols = list(adata.obs.columns)
-                parts.append(f"obs columns ({len(cols)}): {cols}")
-                try:
-                    parts.append(f"obs.head(3):\n{adata.obs.head(3).to_string()}")
-                except Exception:
-                    pass
-            if aspect in ("var", "full") and not is_mudata:
-                cols = list(adata.var.columns)
-                parts.append(f"var columns ({len(cols)}): {cols}")
-                try:
-                    parts.append(f"var.head(3):\n{adata.var.head(3).to_string()}")
-                except Exception:
-                    pass
-            if aspect in ("obsm", "full"):
-                keys = list(adata.obsm.keys()) if hasattr(adata, 'obsm') else []
-                parts.append(f"obsm keys: {keys}")
-                for k in keys:
-                    try:
-                        parts.append(f"  {k}: shape {adata.obsm[k].shape}")
-                    except Exception:
-                        pass
-            if aspect in ("uns", "full"):
-                keys = list(adata.uns.keys()) if hasattr(adata, 'uns') else []
-                parts.append(f"uns keys: {keys}")
-            if aspect in ("layers", "full"):
-                layers = getattr(adata, 'layers', None)
-                keys = list(layers.keys()) if layers is not None else []
-                parts.append(f"layers: {keys}")
-            return "\n".join(parts) if parts else f"Unknown aspect: {aspect}"
-        except Exception as e:
-            return f"Error inspecting data: {e}"
+        return self._tool_runtime._tool_inspect_data(adata, aspect)
 
     def _check_code_prerequisites(self, code: str, adata: Any) -> str:
-        """Check if code references functions whose prerequisites are not satisfied.
-
-        Returns a warning string (empty if all satisfied).
-        """
-        warnings = []
-        # Known OmicVerse function patterns to check
-        func_patterns = {
-            'ov.pp.pca': 'pca',
-            'ov.pp.scale': 'scale',
-            'ov.pp.neighbors': 'neighbors',
-            'ov.pp.umap': 'umap',
-            'ov.pp.tsne': 'tsne',
-            'ov.pp.leiden': 'leiden',
-            'ov.pp.louvain': 'louvain',
-            'ov.pp.sude': 'sude',
-            'ov.pp.mde': 'mde',
-            'ov.single.leiden': 'leiden',
-            'ov.single.louvain': 'louvain',
-        }
-        for pattern, func_name in func_patterns.items():
-            if pattern in code:
-                try:
-                    result = _global_registry.check_prerequisites(func_name, adata)
-                    if not result['satisfied']:
-                        missing = ', '.join(result['missing_structures'][:3])
-                        rec = result['recommendation']
-                        warnings.append(f"{func_name}: missing {missing}. {rec}")
-                except Exception:
-                    pass
-        return "; ".join(warnings)
+        return self._analysis_executor.check_code_prerequisites(code, adata)
 
     def _tool_execute_code(self, code: str, description: str, adata: Any) -> dict:
-        """Handle execute_code tool call. Returns {"adata": result, "output": stdout_str}."""
-        # Apply proactive code transforms
-        code = ProactiveCodeTransformer().transform(code)
-
-        # Check prerequisites before execution
-        prereq_warnings = self._check_code_prerequisites(code, adata)
-
-        try:
-            result = self._execute_generated_code(code, adata, capture_stdout=True)
-            stdout = result.get("stdout", "")
-            result_adata = result.get("adata", adata)
-
-            # Build output summary
-            output_parts = []
-            if prereq_warnings:
-                output_parts.append(f"PREREQUISITE WARNINGS: {prereq_warnings}")
-            if stdout.strip():
-                output_parts.append(f"stdout:\n{stdout[:3000]}")
-            try:
-                output_parts.append(f"Result adata shape: {result_adata.shape[0]} cells x {result_adata.shape[1]} features")
-            except Exception:
-                output_parts.append(f"Result type: {type(result_adata).__name__}")
-
-            return {
-                "adata": result_adata,
-                "output": "\n".join(output_parts) if output_parts else "Code executed successfully (no output).",
-            }
-        except Exception as e:
-            original_error = str(e)
-            tb_str = traceback.format_exc()
-
-            # Stage A: Pattern-based fix (fast, no LLM call)
-            fixed_code = self._apply_execution_error_fix(code, original_error)
-            if fixed_code:
-                try:
-                    result = self._execute_generated_code(fixed_code, adata, capture_stdout=True)
-                    stdout = result.get("stdout", "")
-                    result_adata = result.get("adata", adata)
-                    output_parts = [f"RECOVERED (pattern fix): {original_error}"]
-                    if stdout.strip():
-                        output_parts.append(f"stdout:\n{stdout[:3000]}")
-                    try:
-                        output_parts.append(f"Result adata shape: {result_adata.shape[0]} cells x {result_adata.shape[1]} features")
-                    except Exception:
-                        output_parts.append(f"Result type: {type(result_adata).__name__}")
-                    return {
-                        "adata": result_adata,
-                        "output": "\n".join(output_parts),
-                    }
-                except Exception:
-                    pass  # Fall through to return original error
-
-            error_output = f"ERROR: {e}\n\nTraceback (last 2000 chars):\n{tb_str[-2000:]}"
-            if prereq_warnings:
-                error_output = f"PREREQUISITE WARNINGS: {prereq_warnings}\n\n{error_output}"
-            return {
-                "adata": adata,  # Return original on error
-                "output": error_output,
-            }
+        return self._tool_runtime._tool_execute_code(code, description, adata)
 
     def _tool_run_snippet(self, code: str, adata: Any) -> str:
-        """Handle run_snippet tool call. Runs on adata copy, returns stdout only."""
-        try:
-            # Shallow copy to avoid modifying original
-            adata_copy = adata.copy() if hasattr(adata, 'copy') else adata
-            result = self._execute_generated_code(code, adata_copy, capture_stdout=True)
-            stdout = result.get("stdout", "")
-            return stdout if stdout.strip() else "(no stdout output)"
-        except Exception as e:
-            return f"ERROR: {e}"
+        return self._tool_runtime._tool_run_snippet(code, adata)
 
     def _tool_search_functions(self, query: str) -> str:
-        """Handle search_functions tool call. Searches the OmicVerse function registry."""
-        query_lower = query.lower()
-        matches = []
-        for entry in _global_registry._registry.values():
-            # Match against name, description, aliases, category
-            searchable = (
-                entry.get('short_name', '').lower() + ' ' +
-                entry.get('full_name', '').lower() + ' ' +
-                entry.get('description', '').lower() + ' ' +
-                entry.get('category', '').lower() + ' ' +
-                ' '.join(entry.get('aliases', [])).lower()
-            )
-            if any(word in searchable for word in query_lower.split()):
-                matches.append(entry)
-
-        if not matches:
-            return f"No functions found matching '{query}'. Try broader keywords."
-
-        # Limit to top 10 unique functions
-        results = []
-        seen = set()
-        for m in matches[:20]:
-            fname = m.get('full_name', m.get('short_name', ''))
-            if fname in seen:
-                continue
-            seen.add(fname)
-            sig = m.get('signature', '')
-            desc = m.get('description', '')[:300]
-
-            entry_text = f"  {fname}({sig})\n    {desc}"
-
-            # Add prerequisite info
-            prereqs = m.get('prerequisites', {})
-            req_funcs = prereqs.get('functions', [])
-            if req_funcs:
-                entry_text += "\n    Must run first: " + ", ".join(req_funcs)
-
-            # Add requires/produces
-            requires = m.get('requires', {})
-            if requires:
-                req_items = [f"{k}['{v}']" for k, vals in requires.items() for v in vals]
-                entry_text += "\n    Requires: " + ", ".join(req_items)
-
-            produces = m.get('produces', {})
-            if produces:
-                prod_items = [f"{k}['{v}']" for k, vals in produces.items() for v in vals]
-                entry_text += "\n    Produces: " + ", ".join(prod_items)
-
-            # Add one code example
-            examples = m.get('examples', [])
-            code_examples = [ex for ex in examples
-                             if ex.strip().startswith(('ov.', 'sc.'))]
-            if code_examples:
-                entry_text += "\n    Example: " + code_examples[0]
-            elif examples:
-                entry_text += "\n    Example: " + examples[0]
-
-            results.append(entry_text)
-            if len(results) >= 10:
-                break
-
-        return f"Found {len(results)} matching functions:\n" + "\n".join(results)
+        return self._tool_runtime._tool_search_functions(query)
 
     def _tool_search_skills(self, query: str) -> str:
-        """Handle search_skills tool call. Searches domain-specific skill guidance."""
-        if not hasattr(self, 'skill_registry') or not self.skill_registry:
-            return "No domain skills available."
-        if not self.skill_registry.skill_metadata:
-            return "No domain skills loaded."
+        return self._tool_runtime._tool_search_skills(query)
 
-        query_lower = query.lower()
-        scored = []
-        for meta in self.skill_registry.skill_metadata.values():
-            searchable = f"{meta.name} {meta.description} {meta.slug}".lower()
-            score = sum(1 for word in query_lower.split() if word in searchable)
-            if score > 0:
-                scored.append((meta, score))
+    # ----- Web tools -----
 
-        scored.sort(key=lambda x: x[1], reverse=True)
+    def _tool_web_fetch(self, url: str, prompt: str = None, timeout: int = 15) -> str:
+        return self._tool_runtime._tool_web_fetch(url, prompt=prompt, timeout=timeout)
 
-        if not scored:
-            slugs = ", ".join(m.slug for m in self.skill_registry.skill_metadata.values())
-            return f"No skills matched '{query}'. Available skills: {slugs}"
+    def _tool_web_search(self, query: str, num_results: int = 5) -> str:
+        return self._tool_runtime._tool_web_search(query, num_results=num_results)
 
-        # Load top 1-2 matched skills (lazy loading)
-        results = []
-        for meta, _ in scored[:2]:
-            try:
-                full_skill = self.skill_registry.load_full_skill(meta.slug)
-                if full_skill:
-                    # Use provider-aware formatting if available
-                    provider = None
-                    if hasattr(self, '_llm') and self._llm and hasattr(self._llm, 'config'):
-                        provider = self._llm.config.provider
-                    body = full_skill.prompt_instructions(max_chars=4000, provider=provider)
-                    results.append(f"=== {full_skill.name} ===\n{body}")
-            except Exception:
-                pass
+    def _tool_web_download(self, url: str, filename: str = None,
+                           directory: str = None) -> str:
+        return self._tool_runtime._tool_web_download(url, filename=filename, directory=directory)
 
-        if not results:
-            return "Skills matched but content could not be loaded."
+    # ----- Claude-style tool helpers -----
 
-        return "\n\n".join(results)
+    def _resolve_local_path(self, file_path: str, *, allow_relative: bool = False) -> Path:
+        path = Path(file_path).expanduser()
+        if not path.is_absolute():
+            if not allow_relative:
+                raise ValueError("file_path must be an absolute path")
+            path = Path(self._refresh_runtime_working_directory()) / path
+        return path.resolve()
+
+    def _ensure_server_tool_mode(self, tool_name: str) -> None:
+        harness_config = getattr(self._config, "harness", None)
+        if harness_config is None or not getattr(harness_config, "server_tool_mode", True):
+            raise RuntimeError(f"{tool_name} is disabled because server_tool_mode is off.")
+
+    def _request_interaction(self, payload: dict[str, Any]) -> Any:
+        if self._approval_handler is None:
+            # Headless / bench mode — auto-approve tool calls
+            return True
+        return self._approval_handler(payload)
+
+    def _request_tool_approval(self, tool_name: str, *, reason: str, payload: dict[str, Any]) -> None:
+        spec = get_tool_spec(tool_name)
+        if spec is None or not spec.requires_approval:
+            return
+        interaction = {
+            "kind": "approval",
+            "title": f"{tool_name} approval required",
+            "message": reason,
+            "tool_name": tool_name,
+            "payload": payload,
+            "session_id": self._get_runtime_session_id(),
+            "trace_id": getattr(getattr(self, "_last_run_trace", None), "trace_id", ""),
+        }
+        approved = self._request_interaction(interaction)
+        if not approved:
+            raise PermissionError(f"{tool_name} was not approved by the user.")
+
+    def _tool_tool_search(self, query: str, max_results: int = 5) -> str:
+        return self._tool_runtime._tool_tool_search(query, max_results=max_results)
+
+    def _tool_read(self, file_path: str, offset: int = 0, limit: int = 2000, pages: str = "") -> str:
+        return self._tool_runtime._tool_read(file_path, offset=offset, limit=limit, pages=pages)
+
+    def _tool_edit(self, file_path: str, old_string: str, new_string: str, replace_all: bool = False) -> str:
+        return self._tool_runtime._tool_edit(
+            file_path, old_string, new_string, replace_all=replace_all,
+        )
+
+    def _tool_write(self, file_path: str, content: str) -> str:
+        return self._tool_runtime._tool_write(file_path, content)
+
+    def _tool_glob(self, pattern: str, root: str = "", max_results: int = 200) -> str:
+        return self._tool_runtime._tool_glob(pattern, root=root, max_results=max_results)
+
+    def _tool_grep(self, pattern: str, root: str = "", glob: str = "", max_results: int = 200) -> str:
+        return self._tool_runtime._tool_grep(pattern, root=root, glob=glob, max_results=max_results)
+
+    def _tool_notebook_edit(self, file_path: str, cell_index: int, source: str, cell_type: str = "") -> str:
+        return self._tool_runtime._tool_notebook_edit(
+            file_path, cell_index, source, cell_type=cell_type,
+        )
+
+    def _tool_create_task(self, title: str, description: str = "", status: str = "pending") -> str:
+        return self._tool_runtime._tool_create_task(title, description=description, status=status)
+
+    def _tool_get_task(self, task_id: str) -> str:
+        return self._tool_runtime._tool_get_task(task_id)
+
+    def _tool_list_tasks(self, status: str = "") -> str:
+        return self._tool_runtime._tool_list_tasks(status=status)
+
+    def _tool_task_output(self, task_id: str, offset: int = 0, limit: int = 200) -> str:
+        return self._tool_runtime._tool_task_output(task_id, offset=offset, limit=limit)
+
+    def _tool_task_stop(self, task_id: str) -> str:
+        return self._tool_runtime._tool_task_stop(task_id)
+
+    def _tool_task_update(self, task_id: str, status: str, summary: str = "") -> str:
+        return self._tool_runtime._tool_task_update(task_id, status, summary=summary)
+
+    def _tool_enter_plan_mode(self, reason: str = "") -> str:
+        return self._tool_runtime._tool_enter_plan_mode(reason=reason)
+
+    def _tool_exit_plan_mode(self, summary: str = "") -> str:
+        return self._tool_runtime._tool_exit_plan_mode(summary=summary)
+
+    def _detect_repo_root(self, cwd: Optional[Path] = None) -> Optional[Path]:
+        current = (cwd or Path(self._refresh_runtime_working_directory())).resolve()
+        for candidate in (current, *current.parents):
+            if (candidate / ".git").exists():
+                return candidate
+        return None
+
+    def _tool_enter_worktree(self, branch_name: str = "", path: str = "", base_ref: str = "HEAD") -> str:
+        return self._tool_runtime._tool_enter_worktree(
+            branch_name=branch_name, path=path, base_ref=base_ref,
+        )
+
+    def _tool_skill(self, query: str, mode: str = "search") -> str:
+        return self._tool_runtime._tool_skill(query, mode=mode)
+
+    def _tool_list_mcp_resources(self, server: str = "") -> str:
+        return self._tool_runtime._tool_list_mcp_resources(server=server)
+
+    def _tool_read_mcp_resource(self, server: str, uri: str) -> str:
+        return self._tool_runtime._tool_read_mcp_resource(server, uri)
+
+    def _tool_ask_user_question(self, question: str, header: str = "", options: Optional[list[str]] = None) -> str:
+        return self._tool_runtime._tool_ask_user_question(
+            question, header=header, options=options,
+        )
+
+    def _tool_bash(
+        self,
+        command: str,
+        description: str = "",
+        timeout: int = 120000,
+        run_in_background: bool = False,
+        dangerouslyDisableSandbox: bool = False,
+    ) -> str:
+        return self._tool_runtime._tool_bash(
+            command,
+            description=description,
+            timeout=timeout,
+            run_in_background=run_in_background,
+            dangerouslyDisableSandbox=dangerouslyDisableSandbox,
+        )
 
     # ----- Subagent prompt builders -----
 
-    _CODE_QUALITY_RULES = (
-        "MANDATORY CODE QUALITY RULES:\n"
-        "- NEVER use f-strings in print() - use string concatenation: "
-        "print('Result: ' + str(value))\n"
-        "- NEVER assign result of in-place OmicVerse functions. Call them directly:\n"
-        "  ov.pp.pca(adata, n_pcs=50)   # CORRECT\n"
-        "  adata = ov.pp.pca(adata)      # WRONG - returns None!\n"
-        "  In-place functions: pca, scale, neighbors, leiden, umap, tsne, "
-        "sude, scrublet, mde, louvain, phate\n"
-        "- NEVER use .cat.categories - use .value_counts() instead\n"
-        "- ALWAYS wrap HVG selection in try/except with fallback:\n"
-        "  try:\n"
-        "      sc.pp.highly_variable_genes(adata, flavor='seurat_v3', n_top_genes=2000)\n"
-        "  except ValueError:\n"
-        "      sc.pp.highly_variable_genes(adata, flavor='seurat', n_top_genes=2000)\n"
-        "- ALWAYS validate batch column before batch operations "
-        "(check existence, fillna, astype('category'))\n"
-    )
+    _CODE_QUALITY_RULES = _CODE_QUALITY_RULES_EXT
+
+    # -- Prompt building (delegated to ovagent.prompt_builder) ---------------
 
     def _build_explore_prompt(self, context: str) -> str:
-        """System prompt for the explore subagent (read-only data characterisation)."""
-        prompt = (
-            "You are a bioinformatics data inspector for OmicVerse. "
-            "Your job is to thoroughly characterize the dataset and report findings.\n\n"
-            "You CANNOT modify the data. Use inspect_data and run_snippet to explore.\n"
-            "Use search_functions to understand what OmicVerse functions are available.\n\n"
-            "Report:\n"
-            "1. Dataset dimensions (cells x genes)\n"
-            "2. Available metadata columns (obs, var) with example values\n"
-            "3. Existing embeddings (obsm) and layers\n"
-            "4. Data quality indicators (sparsity, mito%, batch columns, cell type annotations)\n"
-            "5. Potential issues or recommendations\n\n"
-            "Available packages: ov (omicverse), sc (scanpy), np (numpy), pd (pandas)\n\n"
-            "Call finish() with a comprehensive summary when done.\n"
-        )
-        if context:
-            prompt += f"\nAdditional context from parent: {context}"
-        return prompt
+        return self._prompt_builder.build_explore_prompt(context)
 
     def _build_plan_prompt(self, context: str) -> str:
-        """System prompt for the plan subagent (workflow design, read-only)."""
-        prompt = (
-            "You are a bioinformatics workflow architect for OmicVerse. "
-            "Design a step-by-step execution plan. Do NOT execute code — only plan.\n\n"
-            "Use search_functions to find OmicVerse functions and their prerequisites.\n"
-            "Use search_skills for domain-specific workflow guidance.\n"
-            "Use inspect_data and run_snippet to understand current data state.\n\n"
-            "Your plan should include:\n"
-            "1. Ordered steps with specific OmicVerse function calls and parameters\n"
-            "2. Quality check points between steps\n"
-            "3. Fallback strategies for known failure modes\n"
-            "4. Expected outputs at each step (obsm, obs columns, layers)\n\n"
-        )
-        prompt += self._CODE_QUALITY_RULES
-        prompt += "\nCall finish() with the complete plan when done.\n"
-        if context:
-            prompt += f"\nAdditional context from parent: {context}"
-        # Append skill catalog
-        if hasattr(self, 'skill_registry') and self.skill_registry and self.skill_registry.skill_metadata:
-            prompt += "\nAvailable domain skills (use search_skills for details):\n"
-            for meta in sorted(self.skill_registry.skill_metadata.values(), key=lambda s: s.slug):
-                prompt += f"  - {meta.slug}: {meta.description[:80]}\n"
-        return prompt
+        return self._prompt_builder.build_plan_prompt(context)
 
     def _build_execute_prompt(self, context: str) -> str:
-        """System prompt for the execute subagent (focused code execution)."""
-        prompt = (
-            "You are a focused bioinformatics code executor for OmicVerse. "
-            "Complete the specific sub-task described. Execute code step by step.\n\n"
-            "Guidelines:\n"
-            "- Inspect data before writing code that depends on column names\n"
-            "- Execute in logical steps, not one giant block\n"
-            "- If code fails, diagnose and try a different approach\n"
-            "- Use run_snippet() for exploration, execute_code() for processing\n"
-            "- Call finish() when done with a summary of what was accomplished\n\n"
-        )
-        prompt += self._CODE_QUALITY_RULES
-        prompt += (
-            "\nAvailable packages: ov (omicverse), sc (scanpy), np (numpy), pd (pandas), "
-            "matplotlib, seaborn, scipy, sklearn\n"
-            "All OmicVerse functions are called via ov.* (e.g. ov.pp.preprocess, ov.pp.scale)\n"
-        )
-        if context:
-            prompt += f"\nContext from parent: {context}"
-        return prompt
+        return self._prompt_builder.build_execute_prompt(context)
 
     def _build_subagent_system_prompt(self, agent_type: str, context: str = "") -> str:
-        """Route to the correct subagent prompt builder."""
-        if agent_type == "explore":
-            return self._build_explore_prompt(context)
-        elif agent_type == "plan":
-            return self._build_plan_prompt(context)
-        elif agent_type == "execute":
-            return self._build_execute_prompt(context)
-        raise ValueError(f"Unknown subagent type: {agent_type}")
+        return self._prompt_builder.build_subagent_system_prompt(agent_type, context)
 
     def _build_subagent_user_message(self, task: str, adata: Any) -> str:
-        """Build the initial user message for a subagent."""
-        msg = f"Task: {task}\n\n"
-        if adata is not None and hasattr(adata, 'shape'):
-            msg += f"Dataset: {adata.shape[0]} cells x {adata.shape[1]} genes\n"
-        return msg
+        return self._prompt_builder.build_subagent_user_message(task, adata)
 
     async def _run_subagent(
-        self,
-        agent_type: str,
-        task: str,
-        adata: Any,
-        context: str = "",
+        self, agent_type: str, task: str, adata: Any, context: str = "",
     ) -> dict:
-        """Spawn a subagent with restricted tools and its own conversation.
-
-        The subagent gets its own system prompt and message history (isolated
-        context window). Only the final result is returned to the parent.
-
-        Returns
-        -------
-        dict
-            ``{"result": str, "adata": AnnData}``
-        """
-        from .agent_config import SUBAGENT_CONFIGS
-
-        config = SUBAGENT_CONFIGS[agent_type]
-
-        # Filter tools to only those allowed for this subagent type
-        subagent_tools = [
-            t for t in self.AGENT_TOOLS
-            if t["name"] in config.allowed_tools
-        ]
-
-        # Build independent message history
-        messages = [
-            {"role": "system", "content": self._build_subagent_system_prompt(agent_type, context)},
-            {"role": "user", "content": self._build_subagent_user_message(task, adata)},
-        ]
-
-        working_adata = adata
-
-        for turn in range(config.max_turns):
-            print(f"      🔄 [{agent_type}] Turn {turn + 1}/{config.max_turns}")
-
-            response = await self._llm.chat(
-                messages, tools=subagent_tools, tool_choice="auto"
-            )
-
-            # Track usage
-            if response.usage:
-                self.last_usage = response.usage
-
-            # Append assistant response
-            if response.raw_message:
-                messages.append(response.raw_message)
-            elif response.content:
-                messages.append({"role": "assistant", "content": response.content})
-
-            # Text-only response → done
-            if not response.tool_calls:
-                return {
-                    "result": response.content or "",
-                    "adata": working_adata,
-                }
-
-            # Process tool calls
-            for tc in response.tool_calls:
-                print(f"      🔧 [{agent_type}] {tc.name}({', '.join(f'{k}=' for k in tc.arguments)})")
-
-                result = await self._dispatch_tool(tc, working_adata, task)
-
-                if tc.name == "execute_code" and isinstance(result, dict) and "adata" in result:
-                    working_adata = result["adata"]
-                    tool_output = result.get("output", "Code executed.")
-                elif tc.name == "finish":
-                    summary = tc.arguments.get("summary", "")
-                    print(f"      ✅ [{agent_type}] Finished: {summary[:120]}")
-                    return {"result": summary, "adata": working_adata}
-                elif isinstance(result, str):
-                    tool_output = result
-                else:
-                    tool_output = str(result)
-
-                # Tighter truncation for subagents
-                if len(tool_output) > 6000:
-                    tool_output = tool_output[:5500] + "\n... (truncated)"
-
-                tool_msg = self._llm.format_tool_result_message(
-                    tc.id, tc.name, tool_output
-                )
-                messages.append(tool_msg)
-
-        return {
-            "result": f"Subagent ({agent_type}) reached max turns ({config.max_turns})",
-            "adata": working_adata,
-        }
-
-    def _build_agentic_system_prompt(self) -> str:
-        """Build the system prompt for agentic loop mode."""
-        prompt = (
-            "You are OmicVerse Agent, an expert bioinformatics assistant that processes "
-            "single-cell, bulk RNA-seq, and spatial transcriptomics data.\n\n"
-            "You have tools to inspect data, execute code, search for functions, "
-            "and search domain-specific skills. Follow this workflow:\n"
-            "1. First use inspect_data to understand the dataset structure\n"
-            "2. Use search_functions to find relevant OmicVerse functions "
-            "(includes prerequisite chains and examples)\n"
-            "3. For complex multi-step workflows, use search_skills for domain guidance\n"
-            "4. Execute code step by step, checking results between steps\n"
-            "5. Call finish() when the task is complete\n\n"
-            "MANDATORY CODE QUALITY RULES:\n"
-            "- NEVER use f-strings in print() - use string concatenation: "
-            "print('Result: ' + str(value))\n"
-            "- NEVER assign result of in-place OmicVerse functions. Call them directly:\n"
-            "  ov.pp.pca(adata, n_pcs=50)   # CORRECT\n"
-            "  adata = ov.pp.pca(adata)      # WRONG - returns None!\n"
-            "  In-place functions: pca, scale, neighbors, leiden, umap, tsne, "
-            "sude, scrublet, mde, louvain, phate\n"
-            "- NEVER use .cat.categories - use .value_counts() instead\n"
-            "- ALWAYS wrap HVG selection in try/except with fallback:\n"
-            "  try:\n"
-            "      sc.pp.highly_variable_genes(adata, flavor='seurat_v3', n_top_genes=2000)\n"
-            "  except ValueError:\n"
-            "      sc.pp.highly_variable_genes(adata, flavor='seurat', n_top_genes=2000)\n"
-            "- ALWAYS validate batch column before batch operations "
-            "(check existence, fillna, astype('category'))\n\n"
-            "Guidelines:\n"
-            "- ALWAYS inspect data before writing code that depends on column names or structure\n"
-            "- Execute code in logical steps, not one giant block\n"
-            "- If code fails, read the error carefully, diagnose the issue, and try a different approach\n"
-            "- Use run_snippet() for exploration (won't modify data)\n"
-            "- Use execute_code() for actual processing (modifies data)\n"
-            "- Available packages: ov (omicverse), sc (scanpy), np (numpy), pd (pandas), "
-            "matplotlib, seaborn, scipy, sklearn\n"
-            "- All OmicVerse functions are called via ov.* (e.g. ov.pp.preprocess, ov.pp.scale)\n"
-            "- When saving files, use the output directory or current working directory\n\n"
-            "DELEGATION STRATEGY (use the delegate tool for complex tasks):\n"
-            "- delegate('explore', ...) — read-only data characterization (fast, 5 turns max)\n"
-            "- delegate('plan', ...) — design multi-step workflow before execution\n"
-            "- delegate('execute', ...) — focused execution of a well-defined processing step\n"
-            "- For simple single-step operations, execute directly without delegation\n"
-            "- Subagents have their own context window (prevents context overflow)\n"
+        return await self._subagent_controller.run_subagent(
+            agent_type=agent_type, task=task, adata=adata, context=context,
         )
 
-        # Add brief skill catalog if available
-        if hasattr(self, 'skill_registry') and self.skill_registry and self.skill_registry.skill_metadata:
-            prompt += "\nAvailable domain skills (use search_skills for detailed guidance):\n"
-            for meta in sorted(self.skill_registry.skill_metadata.values(), key=lambda s: s.slug):
-                prompt += f"  - {meta.slug}: {meta.description[:80]}\n"
-
-        return prompt
+    def _build_agentic_system_prompt(self) -> str:
+        return self._prompt_builder.build_agentic_system_prompt()
 
     def _build_initial_user_message(self, request: str, adata: Any) -> str:
-        """Build the initial user message for the agentic loop."""
-        msg = f"Task: {request}\n\n"
-        if adata is not None:
-            dtype = type(adata).__name__  # "AnnData" or "MuData"
-            if hasattr(adata, 'shape'):
-                msg += f"Dataset ({dtype}): {adata.shape[0]} cells x {adata.shape[1]} features\n"
-            if dtype == "MuData" and hasattr(adata, 'mod'):
-                msg += f"Modalities: {list(adata.mod.keys())}\n"
-        msg += "Use inspect_data to learn more about the dataset structure before writing code."
-        return msg
+        return self._prompt_builder.build_initial_user_message(request, adata)
 
-    async def _dispatch_tool(self, tool_call, current_adata: Any, request: str):
-        """Dispatch a tool call and return the result."""
-        name = tool_call.name
-        args = tool_call.arguments
+    def _get_harness_session_id(self) -> str:
+        """Best-effort session identifier for harness traces/history."""
+        web_session_id = getattr(self, "_web_session_id", "")
+        if web_session_id:
+            return web_session_id
+        if self._filesystem_context is not None:
+            return self._filesystem_context.session_id
+        if self._notebook_executor is not None and self._notebook_executor.current_session:
+            return self._notebook_executor.current_session.get("session_id", "")
+        return ""
 
-        if name == "inspect_data":
-            return self._tool_inspect_data(current_adata, args.get("aspect", "full"))
-        elif name == "execute_code":
-            return self._tool_execute_code(
-                args.get("code", ""),
-                args.get("description", ""),
-                current_adata,
-            )
-        elif name == "run_snippet":
-            return self._tool_run_snippet(args.get("code", ""), current_adata)
-        elif name == "search_functions":
-            return self._tool_search_functions(args.get("query", ""))
-        elif name == "search_skills":
-            return self._tool_search_skills(args.get("query", ""))
-        elif name == "delegate":
-            agent_type = args.get("agent_type", "explore")
-            task = args.get("task", "")
-            context = args.get("context", "")
-            print(f"   -> Delegating to {agent_type} subagent: {task[:80]}...")
-            sub_result = await self._run_subagent(
-                agent_type=agent_type,
-                task=task,
-                adata=current_adata,
-                context=context,
-            )
-            # execute subagents return modified adata
-            if agent_type == "execute":
-                return {"adata": sub_result["adata"], "output": sub_result["result"]}
-            return sub_result["result"]
-        elif name == "finish":
-            return {"finished": True, "summary": args.get("summary", "")}
-        else:
-            return f"Unknown tool: {name}"
+    def _get_runtime_session_id(self) -> str:
+        """Return the session key used by the harness runtime registry."""
+        return self._get_harness_session_id() or "default"
 
-    async def _run_agentic_loop(self, request: str, adata: Any,
-                               event_callback=None) -> Any:
-        """Execute the agentic loop: LLM decides tools to call iteratively.
-
-        Parameters
-        ----------
-        request : str
-            Natural language request.
-        adata : Any
-            AnnData/MuData object to process.
-        event_callback : callable, optional
-            Async callback ``await event_callback(event_dict)`` for streaming.
-            When provided, events are emitted at key points (llm_chunk, code,
-            result, finish, error, usage). When None (default), no events are
-            emitted and behavior is identical to the pre-callback version.
-        """
-        config = self._config if hasattr(self, '_config') else None
-        max_turns = config.execution.max_agent_turns if config else 15
-
-        async def emit(event):
-            if event_callback:
-                await event_callback(event)
-
-        # Build initial messages
-        messages = [
-            {"role": "system", "content": self._build_agentic_system_prompt()},
-            {"role": "user", "content": self._build_initial_user_message(request, adata)},
+    def _get_visible_agent_tools(self, *, allowed_names: Optional[set[str]] = None) -> list[dict[str, Any]]:
+        """Return the currently visible tool schemas for this session."""
+        session_id = self._get_runtime_session_id()
+        loaded = runtime_state.get_loaded_tools(session_id)
+        tools = get_visible_tool_schemas(loaded) + list(self.LEGACY_AGENT_TOOLS)
+        if allowed_names is None:
+            return tools
+        normalized_allowed = {normalize_tool_name(name) for name in allowed_names}
+        return [
+            tool for tool in tools
+            if tool["name"] in allowed_names or normalize_tool_name(tool["name"]) in normalized_allowed
         ]
 
-        current_adata = adata
+    def _get_loaded_tool_names(self) -> list[str]:
+        return runtime_state.get_loaded_tools(self._get_runtime_session_id())
 
-        for turn in range(max_turns):
-            print(f"   🔄 Turn {turn + 1}/{max_turns}")
+    def _refresh_runtime_working_directory(self) -> str:
+        """Keep runtime cwd aligned with the active worktree / filesystem context."""
+        session_id = self._get_runtime_session_id()
+        cwd = runtime_state.get_working_directory(session_id)
+        if cwd:
+            return cwd
+        current = os.getcwd()
+        if self._filesystem_context is not None:
+            current = str(self._filesystem_context._workspace_dir)
+        runtime_state.set_working_directory(session_id, current)
+        return current
 
-            # LLM call with tools
-            response = await self._llm.chat(
-                messages, tools=self.AGENT_TOOLS, tool_choice="auto"
-            )
+    def _tool_blocked_in_plan_mode(self, tool_name: str) -> bool:
+        spec = get_tool_spec(tool_name)
+        session_state = runtime_state.get_summary(self._get_runtime_session_id())
+        plan_mode = bool((session_state.get("plan_mode") or {}).get("enabled", False))
+        if not plan_mode:
+            return False
+        if spec is not None:
+            return spec.high_risk or spec.name in {"Bash", "Edit", "Write", "NotebookEdit", "EnterWorktree"}
+        return tool_name in {"execute_code", "web_download"}
 
-            # Track usage
-            if response.usage:
-                self.last_usage = response.usage
+    def _request_requires_tool_action(self, request: str, adata: Any) -> bool:
+        return _FollowUpGate.request_requires_tool_action(request, adata)
 
-            # Append assistant response to conversation
-            if response.raw_message:
-                messages.append(response.raw_message)
-            elif response.content:
-                messages.append({"role": "assistant", "content": response.content})
+    def _response_is_promissory(self, content: str) -> bool:
+        return _FollowUpGate.response_is_promissory(content)
 
-            # If text-only response with no tool calls, treat as done
-            if not response.tool_calls:
-                if response.content:
-                    print(f"   💬 Agent response: {response.content[:200]}")
-                    await emit({"type": "llm_chunk", "content": response.content})
-                break
+    def _select_agent_tool_choice(self, *, request, adata, turn_index, had_meaningful_tool_call, forced_retry) -> str:
+        return _FollowUpGate.select_tool_choice(
+            request=request, adata=adata, turn_index=turn_index,
+            had_meaningful_tool_call=had_meaningful_tool_call, forced_retry=forced_retry,
+        )
 
-            # Process each tool call
-            for tc in response.tool_calls:
-                print(f"   🔧 Tool: {tc.name}({', '.join(f'{k}=' for k in tc.arguments)})")
+    def _should_continue_after_text_response(self, *, request, response_content, adata, had_meaningful_tool_call) -> bool:
+        return _FollowUpGate.should_continue_after_text(
+            request=request, response_content=response_content,
+            adata=adata, had_meaningful_tool_call=had_meaningful_tool_call,
+        )
 
-                result = await self._dispatch_tool(tc, current_adata, request)
+    def _build_no_tool_follow_up_message(self, request, *, retry_count=0, max_retries=2) -> str:
+        return _FollowUpGate.build_no_tool_follow_up(request, retry_count=retry_count, max_retries=max_retries)
 
-                # Handle tools that return dict with adata (execute_code, delegate/execute)
-                if tc.name in ("execute_code", "delegate") and isinstance(result, dict) and "adata" in result:
-                    current_adata = result["adata"]
-                    tool_output = result.get("output", "Code executed.")
-                    if tc.name == "execute_code":
-                        print(f"      ✅ {tc.arguments.get('description', 'Code executed')}")
-                        await emit({"type": "code", "content": tc.arguments.get("code", "")})
-                    else:
-                        print(f"      ✅ delegate({tc.arguments.get('agent_type', '')}) completed")
-                    await emit({
-                        "type": "result",
-                        "content": current_adata,
-                        "shape": (current_adata.shape[0], current_adata.shape[1])
-                            if hasattr(current_adata, "shape") else None,
-                    })
-                elif tc.name == "finish":
-                    summary = tc.arguments.get("summary", "Task completed")
-                    print(f"   ✅ Finished: {summary}")
-                    await emit({"type": "finish", "content": summary})
-                    if self.last_usage:
-                        await emit({"type": "usage", "content": self.last_usage})
-                    self._save_conversation_log(messages)
-                    return current_adata
-                elif isinstance(result, str):
-                    tool_output = result
-                else:
-                    tool_output = str(result)
+    def _persist_harness_history(self, request: str) -> None:
+        self._turn_controller._persist_harness_history(request)
 
-                # Truncate very long tool outputs
-                if len(tool_output) > 8000:
-                    tool_output = tool_output[:7500] + "\n... (truncated)"
+    def _append_tool_results(self, messages: list, tool_results: list) -> None:
+        self._turn_controller._append_tool_results(messages, tool_results)
 
-                # Append tool result to conversation
-                tool_msg = self._llm.format_tool_result_message(
-                    tc.id, tc.name, tool_output
-                )
-                messages.append(tool_msg)
+    async def _dispatch_tool(self, tool_call, current_adata: Any, request: str):
+        return await self._tool_runtime.dispatch_tool(tool_call, current_adata, request)
 
-        print(f"   ⚠️  Max turns ({max_turns}) reached, returning current result")
-        if self.last_usage:
-            await emit({"type": "usage", "content": self.last_usage})
-        self._save_conversation_log(messages)
-        return current_adata
+    async def _run_agentic_loop(self, request: str, adata: Any,
+                               event_callback=None,
+                               cancel_event=None,
+                               history=None,
+                               approval_handler=None) -> Any:
+        return await self._turn_controller.run_agentic_loop(
+            request, adata,
+            event_callback=event_callback,
+            cancel_event=cancel_event,
+            history=history,
+            approval_handler=approval_handler,
+        )
 
     def _save_conversation_log(self, messages: list) -> None:
-        """Save the full conversation to a JSON file for debugging.
-
-        Activated by setting the ``OV_AGENT_LOG_DIR`` environment variable to a
-        directory path.  Each run produces a timestamped JSON file containing
-        the full message list (system, user, assistant, tool results).
-        """
-        log_dir = os.environ.get("OV_AGENT_LOG_DIR")
-        if not log_dir:
-            return
-        try:
-            from pathlib import Path
-            import datetime as _dt
-            log_path = Path(log_dir)
-            log_path.mkdir(parents=True, exist_ok=True)
-            ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-            out_file = log_path / f"agent_conversation_{ts}.json"
-
-            # Serialize messages, converting non-serializable objects
-            def _safe(obj):
-                if isinstance(obj, (str, int, float, bool, type(None))):
-                    return obj
-                if isinstance(obj, (list, tuple)):
-                    return [_safe(v) for v in obj]
-                if isinstance(obj, dict):
-                    return {k: _safe(v) for k, v in obj.items()}
-                return repr(obj)
-
-            out_file.write_text(json.dumps(_safe(messages), indent=2, ensure_ascii=False))
-            print(f"   📝 Conversation log saved: {out_file}")
-        except Exception as exc:
-            logger.debug(f"Failed to save conversation log: {exc}")
+        _TurnController._save_conversation_log(messages)
 
     def _list_project_skills(self) -> str:
         """Return a JSON catalog of the discovered project skills."""
@@ -2457,154 +1951,18 @@ IMPORTANT:
             }
 
     def _apply_execution_error_fix(self, code: str, error_msg: str) -> Optional[str]:
-        """
-        Apply targeted fixes to code based on known execution error patterns.
-
-        Parameters
-        ----------
-        code : str
-            The code that failed execution
-        error_msg : str
-            The error message from execution
-
-        Returns
-        -------
-        Optional[str]
-            Fixed code if a known pattern was matched, None otherwise
-        """
-        error_str = str(error_msg).lower()
-
-        # Fix 0: Missing package → auto-install and retry same code
-        cfg = self._config if hasattr(self, '_config') else None
-        auto_install = cfg.execution.auto_install_packages if cfg else True
-        if auto_install and ("no module named" in error_str or "modulenotfounderror" in error_str):
-            pkg = self._extract_package_name(error_msg)
-            if pkg and self._auto_install_package(pkg):
-                return code  # same code, package now installed
-
-        # Fix 1: .dtype -> .dtypes for DataFrames
-        if "has no attribute 'dtype'" in error_str or "'dtype'" in error_str:
-            # Replace .dtype with .dtypes (for DataFrame attribute access)
-            import re
-            fixed_code = re.sub(r'\.dtype\b', '.dtypes', code)
-            if fixed_code != code:
-                logger.debug("Applied fix: .dtype -> .dtypes")
-                return fixed_code
-
-        # Fix 2: seurat_v3 LOESS error -> seurat fallback
-        if "extrapolation" in error_str or "loess" in error_str or "blending" in error_str:
-            # Replace seurat_v3 with seurat
-            fixed_code = code.replace("flavor='seurat_v3'", "flavor='seurat'")
-            fixed_code = fixed_code.replace('flavor="seurat_v3"', 'flavor="seurat"')
-            if fixed_code != code:
-                logger.debug("Applied fix: seurat_v3 -> seurat for HVG")
-                return fixed_code
-
-        # Fix 3: Categorical batch column errors (improved to handle Categorical dtype)
-        if ("cannot setitem on a categorical" in error_str or "new category" in error_str or
-            ("nan" in error_str and ("batch" in error_str or "categorical" in error_str))):
-            # Inject defensive batch preparation code that handles Categorical columns
-            prep_code = '''
-import pandas as pd
-if 'batch' in adata.obs.columns:
-    if pd.api.types.is_categorical_dtype(adata.obs['batch']):
-        adata.obs['batch'] = adata.obs['batch'].astype(str)
-    adata.obs['batch'] = adata.obs['batch'].fillna('unknown')
-    adata.obs['batch'] = adata.obs['batch'].astype('category')
-'''
-            fixed_code = prep_code + "\n" + code
-            logger.debug("Applied fix: Categorical batch column handling")
-            return fixed_code
-
-        # Fix 4: In-place function assignment error (adata = ov.pp.func(adata) returns None)
-        if "'nonetype' object has no attribute" in error_str:
-            import re
-            # Pattern: adata = ov.pp.func(adata, ...) where func is an in-place function
-            inplace_funcs = ['pca', 'scale', 'neighbors', 'leiden', 'umap', 'tsne', 'sude', 'scrublet', 'mde']
-            pattern = r'adata\s*=\s*ov\.pp\.(' + '|'.join(inplace_funcs) + r')\s*\('
-
-            if re.search(pattern, code):
-                # Remove the assignment, keep just the function call
-                fixed_code = re.sub(
-                    r'adata\s*=\s*(ov\.pp\.(?:' + '|'.join(inplace_funcs) + r')\s*\([^)]*\))',
-                    r'\1',  # Keep just the function call
-                    code
-                )
-                if fixed_code != code:
-                    logger.debug("Applied fix: Removed assignment from in-place function call")
-                    return fixed_code
-
-        return None
+        return self._analysis_executor.apply_execution_error_fix(code, error_msg)
 
     # ------------------------------------------------------------------
-    # Self-repair helpers (P3-1)
+    # Self-repair helpers — delegated to AnalysisExecutor (P3-1)
     # ------------------------------------------------------------------
-
-    _PACKAGE_ALIASES: Dict[str, str] = {
-        "cv2": "opencv-python",
-        "sklearn": "scikit-learn",
-        "skimage": "scikit-image",
-        "yaml": "pyyaml",
-        "PIL": "Pillow",
-        "Bio": "biopython",
-        "umap": "umap-learn",
-        "leidenalg": "leidenalg",
-        "louvain": "louvain",
-        "harmonypy": "harmonypy",
-        "scanorama": "scanorama",
-        "scvi": "scvi-tools",
-        "scarches": "scarches",
-        "bbknn": "bbknn",
-        "scrublet": "scrublet",
-        "magic": "magic-impute",
-    }
 
     @staticmethod
     def _extract_package_name(error_msg: str) -> Optional[str]:
-        """Extract the top-level package name from a ModuleNotFoundError message."""
-        # "No module named 'leidenalg'"  → leidenalg
-        # "No module named 'some.sub.pkg'" → some
-        m = re.search(r"No module named ['\"]([^'\"]+)['\"]", str(error_msg))
-        if m:
-            return m.group(1).split(".")[0]
-        return None
+        return _AnalysisExecutor.extract_package_name(error_msg)
 
     def _auto_install_package(self, package_name: str) -> bool:
-        """Attempt to pip-install a missing package.  Returns True on success."""
-        import subprocess
-
-        cfg = self._config if hasattr(self, '_config') else None
-
-        # Check blocklist
-        blocklist = ["os", "sys", "subprocess", "shutil", "signal", "ctypes"]
-        if cfg and hasattr(cfg, 'execution'):
-            blocklist = cfg.execution.package_blocklist
-
-        if package_name in blocklist:
-            logger.warning("Package %r is on the blocklist — skipping auto-install", package_name)
-            return False
-
-        pip_name = self._PACKAGE_ALIASES.get(package_name, package_name)
-        print(f"   📦 Auto-installing missing package: {pip_name}")
-
-        try:
-            result = subprocess.run(
-                [sys.executable, "-m", "pip", "install", pip_name],
-                capture_output=True, text=True, timeout=120,
-            )
-            if result.returncode == 0:
-                print(f"   ✅ Successfully installed {pip_name}")
-                # Force re-import by clearing module cache
-                for key in list(sys.modules.keys()):
-                    if key == package_name or key.startswith(package_name + "."):
-                        del sys.modules[key]
-                return True
-            else:
-                print(f"   ❌ pip install failed: {result.stderr[:200]}")
-                return False
-        except Exception as exc:
-            logger.warning("Auto-install of %r failed: %s", pip_name, exc)
-            return False
+        return self._analysis_executor.auto_install_package(package_name)
 
     async def _diagnose_error_with_llm(
         self,
@@ -2613,89 +1971,12 @@ if 'batch' in adata.obs.columns:
         traceback_str: str,
         adata: Any,
     ) -> Optional[str]:
-        """Use LLM to diagnose an execution error and generate fixed code.
-
-        Called when pattern-based fixes fail.  Returns corrected code or None.
-        """
-        if self._llm is None:
-            return None
-
-        dataset_summary = ""
-        if adata is not None and hasattr(adata, "shape"):
-            dataset_summary = f"Dataset: {adata.shape[0]} cells × {adata.shape[1]} genes"
-            if hasattr(adata, "obs") and hasattr(adata.obs, "columns"):
-                cols = list(adata.obs.columns[:20])
-                dataset_summary += f"\nobs columns: {cols}"
-
-        diagnosis_prompt = f"""The following OmicVerse agent-generated Python code failed during execution.
-
---- CODE ---
-{code}
-
---- ERROR ---
-{error_msg}
-
---- TRACEBACK ---
-{traceback_str[-1500:]}
-
---- DATASET ---
-{dataset_summary}
-
-Your task:
-1. Diagnose the root cause of the error.
-2. Generate a CORRECTED version of the full code that fixes the issue.
-3. Wrap the corrected code in ```python ... ``` markers.
-
-Important rules:
-- Fix ONLY the error. Do not change logic that already works.
-- If a variable is undefined, define it or remove the reference.
-- If a module is unavailable, use an alternative or add a try/except.
-- Preserve all file output operations (savefig, to_csv, json.dump, etc.).
-"""
-
-        try:
-            print(f"   🔬 LLM diagnosing execution error...")
-            response = await self._llm.run(diagnosis_prompt)
-
-            diagnosed_code = self._extract_python_code(response)
-            if diagnosed_code and diagnosed_code.strip():
-                print(f"   💡 LLM generated fix ({len(diagnosed_code)} chars)")
-                return diagnosed_code
-        except Exception as exc:
-            logger.warning("LLM error diagnosis failed: %s", exc)
-
-        return None
+        return await self._analysis_executor.diagnose_error_with_llm(
+            code, error_msg, traceback_str, adata,
+        )
 
     def _validate_outputs(self, code: str, output_dir: Optional[str] = None) -> List[str]:
-        """Check which file-write operations in *code* produced actual files.
-
-        Returns list of file paths that were referenced in code but do NOT exist.
-        """
-        missing: List[str] = []
-        # Patterns for common file-write calls
-        file_patterns = [
-            # savefig("path") or savefig('path')
-            r'\.savefig\s*\(\s*["\']([^"\']+)["\']',
-            # to_csv("path")
-            r'\.to_csv\s*\(\s*["\']([^"\']+)["\']',
-            # write_h5ad("path")
-            r'\.write_h5ad\s*\(\s*["\']([^"\']+)["\']',
-            # write("path")
-            r'\.write\s*\(\s*["\']([^"\']+\.h5ad)["\']',
-            # json.dump(..., open("path", "w"))
-            r'open\s*\(\s*["\']([^"\']+\.json)["\']',
-            # pd.to_excel / to_parquet
-            r'\.to_excel\s*\(\s*["\']([^"\']+)["\']',
-            r'\.to_parquet\s*\(\s*["\']([^"\']+)["\']',
-        ]
-        for pattern in file_patterns:
-            for m in re.finditer(pattern, code):
-                fpath = m.group(1)
-                if output_dir and not os.path.isabs(fpath):
-                    fpath = os.path.join(output_dir, fpath)
-                if not os.path.exists(fpath):
-                    missing.append(fpath)
-        return missing
+        return self._analysis_executor.validate_outputs(code, output_dir)
 
     async def _generate_completion_code(
         self,
@@ -2704,686 +1985,35 @@ Important rules:
         adata: Any,
         request: str,
     ) -> Optional[str]:
-        """Generate code that produces only the missing output files."""
-        if self._llm is None or not missing_files:
-            return None
-
-        prompt = f"""The following code was executed successfully but some output files were NOT created:
-
---- ORIGINAL CODE ---
-{original_code}
-
---- MISSING FILES ---
-{json.dumps(missing_files)}
-
---- ORIGINAL REQUEST ---
-{request}
-
-Generate a SHORT Python snippet that creates ONLY the missing files listed above.
-- The `adata` variable is already available with the processed data.
-- Reuse any variables/imports from the original code.
-- Wrap the code in ```python ... ``` markers.
-"""
-        try:
-            response = await self._llm.run(prompt)
-            return self._extract_python_code(response)
-        except Exception as exc:
-            logger.warning("Completion code generation failed: %s", exc)
-            return None
+        return await self._analysis_executor.generate_completion_code(
+            original_code, missing_files, adata, request,
+        )
 
     def _request_approval(self, code: str, violations: list) -> bool:
-        """Display generated code and ask the user for execution approval.
-
-        Parameters
-        ----------
-        code : str
-            The generated code about to be executed.
-        violations : list
-            Security violations found by the scanner (may be empty).
-
-        Returns
-        -------
-        bool
-            True if user approves execution, False otherwise.
-        """
-        print("\n" + "=" * 60)
-        print("GENERATED CODE REVIEW")
-        print("=" * 60)
-        display = code if len(code) < 2000 else code[:2000] + "\n... (truncated)"
-        for i, line in enumerate(display.split("\n"), 1):
-            print(f"  {i:3d} | {line}")
-        if violations:
-            print()
-            print(self._security_scanner.format_report(violations))
-        print("=" * 60)
-        try:
-            response = input("Execute this code? [y/N]: ").strip().lower()
-            return response in ("y", "yes")
-        except (EOFError, KeyboardInterrupt):
-            return False
+        return self._analysis_executor.request_approval(code, violations)
 
     def _execute_generated_code(self, code: str, adata: Any, capture_stdout: bool = False) -> Any:
-        """Execute generated Python code in a sandboxed namespace or session notebook.
+        return self._analysis_executor.execute_generated_code(code, adata, capture_stdout)
 
-        Parameters
-        ----------
-        code : str
-            Python code to execute.
-        adata : Any
-            AnnData object.
-        capture_stdout : bool
-            If True, returns dict {"adata": result_adata, "stdout": captured_output}
-            instead of just result_adata.
-
-        Notes
-        -----
-        When use_notebook_execution=True, code runs in a separate Jupyter notebook session
-        for better isolation and debugging. Otherwise, executes in a sandboxed namespace.
-        The sandbox restricts available built-ins and module imports, but it is not a
-        foolproof security boundary. Only run the agent with data and environments you
-        trust, and consider additional isolation (e.g., containers) for untrusted input.
-        """
-
-        # --- Pre-execution security scan ---
-        try:
-            violations = self._security_scanner.scan(code)
-        except SyntaxError:
-            violations = []  # Syntax errors handled downstream by compile()
-
-        if violations:
-            report = self._security_scanner.format_report(violations)
-            logger.warning("Security scan report:\n%s", report)
-
-            if self._security_scanner.has_critical(violations):
-                raise SecurityViolationError(
-                    f"Code blocked by security scanner:\n{report}",
-                    violations=violations,
-                )
-
-        # --- Approval gate ---
-        approval_mode = self._security_config.approval_mode
-        if approval_mode == ApprovalMode.ALWAYS:
-            if not self._request_approval(code, violations):
-                raise SecurityViolationError("User declined code execution.")
-        elif approval_mode == ApprovalMode.ON_VIOLATION and violations:
-            if not self._request_approval(code, violations):
-                raise SecurityViolationError(
-                    "User declined code execution after security warnings."
-                )
-
-        # Use notebook execution if enabled
-        if self.use_notebook_execution and self._notebook_executor is not None:
-            try:
-                result_adata = self._notebook_executor.execute(code, adata)
-
-                # Store session info in result
-                if hasattr(result_adata, 'uns'):
-                    result_adata.uns['_ovagent_session'] = {
-                        'session_id': self._notebook_executor.current_session['session_id'],
-                        'notebook_path': str(self._notebook_executor.current_session['notebook_path']),
-                        'prompt_number': self._notebook_executor.session_prompt_count
-                    }
-
-                # Process context directives from the code (notebook execution path)
-                if self.enable_filesystem_context and self._filesystem_context:
-                    # For notebook execution, we don't have access to local vars
-                    # but we can still process plan and update directives
-                    self._process_context_directives(code, {})
-
-                return result_adata
-
-            except Exception as e:
-                # P2-3: Notebook fallback policy
-                policy = getattr(
-                    getattr(self, '_config', None),
-                    'execution', None,
-                )
-                fb = getattr(policy, 'sandbox_fallback_policy', SandboxFallbackPolicy.WARN_AND_FALLBACK)
-
-                if fb == SandboxFallbackPolicy.RAISE:
-                    raise SandboxDeniedError(
-                        f"Notebook execution failed and fallback is disabled: {e}"
-                    ) from e
-                elif fb == SandboxFallbackPolicy.WARN_AND_FALLBACK:
-                    if hasattr(self, '_emit'):
-                        self._emit(EventLevel.WARNING, f"Session execution failed: {e}", "execution")
-                        self._emit(EventLevel.INFO, "Falling back to in-process execution...", "execution")
-                    else:
-                        print(f"\u26a0\ufe0f  Session execution failed: {e}")
-                        print(f"   Falling back to in-process execution...")
-                # SandboxFallbackPolicy.SILENT: fall through silently
-
-        # Legacy in-process execution
-        compiled = compile(code, "<omicverse-agent>", "exec")
-        sandbox_globals = self._build_sandbox_globals()
-        sandbox_locals = {"adata": adata}
-        # Common aliases occasionally emitted by LLM-generated code.
-        # Keep these as locals (not globals) so user code can override them normally.
-        try:
-            if hasattr(adata, "obs_names"):
-                sandbox_locals.setdefault("obs_names", adata.obs_names)
-            if hasattr(adata, "var_names"):
-                sandbox_locals.setdefault("var_names", adata.var_names)
-        except Exception:
-            pass
-
-        # Skip AnnData-specific preprocessing for MuData objects
-        _is_mudata = type(adata).__name__ == "MuData"
-
-        # Normalize HVG column naming so generated code can access either alias
-        try:
-            if not _is_mudata and hasattr(adata, "var") and adata.var is not None:
-                if "highly_variable" not in adata.var.columns and "highly_variable_features" in adata.var.columns:
-                    adata.var["highly_variable"] = adata.var["highly_variable_features"]
-            # Store initial sizes so LLM summaries don't KeyError
-            if hasattr(adata, "uns"):
-                adata.uns.setdefault("initial_cells", getattr(adata, "n_obs", None) or getattr(adata, "shape", [None])[0])
-                adata.uns.setdefault("initial_genes", getattr(adata, "n_vars", None) or getattr(adata, "shape", [None, None])[1])
-                adata.uns.setdefault("omicverse_qc_original_cells", getattr(adata, "n_obs", None))
-            # Provide a default raw/ scaled layer so generated code using use_raw=True or layer='scaled' does not crash
-            if not _is_mudata and getattr(adata, "raw", None) is None:
-                try:
-                    adata.raw = adata
-                except Exception:
-                    pass
-            if not _is_mudata and hasattr(adata, "layers") and getattr(adata, "layers", None) is not None and "scaled" not in adata.layers:
-                try:
-                    adata.layers["scaled"] = adata.X.copy()
-                except Exception:
-                    pass
-            # Fill missing numeric obs values to avoid downstream hist/binning errors (AnnData only)
-            try:
-                import pandas as _pd  # local import to avoid sandbox collisions
-                if not _is_mudata and hasattr(adata, "obs"):
-                    for col in adata.obs.columns:
-                        col_data = adata.obs[col]
-                        if _pd.api.types.is_numeric_dtype(col_data):
-                            if col_data.isna().any():
-                                adata.obs[col] = col_data.fillna(0)
-                    # Provide common QC aliases if missing
-                    if "total_counts" not in adata.obs.columns:
-                        try:
-                            import numpy as _np
-                            data_matrix = None
-                            if hasattr(adata, "layers") and getattr(adata, "layers", None) is not None and "counts" in adata.layers:
-                                data_matrix = adata.layers["counts"]
-                            else:
-                                data_matrix = adata.X
-                            sums = _np.asarray(data_matrix.sum(axis=1)).ravel()
-                            adata.obs["total_counts"] = sums
-                        except Exception:
-                            adata.obs["total_counts"] = 0
-                    if "n_counts" not in adata.obs.columns:
-                        adata.obs["n_counts"] = adata.obs.get("total_counts", 0)
-                    if "n_genes_by_counts" not in adata.obs.columns:
-                        try:
-                            import numpy as _np
-                            data_matrix = None
-                            if hasattr(adata, "layers") and getattr(adata, "layers", None) is not None and "counts" in adata.layers:
-                                data_matrix = adata.layers["counts"]
-                            else:
-                                data_matrix = adata.X
-                            adata.obs["n_genes_by_counts"] = _np.asarray((data_matrix > 0).sum(axis=1)).ravel()
-                        except Exception:
-                            adata.obs["n_genes_by_counts"] = 0
-                    if "pct_counts_mito" not in adata.obs.columns and "pct_counts_mt" in adata.obs.columns:
-                        adata.obs["pct_counts_mito"] = adata.obs["pct_counts_mt"]
-                    elif "pct_counts_mito" not in adata.obs.columns:
-                        adata.obs["pct_counts_mito"] = 0
-                if hasattr(adata, "var") and adata.var is not None:
-                    # Provide a canonical mitochondrial column name
-                    if "mito" not in adata.var.columns and "mt" in adata.var.columns:
-                        adata.var["mito"] = adata.var["mt"]
-                    elif "mito" not in adata.var.columns:
-                        adata.var["mito"] = False
-                # Make pandas.cut tolerant to constant/duplicate bin edges
-                try:
-                    if not getattr(_pd.cut, "_ov_wrapped", False):
-                        _orig_cut = _pd.cut
-                        def _safe_cut(*args, **kwargs):
-                            kwargs.setdefault("duplicates", "drop")
-                            return _orig_cut(*args, **kwargs)
-                        _safe_cut._ov_wrapped = True  # type: ignore[attr-defined]
-                        _pd.cut = _safe_cut
-                except Exception:
-                    pass
-            except Exception:
-                pass
-            # Ensure common output directories exist for downloads
-            try:
-                from pathlib import Path
-                Path("genesets").mkdir(exist_ok=True)
-            except Exception:
-                pass
-        except Exception as exc:  # pragma: no cover - defensive guard
-            warnings.warn(
-                f"Failed to normalize HVG columns for agent execution: {exc}",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-
-        warnings.warn(
-            "Executing agent-generated code. Ensure the input model and prompts come from a trusted source.",
-            RuntimeWarning,
-            stacklevel=2,
-        )
-
-        import io as _io
-
-        stdout_buffer = _io.StringIO() if capture_stdout else None
-
-        with self._temporary_api_keys():
-            if capture_stdout:
-                old_stdout = sys.stdout
-                sys.stdout = stdout_buffer
-                try:
-                    exec(compiled, sandbox_globals, sandbox_locals)
-                finally:
-                    sys.stdout = old_stdout
-            else:
-                exec(compiled, sandbox_globals, sandbox_locals)
-
-        result_adata = sandbox_locals.get("adata", adata)
-        self._normalize_doublet_obs(result_adata)
-
-        # Process context directives from the code
-        if self.enable_filesystem_context and self._filesystem_context:
-            self._process_context_directives(code, sandbox_locals)
-
-        if capture_stdout:
-            stdout_text = stdout_buffer.getvalue()
-            return {"adata": result_adata, "stdout": stdout_text}
-
-        return result_adata
-
-    def _normalize_doublet_obs(self, adata: Any) -> None:
-        """Harmonize doublet labels so downstream reporting works for non-expert users."""
-        try:
-            obs = getattr(adata, "obs", None)
-            if obs is None:
-                return
-            # Create a canonical column if a plural form exists
-            if "predicted_doublet" not in obs.columns and "predicted_doublets" in obs.columns:
-                obs["predicted_doublet"] = obs["predicted_doublets"]
-            # Choose the first available doublet flag column
-            col = None
-            for c in ("predicted_doublet", "predicted_doublets", "doublet", "doublets"):
-                if c in obs.columns:
-                    col = c
-                    break
-            if col is None:
-                return
-            # Store a simple rate summary for easy reporting
-            try:
-                rate = float(obs[col].mean()) * 100.0
-                if hasattr(adata, "uns"):
-                    adata.uns.setdefault("doublet_summary", {})["rate_percent"] = rate
-            except Exception:
-                pass
-        except Exception:
-            # Keep silent; this is a best-effort harmonization step
-            return
+    @staticmethod
+    def _normalize_doublet_obs(adata: Any) -> None:
+        _AnalysisExecutor.normalize_doublet_obs(adata)
 
     def _process_context_directives(self, code: str, local_vars: Dict[str, Any]) -> None:
-        """Process context directives from generated code.
-
-        This method parses special comments in the code that instruct the agent
-        to write notes, save plans, or update plan status.
-
-        Supported directives:
-        - # CONTEXT_WRITE: key -> value
-        - # CONTEXT_PLAN: list of steps
-        - # CONTEXT_UPDATE: step=N, status=S, result=R
-
-        Parameters
-        ----------
-        code : str
-            The generated code containing context directives.
-        local_vars : dict
-            The local namespace after code execution, for resolving variable references.
-        """
-        if not self._filesystem_context:
-            return
-
-        try:
-            lines = code.split('\n')
-
-            # Track if we're collecting a multi-line plan
-            collecting_plan = False
-            plan_steps = []
-
-            for line in lines:
-                stripped = line.strip()
-
-                # Handle CONTEXT_WRITE directives
-                if stripped.startswith('# CONTEXT_WRITE:'):
-                    self._handle_context_write(stripped, local_vars)
-
-                # Handle CONTEXT_PLAN directives
-                elif stripped.startswith('# CONTEXT_PLAN:'):
-                    collecting_plan = True
-                    plan_steps = []
-
-                elif collecting_plan:
-                    if stripped.startswith('# - '):
-                        # Parse plan step: "# - Step N: Description [status]"
-                        step_text = stripped[4:]  # Remove "# - "
-                        step_info = self._parse_plan_step(step_text)
-                        if step_info:
-                            plan_steps.append(step_info)
-                    elif stripped.startswith('#'):
-                        # Continue collecting if it's still a comment
-                        if not stripped.startswith('# CONTEXT_'):
-                            continue
-                        else:
-                            # New directive, stop collecting plan
-                            if plan_steps:
-                                self._filesystem_context.write_plan(plan_steps)
-                                logger.debug(f"Saved plan with {len(plan_steps)} steps")
-                            collecting_plan = False
-                            plan_steps = []
-                    else:
-                        # Non-comment line, stop collecting plan
-                        if plan_steps:
-                            self._filesystem_context.write_plan(plan_steps)
-                            logger.debug(f"Saved plan with {len(plan_steps)} steps")
-                        collecting_plan = False
-                        plan_steps = []
-
-                # Handle CONTEXT_UPDATE directives
-                elif stripped.startswith('# CONTEXT_UPDATE:'):
-                    self._handle_context_update(stripped)
-
-            # Save any remaining plan
-            if collecting_plan and plan_steps:
-                self._filesystem_context.write_plan(plan_steps)
-                logger.debug(f"Saved plan with {len(plan_steps)} steps")
-
-        except Exception as e:
-            logger.debug(f"Error processing context directives: {e}")
+        self._analysis_executor.process_context_directives(code, local_vars)
 
     def _handle_context_write(self, directive: str, local_vars: Dict[str, Any]) -> None:
-        """Handle a CONTEXT_WRITE directive.
-
-        Format: # CONTEXT_WRITE: key -> value
-        where value can be a variable name or a literal dict/string.
-        """
-        try:
-            # Extract the part after "# CONTEXT_WRITE:"
-            content = directive.replace('# CONTEXT_WRITE:', '').strip()
-
-            if ' -> ' in content:
-                key, value_expr = content.split(' -> ', 1)
-                key = key.strip()
-                value_expr = value_expr.strip()
-
-                # Try to evaluate the value expression
-                try:
-                    # First, try as a variable reference
-                    if value_expr in local_vars:
-                        value = local_vars[value_expr]
-                    else:
-                        # Try to evaluate as a Python expression
-                        value = eval(value_expr, {"__builtins__": {}}, local_vars)
-                except Exception:
-                    # Fall back to string literal
-                    value = value_expr
-
-                # Determine category based on key pattern
-                category = "notes"
-                if any(kw in key.lower() for kw in ['result', 'stats', 'metrics', 'output']):
-                    category = "results"
-                elif any(kw in key.lower() for kw in ['decision', 'choice', 'why']):
-                    category = "decisions"
-                elif any(kw in key.lower() for kw in ['error', 'fail', 'exception']):
-                    category = "errors"
-
-                self._filesystem_context.write_note(key, value, category)
-                logger.debug(f"Context write: {key} -> {category}")
-
-        except Exception as e:
-            logger.debug(f"Failed to process CONTEXT_WRITE: {e}")
+        self._analysis_executor._handle_context_write(directive, local_vars)
 
     def _handle_context_update(self, directive: str) -> None:
-        """Handle a CONTEXT_UPDATE directive.
+        self._analysis_executor._handle_context_update(directive)
 
-        Format: # CONTEXT_UPDATE: step=N, status=S, result=R
-        """
-        try:
-            content = directive.replace('# CONTEXT_UPDATE:', '').strip()
-
-            # Parse key=value pairs
-            parts = {}
-            for part in content.split(','):
-                if '=' in part:
-                    k, v = part.split('=', 1)
-                    parts[k.strip()] = v.strip().strip('"').strip("'")
-
-            step = int(parts.get('step', 0))
-            status = parts.get('status', 'completed')
-            result = parts.get('result')
-
-            self._filesystem_context.update_plan_step(step, status, result)
-            logger.debug(f"Context update: step {step} -> {status}")
-
-        except Exception as e:
-            logger.debug(f"Failed to process CONTEXT_UPDATE: {e}")
-
-    def _parse_plan_step(self, step_text: str) -> Optional[Dict[str, Any]]:
-        """Parse a plan step from text.
-
-        Format: "Step N: Description [status]" or just "Description [status]"
-        """
-        try:
-            # Extract status if present
-            status = "pending"
-            if '[' in step_text and ']' in step_text:
-                status_start = step_text.rfind('[')
-                status_end = step_text.rfind(']')
-                status = step_text[status_start + 1:status_end].strip().lower()
-                step_text = step_text[:status_start].strip()
-
-            # Remove "Step N:" prefix if present
-            if step_text.lower().startswith('step '):
-                # Find the colon after step number
-                colon_idx = step_text.find(':')
-                if colon_idx > 0:
-                    step_text = step_text[colon_idx + 1:].strip()
-
-            return {
-                "description": step_text,
-                "status": status,
-            }
-
-        except Exception:
-            return None
+    @staticmethod
+    def _parse_plan_step(step_text: str) -> Optional[Dict[str, Any]]:
+        return _AnalysisExecutor._parse_plan_step(step_text)
 
     def _build_sandbox_globals(self) -> Dict[str, Any]:
-        """Create a restricted global namespace for executing agent code."""
-
-        allowed_builtins = [
-            "abs",
-            "all",
-            "any",
-            "bool",
-            "dict",
-            "enumerate",
-            "Exception",
-            "float",
-            "int",
-            "isinstance",
-            "iter",
-            "len",
-            "list",
-            "map",
-            "max",
-            "min",
-            "next",
-            "pow",
-            "print",
-            "range",
-            "round",
-            "set",
-            "sorted",
-            "str",
-            "sum",
-            "tuple",
-            "zip",
-            "filter",
-            "type",
-            # File I/O — needed for json.dump(), csv writing, etc.
-            "open",
-            # Safe introspection helpers often emitted by the agent
-            "hasattr",
-            "getattr",
-            "setattr",
-            "ImportError",
-            "AttributeError",
-            "IndexError",
-            "FileNotFoundError",
-            "OSError",
-            "Exception",
-            "ValueError",
-            "RuntimeError",
-            "TypeError",
-            "KeyError",
-            "AssertionError",
-        ]
-        # Conditionally allow introspection builtins (disabled by default
-        # to prevent sandbox escape via globals()["os"].system(...) etc.)
-        if not self._security_config.restrict_introspection:
-            allowed_builtins.extend(["locals", "globals"])
-
-        safe_builtins = {name: getattr(builtins, name) for name in allowed_builtins if hasattr(builtins, name)}
-        allowed_modules = {}
-        # Modules/roots explicitly disallowed to preserve safety (networking, shells, etc.)
-        deny_roots = {
-            "subprocess",
-            "socket",
-            "ssl",
-            "urllib",
-            "http",
-            "ftplib",
-            "smtplib",
-            "telnetlib",
-            "paramiko",
-            "requests",
-            "importlib",       # Prevents circumventing limited_import
-            "ctypes",          # Prevents native code execution
-            "multiprocessing", # Prevents process spawning
-        }
-        # Merge user-configured extra blocked modules
-        deny_roots |= self._security_config.extra_blocked_modules
-        core_modules = (
-            "omicverse",
-            "numpy",
-            "pandas",
-            "scanpy",
-            # "os" is injected below as SafeOsProxy instead of raw os module
-            "time",
-            "math",
-            "json",
-            "re",
-            "pathlib",
-            "itertools",
-            "functools",
-            "collections",
-            "statistics",
-            "random",
-            "warnings",
-            "datetime",
-            "typing",
-        )
-        skill_modules = (
-            "openpyxl",
-            "reportlab",
-            "matplotlib",
-            "seaborn",
-            "scipy",
-            "statsmodels",
-            "sklearn",
-        )
-        for module_name in core_modules + skill_modules:
-            try:
-                allowed_modules[module_name] = __import__(module_name)
-            except ImportError:
-                warnings.warn(
-                    f"Module '{module_name}' is not available inside the agent sandbox.",
-                    RuntimeWarning,
-                    stacklevel=2,
-                )
-
-        # Inject SafeOsProxy instead of raw os module
-        allowed_modules["os"] = SafeOsProxy()
-
-        def _apply_scvi_shims() -> None:
-            """Apply small runtime patches for known scvi-tools API footguns.
-
-            Context (ovbench):
-            - In scvi-tools 1.4.x, `scvi.model.MULTIVI.train` accepts `**kwargs` and
-              internally forwards early-stopping settings to a TrainRunner.
-            - LLM-generated code often passes `early_stopping_patience=...` into
-              `MULTIVI.train(...)`, which can raise:
-                TypeError: TrainRunner() got multiple values for keyword argument 'early_stopping_patience'
-
-            We defensively drop that kwarg to keep benchmark runs deterministic and
-            avoid a purely API-shape failure mode.
-            """
-            try:
-                import functools
-                from scvi.model import MULTIVI
-            except Exception:
-                return
-
-            try:
-                already = getattr(MULTIVI.train, "_ovbench_patched", False)
-            except Exception:
-                already = False
-            if already:
-                return
-
-            orig_train = MULTIVI.train
-
-            @functools.wraps(orig_train)
-            def _train_wrapper(self, *args, **kwargs):
-                kwargs.pop("early_stopping_patience", None)
-                return orig_train(self, *args, **kwargs)
-
-            _train_wrapper._ovbench_patched = True  # type: ignore[attr-defined]
-            MULTIVI.train = _train_wrapper  # type: ignore[assignment]
-
-        def limited_import(name, globals=None, locals=None, fromlist=(), level=0):
-            root_name = name.split(".")[0]
-            if root_name in deny_roots:
-                # Allow omicverse internal modules (e.g. biocontext HTTP client)
-                # to import denied modules; agent-generated code has no __package__
-                caller_pkg = (globals or {}).get("__package__", "") or ""
-                if not caller_pkg.startswith("omicverse"):
-                    raise ImportError(
-                        f"Module '{name}' is blocked inside the OmicVerse agent sandbox."
-                    )
-            if root_name not in allowed_modules:
-                # Deny-list strategy: any non-denied module is allowed on demand.
-                # Security boundary is deny_roots (network/process/shell) + AST scanner.
-                allowed_modules[root_name] = __import__(root_name)
-            if root_name == "scvi":
-                _apply_scvi_shims()
-            return __import__(name, globals, locals, fromlist, level)
-
-        safe_builtins["__import__"] = limited_import
-
-        sandbox_globals: Dict[str, Any] = {"__builtins__": safe_builtins}
-        sandbox_globals.update(allowed_modules)
-        # Friendly aliases commonly emitted by LLM code
-        if "pandas" in allowed_modules:
-            sandbox_globals.setdefault("pd", allowed_modules["pandas"])
-        if "numpy" in allowed_modules:
-            sandbox_globals.setdefault("np", allowed_modules["numpy"])
-        if "scanpy" in allowed_modules:
-            sandbox_globals.setdefault("sc", allowed_modules["scanpy"])
-        if "omicverse" in allowed_modules:
-            sandbox_globals.setdefault("ov", allowed_modules["omicverse"])
-        return sandbox_globals
+        return self._analysis_executor.build_sandbox_globals()
 
     def _detect_direct_python_request(self, request: str) -> Optional[str]:
         """Detect and return user-provided Python code to execute directly."""
@@ -3494,6 +2124,7 @@ Generate a SHORT Python snippet that creates ONLY the missing files listed above
 
         try:
             result = await self._run_agentic_loop(request, adata)
+            self._persist_harness_history(request)
 
             print()
             print(f"{'=' * 70}")
@@ -3502,6 +2133,7 @@ Generate a SHORT Python snippet that creates ONLY the missing files listed above
 
             return result
         except Exception as e:
+            self._persist_harness_history(request)
             print()
             print(f"{'=' * 70}")
             print(f"❌ ERROR - Agentic loop failed: {e}")
@@ -3587,7 +2219,9 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         ]
         return "\n".join(lines)
 
-    async def stream_async(self, request: str, adata: Any):
+    async def stream_async(self, request: str, adata: Any,
+                           cancel_event=None, history=None,
+                           approval_handler=None):
         """
         Stream agentic-loop events as the agent processes a request.
 
@@ -3601,16 +2235,22 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
             Natural language description of what to do.
         adata : Any
             AnnData/MuData object to process.
+        cancel_event : threading.Event, optional
+            When set, signals the agentic loop to stop at the next safe
+            checkpoint.
+        history : list, optional
+            Prior conversation messages for multi-turn context.
 
         Yields
         ------
         dict
             Dictionary with ``'type'`` and ``'content'`` keys. Types:
 
+            - ``'tool_call'``: Agent dispatched a tool (``content`` has ``name`` and ``arguments``).
             - ``'llm_chunk'``: LLM assistant text response.
             - ``'code'``: Python code sent to ``execute_code``.
             - ``'result'``: Updated adata after execution (also has ``'shape'``).
-            - ``'finish'``: Agent declared the task complete.
+            - ``'done'``: Agent declared the task complete (may have ``'cancelled': True``).
             - ``'error'``: An error occurred.
             - ``'usage'``: Token usage statistics (final event).
 
@@ -3633,10 +2273,32 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         async def _run_loop():
             try:
                 await self._run_agentic_loop(
-                    request, adata, event_callback=_event_callback,
+                    request, adata,
+                    event_callback=_event_callback,
+                    cancel_event=cancel_event,
+                    history=history,
+                    approval_handler=approval_handler,
                 )
             except Exception as exc:
-                await queue.put({"type": "error", "content": str(exc)})
+                trace_id = getattr(getattr(self, "_last_run_trace", None), "trace_id", "")
+                turn_id = getattr(getattr(self, "_last_run_trace", None), "turn_id", "")
+                await queue.put(build_stream_event(
+                    "error",
+                    str(exc),
+                    turn_id=turn_id,
+                    trace_id=trace_id,
+                    session_id=self._get_harness_session_id(),
+                    category="runtime",
+                ))
+                # Defense-in-depth: ensure a done event is always emitted
+                await queue.put(build_stream_event(
+                    "done",
+                    f"Error: {exc}",
+                    turn_id=turn_id,
+                    trace_id=trace_id,
+                    session_id=self._get_harness_session_id(),
+                    category="lifecycle",
+                ) | {"error": True})
             finally:
                 await queue.put(None)  # sentinel
 

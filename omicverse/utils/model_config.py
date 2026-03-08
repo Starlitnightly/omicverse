@@ -80,6 +80,8 @@ register_provider(ProviderInfo(
     models={
         "gpt-5": "OpenAI GPT-5 (Latest)",
         "gpt-5.2": "OpenAI GPT-5.2",
+        "gpt-5.4": "OpenAI GPT-5.4",
+        "gpt-5.4-pro": "OpenAI GPT-5.4 Pro",
         "gpt-5-mini": "OpenAI GPT-5 Mini",
         "gpt-5-nano": "OpenAI GPT-5 Nano",
         "gpt-5-chat-latest": "OpenAI GPT-5 Chat Latest",
@@ -104,13 +106,21 @@ register_provider(ProviderInfo(
     base_url="https://api.anthropic.com",
     env_key="ANTHROPIC_API_KEY",
     wire_api=WireAPI.ANTHROPIC_MESSAGES,
-    model_prefixes=("anthropic/",),
+    model_prefixes=("anthropic/", "claude-"),
     models={
-        "anthropic/claude-opus-4-1-20250805": "Claude Opus 4.1 (Latest)",
+        # Claude 4.6
+        "anthropic/claude-opus-4-6-20260201": "Claude Opus 4.6",
+        "anthropic/claude-sonnet-4-6-20260201": "Claude Sonnet 4.6",
+        "anthropic/claude-haiku-4-5-20251001": "Claude Haiku 4.5",
+        # Claude 4.1
+        "anthropic/claude-opus-4-1-20250805": "Claude Opus 4.1",
+        # Claude 4
         "anthropic/claude-opus-4-20250514": "Claude Opus 4",
         "anthropic/claude-sonnet-4-20250514": "Claude Sonnet 4",
+        # Claude 3.7 / 3.5
         "anthropic/claude-3-7-sonnet-20250219": "Claude Sonnet 3.7",
         "anthropic/claude-3-5-haiku-20241022": "Claude Haiku 3.5",
+        # Legacy
         "anthropic/claude-3-opus-20240229": "Claude 3 Opus (Legacy)",
         "anthropic/claude-3-sonnet-20240229": "Claude 3 Sonnet (Legacy)",
         "anthropic/claude-3-haiku-20240307": "Claude 3 Haiku (Legacy)",
@@ -254,7 +264,23 @@ _RAW_MODEL_ALIASES = {
     "python-local": "python",
     "py-local": "python",
 
-    # Claude 4.5 variations
+    # Claude 4.6 variations
+    "claude-opus-4-6": "anthropic/claude-opus-4-6-20260201",
+    "claude-opus-4-6-thinking": "anthropic/claude-opus-4-6-20260201",
+    "claude-4-6-opus": "anthropic/claude-opus-4-6-20260201",
+    "claude-4.6-opus": "anthropic/claude-opus-4-6-20260201",
+    "claude-sonnet-4-6": "anthropic/claude-sonnet-4-6-20260201",
+    "claude-sonnet-4-6-thinking": "anthropic/claude-sonnet-4-6-20260201",
+    "claude-4-6-sonnet": "anthropic/claude-sonnet-4-6-20260201",
+    "claude-4.6-sonnet": "anthropic/claude-sonnet-4-6-20260201",
+    "claude-haiku-4-5": "anthropic/claude-haiku-4-5-20251001",
+    "claude-4-5-haiku": "anthropic/claude-haiku-4-5-20251001",
+    "claude-4.5-haiku": "anthropic/claude-haiku-4-5-20251001",
+    # Claude 4.1 variations
+    "claude-opus-4-1": "anthropic/claude-opus-4-1-20250805",
+    "claude-4-1-opus": "anthropic/claude-opus-4-1-20250805",
+    "claude-4.1-opus": "anthropic/claude-opus-4-1-20250805",
+    # Claude 4 / 4.5 Sonnet variations
     "claude-sonnet-4-5": "anthropic/claude-sonnet-4-20250514",
     "claude-4-5-sonnet": "anthropic/claude-sonnet-4-20250514",
     "claude-sonnet-4-5-20250929": "anthropic/claude-sonnet-4-20250514",

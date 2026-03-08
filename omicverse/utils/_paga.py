@@ -4,6 +4,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse import coo_matrix, issparse
 
 from scanpy.tools._paga import PAGA
+from .._registry import register_function
 
 # TODO: Add docstrings
 class PAGA_tree(PAGA):
@@ -213,6 +214,17 @@ def get_sparse_from_igraph(graph, weight_attr=None):
         return csr_matrix(shape)
 
 
+@register_function(
+    aliases=['计算 PAGA 图', 'cal_paga', 'trajectory graph abstraction'],
+    category="utils",
+    description="Compute PAGA connectivity among cell groups to summarize lineage topology and coarse-grained trajectory structure.",
+    prerequisites={'functions': ['pp.neighbors'], 'optional_functions': ['pp.leiden']},
+    requires={'obsp': ['connectivities'], 'uns': ['neighbors'], 'obs': ['cluster labels']},
+    produces={'uns': ['paga'], 'obs': ['pseudotime (optional)']},
+    auto_fix='escalate',
+    examples=['ov.utils.cal_paga(adata, use_time_prior="dpt_pseudotime", vkey="paga")'],
+    related=['utils.plot_paga', 'pp.neighbors', 'pp.umap']
+)
 def cal_paga(
     adata,
     groups=None,
@@ -224,50 +236,33 @@ def cal_paga(
     minimum_spanning_tree=True,
     copy=False,
 ):
-    """PAGA graph with velocity-directed edges.
-
-    Mapping out the coarse-grained connectivity structures of complex manifolds
-    :cite:p:`Wolf19`. By quantifying the connectivity of partitions (groups, clusters) of the
-    single-cell graph, partition-based graph abstraction (PAGA) generates a much
-    simpler abstracted graph (*PAGA graph*) of partitions, in which edge weights
-    represent confidence in the presence of connections.
+    """Compute a PAGA graph with optional velocity/time priors.
 
     Parameters
     ----------
-    adata : :class:`~anndata.AnnData`
-        An annotated data matrix.
-    groups : key for categorical in `adata.obs`, optional (default: 'louvain')
-        You can pass your predefined groups by choosing any categorical
-        annotation of observations (`adata.obs`).
-    vkey: `str` or `None` (default: `None`)
-        Key for annotations of observations/cells or variables/genes.
-    use_time_prior : `str` or bool, optional (default: True)
-        Obs key for pseudo-time values.
-        If True, 'velocity_pseudotime' is used if available.
-    root_key : `str` or bool, optional (default: None)
-        Obs key for root states.
-    end_key : `str` or bool, optional (default: None)
-        Obs key for end states.
-    threshold_root_end_prior : `float` (default: 0.9)
-        Threshold for root and final states priors, to be in the range of [0,1].
-        Values above the threshold will be considered as terminal and included as prior.
-    minimum_spanning_tree : bool, optional (default: True)
-        Whether to prune the tree such that a path from A-to-B
-        is removed if another more confident path exists.
-    copy : `bool`, optional (default: `False`)
-        Copy `adata` before computation and return a copy.
-        Otherwise, perform computation inplace and return `None`.
+    adata:anndata.AnnData
+        Annotated data matrix with neighborhood graph.
+    groups:str or None
+        Grouping key in ``adata.obs``; auto-detected when ``None``.
+    vkey:str
+        Velocity layer key used for transition confidence.
+    use_time_prior:str or bool
+        Pseudotime prior key (or ``True`` to auto-use velocity pseudotime).
+    root_key:str or None
+        Obs key marking root states.
+    end_key:str or None
+        Obs key marking terminal states.
+    threshold_root_end_prior:float or None
+        Threshold for root/end priors in ``[0, 1]``.
+    minimum_spanning_tree:bool
+        Whether to prune graph to most confident tree-like structure.
+    copy:bool
+        Whether to return a copied AnnData with computed results.
 
     Returns
     -------
-    connectivities: `.uns`
-        The full adjacency matrix of the abstracted graph, weights correspond to
-        confidence in the connectivities of partitions.
-    connectivities_tree: `.uns`
-        The adjacency matrix of the tree-like subgraph that best explains the topology.
-    transitions_confidence: `.uns`
-        The adjacency matrix of the abstracted directed graph, weights correspond to
-        confidence in the transitions between partitions.
+    anndata.AnnData or None
+        Copied AnnData if ``copy=True``; otherwise results are written in place.
     """
     if "neighbors" not in adata.uns:
         raise ValueError(
@@ -354,9 +349,21 @@ def strings_to_categoricals(adata):
 
 from pandas import Index
 
-# TODO: Add docstrings
 def make_unique_list(key, allow_array=False):
-    """TODO."""
+    """Normalize user input to a list of keys.
+
+    Parameters
+    ----------
+    key:Any
+        Input key or key collection.
+    allow_array:bool
+        Whether numpy arrays are treated as valid list-like inputs.
+
+    Returns
+    -------
+    list or Any
+        Normalized list-like key representation.
+    """
     from collections import abc
     if isinstance(key, (Index, abc.KeysView)):
         key = list(key)
@@ -368,15 +375,40 @@ def make_unique_list(key, allow_array=False):
     is_list_of_str = is_list and all(isinstance(item, str) for item in key)
     return key if is_list_of_str else key if is_list and len(key) < 20 else [key]
 
-# TODO: Add docstrings
 def check_basis(adata, basis):
-    """TODO."""
+    """Ensure embedding basis follows ``X_<basis>`` convention in ``obsm``.
+
+    Parameters
+    ----------
+    adata:anndata.AnnData
+        AnnData object containing embeddings.
+    basis:str
+        Embedding basis name.
+
+    Returns
+    -------
+    None
+        May add/rename ``adata.obsm`` key.
+    """
     if basis in adata.obsm.keys() and f"X_{basis}" not in adata.obsm.keys():
         adata.obsm[f"X_{basis}"] = adata.obsm[basis]
         print(f"Renamed '{basis}' to convention 'X_{basis}' (adata.obsm).")
 
 def make_unique_valid_list(adata, keys):
-    """TODO."""
+    """Filter key list to those available in AnnData containers.
+
+    Parameters
+    ----------
+    adata:anndata.AnnData
+        AnnData object with obs/var/layer keys.
+    keys:list or str
+        Candidate keys.
+
+    Returns
+    -------
+    list
+        Valid keys existing in AnnData.
+    """
     keys = make_unique_list(keys)
     if all(isinstance(item, str) for item in keys):
         for i, key in enumerate(keys):
@@ -401,7 +433,20 @@ def make_unique_valid_list(adata, keys):
     return keys
 
 def default_basis(adata, **kwargs):
-    """TODO."""
+    """Choose a default embedding basis from AnnData.
+
+    Parameters
+    ----------
+    adata:anndata.AnnData
+        AnnData containing embeddings.
+    **kwargs
+        Optional explicit ``x``/``y`` vectors used to create temporary embedding.
+
+    Returns
+    -------
+    str
+        Selected basis name.
+    """
     if "x" in kwargs and "y" in kwargs:
         keys, x, y = ["embedding"], kwargs.pop("x"), kwargs.pop("y")
         adata.obsm["X_embedding"] = np.stack([x, y]).T
@@ -432,6 +477,17 @@ def _safe_categorical_to_str(adata, color_key):
         return adata_copy
     return adata
 
+@register_function(
+    aliases=['绘制 PAGA 图', 'plot_paga', 'paga visualization'],
+    category="utils",
+    description="Plot PAGA graph over embedding coordinates to visualize lineage transitions and connectivity confidence.",
+    prerequisites={'functions': ['cal_paga']},
+    requires={'uns': ['paga'], 'obsm': ['X_umap or selected basis']},
+    produces={},
+    auto_fix='none',
+    examples=['ov.utils.plot_paga(adata, basis="umap", title="PAGA graph")'],
+    related=['utils.cal_paga', 'pl.embedding']
+)
 def plot_paga(adata,
     basis=None,
     vkey="velocity",
@@ -476,6 +532,110 @@ def plot_paga(adata,
     ncols=None,
     scatter_flag=None,
     **kwargs,):
+    """
+    Plot PAGA graph and optional embedding-level annotations.
+    
+    Parameters
+    ----------
+    adata:AnnData
+        AnnData with PAGA graph stored in ``adata.uns['paga']``.
+    basis:str or None, optional
+        Embedding basis used for overlay (for example ``'umap'``). Set ``None`` to draw
+        graph layout only.
+    vkey:str, optional
+        Velocity key used by scVelo when velocity-aware plotting is enabled.
+    color:str or sequence of str, optional
+        Cell-level annotation(s) used for coloring.
+    layer:str or None, optional
+        Layer used for expression coloring.
+    title:str or None, optional
+        Plot title.
+    threshold:float or None, optional
+        Minimum edge threshold.
+    layout:str or None, optional
+        Graph layout algorithm name.
+    layout_kwds:dict or None, optional
+        Additional layout options.
+    init_pos:str or None, optional
+        Initialization for graph layout.
+    root:int or None, optional
+        Root index used by tree-like layouts.
+    labels:str or None, optional
+        Node labels to display.
+    single_component:bool, optional
+        Keep only the largest connected component.
+    dashed_edges:str or None, optional
+        Key for dashed edges.
+    solid_edges:str or None, optional
+        Key for solid edges.
+    transitions:str or None, optional
+        Transition-confidence edge key.
+    node_size_scale:float, optional
+        Scale factor for node sizes.
+    node_size_power:float, optional
+        Exponent for node-size scaling.
+    edge_width_scale:float, optional
+        Scale factor for edge widths.
+    min_edge_width:float or None, optional
+        Lower bound for edge widths.
+    max_edge_width:float, optional
+        Upper bound for edge widths.
+    arrowsize:float, optional
+        Arrow size for directed edges.
+    random_state:int, optional
+        Random seed used by layout routines.
+    pos:dict or None, optional
+        Precomputed node positions.
+    node_colors:dict or sequence, optional
+        Custom node colors.
+    normalize_to_color:bool, optional
+        Whether to normalize values before color mapping.
+    cmap:str or matplotlib colormap, optional
+        Colormap.
+    cax:matplotlib.axes.Axes or None, optional
+        Colorbar axis.
+    cb_kwds:dict or None, optional
+        Colorbar keyword arguments.
+    add_pos:bool, optional
+        Whether to save computed positions back to ``adata.uns``.
+    export_to_gexf:bool, optional
+        Whether to export graph to GEXF.
+    plot:bool, optional
+        If ``False``, only compute/return graph data.
+    use_raw:bool or None, optional
+        Whether to use ``adata.raw``.
+    size:float or None, optional
+        Point size for scatter overlay.
+    groups:str or sequence or None, optional
+        Category subset.
+    components:str or sequence or None, optional
+        Embedding components to plot.
+    figsize:tuple or None, optional
+        Figure size.
+    dpi:int or None, optional
+        Figure dpi.
+    show:bool or None, optional
+        Whether to immediately show the figure.
+    save:str or bool or None, optional
+        Save path or Scanpy-style save flag.
+    ax:matplotlib.axes.Axes or None, optional
+        Existing axis.
+    ncols:int or None, optional
+        Number of columns when plotting multiple panels.
+    scatter_flag:bool or None, optional
+        Whether to add embedding scatter underlay.
+    **kwargs
+        Additional arguments forwarded to ``scvelo.pl.paga``.
+    
+    Returns
+    -------
+    Any
+        Return value from ``scvelo.pl.paga``.
+    
+    Examples
+    --------
+    >>> ov.utils.plot_paga(adata, basis='umap', color='celltype', threshold=0.05)
+    """
 
     if layout is not None:
         basis = None
@@ -531,4 +691,3 @@ def plot_paga(adata,
     ncols=ncols,
     scatter_flag=scatter_flag,
     **kwargs,)
-

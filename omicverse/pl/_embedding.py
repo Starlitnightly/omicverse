@@ -90,50 +90,79 @@ def embedding_atlas(
     hspace: float = 0.25,
     **kwargs,
 ) -> Union[Figure, Axes, None]:
-    r"""Create high-resolution embedding plots using Datashader for large datasets.
+    r"""Render large-scale embeddings with Datashader.
 
-    Uses Datashader to render embeddings at high resolution, suitable for datasets
-    with millions of cells where standard scatter plots become ineffective.
+    Parameters
+    ----------
+    adata : AnnData
+        Annotated data object containing embedding coordinates in ``obsm``.
+    basis : str
+        Embedding key in ``adata.obsm`` (for example ``'X_umap'``).
+    color : str or Sequence[str] or None, default=None
+        Feature(s) used for coloring. Accepts obs columns or gene names.
+    gene_symbols : str or None, default=None
+        Column in ``adata.var`` used for resolving gene symbols.
+    use_raw : bool or None, default=None
+        Whether to draw expression values from ``adata.raw``.
+    layer : str or None, default=None
+        Layer name for expression-based coloring.
+    groups : str or None, default=None
+        Optional subset of categorical groups to display.
+    title : str or Sequence[str] or None, default=None
+        Plot title(s).
+    figsize : tuple[float, float], default=(4, 4)
+        Single-panel figure size.
+    ax : matplotlib.axes.Axes or None, default=None
+        Existing axis for single-panel plotting.
+    cmap : str or Colormap, default='RdBu_r'
+        Colormap for continuous variables.
+    palette : str or sequence or Cycler or None, default=None
+        Palette for categorical variables.
+    na_color : ColorLike, default='lightgray'
+        Color for missing values.
+    na_in_legend : bool, default=True
+        Whether to include missing values in categorical legends.
+    legend_loc : str, default='right margin'
+        Legend location mode.
+    legend_fontsize : int or float or None, default=None
+        Legend font size.
+    legend_fontweight : int or str, default='bold'
+        Legend font weight.
+    legend_fontoutline : int or None, default=None
+        Outline width for legend text.
+    frameon : bool or str or None, default='small'
+        Frame style.
+    colorbar_loc : str or None, default='right'
+        Colorbar placement.
+    vmax, vmin, vcenter, norm
+        Color normalization controls for continuous features.
+    plot_width : int, default=800
+        Datashader canvas width in pixels.
+    plot_height : int, default=800
+        Datashader canvas height in pixels.
+    spread_px : int, default=0
+        Pixel spreading radius to improve sparse visibility.
+    how : str, default='eq_hist'
+        Datashader shading strategy.
+    show : bool or None, default=None
+        Whether to display the figure immediately.
+    save : bool or str or None, default=None
+        Save option forwarded to Scanpy-style behavior.
+    return_fig : bool or None, default=None
+        Whether to return the figure object for multi-panel output.
+    ncols : int, default=4
+        Number of columns in multi-panel mode.
+    wspace : float or None, default=None
+        Horizontal spacing between panels.
+    hspace : float, default=0.25
+        Vertical spacing between panels.
+    **kwargs
+        Additional arguments passed to lower-level plotting helpers.
 
-    Arguments:
-        adata: Annotated data object with embedding coordinates
-        basis: Key in adata.obsm containing embedding coordinates (e.g., 'X_umap')
-        color: Gene name(s) or obs column(s) to color cells by (None)
-        gene_symbols: Column name in .var DataFrame for gene symbols (None)
-        use_raw: Whether to use .raw attribute of adata (None)
-        layer: Layer to use for coloring (None)
-        groups: Restrict to a subset of groups (None)
-        title: Plot title (None, uses color name)
-        figsize: Figure dimensions as (width, height) ((4, 4))
-        ax: Existing matplotlib axes object (None)
-        cmap: Colormap for continuous values ('RdBu_r')
-        palette: Colors to use for categorical variables (None)
-        na_color: Color for missing values ('lightgray')
-        na_in_legend: Include missing values in legend (True)
-        legend_loc: Legend position ('right margin')
-        legend_fontsize: Font size for legend (None)
-        legend_fontweight: Font weight for legend ('bold')
-        legend_fontoutline: Font outline width for legend (None)
-        frameon: Frame style - False, 'small', or True ('small')
-        colorbar_loc: Location of colorbar ('right')
-        vmax: Maximum color scale value (None)
-        vmin: Minimum color scale value (None)
-        vcenter: Center color scale value (None)
-        norm: Normalization for color scale (None)
-        plot_width: Datashader canvas width in pixels (800)
-        plot_height: Datashader canvas height in pixels (800)
-        spread_px: Spread pixels for better visibility (0)
-        how: Datashader color aggregation method ('eq_hist')
-        show: Show the plot (None)
-        save: Save the plot (None)
-        return_fig: Return figure object (None)
-        ncols: Number of columns for multi-panel plots (4)
-        wspace: Width spacing between subplots (None)
-        hspace: Height spacing between subplots (0.25)
-        **kwargs: Additional arguments
-
-    Returns:
-        Matplotlib axes or figure object if show=False, otherwise None
+    Returns
+    -------
+    Figure or Axes or None
+        Plot object when ``show=False`` or ``return_fig=True``; otherwise ``None``.
     """
     try:
         import datashader as ds

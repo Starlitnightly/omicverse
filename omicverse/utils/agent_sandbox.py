@@ -217,6 +217,11 @@ class CodeSecurityScanner:
         "importlib", "ctypes", "multiprocessing",
     })
 
+    SAFE_IMPORT_SUBMODULES: FrozenSet[str] = frozenset({
+        "importlib.metadata",
+        "importlib.resources",
+    })
+
     def __init__(self, config: Optional[SecurityConfig] = None) -> None:
         self.config = config or SecurityConfig()
         self._blocked_calls = self.BLOCKED_CALLS | self.config.extra_blocked_calls
@@ -354,6 +359,8 @@ class CodeSecurityScanner:
 
         if isinstance(node, ast.Import):
             for alias in node.names:
+                if alias.name in self.SAFE_IMPORT_SUBMODULES:
+                    continue
                 root = alias.name.split(".")[0]
                 if root in self._blocked_import_roots:
                     violations.append(SecurityViolation(
@@ -366,6 +373,12 @@ class CodeSecurityScanner:
 
         elif isinstance(node, ast.ImportFrom):
             if node.module:
+                if node.module in self.SAFE_IMPORT_SUBMODULES:
+                    return violations
+                if node.module == "importlib":
+                    imported_names = {alias.name for alias in node.names}
+                    if imported_names and imported_names <= {"metadata", "resources"}:
+                        return violations
                 root = node.module.split(".")[0]
                 if root in self._blocked_import_roots:
                     violations.append(SecurityViolation(

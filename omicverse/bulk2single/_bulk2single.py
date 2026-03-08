@@ -11,23 +11,53 @@ import os
 import warnings
 import matplotlib
 from typing import Union, Tuple, Optional, Any
+from .._registry import register_function
 
 warnings.filterwarnings("ignore")
 
 
+@register_function(
+    aliases=['bulk2single建模器', 'Bulk2Single', 'bulk to single generator'],
+    category="bulk2single",
+    description="VAE-based bulk-to-single deconvolution class that estimates cell-type fractions and generates synthetic single-cell profiles from bulk RNA-seq.",
+    prerequisites={'optional_functions': ['utils.read_csv']},
+    requires={'obs': ['celltype labels in single-cell reference']},
+    produces={'obs': ['predicted cell types'], 'uns': ['bulk2single model history']},
+    auto_fix='none',
+    examples=['model = ov.bulk2single.Bulk2Single(bulk_data=bulk_data, single_data=single_data, celltype_key="Cell_type")', 'model.train(vae_save_dir="save_model")'],
+    related=['bulk2single.bulk2single_plot_cellprop', 'bulk2single.bulk2single_plot_correlation', 'bulk2single.BulkTrajBlend']
+)
 class Bulk2Single:
-    r"""
-    Main class for bulk-to-single-cell deconvolution.
+    """
+    VAE-based bulk-to-single framework for reconstructing pseudo single cells from bulk RNA-seq.
+
+    Parameters
+    ----------
+    bulk_data:pd.DataFrame
+        Bulk expression matrix with genes in rows and samples in columns.
+    single_data:anndata.AnnData
+        Reference single-cell dataset used to learn cell-type expression patterns.
+    celltype_key:str
+        Column in ``single_data.obs`` containing cell-type labels.
+    bulk_group:Optional[Any]
+        Optional sample grouping information for averaging bulk replicates.
+    max_single_cells:int
+        Maximum number of reference cells retained for model fitting.
+    top_marker_num:int
+        Number of marker genes per cell type used by downstream preparation.
+    ratio_num:int
+        Multiplier controlling total generated cell counts.
+    gpu:Union[int,str]
+        Device selector for training (CUDA index, ``'mps'``, or CPU fallback).
     
-    This class implements a VAE-based approach to generate single-cell data from bulk RNA-seq
-    data by leveraging reference single-cell data. The method uses deconvolution to predict
-    cell-type proportions and then generates synthetic single-cell data matching the bulk
-    expression profile.
+    Returns
+    -------
+    None
+        Initializes bulk2single deconvolution and simulation workflow.
     
-    The workflow includes:
-    - Cell fraction prediction using deconvolution methods (SCADEN, TAPE)
-    - VAE training for single-cell data generation
-    - Quality filtering and analysis of generated cells
+    Examples
+    --------
+    >>> model = ov.bulk2single.Bulk2Single(bulk_data=bulk_data, single_data=single_data, celltype_key="Cell_type")
     """
     def __init__(self, bulk_data: pd.DataFrame, single_data: anndata.AnnData,
                  celltype_key: str, bulk_group: Optional[Any] = None, max_single_cells: int = 5000,
@@ -35,15 +65,24 @@ class Bulk2Single:
         r"""
         Initialize the Bulk2Single class for bulk-to-single-cell deconvolution.
 
-        Arguments:
-            bulk_data: Bulk RNA-seq expression data as DataFrame with genes as rows and samples as columns
-            single_data: Reference single-cell RNA-seq data as AnnData object
-            celltype_key: Column name in single_data.obs containing cell type annotations
-            bulk_group: Column names in bulk_data for grouping samples (None)
-            max_single_cells: Maximum number of single cells to use from reference (5000)
-            top_marker_num: Number of top marker genes to select per cell type (500)
-            ratio_num: Ratio between single cells and target converted cells (1)
-            gpu: GPU device ID for computation; -1 for CPU, 'mps' for Apple Silicon (0)
+        Parameters
+        ----------
+        bulk_data:pd.DataFrame
+            Bulk RNA-seq expression matrix. Rows are genes and columns are samples.
+        single_data:anndata.AnnData
+            Single-cell reference with compatible gene symbols and cell metadata.
+        celltype_key:str
+            Name of the column in ``single_data.obs`` that stores cell-type labels.
+        bulk_group:Optional[Any]
+            Optional grouping key/list used to aggregate replicate bulk samples.
+        max_single_cells:int
+            Maximum number of reference cells used during initialization.
+        top_marker_num:int
+            Intended number of marker genes per cell type for preprocessing steps.
+        ratio_num:int
+            Generation ratio used when estimating target cell counts.
+        gpu:Union[int,str]
+            Compute device specification; supports CUDA indices and ``'mps'``.
 
         """
         single_data.var_names_make_unique()
@@ -90,23 +129,39 @@ class Bulk2Single:
         Uses machine learning approaches (SCADEN or TAPE) to estimate cell-type
         proportions in bulk samples based on single-cell reference data.
 
-        Arguments:
-            method: Deconvolution method to use - 'scaden' or 'tape' ('scaden')
-            sep: Separator for input files ('\t')
-            scaler: Scaling method for normalization ('mms')
-            datatype: Type of input data - 'counts' or 'tpm' ('counts')
-            genelenfile: Gene length file for TPM calculation (None)
-            mode: Analysis mode for TAPE method ('overall')
-            adaptive: Whether to use adaptive variance threshold (True)
-            variance_threshold: Variance threshold for feature selection (0.98)
-            save_model_name: Name for saving trained model (None)
-            batch_size: Batch size for training (128)
-            epochs: Number of training epochs (128)
-            seed: Random seed for reproducibility (1)
-            scale_size: Scaling factor for cell number prediction (2)
+        Parameters
+        ----------
+        method:str
+            Deconvolution backend, currently ``'scaden'`` or ``'tape'``.
+        sep:str
+            Delimiter used for intermediate text matrix I/O.
+        scaler:str
+            Scaling strategy used before model fitting.
+        datatype:str
+            Expression data type passed to backend (for example ``'counts'``).
+        genelenfile:str or None
+            Gene-length file path when backend requires TPM transformation.
+        mode:str
+            Inference mode for TAPE.
+        adaptive:bool
+            Whether adaptive feature filtering is enabled.
+        variance_threshold:float
+            Variance cutoff for selecting informative genes.
+        save_model_name:str or None
+            Optional path/prefix for saving backend model artifacts.
+        batch_size:int
+            Batch size for neural-network-based training.
+        epochs:int
+            Number of training epochs.
+        seed:int
+            Random seed for reproducibility.
+        scale_size:int
+            Scaling factor used to convert predicted fractions into cell counts.
 
-        Returns:
-            pd.DataFrame: Predicted cell-type fractions for each bulk sample
+        Returns
+        -------
+        pd.DataFrame
+            Cell-fraction estimates for each bulk sample.
         """
         from ..external.tape import Deconvolution,ScadenDeconvolution
         sc_ref=self.sc_ref.copy()
@@ -167,11 +222,14 @@ class Bulk2Single:
         Steps include duplicate removal, DESeq2 normalization, log10 transformation,
         and optional group-wise averaging.
 
-        Arguments:
-            None
-            
-        Returns:
-            None: Updates self.bulk_seq_group in place
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+            Updates ``self.bulk_seq_group`` in place.
         """
 
         print("......drop duplicates index in bulk data")
@@ -198,11 +256,15 @@ class Bulk2Single:
         Normalizes single-cell data using scanpy's standard preprocessing pipeline
         including total count normalization and log1p transformation.
 
-        Arguments:
-            target_sum: Target sum for total count normalization (10000)
+        Parameters
+        ----------
+        target_sum:int
+            Library-size target used in total-count normalization.
             
-        Returns:
-            None: Updates self.single_data in place
+        Returns
+        -------
+        None
+            Updates ``self.single_data`` in place.
         """
 
         print("......normalize the single data")
@@ -220,11 +282,14 @@ class Bulk2Single:
         This step matches genes between datasets and prepares the data structure
         needed for model training.
 
-        Arguments:
-            None
+        Parameters
+        ----------
+        None
             
-        Returns:
-            None: Updates self.input_data
+        Returns
+        -------
+        None
+            Updates ``self.input_data`` with aligned bulk/single matrices.
         """
         print("......prepare the input of bulk2single")
         self.input_data=bulk2single_data_prepare(self.bulk_seq_group,
@@ -238,7 +303,7 @@ class Bulk2Single:
             generate_save_dir:str='output',
             generate_save_name:str='output',
             batch_size:int=512,
-            learning_rate:int=1e-4,
+            learning_rate:float=1e-4,
             hidden_size:int=256,
             epoch_num:int=5000,
             patience:int=50,save:bool=True)->torch.nn.Module:
@@ -249,20 +314,33 @@ class Bulk2Single:
         patterns. The model learns to generate synthetic single cells that match the
         bulk expression profile and predicted cell-type proportions.
 
-        Arguments:
-            vae_save_dir: Directory to save trained VAE model ('save_model')
-            vae_save_name: Filename for saved VAE model ('vae')
-            generate_save_dir: Directory for generated data output ('output')
-            generate_save_name: Filename for generated data ('output')
-            batch_size: Training batch size (512)
-            learning_rate: Optimizer learning rate (1e-4)
-            hidden_size: Hidden layer dimensions in encoder/decoder (256)
-            epoch_num: Maximum training epochs (5000)
-            patience: Early stopping patience (50)
-            save: Whether to save trained model (True)
+        Parameters
+        ----------
+        vae_save_dir:str
+            Directory for storing trained model checkpoints.
+        vae_save_name:str
+            File prefix for the serialized VAE model.
+        generate_save_dir:str
+            Reserved output directory for generated cells.
+        generate_save_name:str
+            Reserved output prefix for generated datasets.
+        batch_size:int
+            Mini-batch size used for model optimization.
+        learning_rate:float
+            Learning rate for the VAE optimizer.
+        hidden_size:int
+            Hidden dimension size of VAE encoder/decoder layers.
+        epoch_num:int
+            Maximum number of training epochs.
+        patience:int
+            Early-stopping patience based on loss trend.
+        save:bool
+            Whether to persist the trained model and target cell counts.
 
-        Returns:
-            torch.nn.Module: Trained VAE model
+        Returns
+        -------
+        torch.nn.Module
+            Trained VAE model.
         """
         if self.input_data==None:
             self.prepare_input()
@@ -311,11 +389,15 @@ class Bulk2Single:
         Saves both the model state dict and the predicted cell-type target numbers
         needed for generation.
 
-        Arguments:
-            vae_save_dir: Directory to save the trained VAE model. Default: 'save_model'
-            vae_save_name: Filename for the saved VAE model. Default: 'vae'
+        Parameters
+        ----------
+        vae_save_dir:str
+            Directory where model weights and fraction metadata are written.
+        vae_save_name:str
+            Filename prefix for the saved checkpoint.
 
-        Returns:
+        Returns
+        -------
             None
         """
         path_save = os.path.join(vae_save_dir, f"{vae_save_name}.pth")
@@ -335,11 +417,14 @@ class Bulk2Single:
         Uses the trained VAE to generate single-cell expression profiles that match
         the bulk expression and predicted cell-type proportions.
 
-        Arguments:
-            None
+        Parameters
+        ----------
+        None
             
-        Returns:
-            anndata.AnnData: Generated single-cell data with cell type annotations
+        Returns
+        -------
+        anndata.AnnData
+            Generated single-cell AnnData with ``celltype_key`` annotations.
         """
         single_cell, label, breed_2_list, index_2_gene, cell_number_target_num, \
         nclass, ntrain, feature_size = self.__get_model_input(self.input_data, self.cell_target_num)
@@ -359,10 +444,13 @@ class Bulk2Single:
         Loads previously computed cell-type target numbers that specify how many
         cells of each type to generate.
 
-        Arguments:
-            fraction_path: Path to pickled file containing cell target numbers
+        Parameters
+        ----------
+        fraction_path:str
+            Path to a pickle file containing ``cell_target_num`` dictionary.
 
-        Returns:
+        Returns
+        -------
             None
         """
         #load cell_target_num
@@ -377,12 +465,17 @@ class Bulk2Single:
         
         Loads a previously trained VAE model from disk for generating single-cell data.
 
-        Arguments:
-            vae_load_dir: Directory containing the trained VAE model
-            hidden_size: Hidden layer dimensions matching training configuration (256)
+        Parameters
+        ----------
+        vae_load_dir:str
+            Path to the saved ``.pth`` model checkpoint.
+        hidden_size:int
+            Hidden dimension used when reconstructing the VAE architecture.
             
-        Returns:
-            None: Updates self.vae_net
+        Returns
+        -------
+        None
+            Loads model weights into ``self.vae_net``.
         """
 
         single_cell, label, breed_2_list, index_2_gene, cell_number_target_num, \
@@ -400,12 +493,17 @@ class Bulk2Single:
         Convenience method that loads a trained model and immediately generates
         synthetic single-cell data.
 
-        Arguments:
-            vae_load_dir: Directory containing the trained VAE model
-            hidden_size: Hidden layer dimensions matching training configuration (256)
+        Parameters
+        ----------
+        vae_load_dir:str
+            Path to the saved ``.pth`` model checkpoint.
+        hidden_size:int
+            Hidden dimension used when rebuilding model structure.
 
-        Returns:
-            anndata.AnnData: Generated single-cell data with cell type annotations
+        Returns
+        -------
+        anndata.AnnData
+            Generated single-cell AnnData with cell-type labels.
         """
         single_cell, label, breed_2_list, index_2_gene, cell_number_target_num, \
         nclass, ntrain, feature_size = self.__get_model_input(self.input_data, self.cell_target_num)
@@ -431,16 +529,25 @@ class Bulk2Single:
         Applies quality control filtering to generated single-cell data by identifying
         and removing small clusters that may represent noise or artifacts.
 
-        Arguments:
-            generate_adata: Generated single-cell AnnData object to filter
-            highly_variable_genes: Whether to select highly variable genes (True)
-            max_value: Maximum value for scaling (10)
-            n_comps: Number of principal components (100)
-            svd_solver: SVD solver for PCA ('auto')
-            leiden_size: Minimum cluster size threshold for filtering (50)
+        Parameters
+        ----------
+        generate_adata:anndata.AnnData
+            Generated single-cell AnnData to be quality-filtered.
+        highly_variable_genes:bool
+            Whether to restrict PCA/clustering to highly variable genes.
+        max_value:float
+            Clipping threshold used during scaling.
+        n_comps:int
+            Number of principal components used for neighborhood graph.
+        svd_solver:str
+            SVD backend passed to PCA.
+        leiden_size:int
+            Minimum accepted cluster size; smaller clusters are removed.
             
-        Returns:
-            anndata.AnnData: Filtered single-cell data
+        Returns
+        -------
+        anndata.AnnData
+            Filtered generated AnnData.
         """
         generate_adata.raw = generate_adata
         import scanpy as sc
@@ -464,12 +571,17 @@ class Bulk2Single:
         
         Visualizes the training loss progression to assess model convergence.
 
-        Arguments:
-            figsize: Figure dimensions as (width, height) (4, 4)
+        Parameters
+        ----------
+        figsize:tuple
+            Figure size passed to matplotlib.
 
-        Returns:
-            matplotlib.figure.Figure: Figure object containing the plot
-            matplotlib.axes.Axes: Axes object for the plot
+        Returns
+        -------
+        matplotlib.figure.Figure
+            Figure object containing the training-loss curve.
+        matplotlib.axes.Axes
+            Axes object where the curve is drawn.
         """
         fig, ax = plt.subplots(figsize=figsize)
         ax.plot(range(len(self.history)),self.history)

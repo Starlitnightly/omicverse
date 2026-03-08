@@ -5,9 +5,53 @@ import random
 import numpy as np
 import torch
 from typing import Union
+from .._registry import register_function
 
 
+@register_function(
+    aliases=['bulk去卷积', 'bulk Deconvolution', 'bulk cell-fraction inference'],
+    category="bulk",
+    description="Deconvolution class for estimating cell-type composition of bulk RNA-seq using single-cell references and TAPE/Scaden backends.",
+    prerequisites={'optional_functions': ['pp.preprocess']},
+    requires={'obs': ['celltype labels in single reference']},
+    produces={'obs': ['predicted cell fractions'], 'uns': ['deconvolution results']},
+    auto_fix='none',
+    examples=['deconv_obj = ov.bulk.Deconvolution(adata_bulk, adata_single, celltype_key="celltype")', 'frac = deconv_obj.deconvolution(method="tape")'],
+    related=['bulk.pyDEG', 'space.Deconvolution']
+)
 class Deconvolution(object):
+    """
+    Bulk RNA-seq deconvolution class for inferring cell-type fractions from single-cell references.
+
+    Parameters
+    ----------
+    adata_bulk:AnnData
+        Bulk expression matrix with samples in rows and genes in columns.
+    adata_single:AnnData
+        Single-cell reference matrix containing cell-level expression profiles
+        and cell-type annotations used to build signature profiles.
+    max_single_cells:int
+        Maximum number of cells to keep from ``adata_single``. If the reference
+        contains more cells, a random subset is used to control memory/runtime.
+    celltype_key:str
+        Column name in ``adata_single.obs`` storing cell-type labels.
+    cellstate_key:str or None
+        Optional column name in ``adata_single.obs`` storing finer cell-state
+        labels (used by methods such as BayesPrism).
+    gpu:Union[int,str]
+        Compute device selector. Supports CUDA index (for example ``0``),
+        explicit strings such as ``'cuda:0'``, ``'mps'``, or ``'cpu'``.
+    
+    Returns
+    -------
+    None
+        Initializes deconvolution inputs and builds reference expression profiles.
+    
+    Examples
+    --------
+    >>> deconv_obj = ov.bulk.Deconvolution(adata_bulk, adata_single, celltype_key="celltype")
+    """
+
     def __init__(
         self,adata_bulk,adata_single,
         max_single_cells:int=5000,
@@ -52,8 +96,17 @@ class Deconvolution(object):
 
     def _select_device(self, gpu):
         """
-        Select computation device based on user input and PyTorch backend availability.
-        Supports CUDA, MPS (Apple Silicon) and CPU.
+        Resolve a PyTorch device from user input and available backends.
+
+        Parameters
+        ----------
+        gpu:Union[int,str,torch.device]
+            Device hint provided by user.
+
+        Returns
+        -------
+        torch.device
+            Selected device with graceful fallback order (CUDA/MPS/CPU).
         """
         if isinstance(gpu, torch.device):
             return gpu
@@ -111,6 +164,59 @@ class Deconvolution(object):
         scale=True,n_cores=4,fast_mode=True,pseudobulk_size=2000,
         **kwargs,
     ):
+        """
+        Estimate cell-type composition of bulk RNA-seq samples.
+
+        Parameters
+        ----------
+        method:{'tape', 'scaden', 'bayesprism', 'omicstweezer'}
+            Backend used for deconvolution.
+        sep:str
+            Delimiter used when exporting or reading intermediate text matrices.
+        scaler:str
+            Scaling method for TAPE input preprocessing, for example ``'mms'``.
+        datatype:str
+            Data type passed to TAPE (for example raw counts).
+        genelenfile:str or None
+            Path to gene-length file required by certain preprocessing modes.
+        mode:str
+            TAPE running mode controlling how sample-wise fractions are inferred.
+        adaptive:bool
+            Whether to enable adaptive feature selection in TAPE.
+        variance_threshold:float
+            Variance threshold used by TAPE to keep informative genes.
+        save_model_name:str or None
+            Prefix/path used to persist trained model weights for reuse.
+        batch_size:int
+            Mini-batch size for neural-network-based methods.
+        epochs:int
+            Number of training epochs for neural-network-based methods.
+        seed:int
+            Random seed for reproducible pseudo-bulk generation/training.
+        scale_size:int
+            Reserved scaling parameter for compatibility with legacy interfaces.
+        scale:bool
+            Whether to normalize/scale expression values before fitting.
+        n_cores:int
+            Number of CPU processes used by BayesPrism.
+        fast_mode:bool
+            Whether BayesPrism uses fast approximate updates.
+        pseudobulk_size:int
+            Number of pseudo-bulk mixtures generated for model training.
+        **kwargs
+            Additional backend-specific keyword arguments, forwarded to the
+            selected method.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Predicted cell-type fractions with samples in rows and cell types in columns.
+
+        Examples
+        --------
+        >>> frac = dec.deconvolution(method='tape', batch_size=128, epochs=200)
+        >>> frac = dec.deconvolution(method='bayesprism', n_cores=8, fast_mode=True)
+        """
 
         from ..external.tape import Deconvolution,ScadenDeconvolution
         if method=='scaden':

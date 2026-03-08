@@ -14,24 +14,26 @@ def shannon_diversity(
     base: str = 'natural',
     calculate_evenness: bool = True
 ) -> pd.DataFrame:
-    """
-    Calculate Shannon diversity index for cell type composition across different groups/samples.
-    
-    The Shannon diversity index measures the diversity of cell types within each sample/group.
-    Higher values indicate more diverse cell type compositions.
-    
-    H = -Σ(p_i * ln(p_i))
-    where p_i is the proportion of cells of type i
-    
-    Arguments:
-        adata: AnnData object containing cell type and group information.
-        groupby: Key in adata.obs for grouping samples (e.g., 'condition', 'sample_id').
-        cell_type_key: Key in adata.obs for cell type labels.
-        base: Base for logarithm calculation ('natural', '2', '10').
-        calculate_evenness: Whether to calculate Shannon evenness (equitability).
-    
-    Returns:
-        DataFrame with Shannon diversity indices for each group.
+    """Calculate Shannon diversity from cell-type composition.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Input object containing group and cell-type metadata in ``adata.obs``.
+    groupby : str
+        Obs column defining groups/samples for diversity calculation.
+    cell_type_key : str
+        Obs column containing cell-type annotations.
+    base : str, default='natural'
+        Logarithm base used in Shannon index, one of ``'natural'``, ``'2'``,
+        or ``'10'``.
+    calculate_evenness : bool, default=True
+        Whether to compute Shannon evenness (Pielou-style normalization).
+
+    Returns
+    -------
+    pandas.DataFrame
+        Per-group diversity table including Shannon and Simpson metrics.
         
     Examples:
         >>> import omicverse as ov
@@ -128,18 +130,26 @@ def compare_shannon_diversity(
     test_method: str = 'kruskal',
     base: str = 'natural'
 ) -> Dict:
-    """
-    Compare Shannon diversity indices between groups using statistical tests.
-    
-    Arguments:
-        adata: AnnData object.
-        groupby: Key in adata.obs for grouping samples.
-        cell_type_key: Key in adata.obs for cell type labels.
-        test_method: Statistical test to use ('kruskal', 'mann_whitney', 'ttest').
-        base: Base for logarithm calculation.
-    
-    Returns:
-        Dictionary containing test results and diversity values.
+    """Compare Shannon diversity values between groups.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Input object with annotations in ``adata.obs``.
+    groupby : str
+        Obs column defining groups to compare.
+    cell_type_key : str
+        Obs column containing cell-type labels.
+    test_method : str, default='kruskal'
+        Statistical test selector. Supports ``'kruskal'``,
+        ``'mann_whitney'``, and ``'ttest'`` (partial support).
+    base : str, default='natural'
+        Log base forwarded to :func:`shannon_diversity`.
+
+    Returns
+    -------
+    dict
+        Dictionary with per-group diversity values and statistical test output.
     """
     
     # Calculate diversity for each sample individually
@@ -215,17 +225,29 @@ def plot_shannon_diversity(
     show_stats: bool = True,
     save_path: Optional[str] = None
 ) -> None:
-    """
-    Plot Shannon diversity indices across groups.
-    
-    Arguments:
-        adata: AnnData object with diversity results stored in .uns.
-        groupby: Grouping variable for plot. If None, uses stored results.
-        metric: Which diversity metric to plot ('shannon_diversity', 'shannon_evenness', 'simpson_diversity').
-        figsize: Figure size as (width, height).
-        palette: Color palette for the plot.
-        show_stats: Whether to show statistical comparisons.
-        save_path: Path to save the figure.
+    """Visualize diversity metrics across groups.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Object containing ``shannon_diversity_results`` in ``adata.uns``.
+    groupby : str or None, default=None
+        Grouping variable for plotting. If ``None``, uses stored result groups.
+    metric : str, default='shannon_diversity'
+        Metric column to plot.
+    figsize : Tuple[int, int], default=(8, 6)
+        Figure size in inches.
+    palette : str or None, default=None
+        Seaborn palette name or custom palette.
+    show_stats : bool, default=True
+        Whether to display statistical comparison text when possible.
+    save_path : str or None, default=None
+        Optional path to save the figure.
+
+    Returns
+    -------
+    None
+        Displays and optionally saves the plot.
     """
     
     if 'shannon_diversity_results' not in adata.uns:

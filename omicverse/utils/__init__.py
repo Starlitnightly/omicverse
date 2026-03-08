@@ -121,7 +121,7 @@ from .agent_backend import BackendConfig, OmicVerseLLMBackend, Usage
 from .smart_agent import Agent, OmicVerseAgent, list_supported_models
 
 # P0-2 / P0-3 / P1-1 / P2-1 / P2-2: New agent infrastructure modules
-from .agent_config import AgentConfig, SandboxFallbackPolicy
+from .agent_config import AgentConfig, HarnessConfig, SandboxFallbackPolicy
 from .agent_errors import (
     OVAgentError, WorkflowNeedsFallback, ProviderError,
     ConfigError, ExecutionError, SandboxDeniedError,
@@ -129,6 +129,20 @@ from .agent_errors import (
 from .agent_reporter import AgentEvent, EventLevel, Reporter, make_reporter
 from .context_compactor import ContextCompactor, estimate_tokens
 from .session_history import SessionHistory, HistoryEntry
+from .harness import (
+    HARNESS_EVENT_TYPES,
+    STREAM_EVENT_TYPES,
+    ArtifactRef,
+    HarnessEvent,
+    RunTrace,
+    RunTraceRecorder,
+    RunTraceStore,
+    StepTrace,
+    build_stream_event,
+    make_step_id,
+    make_trace_id,
+    make_turn_id,
+)
 
 # Python 3.10 compatibility: Provide __getattr__ to dynamically return verifier
 # This ensures getattr(omicverse.utils, 'verifier') works in unittest.mock.patch
@@ -141,6 +155,8 @@ def __getattr__(name):
     """
     if name == 'verifier':
         return _verifier_module
+    if name in {'Agent', 'OmicVerseAgent', 'list_supported_models'}:
+        return getattr(smart_agent, name)
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 # Also make verifier accessible via normal attribute access
@@ -276,6 +292,20 @@ __all__ = [
     "Agent",
     "OmicVerseAgent",
     "list_supported_models",
+    "HarnessConfig",
+    # @ harness
+    "HARNESS_EVENT_TYPES",
+    "STREAM_EVENT_TYPES",
+    "ArtifactRef",
+    "HarnessEvent",
+    "RunTrace",
+    "RunTraceRecorder",
+    "RunTraceStore",
+    "StepTrace",
+    "build_stream_event",
+    "make_step_id",
+    "make_trace_id",
+    "make_turn_id",
     # @ verifier
     "verifier",
 ]

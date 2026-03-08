@@ -214,6 +214,54 @@ class TestOpenAIUsageTracking:
         assert backend.last_usage.model == "gpt-4o"
         assert backend.last_usage.provider == "openai"
 
+    def test_openai_tool_chat_uses_request_timeout(self, monkeypatch):
+        """Tool-calling chat should set an explicit request timeout."""
+        mock_client = Mock()
+        mock_response = Mock()
+        mock_choice = Mock()
+        mock_choice.finish_reason = "stop"
+        mock_message = Mock()
+        mock_message.content = "done"
+        mock_message.tool_calls = None
+        mock_choice.message = mock_message
+        mock_response.choices = [mock_choice]
+        mock_response.usage = None
+        mock_client.chat.completions.create.return_value = mock_response
+
+        mock_openai_class = Mock(return_value=mock_client)
+        mock_openai_module = Mock()
+        mock_openai_module.OpenAI = mock_openai_class
+
+        monkeypatch.setenv("OV_AGENT_CHAT_TIMEOUT_SECONDS", "12")
+
+        with patch.dict('sys.modules', {'openai': mock_openai_module}):
+            monkeypatch.setattr(
+                agent_backend_module.ModelConfig,
+                'get_provider_from_model',
+                lambda x: 'openai'
+            )
+            monkeypatch.setattr(
+                agent_backend_module.ModelConfig,
+                'requires_responses_api',
+                lambda x: False
+            )
+
+            backend = OmicVerseLLMBackend(
+                system_prompt="Test prompt",
+                model="gpt-4o",
+                api_key="test-key"
+            )
+
+            result = backend._chat_tools_openai(
+                [{"role": "user", "content": "hello"}],
+                [{"name": "Read", "description": "read", "parameters": {"type": "object", "properties": {}, "required": []}}],
+                "auto",
+            )
+
+            assert result.content == "done"
+            mock_openai_class.assert_called_once()
+            assert mock_openai_class.call_args.kwargs["timeout"] == 12.0
+
 
 class TestResponsesAPIUsageTracking:
     """Test usage tracking for OpenAI Responses API (gpt-5 series)."""
