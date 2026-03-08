@@ -17,7 +17,6 @@ import json
 import re
 import inspect
 import ast
-import importlib
 import textwrap
 import time
 import builtins
@@ -28,7 +27,6 @@ import logging
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
-from .._registry import register_function
 
 # ---------------------------------------------------------------------------
 # Compatibility helpers
@@ -138,20 +136,6 @@ ProactiveCodeTransformer = _ProactiveCodeTransformerExt
 
 
 class OmicVerseAgent:
-    # Package-level preloading to trigger @register_function decorators
-    # before agent-side function search.
-    SAFE_PRELOAD_PACKAGES = [
-        "omicverse.pp",
-        "omicverse.pl",
-        "omicverse.single",
-        "omicverse.bulk",
-        "omicverse.bulk2single",
-        "omicverse.space",
-        "omicverse.alignment",
-        "omicverse.datasets",
-        "omicverse.utils",
-    ]
-
     """
     Intelligent agent for OmicVerse function discovery and execution.
 
@@ -315,7 +299,6 @@ class OmicVerseAgent:
         self._web_session_id = ""
         self._ov_runtime: Optional[OmicVerseRuntime] = None
         self._active_run_id = ""
-        self._registry_preloaded = False
         try:
             self._managed_api_env = self._collect_api_key_env(api_key)
         except Exception as exc:  # pragma: no cover - defensive logging
@@ -341,16 +324,6 @@ class OmicVerseAgent:
             print(f"   ⚠️  {key_msg}")
         
         try:
-            preload_stats = self._preload_registry_packages()
-            if preload_stats["loaded"] > 0:
-                print(
-                    f"   📦 Registry preload: {preload_stats['loaded']} packages loaded"
-                    + (
-                        f", {preload_stats['failed']} failed"
-                        if preload_stats["failed"] > 0
-                        else ""
-                    )
-                )
             with self._temporary_api_keys():
                 self._setup_agent()
             stats = self._get_registry_stats()
@@ -454,25 +427,6 @@ class OmicVerseAgent:
         except Exception as e:
             print(f"❌ Agent initialization failed: {e}")
             raise
-
-    def _preload_registry_packages(self) -> Dict[str, Any]:
-        """Import high-level OmicVerse packages to trigger decorator registration."""
-        if self._registry_preloaded:
-            return {"loaded": 0, "failed": 0, "failed_packages": {}}
-
-        loaded = 0
-        failed: Dict[str, str] = {}
-        for package in self.SAFE_PRELOAD_PACKAGES:
-            try:
-                importlib.import_module(package)
-                loaded += 1
-            except Exception as exc:
-                failed[package] = str(exc).split("\n", 1)[0]
-
-        self._registry_preloaded = True
-        if failed:
-            logger.debug("Registry preload failures: %s", failed)
-        return {"loaded": loaded, "failed": len(failed), "failed_packages": failed}
 
     def _initialize_skill_registry(self) -> None:
         """Load skills from package install and current working directory and prepare routing helpers."""
@@ -2783,17 +2737,6 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
                 pass
 
 
-@register_function(
-    aliases=['列出支持模型', 'list_supported_models', 'available llm models'],
-    category="utils",
-    description="List LLM provider/model combinations supported by OmicVerse Agent backends for analysis automation.",
-    prerequisites={},
-    requires={},
-    produces={},
-    auto_fix='none',
-    examples=['ov.list_supported_models()'],
-    related=['utils.Agent']
-)
 def list_supported_models(show_all: bool = False) -> str:
     """
     List all supported models for OmicVerse Smart Agent.
@@ -2816,17 +2759,6 @@ def list_supported_models(show_all: bool = False) -> str:
     """
     return ModelConfig.list_supported_models(show_all)
 
-@register_function(
-    aliases=['智能体入口', 'Agent', 'omicverse agent', 'analysis agent'],
-    category="utils",
-    description="Create an OmicVerse conversational analysis agent with tool access for workflow planning, execution, and report generation.",
-    prerequisites={},
-    requires={},
-    produces={},
-    auto_fix='none',
-    examples=['agent = ov.Agent(model=\"gpt-4o-mini\", api_key=\"YOUR_KEY\")'],
-    related=['utils.list_supported_models', 'single.generate_scRNA_report']
-)
 def Agent(model: str = "gpt-5.2", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, approval_mode: str = "never", agent_mode: str = "agentic", max_agent_turns: int = 15, security_level: Optional[str] = None, *, config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True) -> OmicVerseAgent:
     """
     Create an OmicVerse Smart Agent instance.

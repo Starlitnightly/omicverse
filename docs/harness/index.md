@@ -11,6 +11,7 @@ This directory is the system of record for the OVAgent harness layer.
 - `approval-and-questions.md`: pause/resume contract for approvals and future questions
 - `server-validation.md`: Taiwan-server-only validation policy and commands
 - `cleanup-policy.md`: recurring cleanup and drift-control rules
+- `exec-plans/ovagent-symphony-localization.md`: phased implementation plan for localizing Symphony concepts into OVAgent
 
 ## Server-Only Entry Points
 

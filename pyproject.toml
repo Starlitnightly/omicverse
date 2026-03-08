@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=61", "wheel", "Cython"]
-build-backend = "setuptools.build_meta"
+requires = ["setuptools", "wheel", "flit_core >=3.4,<4","Cython"]
+build-backend = "flit_core.buildapi"
 
 
 
@@ -141,14 +141,6 @@ skillseeker = [
   "PyMuPDF>=1.24",
 ]
 
-jarvis = [
-  "python-telegram-bot>=20.0",
-  "requests>=2.0",
-  "pillow>=9.0",
-  "nbformat>=5.0",
-  "lark-oapi>=1.0",
-]
-
 tests = [
   "pytest>=7.0",
   "pytest-asyncio>=0.23",
@@ -158,12 +150,11 @@ tests = [
 [project.urls]
 Github = 'https://github.com/Starlitnightly/omicverse'
 
+[tool.flit.sdist]
+exclude = [".*", "d*", "e*", "pa*", "s*", "t*"]
+
 [project.scripts]
 ov-skill-seeker = "omicverse.ov_skill_seeker.cli:main"
-omicverse = "omicverse.cli:main"
-
-[tool.setuptools.packages.find]
-include = ["omicverse*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
