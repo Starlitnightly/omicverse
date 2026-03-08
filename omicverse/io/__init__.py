@@ -19,7 +19,7 @@ Compatibility shortcuts:
 from . import bulk, general, single, spatial
 from .general import load, read_csv, save
 from .single import read, read_10x_h5, read_10x_mtx, read_h5ad
-from .spatial import read_visium_hd, read_visium_hd_bin, read_visium_hd_seg
+from .spatial import read_nanostring, read_visium_hd, read_visium_hd_bin, read_visium_hd_seg
 
 __all__ = [
     "general",
@@ -34,6 +34,7 @@ __all__ = [
     "read_visium_hd",
     "read_visium_hd_bin",
     "read_visium_hd_seg",
+    "read_nanostring",
     "read_csv",
     "save",
     "load",
