@@ -1096,6 +1096,12 @@ def bin2cell(
         labels_key="labels_joint",
         spatial_keys=["spatial"],
         diameter_scale_factor=None,
+        add_geometry: bool = False,
+        geometry_key: str = "geometry",
+        geometry_spatial_key: str = "spatial",
+        geometry_force_polygon: bool = False,
+        rename_obs_to_cellid: bool = True,
+        show_progress: bool = True,
 ):
     """Aggregate binned Visium signals into cell-level profiles.
 
@@ -1109,6 +1115,22 @@ def bin2cell(
         Spatial coordinate keys to aggregate.
     diameter_scale_factor : float, optional
         Optional scaling factor for estimated cell diameters.
+    add_geometry : bool, default=False
+        Whether to generate polygon geometry from labeled bins and store
+        WKT strings in ``obs[geometry_key]`` of the returned cell-level AnnData.
+    geometry_key : str, default='geometry'
+        Observation column name used to store generated geometry WKT.
+    geometry_spatial_key : str, default='spatial'
+        Coordinate key in ``adata.obsm`` used to reconstruct polygons.
+    geometry_force_polygon : bool, default=False
+        If ``True``, convert ``MultiPolygon`` geometries to their largest
+        polygon component so each cell gets a single polygon contour.
+    rename_obs_to_cellid : bool, default=True
+        If ``True``, rename output ``obs_names`` to ``cellid_XXXXXXXXX-1``
+        using ``obs['object_id']`` and also write ``obs['cellid']``.
+    show_progress : bool, default=True
+        Whether to display progress bars during aggregation and (if enabled)
+        geometry reconstruction.
 
     Returns
     -------
@@ -1116,8 +1138,299 @@ def bin2cell(
         Cell-level AnnData generated from labeled bins.
     """
     from ..external.bin2cell import bin_to_cell
-    return bin_to_cell(adata, labels_key=labels_key, 
-                spatial_keys=spatial_keys,diameter_scale_factor=diameter_scale_factor)
+    cell_adata = bin_to_cell(
+        adata,
+        labels_key=labels_key,
+        spatial_keys=spatial_keys,
+        diameter_scale_factor=diameter_scale_factor,
+        show_progress=show_progress,
+    )
+
+    if add_geometry:
+        import os
+        import warnings
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        import pandas as pd
+        import shapely
+        from shapely.errors import GEOSException
+        try:
+            from tqdm.auto import tqdm
+        except Exception:
+            def tqdm(x, **kwargs):
+                return x
+
+        if labels_key not in adata.obs.columns:
+            raise ValueError(f"`labels_key='{labels_key}'` not found in `adata.obs`.")
+        if geometry_spatial_key not in adata.obsm:
+            raise ValueError(f"`geometry_spatial_key='{geometry_spatial_key}'` not found in `adata.obsm`.")
+
+        coords = np.asarray(adata.obsm[geometry_spatial_key])
+        labels = pd.to_numeric(adata.obs[labels_key], errors="coerce").fillna(0).astype(np.int64).to_numpy()
+        valid_mask = labels > 0
+        if not np.any(valid_mask):
+            warnings.warn("No positive labels found; skipping geometry generation.")
+            cell_adata.obs[geometry_key] = ""
+            return cell_adata
+
+        x_vals = np.unique(coords[valid_mask, 0])
+        y_vals = np.unique(coords[valid_mask, 1])
+        dx = np.diff(np.sort(x_vals))
+        dy = np.diff(np.sort(y_vals))
+        step_candidates = np.concatenate([dx[dx > 0], dy[dy > 0]])
+        bin_size = float(np.median(step_candidates)) if step_candidates.size else 1.0
+        half = max(bin_size * 0.5, 0.5)
+
+        labels_valid = labels[valid_mask]
+        coords_valid = coords[valid_mask]
+
+        # Prefer exact bin grid geometry when array coordinates are available.
+        rows_valid = None
+        cols_valid = None
+        if "array_row" in adata.obs.columns and "array_col" in adata.obs.columns:
+            rows_raw = pd.to_numeric(adata.obs["array_row"], errors="coerce").to_numpy()[valid_mask]
+            cols_raw = pd.to_numeric(adata.obs["array_col"], errors="coerce").to_numpy()[valid_mask]
+            finite_mask = np.isfinite(rows_raw) & np.isfinite(cols_raw)
+            if np.any(finite_mask):
+                labels_valid = labels_valid[finite_mask]
+                coords_valid = coords_valid[finite_mask]
+                rows_valid = rows_raw[finite_mask].astype(np.int64, copy=False)
+                cols_valid = cols_raw[finite_mask].astype(np.int64, copy=False)
+            else:
+                warnings.warn(
+                    "array_row/array_col exist but contain no finite values; "
+                    "falling back to center-based bin boxes."
+                )
+
+        # Group bins by label once to avoid O(n_labels * n_bins) boolean scans.
+        order = np.argsort(labels_valid, kind="mergesort")
+        labels_sorted = labels_valid[order]
+        coords_sorted = coords_valid[order]
+        if rows_valid is not None and cols_valid is not None:
+            rows_sorted = rows_valid[order]
+            cols_sorted = cols_valid[order]
+        unique_labels, starts, counts = np.unique(
+            labels_sorted, return_index=True, return_counts=True
+        )
+
+        boxes = None
+        if rows_valid is not None and cols_valid is not None:
+            try:
+                row_to_y = (
+                    pd.DataFrame({"row": rows_sorted, "y": coords_sorted[:, 1]})
+                    .groupby("row", sort=True)["y"]
+                    .median()
+                )
+                col_to_x = (
+                    pd.DataFrame({"col": cols_sorted, "x": coords_sorted[:, 0]})
+                    .groupby("col", sort=True)["x"]
+                    .median()
+                )
+
+                def _centers_to_edges(centers: np.ndarray) -> np.ndarray:
+                    centers = np.asarray(centers, dtype=np.float64)
+                    if centers.size == 1:
+                        return np.array([centers[0] - half, centers[0] + half], dtype=np.float64)
+                    mids = (centers[:-1] + centers[1:]) * 0.5
+                    first = centers[0] - (mids[0] - centers[0])
+                    last = centers[-1] + (centers[-1] - mids[-1])
+                    return np.concatenate(([first], mids, [last]))
+
+                row_vals = row_to_y.index.to_numpy()
+                col_vals = col_to_x.index.to_numpy()
+                y_edges = _centers_to_edges(row_to_y.to_numpy())
+                x_edges = _centers_to_edges(col_to_x.to_numpy())
+
+                row_idx = np.searchsorted(row_vals, rows_sorted)
+                col_idx = np.searchsorted(col_vals, cols_sorted)
+
+                x0 = x_edges[col_idx]
+                x1 = x_edges[col_idx + 1]
+                y0 = y_edges[row_idx]
+                y1 = y_edges[row_idx + 1]
+
+                boxes = shapely.box(
+                    np.minimum(x0, x1),
+                    np.minimum(y0, y1),
+                    np.maximum(x0, x1),
+                    np.maximum(y0, y1),
+                )
+            except Exception as exc:
+                warnings.warn(
+                    "Failed to construct array-grid bin polygons; "
+                    f"falling back to center-based boxes. Error: {exc}"
+                )
+
+        if boxes is None:
+            boxes = shapely.box(
+                coords_sorted[:, 0] - half,
+                coords_sorted[:, 1] - half,
+                coords_sorted[:, 0] + half,
+                coords_sorted[:, 1] + half,
+            )
+
+        def _build_geometry(lab, start, count):
+            part = boxes[start:start + count]
+            try:
+                # Faster for grid-cell coverages (touching but non-overlapping polygons).
+                geom = shapely.coverage_union_all(part)
+            except GEOSException:
+                # Fallback for unexpected overlaps/invalids.
+                geom = shapely.union_all(part)
+            if not geom.is_valid:
+                geom = geom.buffer(0)
+            if geometry_force_polygon and geom.geom_type == "MultiPolygon":
+                try:
+                    geom = max(geom.geoms, key=lambda g: g.area)
+                except Exception:
+                    pass
+            return str(int(lab)), "" if geom.is_empty else geom.wkt
+
+        geometry_map = {}
+        tasks = list(zip(unique_labels, starts, counts))
+        max_workers = min(len(tasks), max(1, os.cpu_count() or 1))
+        if max_workers <= 1:
+            label_iter = tasks
+            if show_progress:
+                label_iter = tqdm(
+                    label_iter,
+                    total=len(tasks),
+                    desc="bin2cell geometry",
+                    leave=False,
+                )
+            for lab, start, count in label_iter:
+                key, wkt = _build_geometry(lab, start, count)
+                geometry_map[key] = wkt
+        else:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [executor.submit(_build_geometry, lab, start, count) for lab, start, count in tasks]
+                done_iter = as_completed(futures)
+                if show_progress:
+                    done_iter = tqdm(
+                        done_iter,
+                        total=len(futures),
+                        desc="bin2cell geometry",
+                        leave=False,
+                    )
+                for future in done_iter:
+                    key, wkt = future.result()
+                    geometry_map[key] = wkt
+
+        object_ids = cell_adata.obs["object_id"].astype(np.int64).astype(str)
+        cell_adata.obs[geometry_key] = object_ids.map(geometry_map).fillna("")
+
+        if rename_obs_to_cellid:
+            object_id_vals = pd.to_numeric(cell_adata.obs["object_id"], errors="coerce")
+            if np.all(np.isfinite(object_id_vals)) and np.all(object_id_vals > 0):
+                cellid_vals = object_id_vals.astype(np.int64).map(
+                    lambda x: f"cellid_{x:09d}-1"
+                )
+                if len(set(cellid_vals.tolist())) == len(cellid_vals):
+                    cell_adata.obs["cellid"] = cellid_vals.to_numpy()
+                    cell_adata.obs_names = cellid_vals.to_numpy()
+
+        cell_adata.uns.setdefault("omicverse_io", {})
+        cell_adata.uns["omicverse_io"]["type"] = "bin2cell_seg"
+
+    return cell_adata
+
+
+@register_function(
+    aliases=[
+        "同步VisiumHD分割几何",
+        "sync_visium_hd_seg_geometries",
+        "sync_hd_seg_geometries",
+    ],
+    category="space",
+    description="Sync Visium HD segmentation geometries in adata.uns['spatial'] after AnnData subsetting",
+    examples=[
+        "# Subset and sync segmentation geometries",
+        "adata_sub = adata[adata.obs['classification'] == 'Cluster-1'].copy()",
+        "ov.space.sync_visium_hd_seg_geometries(adata_sub, sample='sample1')",
+    ],
+    related=["io.spatial.read_visium_hd"],
+)
+def sync_visium_hd_seg_geometries(adata, sample=None):
+    """
+    Synchronize ``adata.uns["spatial"][sample]["geometries"]`` with current ``adata.obs_names``.
+
+    This utility is intended for AnnData objects loaded by ``read_visium_hd_seg``.
+    After subsetting AnnData, ``adata.obs`` and ``adata.obsm`` are subset automatically,
+    but the geometry table stored in ``adata.uns["spatial"][sample]["geometries"]`` may
+    still contain rows for cells that are no longer present. This function filters that
+    GeoDataFrame by current cell IDs and updates it in place.
+
+    Parameters
+    ----------
+    adata : sc.AnnData
+        A (possibly subsetted) AnnData object containing spatial segmentation metadata.
+    sample : str, optional
+        Sample key under ``adata.uns["spatial"]``. If ``None``, the first available key
+        is used (with a warning when multiple samples exist).
+
+    Returns
+    -------
+    sc.AnnData
+        The same ``adata`` object, modified in place.
+    """
+    import warnings
+    import geopandas as gpd
+
+    if "spatial" not in adata.uns:
+        warnings.warn(
+            "No spatial information found in adata.uns['spatial']. "
+            "This function is intended for data loaded with read_visium_hd_seg()."
+        )
+        return adata
+
+    if sample is None:
+        available_samples = list(adata.uns["spatial"].keys())
+        if len(available_samples) == 0:
+            warnings.warn("No samples found in adata.uns['spatial'].")
+            return adata
+        sample = available_samples[0]
+        if len(available_samples) > 1:
+            warnings.warn(
+                f"Multiple samples found: {available_samples}. "
+                f"Using '{sample}'. Specify `sample` explicitly to use a different one."
+            )
+
+    if sample not in adata.uns["spatial"]:
+        warnings.warn(f"Sample '{sample}' not found in adata.uns['spatial'].")
+        return adata
+
+    spatial_info = adata.uns["spatial"][sample]
+    if "geometries" not in spatial_info:
+        warnings.warn(
+            f"No geometries found in adata.uns['spatial']['{sample}']['geometries']. "
+            "This function is intended for data loaded with read_visium_hd_seg()."
+        )
+        return adata
+
+    geometries = spatial_info["geometries"]
+    current_cell_ids = set(adata.obs_names)
+
+    if isinstance(geometries, gpd.GeoDataFrame):
+        try:
+            geometries_subset = geometries.loc[geometries.index.isin(current_cell_ids)]
+        except (KeyError, IndexError) as e:
+            common_indices = geometries.index.intersection(current_cell_ids)
+            if len(common_indices) > 0:
+                geometries_subset = geometries.loc[common_indices]
+            else:
+                warnings.warn(
+                    f"Could not filter geometries by index. "
+                    f"Geometries may not be properly indexed by cell IDs. "
+                    f"Error: {e}"
+                )
+                return adata
+        spatial_info["geometries"] = geometries_subset
+    else:
+        warnings.warn(
+            f"Unexpected geometry format in adata.uns['spatial']['{sample}']['geometries']. "
+            "Expected GeoDataFrame."
+        )
+
+    return adata
     
     
     

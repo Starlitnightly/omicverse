@@ -63,7 +63,7 @@ Examples:
 
 # All functions imported via wildcard imports from submodules
 from ._data import (
-    read,read_csv,read_10x_mtx,read_h5ad,read_10x_h5,convert_to_pandas,
+    read,read_csv,read_10x_mtx,read_h5ad,read_10x_h5,convert_to_pandas,wrap_dataframe,
     download_CaDRReS_model,download_GDSC_data,
     download_pathway_database,download_geneid_annotation_pair,
     gtf_to_pair_tsv,download_tosica_gmt,geneset_prepare,get_gene_annotation,
@@ -171,6 +171,7 @@ __all__ = [
     "read_h5ad",
     "read_10x_h5",
     "convert_to_pandas",
+    "wrap_dataframe",
     "download_CaDRReS_model",
     "download_GDSC_data",
     "download_pathway_database",

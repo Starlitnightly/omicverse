@@ -38,7 +38,8 @@ def test_utils_exports_agent_entrypoints(monkeypatch):
     attribute_map = {
         "_data": [
             "read", "read_csv", "read_10x_mtx", "read_h5ad", "read_10x_h5",
-            "convert_to_pandas", "download_CaDRReS_model", "download_GDSC_data",
+            "convert_to_pandas", "wrap_dataframe",
+            "download_CaDRReS_model", "download_GDSC_data",
             "download_pathway_database", "download_geneid_annotation_pair",
             "gtf_to_pair_tsv", "download_tosica_gmt", "geneset_prepare",
             "get_gene_annotation", "correlation_pseudotime", "store_layers",

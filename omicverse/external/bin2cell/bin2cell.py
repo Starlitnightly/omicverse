@@ -1888,8 +1888,31 @@ def salvage_secondary_labels(adata, primary_label="labels_he_expanded", secondar
     #notify of how much was salvaged
     print("Salvaged "+str(len(secondary_to_take))+" secondary labels")
 
+def _copy_spatial_uns_light(spatial_uns):
+    """
+    Copy the spatial container without deep-copying large image arrays.
+
+    We only mutate ``scalefactors['spot_diameter_fullres']`` in ``bin_to_cell``,
+    so a shallow library-level copy plus a dedicated scalefactor dict copy is enough.
+    """
+    if not isinstance(spatial_uns, dict):
+        return deepcopy(spatial_uns)
+
+    copied = {}
+    for lib_key, lib_value in spatial_uns.items():
+        if isinstance(lib_value, dict):
+            lib_copy = dict(lib_value)
+            scalefactors = lib_value.get("scalefactors")
+            if isinstance(scalefactors, dict):
+                lib_copy["scalefactors"] = dict(scalefactors)
+            copied[lib_key] = lib_copy
+        else:
+            copied[lib_key] = lib_value
+    return copied
+
+
 def bin_to_cell(adata, labels_key="labels_expanded", 
-                spatial_keys=["spatial"], diameter_scale_factor=None,):
+                spatial_keys=["spatial"], diameter_scale_factor=None, show_progress=False):
     '''
     Collapse all bins for a given nonzero ``labels_key`` into a single cell. 
     Gene expression added up, array coordinates and ``spatial_keys`` averaged out. 
@@ -1914,67 +1937,107 @@ def bin_to_cell(adata, labels_key="labels_expanded",
         The object's ``"spot_diameter_fullres"`` will be multiplied by this much to reflect 
         the change in unit per observation. If ``None``, will default to the square root of 
         the mean of the per-cell bin counts.
-    store_segmentation : ``bool``, optional (default: ``True``)
-        Whether to generate and store cell segmentation boundaries in the resulting AnnData object.
-        The segmentation mask will be reconstructed from the labels and stored for visualization.
-    segmentation_key : ``str``, optional (default: ``"segmentation"``)
-        Key name to store the segmentation mask in ``adata.uns['spatial'][library_id]['images']``.
+    show_progress : ``bool``, optional (default: ``False``)
+        Whether to display a lightweight progress bar for major aggregation stages.
     '''
-    #a label of 0 means there's nothing there, ditch those bins from this operation
-    adata = adata[adata.obs[labels_key]!=0]
-    #use the newly inserted labels to make pandas dummies, as sparse because the data is huge
-    cell_to_bin = pd.get_dummies(adata.obs[labels_key], sparse=True)
-    #take a quick detour to save the cell labels as they appear in the dummies
-    #they're likely to be integers, make them strings to avoid complications in the downstream AnnData
-    cell_names = [str(i) for i in cell_to_bin.columns]
-    #then pull out the actual internal sparse matrix (.sparse) as a scipy COO one, turn to CSR
-    #this has bins as rows, transpose so cells are as rows (and CSR becomes CSC for .dot())
-    cell_to_bin = cell_to_bin.sparse.to_coo().tocsr().T
-    #can now generate the cell expression matrix by adding up the bins (via matrix multiplication)
-    #cell-bin * bin-gene = cell-gene
-    #(turn it to CSR at the end as somehow it comes out CSC)
-    X = cell_to_bin.dot(adata.X).tocsr()
-    #create object, stash stuff
-    cell_adata = ad.AnnData(X, var = adata.var)
-    cell_adata.obs_names = cell_names
-    #turn the cell names back to int and stash that as metadata too
-    cell_adata.obs['object_id'] = [int(i) for i in cell_names]
-    #need to bust out deepcopy here as otherwise altering the spot diameter gets back-propagated
-    cell_adata.uns['spatial'] = deepcopy(adata.uns['spatial'])
-    #getting the centroids (means of bin coords) involves computing a mean of each cell_to_bin row
-    #premultiplying by a diagonal matrix multiplies each row by a value: https://solitaryroad.com/c108.html
-    #use that to divide each row by it sum (.sum(axis=1)), then matrix multiply the result by bin coords
-    #stash the sum into a separate variable for subsequent object storage
-    #cell-cell * cell-bin * bin-coord = cell-coord
-    bin_count = np.asarray(cell_to_bin.sum(axis=1)).flatten()
-    row_means = scipy.sparse.diags(1/bin_count)
-    cell_adata.obs['bin_count'] = bin_count
-    #take the thing out for a spin with array coordinates
-    cell_adata.obs["array_row"] = row_means.dot(cell_to_bin).dot(adata.obs["array_row"].values)
-    cell_adata.obs["array_col"] = row_means.dot(cell_to_bin).dot(adata.obs["array_col"].values)
-    #generate the various spatial coordinate systems
-    #just in case a single is passed as a string
-    if type(spatial_keys) is not list:
-        spatial_keys = [spatial_keys]
-    for spatial_key in spatial_keys:
-        cell_adata.obsm[spatial_key] = row_means.dot(cell_to_bin).dot(adata.obsm[spatial_key])
-    #of note, the default scale factor bin diameter at 2um resolution stops rendering sensibly in plots
-    #by default estimate it as the sqrt of the bin count mean
-    if diameter_scale_factor is None:
-        diameter_scale_factor = np.sqrt(np.mean(bin_count))
-    #bump it up to something a bit more sensible
-    library = list(adata.uns['spatial'].keys())[0]
-    cell_adata.uns['spatial'][library]['scalefactors']['spot_diameter_fullres'] *= diameter_scale_factor
-    #if we can find a source column, transfer that
-    if labels_key+"_source" in adata.obs.columns:
-        #hell of a one liner. the premise is to turn two columns of obs into a translation dictionary
-        #so pull them out, keep unique rows, turn everything to string (as labels are strings in cells)
-        #then set the index to be the label names, turn the thing to dict
-        #pd.DataFrame -> dict makes one entry per column (even if we just have the one column here)
-        #so pull out our column's entry and we have what we're after
-        mapping = adata.obs[[labels_key,labels_key+"_source"]].drop_duplicates().astype(str).set_index(labels_key).to_dict()[labels_key+"_source"]
-        #translate the labels from the cell object
-        cell_adata.obs[labels_key+"_source"] = [mapping[i] for i in cell_adata.obs_names]
+    pbar = None
+    if show_progress:
+        try:
+            from tqdm.auto import tqdm
+
+            pbar = tqdm(total=7, desc="bin_to_cell", leave=False)
+        except Exception:
+            pbar = None
+
+    def _tick():
+        if pbar is not None:
+            pbar.update(1)
+
+    try:
+        # Fast path: avoid pandas.get_dummies for large tables.
+        label_series = adata.obs[labels_key]
+        if pd.api.types.is_numeric_dtype(label_series.dtype):
+            labels_all = np.asarray(label_series.to_numpy(), dtype=np.float64)
+            labels_all = np.nan_to_num(labels_all, nan=0.0).astype(np.int64, copy=False)
+        else:
+            labels_all = pd.to_numeric(label_series, errors="coerce").fillna(0).astype(np.int64).to_numpy()
+        valid_idx = np.flatnonzero(labels_all != 0)
+        if valid_idx.size == 0:
+            raise ValueError(f"No non-zero labels found in `adata.obs['{labels_key}']`.")
+        _tick()
+
+        labels = labels_all[valid_idx]
+        unique_labels, inverse = np.unique(labels, return_inverse=True)  # sorted ascending, stable naming
+        n_cells = unique_labels.shape[0]
+        n_bins = labels.shape[0]
+        rows = inverse.astype(np.int64, copy=False)
+        _tick()
+
+        # Build sparse cell_to_bin directly: rows=cells, cols=valid bins
+        cols = np.arange(n_bins, dtype=np.int64)
+        data = np.ones(n_bins, dtype=np.int8)
+        cell_to_bin = scipy.sparse.csr_matrix((data, (rows, cols)), shape=(n_cells, n_bins))
+        _tick()
+
+        # Aggregate expression: cell-bin * bin-gene -> cell-gene
+        X_bins = adata.X[valid_idx]
+        if scipy.sparse.issparse(X_bins):
+            X_bins = X_bins.tocsr()
+        X = cell_to_bin.dot(X_bins)
+        if scipy.sparse.issparse(X):
+            X = X.tocsr()
+        _tick()
+
+        cell_names = unique_labels.astype(str).tolist()
+        cell_adata = ad.AnnData(X, var=adata.var)
+        cell_adata.obs_names = cell_names
+        cell_adata.obs["object_id"] = unique_labels.astype(np.int64)
+
+        # Avoid deep-copying large image arrays in uns['spatial'].
+        cell_adata.uns["spatial"] = _copy_spatial_uns_light(adata.uns["spatial"])
+
+        # Per-cell bin counts and weighted coordinate means
+        bin_count = np.bincount(rows, minlength=n_cells).astype(np.int64, copy=False)
+        cell_adata.obs["bin_count"] = bin_count
+        inv_bin_count = np.divide(
+            1.0,
+            bin_count.astype(np.float64),
+            out=np.zeros_like(bin_count, dtype=np.float64),
+            where=bin_count > 0,
+        )
+        _tick()
+
+        arr_row = np.asarray(adata.obs["array_row"].to_numpy())[valid_idx]
+        arr_col = np.asarray(adata.obs["array_col"].to_numpy())[valid_idx]
+        cell_adata.obs["array_row"] = np.bincount(rows, weights=arr_row, minlength=n_cells) * inv_bin_count
+        cell_adata.obs["array_col"] = np.bincount(rows, weights=arr_col, minlength=n_cells) * inv_bin_count
+
+        # Generate averaged spatial coordinate systems
+        if type(spatial_keys) is not list:
+            spatial_keys = [spatial_keys]
+        for spatial_key in spatial_keys:
+            coords = np.asarray(adata.obsm[spatial_key])[valid_idx]
+            summed = np.zeros((n_cells, coords.shape[1]), dtype=np.float64)
+            np.add.at(summed, rows, coords)
+            cell_adata.obsm[spatial_key] = summed * inv_bin_count[:, None]
+        _tick()
+
+        # Rescale rendered diameter
+        if diameter_scale_factor is None:
+            diameter_scale_factor = np.sqrt(np.mean(bin_count))
+        library = list(adata.uns["spatial"].keys())[0]
+        cell_adata.uns["spatial"][library]["scalefactors"]["spot_diameter_fullres"] *= diameter_scale_factor
+
+        # Propagate *_source mapping per object label
+        source_key = labels_key + "_source"
+        if source_key in adata.obs.columns:
+            source_vals = adata.obs[source_key].astype(str).to_numpy()[valid_idx]
+            _, first_indices = np.unique(rows, return_index=True)
+            cell_adata.obs[source_key] = source_vals[first_indices]
+        _tick()
+    finally:
+        if pbar is not None:
+            pbar.close()
     
     # Generate and store segmentation mask for cell boundary visualization
 
