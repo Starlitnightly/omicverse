@@ -60,7 +60,7 @@ from ._integrate import pySTAligner,Cal_Spatial_Net
 from ._spaceflow import pySpaceFlow
 from ._spatrio import CellMap,CellLoc
 from ._stt import STT
-from ._svg import svg
+from ._svg import svg,spatial_neighbors,spatial_autocorr,moranI
 from ._cast import CAST
 from ._tools import *
 from ._gaston import GASTON
@@ -83,6 +83,9 @@ __all__ = [
     
     # Spatially variable genes
     'svg',
+    'spatial_neighbors',
+    'spatial_autocorr',
+    'moranI',
     
     # Spatial trajectory and dynamics
     'STT',
