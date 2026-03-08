@@ -1573,7 +1573,7 @@ def _color_vector(
         # 将数值列强制转为 float array，避免 object dtype 传入 matplotlib 时报错
         # （例如 obs 列存为 Python int / object，circles() 无法识别）
         try:
-            return pd.to_numeric(values, errors="raise").to_numpy(dtype=float), False
+            return np.asarray(pd.to_numeric(values, errors="raise"), dtype=float), False
         except (ValueError, TypeError):
             return values, False
 
