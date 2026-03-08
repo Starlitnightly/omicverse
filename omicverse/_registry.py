@@ -148,18 +148,8 @@ class FunctionRegistry:
                     param_str += f"={repr(param.default)}"
                 params_info.append(param_str)
             
-            # Get full docstring for help.
-            # For classes, prefer __init__ docstring because it usually contains
-            # the complete parameter documentation used by users.
-            if inspect.isclass(func):
-                class_doc = inspect.getdoc(func) or ""
-                init_doc = inspect.getdoc(func.__init__) or ""
-                if init_doc and init_doc != inspect.getdoc(object.__init__):
-                    raw_doc = f"{class_doc}\n\n{init_doc}".strip() if class_doc else init_doc
-                else:
-                    raw_doc = class_doc
-            else:
-                raw_doc = inspect.getdoc(func)
+            # Get full docstring for help
+            raw_doc = inspect.getdoc(func)
             if not raw_doc:
                 warnings.warn(
                     f"Function '{full_name}' is missing a docstring; agent help output may be limited.",
