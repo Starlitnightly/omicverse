@@ -78,6 +78,7 @@ _LAZY_MODULES = {
     'llm',
     'fm',
     'agent',
+    'mcp',
 }
 
 # Lazy attribute mappings: {attribute_name: (module_path, attr_name)}
@@ -208,13 +209,12 @@ def __getattr__(name):
             except Exception:
                 _lazy_modules[name] = None
                 return None
-        # utils needs special handling: cannot use `from . import utils` here
-        # because _handle_fromlist would call __getattr__('utils') again → recursion.
+
+        # utils needs special handling
         elif name == 'utils':
-            import importlib as _il
-            module = _il.import_module('omicverse.utils')
-            _lazy_modules[name] = module
-            return module
+            from . import utils
+            _lazy_modules[name] = utils
+            return utils
 
         # Standard module import
         else:

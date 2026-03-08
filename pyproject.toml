@@ -141,9 +141,20 @@ skillseeker = [
   "PyMuPDF>=1.24",
 ]
 
+jarvis = [
+  "python-telegram-bot>=20.0",
+  "requests>=2.0",
+  "pillow>=9.0",
+  "nbformat>=5.0",
+]
+
 tests = [
   "pytest>=7.0",
   "pytest-asyncio>=0.23",
+]
+
+mcp = [
+  "mcp>=1.0",
 ]
 
 
@@ -153,6 +164,7 @@ Github = 'https://github.com/Starlitnightly/omicverse'
 [project.scripts]
 ov-skill-seeker = "omicverse.ov_skill_seeker.cli:main"
 omicverse = "omicverse.cli:main"
+omicverse-mcp = "omicverse.mcp.server:main"
 
 [tool.setuptools.packages.find]
 include = ["omicverse*"]
@@ -178,4 +190,9 @@ markers = [
   "integration: integration tests that exercise the public fm API",
   "fm_real: real foundation-model inference tests intended for the Taiwan GPU server",
   "fm_gpu: GPU-backed foundation-model tests intended for the Taiwan GPU server",
+  "mock: MCP tests using mock registry only (no real packages needed)",
+  "core: MCP tests requiring anndata + scanpy (core OmicVerse deps)",
+  "scientific: MCP tests requiring anndata + scanpy + scientific stack (scvelo, squidpy)",
+  "extended: MCP tests requiring optional heavy packages (SEACells, pertpy, mira)",
+  "real_runtime: MCP tests that import real OmicVerse modules (superset of core/scientific/extended)",
 ]
