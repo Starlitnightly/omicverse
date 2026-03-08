@@ -80,7 +80,8 @@ register_provider(ProviderInfo(
     models={
         "gpt-5": "OpenAI GPT-5 (Latest)",
         "gpt-5.2": "OpenAI GPT-5.2",
-        "gpt-5.2-codex": "OpenAI GPT-5.2 Codex",
+        "gpt-5.4": "OpenAI GPT-5.4",
+        "gpt-5.4-pro": "OpenAI GPT-5.4 Pro",
         "gpt-5-mini": "OpenAI GPT-5 Mini",
         "gpt-5-nano": "OpenAI GPT-5 Nano",
         "gpt-5-chat-latest": "OpenAI GPT-5 Chat Latest",

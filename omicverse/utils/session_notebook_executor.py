@@ -90,7 +90,6 @@ class SessionNotebookExecutor:
         self.current_session: Optional[Dict[str, Any]] = None
         self.session_prompt_count: int = 0
         self.session_history: List[Dict[str, Any]] = []
-        self.last_stdout: str = ""
 
         # Conda environment detection
         self.conda_env = self._detect_conda_environment()
@@ -305,11 +304,18 @@ class SessionNotebookExecutor:
             return False
 
         km = self.current_session['kernel_manager']
+        kc = self.current_session['kernel_client']
 
         try:
-            # Avoid shell-channel probing here: pulling one shell message can
-            # consume an unrelated execute reply and create false crash signals.
-            return bool(km.is_alive())
+            # Check if kernel process is still running
+            if not km.is_alive():
+                return False
+
+            # Try to communicate with kernel
+            kc.kernel_info()
+            reply = kc.get_shell_msg(timeout=2.0)
+            return reply['msg_type'] == 'kernel_info_reply'
+
         except Exception:
             return False
 
@@ -346,18 +352,23 @@ class SessionNotebookExecutor:
             return
 
         km = self.current_session['kernel_manager']
-        kc = self.current_session['kernel_client']
+        old_kc = self.current_session['kernel_client']
 
         print("⚙ [RESTART] Restarting kernel...")
 
         # Stop channels
-        kc.stop_channels()
+        try:
+            old_kc.stop_channels()
+        except Exception as e:
+            print(f"⚠ [WARN] Failed to stop old kernel channels cleanly: {e}")
 
         # Restart kernel (keeps process alive, clears state)
         km.restart_kernel(now=True)
 
-        # Reconnect channels
+        # Reconnect with a fresh client; stale sockets are a common failure mode.
+        kc = km.client()
         kc.start_channels()
+        self.current_session['kernel_client'] = kc
 
         # Wait for kernel ready
         self._wait_for_kernel_ready(kc)
@@ -420,8 +431,6 @@ class SessionNotebookExecutor:
             return False
 
         km = self.current_session['kernel_manager']
-        kc = self.current_session['kernel_client']
-
         # Check if kernel is truly dead
         if km.is_alive():
             # Kernel process is alive, try interrupting first
@@ -439,20 +448,14 @@ class SessionNotebookExecutor:
 
         try:
             self._restart_kernel()
+            kc = self.current_session['kernel_client']
 
             # Re-initialize session imports
             init_code = """
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import omicverse as ov
 import scanpy as sc
 import pandas as pd
 import numpy as np
-import seaborn as sns
-import warnings
-warnings.filterwarnings('ignore')
-get_ipython().run_line_magic('matplotlib', 'inline')
 print("✓ [OK] Session re-initialized after recovery")
 """
             self._execute_code_in_kernel(init_code, kc)
@@ -536,18 +539,14 @@ print("✓ [OK] Session re-initialized after recovery")
 
         # Initialize session imports
         init_code = """
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import omicverse as ov
 import scanpy as sc
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
 warnings.filterwarnings('ignore')
-# Use inline backend so plt.show() emits display_data instead of opening a GUI window
-get_ipython().run_line_magic('matplotlib', 'inline')
 print("✓ Session initialized")
 """
         try:
@@ -681,14 +680,11 @@ print("✓ Session initialized")
                             f"**Started:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"),
 
             new_markdown_cell("## Session Initialization"),
-            new_code_cell("""import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-%matplotlib inline
-import omicverse as ov
+            new_code_cell("""import omicverse as ov
 import scanpy as sc
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
 warnings.filterwarnings('ignore')""")
@@ -711,7 +707,7 @@ warnings.filterwarnings('ignore')""")
             return  # nbformat not available
 
         try:
-            from nbformat.v4 import new_markdown_cell, new_code_cell, new_output
+            from nbformat.v4 import new_markdown_cell, new_code_cell
         except ImportError:
             return
 
@@ -727,46 +723,38 @@ warnings.filterwarnings('ignore')""")
 
         # Add stdout outputs
         if outputs['stdout']:
-            code_cell.outputs.append(
-                new_output(
-                    output_type='stream',
-                    name='stdout',
-                    text=''.join(outputs['stdout']),
-                )
-            )
+            code_cell.outputs.append({
+                'output_type': 'stream',
+                'name': 'stdout',
+                'text': ''.join(outputs['stdout'])
+            })
 
         # Add stderr outputs
         if outputs['stderr']:
-            code_cell.outputs.append(
-                new_output(
-                    output_type='stream',
-                    name='stderr',
-                    text=''.join(outputs['stderr']),
-                )
-            )
+            code_cell.outputs.append({
+                'output_type': 'stream',
+                'name': 'stderr',
+                'text': ''.join(outputs['stderr'])
+            })
 
         # Add error outputs
         if outputs['errors']:
             for error in outputs['errors']:
-                code_cell.outputs.append(
-                    new_output(
-                        output_type='error',
-                        ename=error['ename'],
-                        evalue=error['evalue'],
-                        traceback=error['traceback'],
-                    )
-                )
+                code_cell.outputs.append({
+                    'output_type': 'error',
+                    'ename': error['ename'],
+                    'evalue': error['evalue'],
+                    'traceback': error['traceback']
+                })
 
         # Add display data outputs
         if outputs['display_data']:
             for data in outputs['display_data']:
-                code_cell.outputs.append(
-                    new_output(
-                        output_type='display_data',
-                        data=data,
-                        metadata={},
-                    )
-                )
+                code_cell.outputs.append({
+                    'output_type': 'display_data',
+                    'data': data,
+                    'metadata': {}
+                })
 
         nb.cells.append(code_cell)
 
@@ -812,8 +800,6 @@ warnings.filterwarnings('ignore')""")
         TimeoutError
             If execution exceeds timeout and recovery fails
         """
-        msg_id = kc.execute(code, silent=False)
-
         outputs = {
             'stdout': [],
             'stderr': [],
@@ -824,6 +810,37 @@ warnings.filterwarnings('ignore')""")
         start_time = time.time()
         timeout_attempt = 0
         MAX_TIMEOUT_RETRIES = 2
+        channel_attempt = 0
+        MAX_CHANNEL_RECOVERIES = 2
+
+        def _restart_after_channel_failure(reason: Exception) -> bool:
+            nonlocal kc, outputs, start_time, channel_attempt
+            if not auto_recover or channel_attempt >= MAX_CHANNEL_RECOVERIES:
+                return False
+            print(
+                f"⚠ [CHANNEL] Kernel channel failure: {type(reason).__name__}: {reason}. "
+                f"Attempting recovery ({channel_attempt + 1}/{MAX_CHANNEL_RECOVERIES})..."
+            )
+            if not self._recover_from_kernel_failure():
+                return False
+            channel_attempt += 1
+            kc = self.current_session['kernel_client']
+            outputs = {
+                'stdout': [],
+                'stderr': [],
+                'errors': [],
+                'display_data': []
+            }
+            start_time = time.time()
+            return True
+
+        try:
+            msg_id = kc.execute(code, silent=False)
+        except Exception as e:
+            if _restart_after_channel_failure(e):
+                msg_id = kc.execute(code, silent=False)
+            else:
+                raise
 
         while True:
             if time.time() - start_time > self.timeout:
@@ -835,6 +852,7 @@ warnings.filterwarnings('ignore')""")
                     if self._recover_from_kernel_failure():
                         # Recovery succeeded, retry execution
                         timeout_attempt += 1
+                        kc = self.current_session['kernel_client']
                         start_time = time.time()
                         msg_id = kc.execute(code, silent=False)
                         # Clear previous outputs
@@ -863,12 +881,12 @@ warnings.filterwarnings('ignore')""")
                 msg = kc.get_iopub_msg(timeout=1.0)
             except Empty:
                 continue
-
-            # Only consume IOPub messages belonging to this execute request.
-            parent = msg.get('parent_header') or {}
-            parent_msg_id = parent.get('msg_id')
-            if parent_msg_id and parent_msg_id != msg_id:
-                continue
+            except Exception as e:
+                if _restart_after_channel_failure(e):
+                    msg_id = kc.execute(code, silent=False)
+                    print("⚙ [RESTART] Retrying execution after channel recovery...")
+                    continue
+                raise
 
             msg_type = msg['msg_type']
             content = msg['content']
@@ -927,30 +945,19 @@ warnings.filterwarnings('ignore')""")
         kc = self.current_session['kernel_client']
         session_dir = self.current_session['session_dir']
 
-        # Save adata to temp file (if provided) and inject into kernel namespace
+        # Save adata to temp file
         temp_input = session_dir / f"temp_input_{self.session_prompt_count}.h5ad"
-        if adata is not None:
-            adata.write_h5ad(str(temp_input))
-            inject_code = f"""
+        adata.write_h5ad(temp_input)
+
+        # Inject adata into kernel namespace
+        inject_code = f"""
 import scanpy as sc
 adata = sc.read_h5ad('{temp_input}')
 print(f"✓ Loaded: {{adata.shape[0]}} cells × {{adata.shape[1]}} genes")
 """
-        else:
-            inject_code = """
-adata = None
-print("✓ Loaded: adata=None (expect code to initialize it)")
-"""
         inject_outputs = self._execute_code_in_kernel(inject_code, kc)
         if inject_outputs['stdout']:
             print(''.join(inject_outputs['stdout']))
-        if inject_outputs['errors']:
-            error = inject_outputs['errors'][0]
-            traceback_str = '\n'.join(error['traceback'])
-            raise RuntimeError(
-                f"Failed to inject adata into session: {error['ename']}: {error['evalue']}\n"
-                f"{traceback_str}"
-            )
 
         # Execute user's generated code
         print(f"⚙ Executing prompt {self.session_prompt_count + 1}...")
@@ -972,36 +979,17 @@ print("✓ Loaded: adata=None (expect code to initialize it)")
         # Extract adata back from kernel
         temp_output = session_dir / f"temp_output_{self.session_prompt_count}.h5ad"
         extract_code = f"""
-import os
-if adata is None:
-    raise ValueError("adata is None after code execution; cannot save result")
-_tmp_output = '{temp_output}.tmp'
-adata.write_h5ad(_tmp_output)
-os.replace(_tmp_output, '{temp_output}')
+adata.write_h5ad('{temp_output}')
 print(f"✓ Saved: {{adata.shape[0]}} cells × {{adata.shape[1]}} genes")
 """
         extract_outputs = self._execute_code_in_kernel(extract_code, kc)
         if extract_outputs['stdout']:
             print(''.join(extract_outputs['stdout']))
-        if extract_outputs['errors']:
-            error = extract_outputs['errors'][0]
-            traceback_str = '\n'.join(error['traceback'])
-            raise RuntimeError(
-                f"Failed to save result adata in session: {error['ename']}: {error['evalue']}\n"
-                f"{traceback_str}"
-            )
-
-        # Expose combined stdout for caller-side tool output.
-        self.last_stdout = "".join(
-            inject_outputs.get('stdout', [])
-            + outputs.get('stdout', [])
-            + extract_outputs.get('stdout', [])
-        )
 
         # Load result
         try:
             import scanpy as sc
-            result_adata = sc.read_h5ad(str(temp_output))
+            result_adata = sc.read_h5ad(temp_output)
         except Exception as e:
             raise RuntimeError(
                 f"Failed to load result adata: {e}\n"
@@ -1081,6 +1069,62 @@ print(f"✓ Saved: {{adata.shape[0]}} cells × {{adata.shape[1]}} genes")
                     'error': str(e)
                 })
             raise
+
+    # ===================================================================
+    # Read-only execution (no adata round-trip)
+    # ===================================================================
+
+    def execute_readonly(self, code: str, adata) -> dict:
+        """Execute code in the kernel session for read-only inspection.
+
+        Unlike :meth:`execute`, this method does **not** serialize *adata*
+        back from the kernel after execution.  It only injects *adata* into
+        the kernel (if not already present in this session) and returns the
+        captured stdout / stderr / errors.
+
+        This avoids the expensive ``write_h5ad`` + ``read_h5ad`` round-trip
+        that can crash kernels on large datasets (e.g. 170 K features).
+
+        Returns
+        -------
+        dict
+            ``{"stdout": str, "stderr": str, "error": str | None}``
+        """
+        # Ensure a live session exists
+        if self._should_start_new_session():
+            self._start_new_session()
+
+        kc = self.current_session['kernel_client']
+        session_dir = self.current_session['session_dir']
+
+        # Inject adata into the kernel if this is the first prompt in the
+        # session (prompt_count == 0 means nothing has been sent yet).
+        if self.session_prompt_count == 0:
+            temp_input = session_dir / "temp_input_readonly.h5ad"
+            adata.write_h5ad(temp_input)
+            inject_code = (
+                "import scanpy as sc\n"
+                f"adata = sc.read_h5ad('{temp_input}')\n"
+                "print(f'✓ Loaded: {adata.shape[0]} cells × {adata.shape[1]} genes')\n"
+            )
+            inject_out = self._execute_code_in_kernel(inject_code, kc)
+            if inject_out['stdout']:
+                print(''.join(inject_out['stdout']))
+
+        # Run the user's snippet
+        outputs = self._execute_code_in_kernel(code, kc)
+
+        stdout = ''.join(outputs.get('stdout', []))
+        stderr = ''.join(outputs.get('stderr', []))
+        error = None
+        if outputs.get('errors'):
+            err = outputs['errors'][0]
+            error = f"{err['ename']}: {err['evalue']}"
+
+        # Record in notebook (lightweight, no adata)
+        self._append_to_session_notebook(code, outputs)
+
+        return {"stdout": stdout, "stderr": stderr, "error": error}
 
     # ===================================================================
     # Cleanup
