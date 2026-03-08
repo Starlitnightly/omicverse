@@ -13,30 +13,25 @@
 | Profile | Status | Constraint Source | CI Cadence |
 |---------|--------|-------------------|------------|
 | `fast-mock` | constrained | pyproject.toml (core deps only) | Every PR/push |
-| `core-runtime` | constrained | pyproject.toml (`anndata<0.12.0`, `scanpy>=1.9`, `scipy>=1.8,<1.12`) | Push + weekly |
+| `core-runtime` | **verified** | pyproject.toml (`anndata<0.12.0`, `scanpy>=1.9`, `scipy>=1.8,<1.12`) | Push + weekly |
 | `scientific-runtime` | constrained | `requirements/mcp-scientific-runtime.txt` (`scvelo>=0.3.0,<0.4`, `squidpy>=1.3.0,<1.7`) | Weekly |
 | `extended-runtime` | best_effort | `requirements/mcp-extended-runtime.txt` (SEACells/mira commented out) | Manual only |
 
-> **Note**: No profile is currently marked **verified** because no CI run has
-> yet produced a version snapshot artifact.  Once the version audit pipeline is
-> live and a CI run completes successfully, update the relevant row to
-> **verified** and record the snapshot below.
+> **Note**: `core-runtime` was promoted to **verified** on 2026-03-08 after
+> all 32 core-marked tests passed on GitHub Actions CI run 22828299495
+> (`HendricksJudy/omicverse`, Python 3.10.19, Ubuntu).  See "Recorded
+> Snapshots" below for the exact version snapshot.
 
 ## Pending Promotions
 
-### core-runtime
+### core-runtime — PROMOTED (2026-03-08)
 
-core-runtime is the primary candidate for the first verified profile. It meets
-all structural prerequisites:
+core-runtime has been promoted to **verified**.  All 32 core-marked tests
+passed on GitHub Actions (run 22828299495, `HendricksJudy/omicverse` fork,
+Python 3.10.19, Linux 6.14.0-1017-azure) and a version snapshot artifact
+was recorded.
 
-- Dependencies sourced from `pyproject.toml` (stable, no separate requirements file)
-- CI job runs on every push to master and weekly schedule
-- Version snapshot artifact: `mcp-versions-core-runtime-py3.10`
-- Test suite: 32 tests covering real P0 pipeline
-
-**Remaining step**: A successful CI run must produce the artifact. Once that
-happens, follow the [upgrade checklist](mcp_verified_process.md#upgrade-checklist-constrained---verified)
-to promote.
+**Next candidate**: `scientific-runtime` (requires scvelo + squidpy verification).
 
 ## Artifact Naming Convention
 
@@ -48,8 +43,19 @@ document for the full field reference.
 
 ## Recorded Snapshots
 
-_No snapshots recorded yet.  After the first successful CI run with version
-reporting enabled, add entries below following the template._
+### core-runtime — 2026-03-08
+
+- Python: 3.10.19
+- omicverse: 1.7.10rc1
+- anndata: 0.11.4
+- scanpy: 1.11.5
+- numpy: 1.26.4
+- pandas: 2.3.3
+- scipy: 1.11.4
+- matplotlib: 3.10.8
+
+Status: **verified** (artifact: `mcp-versions-core-runtime-py3.10`, JSON: `.ci-artifacts/mcp-core-runtime-versions.json`)
+Source: ci (GitHub Actions run 22828299495, `HendricksJudy/omicverse`, 32/32 core tests passed)
 
 ### How to Record a Snapshot
 
