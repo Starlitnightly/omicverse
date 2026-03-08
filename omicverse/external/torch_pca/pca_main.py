@@ -157,11 +157,7 @@ class PCA:
         """
         # Convert scipy sparse input once and reuse it for both fit and transform.
         if sp.issparse(inputs):
-            from .sparse_utils import scipy_sparse_to_torch_sparse
-
-            inputs = scipy_sparse_to_torch_sparse(
-                inputs, device=torch.device("cpu"), dtype=torch.float32
-            ).coalesce()
+            inputs = self._convert_scipy_sparse_input(inputs)
 
         self.fit(inputs, determinist=determinist)
         transformed = self.transform(inputs)
@@ -237,6 +233,37 @@ class PCA:
         self._auto_densified_from_sparse = True
         return inputs.to_dense()
 
+    def _convert_scipy_sparse_input(
+        self, inputs: Union[sp.csr_matrix, sp.csc_matrix]
+    ) -> Tensor:
+        """Convert scipy sparse input to torch tensor with high-density fast path."""
+        total = int(inputs.shape[0]) * int(inputs.shape[1])
+        if total > 0 and total <= MAX_AUTO_DENSE_ELEMENTS:
+            density = float(inputs.nnz) / float(total)
+            dense_bytes = total * 4  # float32 target
+            if (
+                density >= HIGH_DENSITY_AUTO_DENSE_THRESHOLD
+                and dense_bytes <= AUTO_DENSE_CPU_MAX_BYTES
+            ):
+                warnings.warn(
+                    "High-density scipy sparse input detected "
+                    f"(density={density * 100:.2f}%, shape={inputs.shape}); "
+                    "converting directly to dense tensor for faster torch PCA path.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                self._input_is_sparse = False
+                self._auto_densified_from_sparse = True
+                dense = inputs.toarray()
+                return torch.as_tensor(dense, dtype=torch.float32)
+
+        from .sparse_utils import scipy_sparse_to_torch_sparse
+
+        self._input_is_sparse = True
+        return scipy_sparse_to_torch_sparse(
+            inputs, device=torch.device("cpu"), dtype=torch.float32
+        ).coalesce()
+
     def fit(self, inputs: Union[Tensor, sp.csr_matrix, sp.csc_matrix], *, determinist: bool = True) -> "PCA":
         """Fit the PCA model and return it.
 
@@ -259,17 +286,19 @@ class PCA:
             The PCA model fitted on the input data.
         """
         # Detect and validate input type, convert to torch tensor
-        self._auto_densified_from_sparse = False
+        pre_densified_tensor = (
+            isinstance(inputs, Tensor)
+            and (not inputs.is_sparse)
+            and self._auto_densified_from_sparse
+        )
+        if not pre_densified_tensor:
+            self._auto_densified_from_sparse = False
         if sp.issparse(inputs):
-            self._input_is_sparse = True
             if not isinstance(inputs, (sp.csr_matrix, sp.csc_matrix)):
                 raise ValueError(
                     f"Sparse input must be csr_matrix or csc_matrix, got {type(inputs)}"
                 )
-            from .sparse_utils import scipy_sparse_to_torch_sparse
-            inputs = scipy_sparse_to_torch_sparse(
-                inputs, device=torch.device("cpu"), dtype=torch.float32
-            ).coalesce()
+            inputs = self._convert_scipy_sparse_input(inputs)
         elif isinstance(inputs, Tensor) and inputs.is_sparse:
             self._input_is_sparse = True
             inputs = inputs.coalesce()
