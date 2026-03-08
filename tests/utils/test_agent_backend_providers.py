@@ -455,6 +455,79 @@ class TestOpenAIResponsesAPI:
                 result = asyncio.run(backend.run(sample_user_prompt))
                 assert result == "Parsed from output_text via HTTP"
 
+    def test_gpt54_tool_chat_uses_responses_api(self, sample_system_prompt):
+        """GPT-5.4 tool chat should use responses.create with function_call items."""
+        mock_response = Mock()
+        mock_response.output_text = ""
+        mock_response.output = [
+            {
+                "type": "function_call",
+                "call_id": "call_123",
+                "name": "WebFetch",
+                "arguments": "{\"url\": \"https://example.com\"}",
+            }
+        ]
+        mock_response.usage = None
+
+        mock_client = Mock()
+        mock_client.responses = Mock()
+        mock_client.responses.create = Mock(return_value=mock_response)
+        mock_openai_class = Mock(return_value=mock_client)
+
+        with patch.dict('sys.modules', {'openai': Mock(OpenAI=mock_openai_class)}):
+            backend = OmicVerseLLMBackend(
+                system_prompt=sample_system_prompt,
+                model="gpt-5.4",
+                api_key="test-key",
+            )
+
+            response = backend._chat_tools_openai(
+                [{"role": "user", "content": "Fetch https://example.com"}],
+                [{
+                    "name": "WebFetch",
+                    "description": "Fetch a web page",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"url": {"type": "string"}},
+                        "required": ["url"],
+                    },
+                }],
+                "required",
+            )
+
+            mock_client.responses.create.assert_called_once()
+            call_kwargs = mock_client.responses.create.call_args[1]
+            assert "input" in call_kwargs
+            assert "messages" not in call_kwargs
+            assert call_kwargs["tool_choice"] == "required"
+            assert call_kwargs["tools"][0]["type"] == "function"
+            assert call_kwargs["tools"][0]["name"] == "WebFetch"
+            assert call_kwargs["tools"][0]["strict"] is False
+            assert response.tool_calls[0].name == "WebFetch"
+            assert response.tool_calls[0].arguments["url"] == "https://example.com"
+            assert isinstance(response.raw_message, list)
+            assert response.raw_message[0]["type"] == "function_call"
+
+    def test_gpt54_tool_results_use_function_call_output_format(self, sample_system_prompt):
+        """Responses models should feed tool results back as function_call_output items."""
+        backend = OmicVerseLLMBackend(
+            system_prompt=sample_system_prompt,
+            model="gpt-5.4",
+            api_key="test-key",
+        )
+
+        msg = backend.format_tool_result_message(
+            "call_123",
+            "WebFetch",
+            "page contents",
+        )
+
+        assert msg == {
+            "type": "function_call_output",
+            "call_id": "call_123",
+            "output": "page contents",
+        }
+
 
 # ============================================================================
 # Anthropic Provider Tests (BUG-001 Fix Verification)

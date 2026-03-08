@@ -431,6 +431,47 @@ class AnalysisExecutor:
         except (EOFError, KeyboardInterrupt):
             return False
 
+    # -- read-only snippet execution ----------------------------------------
+
+    def execute_snippet_readonly(self, code: str, adata: Any) -> str:
+        """Run *code* for read-only inspection — always in-process.
+
+        Snippets are lightweight diagnostic code that only needs stdout.
+        We execute directly in the sandbox (same process) so *adata* is
+        accessed by reference — no serialisation, no kernel round-trip.
+
+        Returns
+        -------
+        str
+            Captured stdout (or error message).
+        """
+        # Security scan (same gate as execute_generated_code)
+        try:
+            violations = self._ctx._security_scanner.scan(code)
+        except SyntaxError:
+            violations = []
+        if violations:
+            report = self._ctx._security_scanner.format_report(violations)
+            logger.warning("Security scan report:\n%s", report)
+            if self._ctx._security_scanner.has_critical(violations):
+                return f"ERROR: Code blocked by security scanner:\n{report}"
+
+        # Always in-process: adata already in memory, zero-copy
+        import io
+        from contextlib import redirect_stdout
+
+        compiled = compile(code, "<omicverse-snippet>", "exec")
+        sandbox_globals = self.build_sandbox_globals()
+        sandbox_locals: Dict[str, Any] = {"adata": adata}
+        buf = io.StringIO()
+        try:
+            with redirect_stdout(buf):
+                exec(compiled, sandbox_globals, sandbox_locals)  # noqa: S102
+        except Exception as e:
+            return f"ERROR: {e}"
+        out = buf.getvalue()
+        return out if out.strip() else "(no stdout output)"
+
     # -- main execution entry point -----------------------------------------
 
     def execute_generated_code(
@@ -474,8 +515,6 @@ class AnalysisExecutor:
                     }
                 if self._ctx.enable_filesystem_context and self._ctx._filesystem_context:
                     self.process_context_directives(code, {})
-                if capture_stdout:
-                    return {"adata": result_adata, "stdout": ""}
                 return result_adata
 
             except Exception as e:
@@ -787,6 +826,10 @@ class AnalysisExecutor:
             "importlib", "ctypes", "multiprocessing",
         }
         deny_roots |= self._ctx._security_config.extra_blocked_modules
+        safe_import_submodules = {
+            "importlib.metadata",
+            "importlib.resources",
+        }
         core_modules = (
             "omicverse", "numpy", "pandas", "scanpy",
             "time", "math", "json", "re", "pathlib",
@@ -833,7 +876,13 @@ class AnalysisExecutor:
 
         def limited_import(name, globals=None, locals=None, fromlist=(), level=0):
             root_name = name.split(".")[0]
-            if root_name in deny_roots:
+            fromlist_names = {str(item) for item in (fromlist or ())}
+            allow_safe_importlib = (
+                name in safe_import_submodules
+                or any(name.startswith(f"{mod}.") for mod in safe_import_submodules)
+                or (name == "importlib" and fromlist_names and fromlist_names <= {"metadata", "resources"})
+            )
+            if root_name in deny_roots and not allow_safe_importlib:
                 caller_pkg = (globals or {}).get("__package__", "") or ""
                 if not caller_pkg.startswith("omicverse"):
                     raise ImportError(
