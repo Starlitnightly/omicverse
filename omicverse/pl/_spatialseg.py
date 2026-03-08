@@ -12,7 +12,7 @@ import warnings
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.colors import ListedColormap
+from matplotlib import patheffects
 
 
 def _require_geopandas():
@@ -70,6 +70,13 @@ def spatialseg(
     show: bool = True,
     ax: Optional[plt.Axes] = None,
     legend: bool = True,
+    legend_loc: str = "right margin",
+    legend_fontsize: Optional[Union[int, float]] = 12,
+    legend_fontweight: Union[str, int] = "bold",
+    legend_fontoutline: Optional[float] = None,
+    na_color: str = "lightgray",
+    na_in_legend: bool = True,
+    colorbar_loc: Optional[str] = "right",
     xlabel: Optional[str] = "spatial 1",
     ylabel: Optional[str] = "spatial 2",
     show_ticks: bool = False,
@@ -82,6 +89,14 @@ def spatialseg(
     """
     _ = size  # kept for API compatibility with point-based plotting interfaces
 
+    # Backward compatibility for historical usage without exposing a new API entry.
+    if "color_dict" in kwargs:
+        legacy_color_dict = kwargs.pop("color_dict")
+        if legacy_color_dict is not None:
+            if palette is not None:
+                warnings.warn("Both `palette` and legacy `color_dict` were provided. Using `color_dict`.")
+            palette = legacy_color_dict
+
     gpd, wkt = _require_geopandas()
 
     if "geometry" not in adata.obs.columns:
@@ -91,27 +106,43 @@ def spatialseg(
             "as produced by `ov.io.spatial.read_visium_hd_seg`."
         )
 
-    if "spatial" not in adata.uns:
-        raise ValueError("`adata.uns['spatial']` is required but missing.")
+    if "spatial" not in adata.uns or not isinstance(adata.uns["spatial"], dict) or len(adata.uns["spatial"]) == 0:
+        raise ValueError(
+            "`spatialseg` requires non-empty `adata.uns['spatial']` and is strongly coupled to a selected library."
+        )
+    spatial_uns = adata.uns["spatial"]
+    available_library_ids = list(spatial_uns.keys())
 
     if library_id is None:
-        available_library_ids = list(adata.uns["spatial"].keys())
-        if len(available_library_ids) == 0:
-            raise ValueError("No library_id found in `adata.uns['spatial']`.")
-        library_id = available_library_ids[0]
         if len(available_library_ids) > 1:
-            warnings.warn(
+            raise ValueError(
                 f"Multiple library_ids found: {available_library_ids}. "
-                f"Using '{library_id}'. Specify `library_id` explicitly to use a different one."
+                "Please specify `library_id` explicitly."
             )
-
-    if library_id not in adata.uns["spatial"]:
+        library_id = available_library_ids[0]
+    elif library_id not in spatial_uns:
         raise ValueError(
             f"`library_id` '{library_id}' not found in `adata.uns['spatial']`. "
-            f"Available library_ids: {list(adata.uns['spatial'].keys())}"
+            f"Available library_ids: {available_library_ids}"
         )
+    spatial_info = spatial_uns[library_id]
 
-    spatial_info = adata.uns["spatial"][library_id]
+    library_filter_mask = pd.Series(True, index=adata.obs_names)
+    if library_id is not None:
+        library_col = None
+        for candidate in ("library_id", "fov", "FOV", "sample", "library", "library_key"):
+            if candidate in adata.obs.columns:
+                values = adata.obs[candidate].astype(str)
+                if (values == str(library_id)).any():
+                    library_col = candidate
+                    library_filter_mask = values == str(library_id)
+                    break
+        if library_col is None and len(available_library_ids) > 1:
+            raise ValueError(
+                f"`library_id='{library_id}'` was provided but no obs column was found to subset cells "
+                "(`library_id`/`fov`/`FOV`/`sample`/`library`). "
+                "Please add a library indicator column in `adata.obs`."
+            )
 
     if color is None:
         colors_to_plot = [None]
@@ -175,6 +206,7 @@ def spatialseg(
             mask = adata.obs[filter_column].isin(groups)
         else:
             mask = pd.Series(True, index=adata.obs_names)
+        mask = mask & library_filter_mask
 
         cells_to_plot = adata.obs_names[mask]
         if len(cells_to_plot) == 0:
@@ -356,41 +388,9 @@ def spatialseg(
             except Exception:
                 use_equal_aspect = True
 
-        is_categorical = not pd.api.types.is_numeric_dtype(temp_gdf[plot_column])
-        use_custom_palette = False
-        custom_cmap = None
-        categories = None
-        color_list_for_legend = None
-
-        if is_categorical:
-            if pd.api.types.is_categorical_dtype(temp_gdf[plot_column]):
-                categories = temp_gdf[plot_column].cat.categories.tolist()
-            else:
-                categories = sorted(temp_gdf[plot_column].dropna().unique())
-
-            color_list = []
-            if palette is not None:
-                use_custom_palette = True
-                if isinstance(palette, dict):
-                    missing_cats = [cat for cat in categories if cat not in palette]
-                    if missing_cats:
-                        warnings.warn(
-                            f"Palette dictionary is missing colors for {len(missing_cats)} categories; using gray fallback."
-                        )
-                    color_list = [palette.get(cat, "gray") for cat in categories]
-                elif isinstance(palette, (list, np.ndarray)):
-                    palette_array = np.asarray(palette)
-                    if len(palette_array) < len(categories):
-                        warnings.warn(
-                            f"Palette has {len(palette_array)} colors but there are {len(categories)} categories. "
-                            "Colors will be cycled."
-                        )
-                    color_list = [palette_array[i % len(palette_array)] for i in range(len(categories))]
-                else:
-                    raise ValueError(f"Unsupported palette type: {type(palette)}")
-
-                custom_cmap = ListedColormap(color_list)
-                color_list_for_legend = color_list
+        is_categorical = temp_gdf[plot_column].dtype == bool or (
+            not pd.api.types.is_numeric_dtype(temp_gdf[plot_column])
+        )
 
         plot_kwargs = {
             "ax": current_ax,
@@ -400,12 +400,36 @@ def spatialseg(
             **kwargs,
         }
 
-        plot_kwargs["column"] = plot_column
-
         if is_categorical:
+            from ..utils._scatterplot import _add_categorical_legend, _color_vector, _get_palette
+
+            color_source_vector = temp_gdf[plot_column]
+            if (
+                color_source_vector.dtype != bool
+                and not isinstance(color_source_vector.dtype, pd.CategoricalDtype)
+            ):
+                color_source_vector = pd.Series(
+                    pd.Categorical(color_source_vector),
+                    index=temp_gdf.index,
+                    name=plot_column,
+                )
+            if isinstance(color_source_vector.dtype, pd.CategoricalDtype):
+                color_source_vector = color_source_vector.cat.remove_unused_categories()
+
+            color_vector, _ = _color_vector(
+                adata,
+                plot_column,
+                color_source_vector,
+                palette=palette,
+                na_color=na_color,
+            )
+            if isinstance(color_vector, pd.Categorical):
+                face_colors = np.asarray(color_vector.astype(str), dtype=object)
+            else:
+                face_colors = np.asarray(color_vector, dtype=object)
+
+            plot_kwargs["color"] = face_colors
             plot_kwargs["legend"] = False
-            if use_custom_palette:
-                plot_kwargs["cmap"] = custom_cmap
             if use_equal_aspect:
                 plot_kwargs["aspect"] = "equal"
             try:
@@ -418,31 +442,44 @@ def spatialseg(
                     raise
 
             if legend:
-                from matplotlib.patches import Patch
-
-                if use_custom_palette:
-                    legend_elements = [
-                        Patch(facecolor=color_list_for_legend[i], label=str(cat))
-                        for i, cat in enumerate(categories)
+                if legend_fontoutline is not None:
+                    path_effect = [
+                        patheffects.withStroke(linewidth=legend_fontoutline, foreground="w")
                     ]
                 else:
-                    n_cats = len(categories)
-                    default_cmap = plt.get_cmap("tab20" if n_cats <= 20 else "tab20b")
-                    legend_elements = [
-                        Patch(facecolor=default_cmap(i / n_cats), label=str(cat))
-                        for i, cat in enumerate(categories)
-                    ]
-
-                if legend_elements:
-                    current_ax.legend(
-                        handles=legend_elements,
-                        bbox_to_anchor=(1.05, 1),
-                        loc="upper left",
-                        frameon=True,
+                    path_effect = None
+                try:
+                    centroids = np.column_stack(
+                        (
+                            temp_gdf.geometry.centroid.x.to_numpy(),
+                            temp_gdf.geometry.centroid.y.to_numpy(),
+                        )
                     )
+                except Exception:
+                    bounds_df = temp_gdf.bounds
+                    centroids = np.column_stack(
+                        (
+                            (bounds_df["minx"].to_numpy() + bounds_df["maxx"].to_numpy()) / 2.0,
+                            (bounds_df["miny"].to_numpy() + bounds_df["maxy"].to_numpy()) / 2.0,
+                        )
+                    )
+                _add_categorical_legend(
+                    current_ax,
+                    color_source_vector,
+                    palette=_get_palette(adata, plot_column, palette=palette),
+                    scatter_array=centroids,
+                    legend_loc=legend_loc,
+                    legend_fontweight=legend_fontweight,
+                    legend_fontsize=legend_fontsize,
+                    legend_fontoutline=path_effect,
+                    na_color=na_color,
+                    na_in_legend=na_in_legend,
+                    multi_panel=len(colors_to_plot) > 1,
+                )
         else:
+            plot_kwargs["column"] = plot_column
             plot_kwargs["cmap"] = cmap
-            plot_kwargs["legend"] = legend
+            plot_kwargs["legend"] = False
             if vmin is not None:
                 plot_kwargs["vmin"] = vmin
             if vmax is not None:
@@ -457,6 +494,26 @@ def spatialseg(
                     temp_gdf.plot(**plot_kwargs)
                 else:
                     raise
+            if legend and colorbar_loc is not None and len(current_ax.collections) > 0:
+                try:
+                    cb = plt.colorbar(
+                        current_ax.collections[-1],
+                        ax=current_ax,
+                        pad=0.01,
+                        fraction=0.08,
+                        aspect=30,
+                        location=colorbar_loc,
+                    )
+                except TypeError:
+                    cb = plt.colorbar(
+                        current_ax.collections[-1],
+                        ax=current_ax,
+                        pad=0.01,
+                        fraction=0.08,
+                        aspect=30,
+                    )
+                if legend_fontsize is not None:
+                    cb.ax.tick_params(labelsize=legend_fontsize)
 
         current_ax.set_aspect("equal")
         current_ax.invert_yaxis()

@@ -8,6 +8,8 @@ particularly from SpaceRanger output (both bin-level and cell segmentation data)
 import pandas as pd
 import numpy as np
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Literal, Optional, Union
 import ast
@@ -136,12 +138,51 @@ def _init_spatial_slot(
 
 
 def _progress(message: str, level: str = "info") -> None:
-    color = Colors.CYAN
-    if level == "success":
-        color = Colors.GREEN
-    elif level == "warn":
-        color = Colors.WARNING
-    print(f"{color}[VisiumHD] {message}{Colors.ENDC}")
+    level_key = (level or "info").lower()
+    if level_key == "info":
+        msg = message.lower()
+        if msg.startswith("reading"):
+            level_key = "start"
+        elif msg.startswith("loading"):
+            level_key = "step"
+        elif msg.startswith("done"):
+            level_key = "success"
+        elif "error" in msg or "failed" in msg:
+            level_key = "error"
+
+    color_map = {
+        "start": Colors.HEADER,
+        "step": Colors.BLUE,
+        "info": Colors.CYAN,
+        "success": Colors.GREEN,
+        "warn": Colors.WARNING,
+        "warning": Colors.WARNING,
+        "error": Colors.FAIL,
+        "fail": Colors.FAIL,
+    }
+    tag_map = {
+        "start": "[START]",
+        "step": "[STEP]",
+        "info": "[INFO]",
+        "success": "[OK]",
+        "warn": "[WARN]",
+        "warning": "[WARN]",
+        "error": "[ERR]",
+        "fail": "[ERR]",
+    }
+
+    color = color_map.get(level_key, Colors.CYAN)
+    tag = tag_map.get(level_key, "[INFO]")
+    text = f"[VisiumHD]{tag} {message}"
+
+    # Avoid printing raw ANSI escape sequences in non-interactive environments.
+    force_color = os.environ.get("FORCE_COLOR", "").strip() not in ("", "0", "false", "False")
+    no_color = os.environ.get("NO_COLOR", "").strip() != ""
+    supports_color = force_color or (hasattr(sys.stdout, "isatty") and sys.stdout.isatty())
+    if no_color or not supports_color:
+        print(text)
+    else:
+        print(f"{color}{text}{Colors.ENDC}")
 
 
 @register_function(
@@ -505,5 +546,4 @@ def read_visium_hd(
         )
 
     raise ValueError("`data_type` must be one of {'bin', 'cellseg'}.")
-
 
