@@ -101,7 +101,7 @@ plot_utils.pl_spatial_inf_feature(visium_args.adata_plot, feature='ql_m', cmap='
 ```python
 import anndata as ad
 
-Batch_list = [sc.read_h5ad(path) for path in ["Stereo_seq.h5ad", "SlideseqV2.h5ad"]]
+Batch_list = [ov.read(path) for path in ["Stereo_seq.h5ad", "SlideseqV2.h5ad"]]
 adata_concat = ad.concat(Batch_list, label='slice_name', keys=['Stereo', 'Slide'])
 STAligner_obj = ov.space.pySTAligner(
     adata=adata_concat,
@@ -118,7 +118,7 @@ ov.utils.cluster(adata_aligned, use_rep='STAligner', method='GMM', n_components=
 
 ## SpaceFlow pseudo-spatial map
 ```python
-adata = sc.read_visium(path='data', count_file='151676_filtered_feature_bc_matrix.h5')
+adata = ov.io.spatial.read_visium(path='data', count_file='151676_filtered_feature_bc_matrix.h5')
 sc.pp.calculate_qc_metrics(adata, inplace=True)
 sf_obj = ov.space.pySpaceFlow(adata)
 sf_obj.train(
@@ -133,7 +133,7 @@ sc.pl.spatial(adata, color=['pSM_spaceflow'], cmap='RdBu_r')
 
 ## STT attractor dynamics
 ```python
-adata = sc.read_h5ad('mouse_brain.h5ad')
+adata = ov.read('mouse_brain.h5ad')
 STT_obj = ov.space.STT(
     adata,
     spatial_loc='xy_loc',
@@ -205,8 +205,8 @@ from omicverse.external.scSLAT.model import (
 )
 from omicverse.external.scSLAT.viz import Sankey_multi
 
-adata1 = sc.read_h5ad('data/E115_Stereo.h5ad')
-adata2 = sc.read_h5ad('data/E125_Stereo.h5ad')
+adata1 = ov.read('data/E115_Stereo.h5ad')
+adata2 = ov.read('data/E125_Stereo.h5ad')
 adata1.obs['week'] = 'E11.5'
 adata2.obs['week'] = 'E12.5'
 Cal_Spatial_Net(adata1, k_cutoff=20, model='KNN')

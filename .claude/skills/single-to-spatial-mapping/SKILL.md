@@ -32,7 +32,18 @@ Apply this skill when converting single-cell references into spatially resolved 
    - Plot `sp_adata` coloured by `Cell_type` with `palette=ov.utils.ov_palette()[11:]` to show reconstructed assignments.
 8. **Export results**
    - Encourage saving generated AnnData objects (`sp_adata.write_h5ad(...)`, `sp_adata_spot.write_h5ad(...)`) and derived CSV summaries for downstream reporting.
-9. **Troubleshooting tips**
+9. **Defensive validation**
+   ```python
+   # Before Single2Spatial: verify spatial coordinates exist
+   for col in spot_key:
+       assert col in spatial_data.obs.columns, f"Spatial coordinate column '{col}' not found in spatial_data.obs"
+   # Verify scRNA-seq is log-normalized (max should be <~15, not hundreds/thousands)
+   if single_data.X.max() > 50:
+       print("WARNING: scRNA-seq data may not be log-normalized. Raw counts cause scale mismatches.")
+   # Verify cell type column exists
+   assert celltype_key in single_data.obs.columns, f"Cell type column '{celltype_key}' not found"
+   ```
+10. **Troubleshooting tips**
    - If training diverges, reduce `learning_rate` via keyword arguments or decrease `predicted_size` to stabilise the forest.
    - Ensure scRNA-seq inputs are log-normalised; raw counts can lead to scale mismatches and poor spatial predictions.
    - Verify GPU availability when `gpu` is non-zero; fallback to CPU by omitting the argument or setting `gpu=-1`.
