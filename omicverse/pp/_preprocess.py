@@ -1283,6 +1283,7 @@ def neighbors(
     use_rep: Optional[str] = None,
     knn: bool = True,
     random_state: int= 0,
+    n_jobs: Optional[int] = None,
     method: Optional[_Method] = 'umap',
     transformer: Optional[str] = None,
     metric: Union[_Metric, _MetricFn] = 'euclidean',
@@ -1314,6 +1315,7 @@ def neighbors(
             Kernel to assign low weights to neighbors more distant than the
             `n_neighbors` nearest neighbor.
         random_state: A numpy random seed.
+        n_jobs: Number of parallel jobs used by kNN backend. Defaults to scanpy-compatible behavior.
         method: Use 'umap' [McInnes18]_ or 'gauss' (Gauss kernel following [Coifman05]_
             with adaptive width [Haghverdi16]_) for computing connectivities.
             Use 'rapids' for the RAPIDS implementation of UMAP (experimental, GPU
@@ -1321,6 +1323,7 @@ def neighbors(
         transformer: KNN search implementation. Options: None (auto), 'pyg' (PyTorch Geometric,
             recommended for GPU), 'pynndescent', 'sklearn', or 'rapids'.
             'pyg' provides 20-100× speedup over other methods.
+            In `cpu-gpu-mixed` mode, `None` defaults to `'pyg'`.
         metric: A known metric's name or a callable that returns a distance.
         metric_kwds: Options for the metric.
         key_added: If not specified, the neighbors data is stored in .uns['neighbors'],
@@ -1356,15 +1359,19 @@ def neighbors(
         print(f"{EMOJI['cpu']} Using Scanpy CPU to calculate neighbors...")
         from ._neighbors import neighbors as _neighbors
         _neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
-                         random_state=random_state,method=method,transformer=transformer,
+                         random_state=random_state,n_jobs=n_jobs,method=method,transformer=transformer,
                          metric=metric,metric_kwds=metric_kwds,
                          key_added=key_added,copy=copy,**kwargs)
     elif settings.mode == 'cpu-gpu-mixed':
         print(f"{EMOJI['gpu']} Using torch CPU/GPU mixed mode to calculate neighbors...")
         print_gpu_usage_color()
+        effective_transformer = transformer if transformer is not None else "pyg"
+        if transformer is None:
+            print(f"{EMOJI['gpu']} Mixed mode default transformer: pyg")
         from ._neighbors import neighbors as _neighbors
         _neighbors(adata,use_rep=use_rep,n_neighbors=n_neighbors, n_pcs=n_pcs,
-                         random_state=random_state,method='torch',transformer=transformer,
+                         random_state=random_state,n_jobs=n_jobs,method='torch',
+                         transformer=effective_transformer,
                          metric=metric,metric_kwds=metric_kwds,
                          key_added=key_added,copy=copy,**kwargs)
     else:
