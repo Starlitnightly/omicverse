@@ -214,7 +214,8 @@ def get_igraph_from_adjacency(adjacency: CSBase, *, directed: bool = False):
 class _Settings:
     """Mock settings object."""
     N_PCS = 50
-    n_jobs = -1
+    # Keep scanpy-compatible default for approximate kNN reproducibility.
+    n_jobs = 1
 
 settings = _Settings()
 
@@ -249,6 +250,7 @@ class KwdsForTransformer(TypedDict):
     metric: _Metric | _MetricFn
     metric_params: Mapping[str, Any]
     random_state: _LegacyRandom
+    n_jobs: int
 
 
 class NeighborsParams(TypedDict):  # noqa: D101
@@ -259,6 +261,7 @@ class NeighborsParams(TypedDict):  # noqa: D101
     metric_kwds: NotRequired[Mapping[str, Any]]
     use_rep: NotRequired[str]
     n_pcs: NotRequired[int]
+    n_jobs: NotRequired[int]
 
 
 @_doc_params(n_pcs=doc_n_pcs, use_rep=doc_use_rep)
@@ -274,6 +277,7 @@ def neighbors(  # noqa: PLR0913
     metric: _Metric | _MetricFn = "euclidean",
     metric_kwds: Mapping[str, Any] = MappingProxyType({}),
     random_state: _LegacyRandom = 0,
+    n_jobs: int | None = None,
     key_added: str | None = None,
     copy: bool = False,
 ) -> AnnData | None:
@@ -342,6 +346,9 @@ def neighbors(  # noqa: PLR0913
         A numpy random seed.
 
         *ignored if ``transformer`` is an instance.*
+    n_jobs
+        Number of parallel jobs used by neighbor search backends.
+        If `None`, uses the internal default (`1`, scanpy-compatible).
     key_added
         If not specified, the neighbors data is stored in `.uns['neighbors']`,
         distances and connectivities are stored in `.obsp['distances']` and
@@ -411,6 +418,7 @@ def neighbors(  # noqa: PLR0913
         metric=metric,
         metric_kwds=metric_kwds,
         random_state=random_state,
+        n_jobs=n_jobs,
     )
 
     if key_added is None:
@@ -434,6 +442,8 @@ def neighbors(  # noqa: PLR0913
         random_state=random_state,
         metric=metric,
     )
+    if n_jobs is not None:
+        neighbors_dict["params"]["n_jobs"] = n_jobs
     if metric_kwds:
         neighbors_dict["params"]["metric_kwds"] = metric_kwds
     if use_rep is not None:
@@ -775,6 +785,7 @@ class Neighbors:
         metric: _Metric | _MetricFn = "euclidean",
         metric_kwds: Mapping[str, Any] = MappingProxyType({}),
         random_state: _LegacyRandom = 0,
+        n_jobs: int | None = None,
     ) -> None:
         """Compute distances and connectivities of neighbors.
 
@@ -805,12 +816,16 @@ class Neighbors:
             print(f"   {EMOJI['warning']} {Colors.WARNING}Dataset too small: adjusting to {Colors.BOLD}{n_neighbors}{Colors.ENDC}{Colors.WARNING} neighbors{Colors.ENDC}")
             logg.warning(f"n_obs too small: adjusting to `n_neighbors = {n_neighbors}`")
 
+        # Match scanpy by default, but allow explicit override.
+        effective_n_jobs = settings.n_jobs if n_jobs is None else n_jobs
+
         # default keyword arguments when `transformer` is not an instance
         transformer_kwds_default = KwdsForTransformer(
             n_neighbors=n_neighbors,
             metric=metric,
             metric_params=metric_kwds,  # most use _params, not _kwds
             random_state=random_state,
+            n_jobs=effective_n_jobs,
         )
         method, transformer, shortcut = self._handle_transformer(
             method, transformer, knn=knn, kwds=transformer_kwds_default
@@ -954,7 +969,7 @@ class Neighbors:
                 n_neighbors = min(n_neighbors, kwds["n_neighbors"])
             transformer = KNeighborsTransformer(
                 algorithm="brute",
-                n_jobs=settings.n_jobs,
+                n_jobs=kwds["n_jobs"],
                 n_neighbors=n_neighbors,
                 metric=kwds["metric"],
                 metric_params=dict(kwds["metric_params"]),  # needs dict
@@ -999,7 +1014,7 @@ class Neighbors:
                 if transformer is None:
                     # Use defaults from UMAP's `nearest_neighbors` function
                     kwds.update(
-                        n_jobs=settings.n_jobs,
+                        n_jobs=kwds["n_jobs"],
                         n_trees=min(64, 5 + round((self._adata.n_obs) ** 0.5 / 20.0)),
                         n_iters=max(5, round(np.log2(self._adata.n_obs))),
                     )
