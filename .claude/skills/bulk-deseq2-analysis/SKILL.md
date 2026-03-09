@@ -1,7 +1,7 @@
 ---
 name: bulk-rna-seq-deseq2-analysis-with-omicverse
 title: Bulk RNA-seq DESeq2 analysis with omicverse
-description: Walk Claude through PyDESeq2-based differential expression, including ID mapping, DE testing, fold-change thresholding, and enrichment visualisation.
+description: "PyDESeq2 differential expression: ID mapping, DE testing, fold-change thresholding, and GSEA enrichment visualization in OmicVerse."
 ---
 
 # Bulk RNA-seq DESeq2 analysis with omicverse
@@ -34,7 +34,21 @@ Use this skill when a user wants to reproduce the DESeq2 workflow showcased in [
    - Rank genes for GSEA with `rnk = dds.ranking2gsea()`.
    - Instantiate `gsea_obj = ov.bulk.pyGSEA(rnk, pathway_dict)` and call `gsea_obj.enrichment()` to compute terms.
    - Plot enrichment bubble charts via `gsea_obj.plot_enrichment(...)` and GSEA curves with `gsea_obj.plot_gsea(term_num=..., ...)`.
-8. **Troubleshooting**
+8. **Defensive validation**
+   ```python
+   # Before PyDESeq2: verify count matrix contains raw integers (not log-transformed)
+   import numpy as np
+   if hasattr(data, 'values'):
+       sample = data.values.flatten()[:1000]
+   else:
+       sample = np.array(data).flatten()[:1000]
+   if np.any(sample != sample.astype(int)):
+       print("WARNING: Data may not be raw counts. PyDESeq2 requires integer counts, not log-transformed.")
+   # Verify treatment/control groups match column names
+   for g in treatment_groups + control_groups:
+       assert g in data.columns, f"Sample '{g}' not in count matrix columns: {list(data.columns)}"
+   ```
+9. **Troubleshooting**
    - If PyDESeq2 raises errors about size factors, remind users to provide raw counts (not log-transformed data).
    - `gene_id` mapping depends on species; direct them to download the correct genome pair when results look sparse.
    - Large pathway libraries may require raising recursion limits or filtering to the top N terms before plotting.

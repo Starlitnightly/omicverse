@@ -1,7 +1,7 @@
 ---
 name: single-cell-preprocessing-with-omicverse
 title: Single-cell preprocessing with omicverse
-description: Walk through omicverse's single-cell preprocessing tutorials to QC PBMC3k data, normalise counts, detect HVGs, and run PCA/embedding pipelines on CPU, CPU–GPU mixed, or GPU stacks.
+description: "Single-cell QC, normalization, HVG detection, PCA, neighbor graph, UMAP/tSNE embedding pipelines in OmicVerse (CPU/GPU)."
 ---
 
 # Single-cell preprocessing with omicverse
@@ -15,7 +15,7 @@ Follow this skill when a user needs to reproduce the preprocessing workflow from
    - Encourage `%load_ext autoreload` and `%autoreload 2` when iterating inside notebooks so code edits propagate without restarting the kernel.
 2. **Prepare input data**
    - Download the PBMC3k filtered matrix from 10x Genomics (`pbmc3k_filtered_gene_bc_matrices.tar.gz`) and extract it under `data/filtered_gene_bc_matrices/hg19/`.
-   - Load the matrix via `sc.read_10x_mtx(..., var_names='gene_symbols', cache=True)` and keep a writable folder like `write/` for exports.
+   - Load the matrix via `ov.io.read_10x_mtx(..., var_names='gene_symbols')` and keep a writable folder like `write/` for exports.
 3. **Perform quality control (QC)**
    - Run `ov.pp.qc(adata, tresh={'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250}, doublets_method='scrublet')` for the CPU/CPU–GPU pipelines; omit `doublets_method` on pure GPU where Scrublet is not yet supported.
    - Review the returned AnnData summary to confirm doublet rates and QC thresholds; advise adjusting cut-offs for different species or sequencing depths.
@@ -51,7 +51,7 @@ Follow this skill when a user needs to reproduce the preprocessing workflow from
     - *CPU–GPU mixed (`t_preprocess_cpu.ipynb`)*: Highlights Omicverse ≥1.7.0 mixed acceleration. Include timing magics (%%time) to showcase speedups and call out `doublets_method='scrublet'` support.
     - *GPU (`t_preprocess_gpu.ipynb`)*: Requires a CUDA-capable GPU, RAPIDS 24.04 stack, and `rapids-singlecell`. Mention the `ov.pp.anndata_to_GPU`/`ov.pp.anndata_to_CPU` transfers and `method='cagra'` neighbours. Note the current warning that pure-GPU pipelines depend on RAPIDS updates.
 11. **Troubleshooting tips**
-    - If `sc.read_10x_mtx` fails, verify the extracted folder structure and ensure gene symbols are available via `var_names='gene_symbols'`.
+    - If `ov.io.read_10x_mtx` fails, verify the extracted folder structure and ensure gene symbols are available via `var_names='gene_symbols'`.
     - Address GPU import errors by confirming the conda environment matches the RAPIDS version for the installed CUDA driver (`nvidia-smi`).
     - For `ov.pp.preprocess` dimension mismatches, ensure QC filtered out empty barcodes so HVG selection does not encounter zero-variance features.
     - When embeddings lack expected fields (e.g., `scaled|original|X_pca` missing), re-run `ov.pp.scale` and `ov.pp.pca` to rebuild the cached layers.
