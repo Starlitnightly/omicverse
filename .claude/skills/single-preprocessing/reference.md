@@ -36,10 +36,9 @@ ov.plot_set(font_path='Arial')
 %load_ext autoreload
 %autoreload 2
 
-adata = sc.read_10x_mtx(
+adata = ov.io.read_10x_mtx(
     'data/filtered_gene_bc_matrices/hg19/',
     var_names='gene_symbols',
-    cache=True,
 )
 ov.utils.store_layers(adata, layers='counts')
 ```
