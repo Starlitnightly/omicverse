@@ -1,7 +1,7 @@
 ---
 name: omicverse-visualization-for-bulk-color-systems-and-single-cell-d
 title: OmicVerse visualization for bulk, color systems, and single-cell data
-description: Guide users through OmicVerse plotting utilities showcased in the bulk, color system, and single-cell visualization tutorials, including venn/volcano charts, palette selection, and advanced embedding layouts.
+description: "OmicVerse plotting: volcano, venn, boxplot, embedding, density, dotplot, convex hull, stacked bar, and Forbidden City color palettes."
 ---
 
 # OmicVerse visualization for bulk, color systems, and single-cell data
