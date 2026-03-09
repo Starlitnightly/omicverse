@@ -1,7 +1,7 @@
 ---
 name: bulk-wgcna-analysis-with-omicverse
 title: Bulk WGCNA analysis with omicverse
-description: Assist Claude in running PyWGCNA through omicverse—preprocessing expression matrices, constructing co-expression modules, visualising eigengenes, and extracting hub genes.
+description: "WGCNA co-expression network: soft-threshold, module detection, eigengenes, hub genes, and trait correlation in OmicVerse."
 ---
 
 # Bulk WGCNA analysis with omicverse
@@ -40,7 +40,16 @@ Activate this skill for users who want to reproduce the WGCNA workflow from [`t_
    - Plot module eigengene heatmaps and bar charts with `plotModuleEigenGene(module, metadata, show=True)` and `barplotModuleEigenGene(...)`.
 10. **Find hub genes**
     - Identify top hubs per module using `top_n_hub_genes(moduleName='lightgreen', n=10)`.
-11. **Troubleshooting tips**
+11. **Defensive validation**
+    ```python
+    # Before WGCNA: verify enough genes remain after MAD filtering
+    assert data.shape[0] >= 1000, f"Only {data.shape[0]} genes after filtering — WGCNA needs >1000 for meaningful modules"
+    # Verify expression values are numeric and non-negative
+    assert data.dtypes.apply(lambda d: d.kind in 'iuf').all(), "Expression matrix contains non-numeric columns"
+    # Verify enough samples for network construction
+    assert data.shape[1] >= 6, f"Only {data.shape[1]} samples — WGCNA needs >=6 samples for reliable co-expression"
+    ```
+12. **Troubleshooting tips**
     - Large datasets may require increasing `save=False` to avoid writing many intermediate files.
     - If module detection fails, confirm enough genes remain after MAD filtering and adjust `deepSplit` or `softPower`.
     - Ensure metadata categories have assigned colours before plotting eigengene heatmaps.

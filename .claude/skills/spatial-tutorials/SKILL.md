@@ -1,87 +1,215 @@
 ---
 name: spatial-transcriptomics-tutorials-with-omicverse
 title: Spatial transcriptomics tutorials with omicverse
-description: Guide users through omicverse's spatial transcriptomics tutorials covering preprocessing, deconvolution, and downstream modelling workflows across Visium, Visium HD, Stereo-seq, and Slide-seq datasets.
+description: "Spatial transcriptomics: Visium/HD, Stereo-seq, Slide-seq preprocessing (crop, rotate, cellpose), deconvolution (Tangram, cell2location, Starfysh), clustering (GraphST, STAGATE), integration, trajectory, communication."
 ---
 
-# Spatial transcriptomics tutorials with omicverse
+# Spatial Transcriptomics with OmicVerse
 
-## Overview
-Use this skill to navigate the spatial analysis tutorials located under [`Tutorials-space`](../../omicverse_guide/docs/Tutorials-space/). The notebooks span preprocessing utilities ([`t_crop_rotate.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_crop_rotate.ipynb), [`t_cellpose.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_cellpose.ipynb)), deconvolution frameworks ([`t_decov.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_decov.ipynb), [`t_starfysh.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_starfysh.ipynb)), and downstream spatial modelling or integration tasks ([`t_cluster_space.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_cluster_space.ipynb), [`t_staligner.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_staligner.ipynb), [`t_spaceflow.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_spaceflow.ipynb), [`t_commot_flowsig.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_commot_flowsig.ipynb), [`t_gaston.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_gaston.ipynb), [`t_slat.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_slat.ipynb), [`t_stt.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_stt.ipynb)). Follow the staged instructions below to match the "Preprocess", "Deconvolution", and "Downstream" groupings presented in the notebooks.
+This skill covers spatial analysis workflows organized into three stages: Preprocessing, Deconvolution, and Downstream Analysis. Each stage includes the critical function calls, parameter guidance, and common pitfalls.
 
-## Instructions
-### Preprocess
-1. **Load spatial slides and manipulate coordinates**
-   - Import `omicverse as ov`, `scanpy as sc`, and enable plotting defaults with `ov.plot_set()` or `ov.plot_set(font_path='Arial')`. [`t_crop_rotate.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_crop_rotate.ipynb)
-   - Fetch public Visium data via `sc.datasets.visium_sge(...)`, inspect `adata.obsm['spatial']`, and respect `uns['spatial'][library_id]['scalefactors']` when rescaling coordinates for high-resolution overlays.
-   - Apply region selection and alignment helpers: `ov.space.crop_space_visium(...)` for bounding-box crops, `ov.space.rotate_space_visium(...)` followed by `ov.space.map_spatial_auto(..., method='phase')`, and refine offsets with `ov.space.map_spatial_manual(...)` before plotting using `sc.pl.embedding(..., basis='spatial')`.
-2. **Segment Visium HD tiles into cells**
-   - Organise Visium HD outputs (binned parquet counts, `.btf` histology) and load them through `ov.space.read_visium_10x(path, source_image_path=...)`. [`t_cellpose.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_cellpose.ipynb)
-   - Filter sparse bins (`ov.pp.filter_genes(..., min_cells=3)` and `ov.pp.filter_cells(..., min_counts=1)`) prior to segmentation.
-   - Run nucleus/cell segmentation variants: `ov.space.visium_10x_hd_cellpose_he(...)` for H&E, `ov.space.visium_10x_hd_cellpose_expand(...)` to grow labels across neighbouring bins, and `ov.space.visium_10x_hd_cellpose_gex(...)` for gene-expression driven seeds. Harmonise labels with `ov.space.salvage_secondary_labels(...)` and aggregate to cell-level AnnData using `ov.space.bin2cell(..., labels_key='labels_joint')`.
-3. **Initial QC for downstream tasks**
-   - For Visium/DLPFC re-analyses, compute QC metrics (`sc.pp.calculate_qc_metrics(adata, inplace=True)`) and persist intermediate AnnData snapshots (`adata.write('data/cluster_svg.h5ad', compression='gzip')`) for reuse across tutorials. [`t_cluster_space.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_cluster_space.ipynb)
+## Defensive Validation: Always Check Spatial Coordinates First
 
-### Deconvolution
-4. **Configure single-cell references and spatial targets**
-   - Load scRNA-seq references (`adata_sc = ov.read('data/sc.h5ad')`) with harmonised gene IDs and spatial slides (`adata_sp = sc.datasets.visium_sge(...)`). [`t_decov.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_decov.ipynb)
-   - Instantiate the unified wrapper `ov.space.Deconvolution(...)`, passing shared keys like `celltype_key`, `adata_sc`, and `adata_sp`.
-5. **Execute Tangram and cell2location pipelines**
-   - Call `decov_obj.preprocess_sc(...)` / `decov_obj.preprocess_sp(...)` to align matrices, then run `decov_obj.deconvolution(method='tangram', ...)` and persist outputs with `ov.utils.save(...)` plus `.write(...)` hooks for AnnData members.
-   - For cell2location, reinitialise `ov.space.Deconvolution(..., method='cell2location')`, train (`decov_obj.deconvolution(max_epochs=...)`), monitor via `decov_obj.mod_sc.plot_history(...)`, and store models (`decov_obj.save_model(...)`).
-   - Visualise inferred proportions using `ov.space.plot_cell2location(...)`, `sc.pl.spatial(..., color=list_of_celltypes)`, and ROI-focused pie charts after cropping (`ov.space.crop_space_visium(...)`).
-6. **Run Starfysh archetypal deconvolution**
-   - Import Starfysh utilities (`from omicverse.external.starfysh import AA, utils, plot_utils, post_analysis`) and prepare expression counts plus optional signature sets. [`t_starfysh.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_starfysh.ipynb)
-   - Identify anchor spots with `utils.prepare_data(...)`, optionally infer archetypes via `AA.ArchetypalAnalysis(...)`, and refine signatures using `utils.refine_anchors(...)`.
-   - Train Starfysh models (`utils.run_starfysh(poe=False, ...)` or `poe=True` with histology) across multiple restarts, then parse outputs through `post_analysis.load_model(...)`, `plot_utils.pl_spatial_inf_feature(...)`, and `cell2proportion(...)` for per-cell-type maps.
+Before ANY spatial operation, verify that spatial coordinates exist and are numeric:
 
-### Downstream
-7. **Spatial clustering and denoising**
-   - Generate embeddings using omicverse wrappers: `ov.utils.cluster(..., use_rep='graphst|original|X_pca', method='mclust')`, `ov.space.merge_cluster(...)`, and evaluate ARI (`adjusted_rand_score(...)`). [`t_cluster_space.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_cluster_space.ipynb)
-   - Explore algorithm-specific toggles: GraphST/BINARY require precalculated latent spaces, STAGATE training (`ov.utils.cluster(..., use_rep='STAGATE', ...)`), and CAST for multi-slice single-cell resolution data.
-8. **Integrate multi-slice datasets**
-   - Concatenate Stereo-seq/Slide-seqV2 batches (`ad.concat(Batch_list, label='slice_name', keys=section_ids)`) and initialise `ov.space.pySTAligner(...)`. [`t_staligner.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_staligner.ipynb)
-   - Train with `STAligner_obj.train_STAligner_subgraph(...)`, call `STAligner_obj.train()`, and retrieve latent embeddings via `STAligner_obj.predicted()` before clustering (`sc.pp.neighbors(..., use_rep='STAligner')`, `ov.utils.cluster(...)`).
-9. **Model spatial gradients and trajectories**
-   - For pseudo-spatial maps, build `sf_obj = ov.space.pySpaceFlow(adata)` and train using `sf_obj.train(spatial_regularization_strength=0.1, ...)`, then compute `sf_obj.cal_pSM(...)` to populate `adata.obs['pSM_spaceflow']`. [`t_spaceflow.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_spaceflow.ipynb)
-   - Analyse transition dynamics with `STT_obj = ov.space.STT(adata, spatial_loc='xy_loc', region='Region')`, followed by `STT_obj.train(...)`, `STT_obj.stage_estimate()`, and downstream visualisations (`STT_obj.plot_pathway(...)`, `STT_obj.infer_lineage(...)`). [`t_stt.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_stt.ipynb)
-10. **Infer communication and flow networks**
-    - Pull ligand–receptor resources via `ov.external.commot.pp.ligand_receptor_database(species='human')`, filter with `filter_lr_database(...)`, and compute signaling using `ov.external.commot.tl.spatial_communication(...)`. [`t_commot_flowsig.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_commot_flowsig.ipynb)
-    - Construct FlowSig inputs (`adata.layers['normalized'] = adata.X.copy()`, `ov.external.flowsig.tl.construct_intercellular_flow_network(...)`), retain spatially informative modules (Moran’s I filtering), and validate edges through bootstrapping thresholds (`edge_threshold = 0.7`).
-11. **Extract structural layers and align developmental slices**
-    - Train GASTON with `gas_obj = ov.space.GASTON(adata)`, rescale GLM-PC matrices via `gas_obj.load_rescale(A)`, and infer iso-depths using `gas_obj.cal_iso_depth(n_layers)`. Visualise with `gas_obj.plot_isodepth(...)`, `gas_obj.plot_clusters_restrict(...)`, and probe continuous/discontinuous gene lists (`gas_obj.cont_genes_layer`). [`t_gaston.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_gaston.ipynb)
-    - For SLAT, construct spatial graphs (`Cal_Spatial_Net(adata1, k_cutoff=20)`), run alignment (`run_SLAT(...)`, `spatial_match(...)`), and examine correspondences through Sankey diagrams (`Sankey_multi(...)`) and lineage-focused subsetting (`cal_matching_cell(...)`). [`t_slat.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_slat.ipynb)
+```python
+# Required check before spatial analysis
+assert 'spatial' in adata.obsm, \
+    "Missing adata.obsm['spatial']. Load with ov.io.spatial.read_visium() or set manually."
+# Cast to float64 to prevent coordinate precision issues during rotation/cropping
+adata.obsm['spatial'] = adata.obsm['spatial'].astype('float64')
+```
 
-## Dependencies
-- Core: `omicverse`, `scanpy`, `anndata`, `numpy`, `matplotlib`, `squidpy` (deconvolution + QC), `networkx` (FlowSig graphs).
-- Segmentation: `cellpose`, `stardist`, `opencv-python`/`tifffile`, optional GPU-enabled PyTorch for acceleration. [`t_cellpose.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_cellpose.ipynb)
-- Deconvolution: `tangram`, `cell2location`, `pytorch-lightning`, `pandas`, `h5py`, plus optional GPU/CUDA stacks; Starfysh additionally needs `torch`, `scikit-learn`, and curated signature CSVs. [`t_decov.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_decov.ipynb), [`t_starfysh.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_starfysh.ipynb)
-- Downstream modelling: `scikit-learn` (clustering, KMeans, ARI), `gseapy==1.0.4` for STT enrichment, `commot`, `flowsig`, `torch`-backed modules (STAligner, SpaceFlow, GASTON, SLAT), plus HTML exporters (Plotly) for Sankey plots.
+## Stage 1: Preprocessing
 
-## Critical functions and artefacts to surface quickly
-- Spatial preprocessing: `ov.space.crop_space_visium`, `ov.space.rotate_space_visium`, `ov.space.map_spatial_auto`, `ov.space.map_spatial_manual`, `ov.space.bin2cell`.
-- Deconvolution containers: `ov.space.Deconvolution.preprocess_sc`, `.preprocess_sp`, `.deconvolution`, `.adata_cell2location`, `.adata_impute`.
-- Archetypal/Starfysh: `AA.ArchetypalAnalysis`, `utils.refine_anchors`, `utils.run_starfysh`, `plot_utils.pl_spatial_inf_feature`.
-- Clustering/integration: `ov.utils.cluster`, `ov.space.merge_cluster`, `ov.space.pySTAligner`, `ov.space.pySpaceFlow`, `ov.space.STT`, `ov.space.GASTON`, `Cal_Spatial_Net`, `run_SLAT`, `Sankey_multi`.
-- Communication: `ov.external.commot.pp.ligand_receptor_database`, `ov.external.commot.tl.spatial_communication`, `ov.external.flowsig.tl.construct_intercellular_flow_network`.
+### Crop, Rotate, and Align Coordinates
+
+Load Visium data and manipulate spatial coordinates for region selection and alignment:
+
+```python
+import scanpy as sc, omicverse as ov
+ov.plot_set()
+
+adata = sc.datasets.visium_sge(sample_id="V1_Breast_Cancer_Block_A_Section_1")
+library_id = list(adata.uns['spatial'].keys())[0]
+
+# Cast coordinates before manipulation
+adata.obsm['spatial'] = adata.obsm['spatial'].astype('float64')
+
+# Crop to region of interest
+adata_crop = ov.space.crop_space_visium(adata, crop_loc=(0, 0), crop_area=(1000, 1000),
+                                         library_id=library_id, scale=1)
+
+# Rotate and auto-align
+adata_rot = ov.space.rotate_space_visium(adata, angle=45, library_id=library_id)
+ov.space.map_spatial_auto(adata_rot, method='phase')
+# For manual refinement: ov.space.map_spatial_manual(adata_rot, ...)
+```
+
+### Visium HD Cell Segmentation
+
+Segment Visium HD bins into cells using cellpose:
+
+```python
+adata = ov.space.read_visium_10x(path="binned_outputs/square_002um/",
+                                  source_image_path="tissue_image.btf")
+ov.pp.filter_genes(adata, min_cells=3)
+ov.pp.filter_cells(adata, min_counts=1)
+
+# H&E-based segmentation
+adata = ov.space.visium_10x_hd_cellpose_he(adata, mpp=0.3, gpu=True, buffer=150)
+# Expand labels to neighboring bins
+ov.space.visium_10x_hd_cellpose_expand(adata, labels_key='labels_he',
+                                        expanded_labels_key='labels_he_expanded', max_bin_distance=4)
+# Gene-expression-driven seeds
+ov.space.visium_10x_hd_cellpose_gex(adata, obs_key="n_counts_adjusted", mpp=0.3, sigma=5)
+# Merge labels and aggregate to cell-level
+ov.space.salvage_secondary_labels(adata, primary_label='labels_he_expanded',
+                                   secondary_label='labels_gex', labels_key='labels_joint')
+cdata = ov.space.bin2cell(adata, labels_key='labels_joint')
+```
+
+## Stage 2: Deconvolution
+
+### Critical API Reference: Method Selection
+
+```python
+# CORRECT — Tangram: method passed to deconvolution() call
+decov_obj = ov.space.Deconvolution(adata_sc=sc_adata, adata_sp=sp_adata,
+                                    celltype_key='Subset', result_dir='result/tangram')
+decov_obj.preprocess_sc(max_cells=5000)
+decov_obj.preprocess_sp()
+decov_obj.deconvolution(method='tangram', num_epochs=1000)
+
+# CORRECT — cell2location: method passed at INIT time
+cell2_obj = ov.space.Deconvolution(adata_sc=sc_adata, adata_sp=sp_adata,
+                                    celltype_key='Subset', result_dir='result/c2l',
+                                    method='cell2location')
+cell2_obj.deconvolution(max_epochs=30000)
+cell2_obj.save_model('result/c2l/model')
+```
+
+Note: For cell2location, the `method` parameter is set at initialization, not at the `deconvolution()` call. For Tangram, it's passed to `deconvolution()`.
+
+### Starfysh Archetypal Deconvolution
+
+```python
+from omicverse.external.starfysh import AA, utils, plot_utils
+
+visium_args = utils.prepare_data(adata_path="data/counts.h5ad",
+                                  signature_path="data/signatures.csv",
+                                  min_cells=10, filter_hvg=True, n_top_genes=3000)
+adata, adata_normed = visium_args.get_adata()
+aa_model = AA.ArchetypalAnalysis(adata_orig=adata_normed)
+aa_model.fit(k=12, n_init=10)
+visium_args = utils.refine_anchors(visium_args, aa_model, add_marker=True)
+model, history = utils.run_starfysh(visium_args, poe=False, n_repeat=5, lr=5e-3, max_epochs=500)
+```
+
+## Stage 3: Downstream Analysis
+
+### Spatial Clustering
+
+```python
+# GraphST + mclust
+ov.utils.cluster(adata, use_rep='graphst|original|X_pca', method='mclust', n_components=7)
+
+# STAGATE
+ov.utils.cluster(adata, use_rep='STAGATE', method='mclust', n_components=7)
+
+# Merge small clusters
+ov.space.merge_cluster(adata, groupby='mclust', resolution=0.5)
+```
+
+Algorithm choice: GraphST and STAGATE require precalculated latent spaces. For standard clustering without spatial-aware embeddings, use Leiden/Louvain directly.
+
+### Multi-Slice Integration (STAligner)
+
+```python
+import anndata as ad
+Batch_list = [ov.read(p) for p in slice_paths]
+adata_concat = ad.concat(Batch_list, label='slice_name', keys=section_ids)
+STAligner_obj = ov.space.pySTAligner(adata=adata_concat, batch_key='slice_name',
+                                      hidden_dims=[256, 64], use_gpu=True)
+STAligner_obj.train_STAligner_subgraph(nepochs=800, lr=1e-3)
+STAligner_obj.train()
+adata_aligned = STAligner_obj.predicted()
+sc.pp.neighbors(adata_aligned, use_rep='STAligner')
+```
+
+### Spatial Trajectories
+
+**SpaceFlow** — pseudo-spatial maps:
+```python
+sf_obj = ov.space.pySpaceFlow(adata)
+sf_obj.train(spatial_regularization_strength=0.1, num_epochs=300, patience=50)
+sf_obj.cal_pSM(n_neighbors=20, resolution=1.0)
+```
+
+**STT** — transition dynamics:
+```python
+STT_obj = ov.space.STT(adata, spatial_loc='xy_loc', region='Region', n_neighbors=20)
+STT_obj.stage_estimate()
+STT_obj.train(n_states=9, n_iter=15, weight_connectivities=0.5)
+```
+
+### Cell Communication (COMMOT + FlowSig)
+
+```python
+df_cellchat = ov.external.commot.pp.ligand_receptor_database(species='human', database='cellchat')
+df_cellchat = ov.external.commot.pp.filter_lr_database(df_cellchat, adata, min_expr_frac=0.05)
+ov.external.commot.tl.spatial_communication(adata, lr_database=df_cellchat,
+                                              distance_threshold=500, result_prefix='cellchat')
+# FlowSig network
+adata.layers['normalized'] = adata.X.copy()
+ov.external.flowsig.tl.construct_intercellular_flow_network(
+    adata, commot_output_key='commot-cellchat',
+    flowsig_output_key='flowsig-cellchat', edge_threshold=0.7)
+```
+
+### Structural Layers (GASTON) and Slice Alignment (SLAT)
+
+**GASTON** — iso-depth estimation:
+```python
+gas_obj = ov.space.GASTON(adata)
+A = gas_obj.prepare_inputs(n_pcs=50)
+gas_obj.load_rescale(A)
+gas_obj.train(hidden_dims=[64, 32], dropout=0.1, max_epochs=2000)
+gaston_isodepth, gaston_labels = gas_obj.cal_iso_depth(n_layers=5)
+```
+
+**SLAT** — cross-slice alignment:
+```python
+from omicverse.external.scSLAT.model import Cal_Spatial_Net, load_anndatas, run_SLAT, spatial_match
+Cal_Spatial_Net(adata1, k_cutoff=20, model='KNN')
+Cal_Spatial_Net(adata2, k_cutoff=20, model='KNN')
+edges, features = load_anndatas([adata1, adata2], feature='DPCA', check_order=False)
+embeddings, *_ = run_SLAT(features, edges, LGCN_layer=5)
+best, index, distance = spatial_match(embeddings, adatas=[adata1, adata2])
+```
 
 ## Troubleshooting
-- **Coordinate mismatches after rotation/cropping**: ensure scalefactors are applied when plotting and cast `adata.obsm['spatial']` to `float64` before running `map_spatial_auto`. [`t_crop_rotate.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_crop_rotate.ipynb)
-- **Cellpose runtime errors**: verify `.btf` image paths, memory-map large TIFFs via `backend='tifffile'`, and adjust `mpp` plus `buffer` for dense tissues; GPU runs require matching CUDA/PyTorch builds. [`t_cellpose.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_cellpose.ipynb)
-- **Gene ID overlap failures in Tangram/cell2location**: harmonise identifiers (ENSEMBL vs gene symbols) and drop non-overlapping genes before `decov_obj.preprocess_*`. [`t_decov.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_decov.ipynb)
-- **mclust errors in spatial clustering**: install `rpy2` and the R `mclust` package, or switch to the pure Python `method='mclust'` fallback when R bindings are unavailable. [`t_cluster_space.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_cluster_space.ipynb)
-- **STAligner/SpaceFlow convergence**: confirm `adata.obsm['spatial']` exists and scale coordinates; tune learning rates/regularisation strength when embeddings collapse to a point. [`t_staligner.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_staligner.ipynb), [`t_spaceflow.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_spaceflow.ipynb)
-- **FlowSig network sparsity**: build spatial graphs prior to Moran’s I filtering and raise `edge_threshold` or increase bootstraps to stabilise edges. [`t_commot_flowsig.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_commot_flowsig.ipynb)
-- **STT pathway downloads**: `gseapy` lookups need network access; cache gene sets locally and reuse via `ov.utils.geneset_prepare(...)` to avoid repeated requests. [`t_stt.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_stt.ipynb)
-- **GASTON output directories**: provide writable `out_dir` paths and account for PyTorch nondeterminism when comparing replicate runs. [`t_gaston.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_gaston.ipynb)
-- **SLAT alignment quality**: regenerate spatial graphs with appropriate `k_cutoff` and inspect `low_quality_index` flags before trusting downstream lineage analyses. [`t_slat.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_slat.ipynb)
+
+- **`ValueError: spatial coordinates out of bounds` after rotation**: Cast `adata.obsm['spatial']` to `float64` BEFORE calling `rotate_space_visium`. Integer coordinates lose precision during trigonometric rotation.
+- **Cellpose segmentation fails with memory error**: For large `.btf` images, use `backend='tifffile'` to memory-map the image. Reduce `buffer` parameter if GPU memory is insufficient.
+- **Gene ID overlap failure in Tangram/cell2location**: Harmonise identifiers (ENSEMBL vs gene symbols) between `adata_sc` and `adata_sp` before calling `preprocess_sc`/`preprocess_sp`. Drop non-overlapping genes.
+- **`mclust` clustering error**: Requires `rpy2` and the R `mclust` package. If R bindings are unavailable, switch to `method='louvain'` or `method='leiden'`.
+- **STAligner/SpaceFlow embeddings collapse to a single point**: Verify `adata.obsm['spatial']` exists and coordinates are scaled appropriately. Tune learning rate (try `lr=5e-4`) and regularisation strength.
+- **FlowSig returns empty network**: Build spatial neighbor graphs before Moran's I filtering. Increase bootstraps or lower `edge_threshold` (try 0.5) if the network is too sparse.
+- **GASTON `RuntimeError` in training**: Provide a writable `out_dir` path. PyTorch nondeterminism may cause variation between runs—set `torch.manual_seed()` for reproducibility.
+- **SLAT alignment has many low-quality matches**: Regenerate spatial graphs with a higher `k_cutoff` value. Inspect `low_quality_index` flags and filter cells with high distance scores.
+- **STT pathway enrichment fails**: `gseapy` needs network access for gene set downloads. Cache gene sets locally with `ov.utils.geneset_prepare()` and pass the dictionary directly.
+
+## Dependencies
+- Core: `omicverse`, `scanpy`, `anndata`, `squidpy`, `numpy`, `matplotlib`
+- Segmentation: `cellpose`, `opencv-python`/`tifffile`, optional GPU PyTorch
+- Deconvolution: `tangram-sc`, `cell2location`, `pytorch-lightning`; Starfysh needs `torch`, `scikit-learn`
+- Downstream: `scikit-learn`, `commot`, `flowsig`, `gseapy`, torch-backed modules (STAligner, SpaceFlow, GASTON, SLAT)
 
 ## Examples
-- "Crop, rotate, and manually re-align Visium coordinates before running Visium HD cell segmentation, then aggregate bins into cell-level AnnData."
-- "Execute Tangram and cell2location through `ov.space.Deconvolution`, save trained models, and plot lymph node cell-type proportions."
-- "Train STAligner and SpaceFlow on DLPFC slices, infer communication networks with COMMOT+FlowSig, and visualise iso-depth layers via GASTON."
+- "Crop and rotate my Visium slide, then run cellpose segmentation on the HD data and aggregate to cell-level AnnData."
+- "Deconvolve my lymph node spatial data with Tangram and cell2location, compare proportions, and plot cell-type maps."
+- "Integrate three DLPFC slices with STAligner, cluster with STAGATE, and infer communication with COMMOT+FlowSig."
 
 ## References
-- Tutorials: [`Tutorials-space/`](../../omicverse_guide/docs/Tutorials-space/)
-- Notebook index: [`t_crop_rotate.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_crop_rotate.ipynb), [`t_cellpose.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_cellpose.ipynb), [`t_cluster_space.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_cluster_space.ipynb), [`t_decov.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_decov.ipynb), [`t_starfysh.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_starfysh.ipynb), [`t_staligner.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_staligner.ipynb), [`t_spaceflow.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_spaceflow.ipynb), [`t_commot_flowsig.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_commot_flowsig.ipynb), [`t_gaston.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_gaston.ipynb), [`t_slat.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_slat.ipynb), [`t_stt.ipynb`](../../omicverse_guide/docs/Tutorials-space/t_stt.ipynb)
 - Quick copy/paste commands: [`reference.md`](reference.md)

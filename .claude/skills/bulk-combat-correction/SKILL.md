@@ -1,7 +1,7 @@
 ---
 name: bulk-rna-seq-batch-correction-with-combat
 title: Bulk RNA-seq batch correction with ComBat
-description: Use omicverse's pyComBat wrapper to remove batch effects from merged bulk RNA-seq or microarray cohorts, export corrected matrices, and benchmark pre/post correction visualisations.
+description: "Bulk RNA-seq batch correction with pyComBat: remove batch effects from merged cohorts, export corrected matrices, and benchmark visualizations."
 ---
 
 # Bulk RNA-seq batch correction with ComBat
@@ -37,7 +37,17 @@ n_color` palettes to match batches.
    - Run `ov.pp.pca(adata, layer='raw', n_pcs=50)` and `ov.pp.pca(adata, layer='batch_correction', n_pcs=50)`.
    - Visualise embeddings with `ov.utils.embedding(..., basis='raw|original|X_pca', color='batch', frameon='small')` and repeat fo
 r the corrected layer to verify mixing.
-7. **Troubleshooting tips**
+7. **Defensive validation**
+   ```python
+   # Before ComBat: verify batch column exists and has >1 batch
+   assert 'batch' in adata.obs.columns, "adata.obs must contain a 'batch' column"
+   n_batches = adata.obs['batch'].nunique()
+   assert n_batches > 1, f"Only {n_batches} batch — need >1 for batch correction"
+   # Verify gene overlap after concatenation
+   if adata.n_vars < 100:
+       print(f"WARNING: Only {adata.n_vars} shared genes after concat — check gene ID harmonization")
+   ```
+8. **Troubleshooting tips**
    - Mismatched gene identifiers cause dropped features—remind users to harmonise feature names (e.g., gene symbols) before conca
 tenation.
    - pyComBat expects log-scale intensities or similarly distributed counts; recommend log-transforming strongly skewed matrices.

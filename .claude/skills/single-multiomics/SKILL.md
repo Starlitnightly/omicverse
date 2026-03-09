@@ -1,44 +1,165 @@
 ---
 name: single-cell-multi-omics-integration
 title: Single-cell multi-omics integration
-description: Quick-reference sheet for OmicVerse tutorials spanning MOFA, GLUE pairing, SIMBA integration, TOSICA transfer, and StaVIA cartography.
+description: "Multi-omics integration: MOFA factor analysis, GLUE unpaired alignment, SIMBA batch correction, TOSICA label transfer, StaVIA trajectory. Covers scRNA+scATAC paired/unpaired workflows."
 ---
 
-# Single-Cell Multi-Omics Tutorials Cheat Sheet
+# Single-Cell Multi-Omics Integration
 
-This skill walk-through summarizes the OmicVerse notebooks that cover paired and unpaired multi-omic integration, multi-batch embedding, reference transfer, and trajectory cartography.
+This skill covers OmicVerse's multi-omics integration tools for combining scRNA-seq, scATAC-seq, and other modalities. Each method addresses a different scenario—choose based on your data structure and analysis goal.
 
-## MOFA on paired scRNA + scATAC (`t_mofa.ipynb`)
-- **Data preparation:** Load preprocessed AnnData objects for RNA (`rna_p_n_raw.h5ad`) and ATAC (`atac_p_n_raw.h5ad`) with `ov.utils.read`, and initialise `pyMOFA` with matching `omics` and `omics_name` lists.
-- **Model training:** Call `mofa_preprocess()` to select highly variable features and run the factor model with `mofa_run(outfile=...)`, which exports the learned MOFA+ factors to an HDF5 model file.
-- **Result inspection:** Reload downstream AnnData, append factor scores via `ov.single.factor_exact`, and explore factor–cluster associations using `factor_correlation`, `get_weights`, and the plotting helpers in `pyMOFAART` (`plot_r2`, `plot_cor`, `plot_factor`, `plot_weights`, etc.).
-- **Export workflow:** Persist factors and weights through the MOFA HDF5 artifact and reuse them by instantiating `pyMOFAART(model_path=...)` for later annotation or visualisation sessions.
-- **Dependencies & hardware:** Requires `mofapy2`; plots optionally rely on `pymde`/`scvi-tools` but run on CPU.
+## Method Selection Guide
 
-## MOFA after GLUE pairing (`t_mofa_glue.ipynb`)
-- **Data preparation:** Start from GLUE-derived embeddings (`rna-emb.h5ad`, `atac.emb.h5ad`), build a `GLUE_pair` object, and run `correlation()` to align unpaired cells before subsetting to highly variable features.
-- **Model training:** Instantiate `pyMOFA` with the aligned AnnData objects, run `mofa_preprocess()`, and save the joint factors through `mofa_run(outfile='models/chen_rna_atac.hdf5')`.
-- **Result inspection:** Use `pyMOFAART` plus AnnData that now contains the GLUE embeddings to compute factors (`get_factors`) and visualise variance explained, factor–cluster correlations, and ranked feature weights.
-- **Export workflow:** Reuse the saved MOFA HDF5 model for downstream inspection; GLUE embeddings can be embedded with `scvi.model.utils.mde` (GPU-accelerated MDE is optional, `sc.tl.umap` works on CPU).
-- **Dependencies & hardware:** Requires both `mofapy2` and the GLUE tooling (`scglue`, `scvi-tools`, `pymde`); GPU acceleration only affects optional MDE visualisation.
+Pick the right tool before writing any code:
 
-## SIMBA batch integration (`t_simba.ipynb`)
-- **Data preparation:** Fetch the concatenated AnnData (`simba_adata_raw.h5ad`) derived from multiple pancreas studies and pass it, alongside a results directory, to `pySIMBA`.
-- **Model training:** Execute `preprocess(...)` to bin features and build a SIMBA-compatible graph, then call `gen_graph()` followed by `train(num_workers=...)` to launch PyTorch-BigGraph optimisation (can scale with CPU workers) and `load(...)` to resume trained checkpoints.
-- **Result inspection:** Apply `batch_correction()` to obtain the harmonised AnnData with SIMBA embeddings (`X_simba`) and visualise using `mde`/`sc.tl.umap` coloured by cell type or batch.
-- **Export workflow:** Training outputs reside in the workdir (e.g., `result_human_pancreas/pbg/graph0`); reuse them with `simba_object.load(...)` for later analyses.
-- **Dependencies & hardware:** Requires installing `simba` and `simba_pbg` (PyTorch BigGraph backend). GPU is optional; make sure adequate CPU threads and memory are available for graph training.
+| Scenario | Method | Key Class |
+|----------|--------|-----------|
+| Paired RNA + ATAC from same cells | MOFA directly | `ov.single.pyMOFA` |
+| Unpaired RNA + ATAC (different experiments) | GLUE pairing → MOFA | `ov.single.GLUE_pair` → `pyMOFA` |
+| Multi-batch single-modality integration | SIMBA | `ov.single.pySIMBA` |
+| Transfer labels from annotated reference | TOSICA | `ov.single.pyTOSICA` |
+| Trajectory on preprocessed multi-omic data | StaVIA | `VIA.core.VIA` |
 
-## TOSICA reference transfer (`t_tosica.ipynb`)
-- **Data preparation:** Download demo AnnData references (`demo_train.h5ad`, `demo_test.h5ad`) and required gene-set GMT files via `ov.utils.download_tosica_gmt()`; confirm datasets are log-normalised before training.
-- **Model training:** Create `pyTOSICA` with the reference AnnData, chosen pathway mask, label key, project directory, and batch size; train with `train(epochs=...)`, then persist weights with `save()` and optionally reload via `load()`.
-- **Result inspection:** Generate predictions on query AnnData through `predicted(pre_adata=...)`, embed with OmicVerse preprocessing and GPU-enabled `mde` (UMAP fallback available), and explore pathway attention to interpret transformer heads.
-- **Export workflow:** Saved project folder keeps model checkpoints and attention summaries; reuse the exported assets to annotate future datasets without retraining from scratch.
-- **Dependencies & hardware:** Needs TOSICA (PyTorch transformer) plus downloaded gene-set masks; avoid setting `depth=2` if memory is constrained. GPU acceleration improves embedding (`mde`) but training runs on standard PyTorch (CPU/GPU depending on environment).
+## Instructions
 
-## StaVIA trajectory cartography (`t_stavia.ipynb`)
-- **Data preparation:** Load example dentate gyrus velocity data via `scvelo.datasets.dentategyrus()`, preprocess with OmicVerse (`preprocess`, `scale`, `pca`, neighbours, UMAP) to populate the AnnData matrices used by VIA.
-- **Model training:** Configure VIA hyperparameters (components, neighbours, seeds, root selection) and instantiate/run `VIA.core.VIA` on the chosen representation (`adata.obsm['scaled|original|X_pca']`).
-- **Result inspection:** Store outputs such as pseudotime (`single_cell_pt_markov`), cluster graph abstractions, trajectory curves, atlas views, and stream plots through VIA plotting helpers.
-- **Export workflow:** Persist derived visualisations and animations (e.g., `animate_streamplot_ov`, `animate_atlas`) to files (`.gif`) for reporting; recompute edge bundles via `make_edgebundle_milestone` when needed.
-- **Dependencies & hardware:** Relies on `scvelo`, `pyVIA`, and OmicVerse plotting; computations are CPU-bound though producing large stream/animation outputs benefits from ample memory.
+### 1. MOFA on paired multi-omics
+
+Use MOFA when you have paired measurements (RNA + ATAC from the same cells). MOFA learns shared and modality-specific factors that explain variance across omics layers.
+
+1. Load each modality as a **separate AnnData** object
+2. Initialise `pyMOFA` with matching `omics` and `omics_name` lists
+3. Run `mofa_preprocess()` to select HVGs, then `mofa_run(outfile=...)` to train
+4. Inspect factors with `pyMOFAART(model_path=...)` for correlation, weights, and variance plots
+5. Dependencies: `mofapy2`; CPU-only
+
+### 2. GLUE pairing then MOFA
+
+Use GLUE when RNA and ATAC come from different experiments (unpaired). GLUE aligns cells across modalities by learning a shared embedding, then MOFA identifies joint factors.
+
+1. Start from GLUE-derived embeddings (`.h5ad` files with embeddings in `.obsm`)
+2. Build `GLUE_pair` and call `correlation()` to match unpaired cells
+3. Subset to HVGs and run MOFA as in the paired workflow
+4. Dependencies: `mofapy2`, `scglue`, `scvi-tools`; GPU optional for MDE embedding
+
+### 3. SIMBA batch integration
+
+Use SIMBA for multi-batch single-modality data (e.g., multiple pancreas studies). SIMBA builds a graph from binned features and learns batch-corrected embeddings via PyTorch-BigGraph.
+
+1. Load concatenated AnnData with a `batch` column in `.obs`
+2. Initialise `pySIMBA(adata, workdir)` and run the preprocessing pipeline
+3. Call `gen_graph()` then `train(num_workers=...)` to learn embeddings
+4. Apply `batch_correction()` to get harmonised AnnData with `X_simba`
+5. Dependencies: `simba`, `simba_pbg`; GPU optional, needs adequate CPU threads
+
+### 4. TOSICA reference transfer
+
+Use TOSICA to transfer cell-type labels from a well-annotated reference to a query dataset. TOSICA uses a pathway-masked transformer that also provides attention-based interpretability.
+
+1. Download gene-set GMT files with `ov.utils.download_tosica_gmt()`
+2. Initialise `pyTOSICA` with reference AnnData, GMT path, label key, and project path
+3. Train with `train(epochs=...)`, save, then predict on query data
+4. Dependencies: TOSICA (PyTorch transformer); `depth=1` recommended (depth=2 doubles memory)
+
+### 5. StaVIA trajectory cartography
+
+Use StaVIA/VIA for trajectory inference on preprocessed data with velocity information. VIA computes pseudotime, cluster graphs, and stream plots.
+
+1. Preprocess with OmicVerse (HVGs, scale, PCA, neighbors, UMAP)
+2. Configure VIA with root selection, components, neighbors, and resolution
+3. Run `v0.run_VIA()` and extract pseudotime from `single_cell_pt_markov`
+4. Dependencies: `scvelo`, `pyVIA`; CPU-bound
+
+## Critical API Reference
+
+### MOFA: `omics` must be a list of separate AnnData objects
+
+```python
+# CORRECT — each modality is a separate AnnData
+mofa = ov.single.pyMOFA(omics=[rna_adata, atac_adata], omics_name=['RNA', 'ATAC'])
+
+# WRONG — do NOT pass a single concatenated AnnData
+# mofa = ov.single.pyMOFA(omics=combined_adata, omics_name=['RNA', 'ATAC'])  # TypeError!
+```
+
+The `omics` list and `omics_name` list must have the same length. Each AnnData should contain cells from the same experiment (paired measurements).
+
+### SIMBA: `preprocess()` must run before `gen_graph()`
+
+```python
+# CORRECT — preprocess first, then build graph
+simba = ov.single.pySIMBA(adata, workdir)
+simba.preprocess(batch_key='batch', min_n_cells=3, method='lib_size', n_top_genes=3000, n_bins=5)
+simba.gen_graph()
+simba.train(num_workers=6)
+
+# WRONG — skipping preprocess causes gen_graph to fail
+# simba.gen_graph()  # KeyError: missing binned features
+```
+
+### TOSICA: `gmt_path` must be an actual file path
+
+```python
+# CORRECT — download GMT files first, then pass the file path
+ov.utils.download_tosica_gmt()
+tosica = ov.single.pyTOSICA(adata=ref, gmt_path='genesets/GO_bp.gmt', ...)
+
+# WRONG — passing a database name string instead of file path
+# tosica = ov.single.pyTOSICA(adata=ref, gmt_path='GO_Biological_Process', ...)  # FileNotFoundError!
+```
+
+### MOFA HDF5: `outfile` directory must exist
+
+```python
+import os
+os.makedirs('models', exist_ok=True)  # Create output directory first
+mofa.mofa_run(outfile='models/rna_atac.hdf5')
+```
+
+## Defensive Validation Patterns
+
+Always validate inputs before running integration methods:
+
+```python
+# Before MOFA: verify inputs are compatible
+assert isinstance(omics, list), "omics must be a list of AnnData objects"
+assert len(omics) == len(omics_name), f"omics ({len(omics)}) and omics_name ({len(omics_name)}) must match in length"
+for i, a in enumerate(omics):
+    assert a.n_obs > 0, f"AnnData '{omics_name[i]}' has 0 cells"
+    assert a.n_vars > 0, f"AnnData '{omics_name[i]}' has 0 genes/features"
+
+# Before SIMBA: verify batch column exists
+assert 'batch' in adata.obs.columns, "adata.obs must contain a 'batch' column for SIMBA"
+assert adata.obs['batch'].nunique() > 1, "Need >1 batch for batch integration"
+
+# Before TOSICA: verify GMT file exists and reference has labels
+import os
+assert os.path.isfile(gmt_path), f"GMT file not found: {gmt_path}. Run ov.utils.download_tosica_gmt() first."
+assert label_name in ref_adata.obs.columns, f"Label column '{label_name}' not found in reference AnnData"
+
+# Before StaVIA: verify PCA and neighbors are computed
+assert 'X_pca' in adata.obsm, "PCA required. Run ov.pp.pca(adata) first."
+assert 'neighbors' in adata.uns, "Neighbor graph required. Run ov.pp.neighbors(adata) first."
+```
+
+## Troubleshooting
+
+- **`PermissionError` or `OSError` writing MOFA HDF5**: The output directory for `mofa_run(outfile=...)` must exist and be writable. Create it with `os.makedirs()` before training.
+- **GLUE `correlation()` returns empty DataFrame**: The RNA and ATAC embeddings have no overlapping features. Verify both AnnData objects have been through GLUE preprocessing and contain embeddings in `.obsm`.
+- **SIMBA `gen_graph()` runs out of memory**: Reduce `n_top_genes` (try 2000) or increase `n_bins` to compress the feature space. SIMBA graph construction scales with gene count.
+- **TOSICA `FileNotFoundError` after `download_tosica_gmt()`**: The download writes to `genesets/` in the current working directory. Verify the file exists at the expected path, or pass an absolute path.
+- **StaVIA `root_user` mismatch**: The root must be a value that exists in the `true_label` array. Check `adata.obs['clusters'].unique()` to find valid root names.
+- **`ImportError: No module named 'mofapy2'`**: Install with `pip install mofapy2`. Similarly, SIMBA needs `pip install simba simba_pbg`.
+- **MOFA factors all zero or NaN**: Input AnnData may have constant or all-zero features. Filter genes with `sc.pp.filter_genes(adata, min_cells=10)` before MOFA.
+
+## Examples
+- "I have paired scRNA and scATAC h5ad files—run MOFA to find shared factors and plot variance explained per factor."
+- "Integrate three pancreas batches using SIMBA and visualise the corrected embedding coloured by batch and cell type."
+- "Transfer cell type labels from my annotated reference to a new query dataset using TOSICA with GO biological process pathways."
+
+## References
+- MOFA tutorial: `t_mofa.ipynb`
+- GLUE+MOFA tutorial: `t_mofa_glue.ipynb`
+- SIMBA tutorial: `t_simba.ipynb`
+- TOSICA tutorial: `t_tosica.ipynb`
+- StaVIA tutorial: `t_stavia.ipynb`
+- Quick copy/paste commands: [`reference.md`](reference.md)

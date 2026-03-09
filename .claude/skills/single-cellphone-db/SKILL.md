@@ -1,7 +1,7 @@
 ---
 name: single-cell-cellphonedb-communication-mapping
 title: Single-cell CellPhoneDB communication mapping
-description: Run omicverse's CellPhoneDB v5 wrapper on annotated single-cell data to infer ligand-receptor networks and produce CellChat-style visualisations.
+description: "CellPhoneDB v5 ligand-receptor analysis, cell-cell communication networks, and CellChat-style visualization in OmicVerse."
 ---
 
 # Single-cell CellPhoneDB communication mapping
@@ -51,7 +51,17 @@ Apply this skill when a user wants to quantify ligand–receptor communication b
    - Compose bubble summaries for multiple pathways with `viz.netVisual_bubble_marsilea(...)`, optionally restricting `sources_use`/`targets_use`.
    - Display gene-level chords via `viz.netVisual_chord_gene(...)` to inspect signalling directionality.
    - Evaluate signalling roles using `viz.netAnalysis_computeCentrality()`, `viz.netAnalysis_signalingRole_network_marsilea(...)`, `viz.netAnalysis_signalingRole_scatter(...)`, and `viz.netAnalysis_signalingRole_heatmap(...)` for incoming/outgoing programmes.
-8. **Troubleshooting tips**
+8. **Defensive validation**
+   ```python
+   # Before CellPhoneDB: validate cell type column
+   assert celltype_key in adata.obs.columns, f"Column '{celltype_key}' not found in adata.obs"
+   adata.obs[celltype_key] = adata.obs[celltype_key].astype('category').cat.remove_unused_categories()
+   assert not adata.obs[celltype_key].isna().any(), f"NaN values in '{celltype_key}' — clean before running CellPhoneDB"
+   min_per_group = adata.obs[celltype_key].value_counts().min()
+   if min_per_group < 10:
+       print(f"WARNING: smallest cell group has {min_per_group} cells — may cause permutation failures")
+   ```
+9. **Troubleshooting tips**
    - **Metadata alignment**: CellPhoneDB requires a categorical `celltype_key`. If the column contains spaces, mixed casing, or `NaN`, clean it (`adata.obs['cell_labels'] = adata.obs['cell_labels'].astype('category').cat.remove_unused_categories()`).
    - **Database bundle**: `cpdb_file_path` must point to a full CellPhoneDB v5 SQLite zip. If omicverse raises `FileNotFoundError` or missing receptor tables, re-download the bundle from the official release and ensure the zip is not corrupted.
    - **Permutation failures**: Low cell counts per group (<`min_cells`) cause early termination. Increase `min_cell_fraction` thresholds or merge sparse clusters before rerunning.
