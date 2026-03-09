@@ -391,6 +391,44 @@ def _ensure_numpy_array(x):
     return x
 
 
+def _infer_solver_used(
+    pca_obj,
+    *,
+    requested_solver: str | None,
+    chunked: bool,
+    zero_center: bool | None,
+) -> str:
+    """Infer the effective PCA solver/backend for runtime reporting."""
+    # torch_pca
+    solver = getattr(pca_obj, "svd_solver_", None)
+    if isinstance(solver, str) and solver:
+        return solver
+
+    # sklearn PCA internals
+    solver = getattr(pca_obj, "_fit_svd_solver", None)
+    if isinstance(solver, str) and solver:
+        return solver
+
+    # sklearn/dask API
+    solver = getattr(pca_obj, "svd_solver", None)
+    if isinstance(solver, str) and solver:
+        return solver
+
+    # TruncatedSVD
+    algo = getattr(pca_obj, "algorithm", None)
+    if isinstance(algo, str) and algo:
+        return algo
+
+    # Last-resort semantic fallback
+    if chunked:
+        return "incremental"
+    if zero_center is False:
+        return "truncated_svd"
+    if requested_solver is not None:
+        return str(requested_solver)
+    return "unknown"
+
+
 def _torch_chunked_covariance_pca(
     adata_comp: AnnData,
     *,
@@ -481,12 +519,14 @@ def _torch_chunked_covariance_pca(
     ) / (n_samples - 1)
     covariance = 0.5 * (covariance + covariance.T)
 
-    prefer_eigh = covariance.is_cuda and covariance.shape[0] <= 4096
+    prefer_eigh = covariance.shape[0] <= 4096
     if prefer_eigh or k >= covariance.shape[0] - 1:
+        effective_solver = "covariance_eigh"
         eigenvals, eigenvecs = torch.linalg.eigh(covariance)
         eigenvals = eigenvals[-k:]
         eigenvecs = eigenvecs[:, -k:]
     else:
+        effective_solver = "lobpcg"
         init_vecs = None
         if isinstance(random_state, int):
             gen = torch.Generator(device=device)
@@ -563,6 +603,7 @@ def _torch_chunked_covariance_pca(
         svd_solver="lobpcg",
         random_state=random_state if isinstance(random_state, int) else None,
     )
+    pca_.svd_solver_ = effective_solver
     pca_.components_ = components
     pca_.explained_variance_ = explained_variance
     pca_.explained_variance_ratio_ = explained_variance_ratio
@@ -594,7 +635,7 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
     *,
     layer: str | None = None,
     zero_center: bool | None = True,
-    svd_solver: SvdSolver | None = None,
+    svd_solver: SvdSolver | None = 'covariance_eigh',
     random_state: _LegacyRandom = 0,
     return_info: bool = False,
     mask_var: NDArray[np.bool_] | str | None | Empty = _empty,
@@ -886,6 +927,8 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                 print(f"   {Colors.CYAN}📊 PCA input data type (chunked): {type(X).__name__}, shape: {X.shape}, dtype: {X.dtype}{Colors.ENDC}")
                 if scipy.sparse.issparse(X):
                     print(f"   {Colors.CYAN}📊 Sparse matrix density: {X.nnz / (X.shape[0] * X.shape[1]) * 100:.2f}%{Colors.ENDC}")
+                solver_hint = "covariance_eigh" if X.shape[1] <= 4096 else "lobpcg"
+                print(f"   {Colors.CYAN}🔧 solver_used_in_uns (planned): {solver_hint}{Colors.ENDC}")
 
                 # Reset memory stats only for CUDA devices
                 if device.type == 'cuda':
@@ -1015,7 +1058,9 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
 
                         # Map svd_solver to torch_pca compatible values
                         if svd_solver in (None, "auto"):
-                            svd_solver_mapped = "auto"
+                            # In cpu-gpu-mixed mode, default to covariance_eigh for
+                            # better stability/consistency on dense or densified inputs.
+                            svd_solver_mapped = "covariance_eigh"
                         elif svd_solver in {"lobpcg", "arpack"}:
                             if svd_solver == "arpack":
                                 warnings.warn(
@@ -1040,6 +1085,11 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                         print(f"   {Colors.CYAN}📊 PCA input data type: {type(X).__name__}, shape: {X.shape}, dtype: {X.dtype}{Colors.ENDC}")
                         if scipy.sparse.issparse(X):
                             print(f"   {Colors.CYAN}📊 Sparse matrix density: {X.nnz / (X.shape[0] * X.shape[1]) * 100:.2f}%{Colors.ENDC}")
+                        print(
+                            f"   {Colors.CYAN}🔧 solver_used_in_uns (planned): "
+                            f"{svd_solver_mapped if svd_solver_mapped != 'auto' else 'covariance_eigh'}"
+                            f"{Colors.ENDC}"
+                        )
 
                         # torch_pca natively supports sparse matrices, but very high-density
                         # sparse matrices are faster/stabler with dense chunked accumulation.
@@ -1176,6 +1226,14 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
     # Ensure X_pca is a NumPy array (or sparse) before dtype checks
     X_pca = _ensure_numpy_array(X_pca)
 
+    solver_used = _infer_solver_used(
+        pca_,
+        requested_solver=svd_solver,
+        chunked=chunked,
+        zero_center=zero_center,
+    )
+    print(f"   {Colors.CYAN}🔧 PCA solver used: {solver_used}{Colors.ENDC}")
+
     # Normalize target dtype and cast if needed
     target_dtype = _normalize_to_numpy_dtype(dtype)
     # Use np.asarray to handle cases where X_pca is array-like
@@ -1206,6 +1264,7 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
             zero_center=zero_center,
             use_highly_variable=mask_var_param == "highly_variable",
             mask_var=mask_var_param,
+            solver_used=solver_used,
         )
         if layer is not None:
             params["layer"] = layer
