@@ -46,7 +46,7 @@ def test_utils_exports_agent_entrypoints(monkeypatch):
             "get_gene_annotation", "correlation_pseudotime", "store_layers",
             "retrieve_layers", "easter_egg", "save", "load", "convert_adata_for_rust",
             "anndata_sparse", "np_mean", "np_std", "load_signatures_from_file",
-            "predefined_signatures"
+            "predefined_signatures", "print_tree"
         ],
         "_anndata_rust_patch": ["patch_rust_adata"],
         "_plot": [
