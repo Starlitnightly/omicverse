@@ -170,6 +170,7 @@ nav:
         - Domain Research (dr) — Live Web: Tutorials-llm/t_dr_web.md
         - ov.Agent PBMC3k: Tutorials-llm/t_ov_agent_pbmc3k.ipynb
         - ov.Agent Ten-Task Suite: Tutorials-llm/ov_agent_ten_task_suite.ipynb
+        - MCP Server Guide: Tutorials-llm/t_mcp_guide.md
         - UCE: Tutorials-llm/t_uce.ipynb
         - scGPT: Tutorials-llm/t_scgpt.ipynb
         - scFoundation: Tutorials-llm/t_scfoundation.ipynb
