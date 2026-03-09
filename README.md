@@ -91,6 +91,26 @@ You can use `conda install omicverse -c conda-forge` or `pip install -U omicvers
 Please checkout the documentations and tutorials at [omicverse page](https://starlitnightly.github.io/omicverse/) or [omicverse.readthedocs.io](https://omicverse.readthedocs.io/en/latest/index.html).
 
 
+### MCP Server (Model Context Protocol)
+
+OmicVerse provides an MCP server that exposes registered analysis tools to AI assistants (Claude Code, etc.) via the standard [Model Context Protocol](https://modelcontextprotocol.io/).
+
+```bash
+# Install with MCP dependencies
+pip install -e ".[mcp]"
+
+# Start the server (stdio transport)
+python -m omicverse.mcp        # or: omicverse-mcp
+python -m omicverse.mcp --phase P0   # core pipeline tools only
+```
+
+**Tool phases**: P0 covers the core single-cell pipeline (read, qc, scale, pca, neighbors, umap, leiden). P0.5 adds marker gene analysis and visualization. P2 adds availability-gated class tools (pyDEG, pySCSA, MetaCell). 20 built-in meta tools provide tool discovery, session management, observability, artifact management, and runtime safety (quotas, TTL, cleanup).
+
+**Testing**: 4 CI profiles — fast-mock (PR default), core-runtime, scientific-runtime, extended-runtime. Run `bash scripts/ci/mcp-fast-mock.sh` locally. See [CI profiles](docs/mcp_ci_profiles.md) and [runtime matrix](docs/mcp_runtime_matrix.md).
+
+- [Quickstart Guide](docs/mcp_quickstart.md) — installation, tool tables, response format, full pipeline walkthrough
+- [Integration Guide](docs/mcp_integration.md) — client setup (Claude Code, generic MCP), phase selection, session config
+
 ## `4` [Data Framework and Reference](#)
 
 The omicverse is implemented as an infrastructure based on the following four data structures.

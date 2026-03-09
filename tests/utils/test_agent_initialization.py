@@ -1,3 +1,4 @@
+import importlib.machinery
 import importlib.util
 import sys
 import types
@@ -115,3 +116,52 @@ def test_utils_exports_agent_entrypoints(monkeypatch):
     assert utils_module.list_supported_models is fake_list_supported_models
     # The module should keep a reference to the imported smart_agent module
     assert utils_module.smart_agent is smart_agent
+
+
+def test_smart_agent_import_does_not_probe_parent_utils_via___getattr__(monkeypatch):
+    """Import compatibility wiring must not trigger omicverse.__getattr__('utils')."""
+
+    package_root = PROJECT_ROOT / "omicverse"
+    smart_agent_path = package_root / "utils" / "smart_agent.py"
+
+    for name in [
+        "omicverse",
+        "omicverse.utils",
+        "omicverse.utils.smart_agent",
+    ]:
+        monkeypatch.delitem(sys.modules, name, raising=False)
+
+    getattr_calls = []
+
+    omicverse_pkg = types.ModuleType("omicverse")
+    omicverse_pkg.__path__ = [str(package_root)]
+    omicverse_pkg.__spec__ = importlib.machinery.ModuleSpec(
+        "omicverse", loader=None, is_package=True
+    )
+
+    def _pkg_getattr(name):
+        getattr_calls.append(name)
+        raise AttributeError(name)
+
+    omicverse_pkg.__getattr__ = _pkg_getattr
+    monkeypatch.setitem(sys.modules, "omicverse", omicverse_pkg)
+
+    utils_pkg = types.ModuleType("omicverse.utils")
+    utils_pkg.__path__ = [str(package_root / "utils")]
+    utils_pkg.__spec__ = importlib.machinery.ModuleSpec(
+        "omicverse.utils", loader=None, is_package=True
+    )
+    monkeypatch.setitem(sys.modules, "omicverse.utils", utils_pkg)
+
+    spec = importlib.util.spec_from_file_location(
+        "omicverse.utils.smart_agent",
+        smart_agent_path,
+    )
+    smart_agent_module = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, "omicverse.utils.smart_agent", smart_agent_module)
+    assert spec.loader is not None
+    spec.loader.exec_module(smart_agent_module)
+
+    assert "utils" not in getattr_calls
+    assert omicverse_pkg.utils is utils_pkg
+    assert utils_pkg.smart_agent is smart_agent_module
