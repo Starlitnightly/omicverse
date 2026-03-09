@@ -1135,6 +1135,8 @@ def pca(adata, n_pcs=50, layer='scaled',inplace=True,**kwargs):
         print(f"{EMOJI['gpu']} Using GPU to calculate PCA...")
         print_gpu_usage_color()
         from ._pca import pca as _pca
+        if kwargs.get("svd_solver", "auto") in (None, "auto"):
+            kwargs["svd_solver"] = "covariance_eigh"
         _pca(adata, layer=layer,n_comps=n_pcs,use_gpu=True,**kwargs)
         adata.obsm[key + '|X_pca'] = adata.obsm['X_pca']
         adata.varm[key + '|pca_loadings'] = adata.varm['PCs']

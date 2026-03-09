@@ -10,9 +10,16 @@ import torch
 from torch import Tensor
 from torch._prims_common import DeviceLikeType
 from scipy import sparse as sp
+import warnings
 
 from .ncompo import NComponentsType, find_ncomponents
-from .svd import choose_svd_solver, randomized_svd, svd_flip, arpack_svd
+from .svd import choose_svd_solver, randomized_svd, svd_flip
+
+HIGH_DENSITY_AUTO_DENSE_THRESHOLD = 0.2
+MAX_AUTO_DENSE_ELEMENTS = 250_000_000
+AUTO_DENSE_COV_EIGH_MAX_FEATURES = 4096
+AUTO_DENSE_CPU_MAX_BYTES = 2_500_000_000
+AUTO_DENSE_CUDA_FREE_MEM_FRACTION = 0.4
 
 
 class PCA:
@@ -36,19 +43,19 @@ class PCA:
         By default, n_components=None.
 
     svd_solver: str, optional
-        One of {'auto', 'full', 'covariance_eigh', 'randomized', 'arpack'}
+        One of {'auto', 'full', 'covariance_eigh', 'randomized', 'lobpcg', 'arpack'}
 
         * 'auto': the solver is selected automatically based on the shape and type of input.
-          For sparse matrices, 'arpack' is selected. For dense tensors, selection follows
+          For sparse matrices, 'lobpcg' is selected. For dense tensors, selection follows
           the original heuristics.
         * 'full': Run exact full SVD with torch.linalg.svd (dense tensors only)
         * 'covariance_eigh': Compute the covariance matrix and take
           the eigenvalues decomposition with torch.linalg.eigh (dense tensors only).
           Most efficient for small n_features and large n_samples.
         * 'randomized': Compute the randomized SVD by the method of Halko et al (dense tensors only).
-        * 'arpack': Use ARPACK iterative solver from scipy.sparse.linalg.svds.
-          Only works with scipy sparse matrices (csr_matrix, csc_matrix).
-          Efficient for sparse matrices when computing a small number of components.
+        * 'lobpcg': Compute top eigenpairs of covariance with torch.lobpcg.
+          Works for dense and sparse tensors in pure PyTorch.
+        * 'arpack': Deprecated compatibility alias; internally redirected to 'lobpcg'.
 
         By default, svd_solver='auto'.
 
@@ -81,7 +88,7 @@ class PCA:
         n_components: NComponentsType = None,
         *,
         whiten: bool = False,
-        svd_solver: str = "auto",
+        svd_solver: str = "covariance_eigh",
         iterated_power: Union[str, int] = "auto",
         n_oversamples: int = 10,
         power_iteration_normalizer: str = "auto",
@@ -118,11 +125,12 @@ class PCA:
         self._input_is_sparse: bool = False
         self._original_device: Optional[torch.device] = None
         self._original_dtype: Optional[torch.dtype] = None
+        self._auto_densified_from_sparse: bool = False
 
-        if self.svd_solver_ not in ["auto", "full", "covariance_eigh", "randomized", "arpack"]:
+        if self.svd_solver_ not in ["auto", "full", "covariance_eigh", "randomized", "lobpcg", "arpack"]:
             raise ValueError(
                 "Unknown SVD solver. `svd_solver` should be one of "
-                "'auto', 'full', 'covariance_eigh', 'randomized', 'arpack'."
+                "'auto', 'full', 'covariance_eigh', 'randomized', 'lobpcg', 'arpack'."
             )
 
     def fit_transform(self, inputs: Union[Tensor, sp.csr_matrix, sp.csc_matrix], *, determinist: bool = True) -> Tensor:
@@ -147,9 +155,114 @@ class PCA:
         transformed : Tensor
             Transformed data.
         """
+        # Convert scipy sparse input once and reuse it for both fit and transform.
+        if sp.issparse(inputs):
+            inputs = self._convert_scipy_sparse_input(inputs)
+
         self.fit(inputs, determinist=determinist)
         transformed = self.transform(inputs)
         return transformed
+
+    def _compute_sparse_gram_matrix(self, inputs: Tensor) -> Tensor:
+        """Compute X^T X for sparse inputs with robust fallback paths."""
+        x_t = inputs.transpose(0, 1)
+        try:
+            # Fast path: sparse@sparse -> sparse (then densify, small n_features x n_features)
+            return torch.sparse.mm(x_t, inputs).to_dense()
+        except RuntimeError as err:
+            err_msg = str(err).lower()
+
+            # Older/newer torch builds may require dense mat2 for sparse.mm.
+            if "dense" in err_msg or "strided" in err_msg:
+                return torch.sparse.mm(x_t, inputs.to_dense())
+
+            # CUDA sparse SpGEMM can fail with insufficient resources on large nnz.
+            if any(tok in err_msg for tok in ("cusparse", "spgemm", "insufficient resources")):
+                warnings.warn(
+                    "Sparse GPU SpGEMM failed while building PCA Gram matrix; "
+                    "falling back to CPU sparse multiplication in torch.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                x_t_cpu = x_t.cpu()
+                inputs_cpu = inputs.cpu()
+                try:
+                    gram_cpu = torch.sparse.mm(x_t_cpu, inputs_cpu).to_dense()
+                except RuntimeError as cpu_err:
+                    cpu_err_msg = str(cpu_err).lower()
+                    if "dense" not in cpu_err_msg and "strided" not in cpu_err_msg:
+                        raise
+                    gram_cpu = torch.sparse.mm(x_t_cpu, inputs_cpu.to_dense())
+                return gram_cpu.to(device=inputs.device, dtype=inputs.dtype)
+
+            raise
+
+    def _maybe_auto_densify_sparse(self, inputs: Tensor) -> Tensor:
+        """Auto-convert high-density sparse tensors to dense for better performance."""
+        n_samples, n_features = inputs.shape
+        total = int(n_samples) * int(n_features)
+        if total <= 0 or total > MAX_AUTO_DENSE_ELEMENTS:
+            return inputs
+
+        # inputs is coalesced sparse COO in our pipeline
+        nnz = int(inputs._nnz())
+        density = nnz / total
+        if density < HIGH_DENSITY_AUTO_DENSE_THRESHOLD:
+            return inputs
+
+        element_size = torch.empty((), dtype=inputs.dtype).element_size()
+        dense_bytes = total * element_size
+        if inputs.is_cuda:
+            try:
+                free_mem, _ = torch.cuda.mem_get_info(inputs.device)
+            except Exception:
+                return inputs
+            if dense_bytes > int(free_mem * AUTO_DENSE_CUDA_FREE_MEM_FRACTION):
+                return inputs
+        elif dense_bytes > AUTO_DENSE_CPU_MAX_BYTES:
+            return inputs
+
+        warnings.warn(
+            "High-density sparse input detected "
+            f"(density={density * 100:.2f}%, shape={tuple(inputs.shape)}); "
+            "converting to dense tensor for faster torch PCA path.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        self._input_is_sparse = False
+        self._auto_densified_from_sparse = True
+        return inputs.to_dense()
+
+    def _convert_scipy_sparse_input(
+        self, inputs: Union[sp.csr_matrix, sp.csc_matrix]
+    ) -> Tensor:
+        """Convert scipy sparse input to torch tensor with high-density fast path."""
+        total = int(inputs.shape[0]) * int(inputs.shape[1])
+        if total > 0 and total <= MAX_AUTO_DENSE_ELEMENTS:
+            density = float(inputs.nnz) / float(total)
+            dense_bytes = total * 4  # float32 target
+            if (
+                density >= HIGH_DENSITY_AUTO_DENSE_THRESHOLD
+                and dense_bytes <= AUTO_DENSE_CPU_MAX_BYTES
+            ):
+                warnings.warn(
+                    "High-density scipy sparse input detected "
+                    f"(density={density * 100:.2f}%, shape={inputs.shape}); "
+                    "converting directly to dense tensor for faster torch PCA path.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                self._input_is_sparse = False
+                self._auto_densified_from_sparse = True
+                dense = inputs.toarray()
+                return torch.as_tensor(dense, dtype=torch.float32)
+
+        from .sparse_utils import scipy_sparse_to_torch_sparse
+
+        self._input_is_sparse = True
+        return scipy_sparse_to_torch_sparse(
+            inputs, device=torch.device("cpu"), dtype=torch.float32
+        ).coalesce()
 
     def fit(self, inputs: Union[Tensor, sp.csr_matrix, sp.csc_matrix], *, determinist: bool = True) -> "PCA":
         """Fit the PCA model and return it.
@@ -173,36 +286,30 @@ class PCA:
             The PCA model fitted on the input data.
         """
         # Detect and validate input type, convert to torch tensor
+        pre_densified_tensor = (
+            isinstance(inputs, Tensor)
+            and (not inputs.is_sparse)
+            and self._auto_densified_from_sparse
+        )
+        if not pre_densified_tensor:
+            self._auto_densified_from_sparse = False
         if sp.issparse(inputs):
-            self._input_is_sparse = True
             if not isinstance(inputs, (sp.csr_matrix, sp.csc_matrix)):
                 raise ValueError(
                     f"Sparse input must be csr_matrix or csc_matrix, got {type(inputs)}"
                 )
-            # Validate solver compatibility
-            if self.svd_solver_ == 'arpack':
-                # ARPACK can work with sparse inputs
-                pass
-            elif self.svd_solver_ != 'auto':
-                raise ValueError(
-                    f"Only 'arpack' and 'auto' solvers support sparse inputs, got '{self.svd_solver_}'"
-                )
-            # Convert scipy sparse to torch sparse tensor
-            # This allows GPU acceleration for matrix operations
-            from .sparse_utils import scipy_sparse_to_torch_sparse
-            # Use CPU for now, will move to GPU if needed
-            inputs_torch_sparse = scipy_sparse_to_torch_sparse(
-                inputs, device=torch.device('cpu'), dtype=torch.float32
-            )
-            # Keep original scipy sparse for ARPACK SVD (CPU-only operation)
-            inputs_scipy = inputs
-            inputs = inputs_torch_sparse
+            inputs = self._convert_scipy_sparse_input(inputs)
+        elif isinstance(inputs, Tensor) and inputs.is_sparse:
+            self._input_is_sparse = True
+            inputs = inputs.coalesce()
+            if inputs.dtype == torch.float16:
+                inputs = inputs.to(torch.float32)
         else:
             self._input_is_sparse = False
-            inputs_scipy = None
-            if self.svd_solver_ == 'arpack':
+            if self.svd_solver_ == "arpack":
                 raise ValueError(
-                    "ARPACK solver only works with sparse matrices (scipy.sparse.csr_matrix or csc_matrix)"
+                    "ARPACK compatibility alias only works with sparse input. "
+                    "Please use 'auto', 'full', 'covariance_eigh', 'randomized', or 'lobpcg'."
                 )
             # Convert to tensor if needed
             if not isinstance(inputs, Tensor):
@@ -211,85 +318,123 @@ class PCA:
             if inputs.dtype == torch.float16:
                 inputs = inputs.to(torch.float32)
 
+        if self._input_is_sparse and isinstance(inputs, Tensor):
+            inputs = self._maybe_auto_densify_sparse(inputs)
+
         if self.svd_solver_ == "auto":
-            self.svd_solver_ = choose_svd_solver(
-                inputs=inputs,
-                n_components=self.n_components_,
-                is_sparse=self._input_is_sparse,
+            # For sparse inputs auto-densified due to high density, prefer
+            # covariance_eigh when feature dimensionality is moderate.
+            if (
+                self._auto_densified_from_sparse
+                and inputs.shape[-1] <= AUTO_DENSE_COV_EIGH_MAX_FEATURES
+                and inputs.shape[-2] >= inputs.shape[-1]
+            ):
+                self.svd_solver_ = "covariance_eigh"
+            else:
+                self.svd_solver_ = choose_svd_solver(
+                    inputs=inputs,
+                    n_components=self.n_components_,
+                    is_sparse=self._input_is_sparse,
+                )
+        elif self.svd_solver_ == "arpack":
+            warnings.warn(
+                "svd_solver='arpack' is deprecated in torch_pca sparse mode and "
+                "has been replaced by pure PyTorch 'lobpcg'.",
+                FutureWarning,
+                stacklevel=2,
+            )
+            self.svd_solver_ = "lobpcg"
+
+        if self._input_is_sparse and self.svd_solver_ != "lobpcg":
+            raise ValueError(
+                f"Sparse inputs only support 'auto', 'lobpcg', or 'arpack' compatibility alias. "
+                f"Got '{self.svd_solver_}'."
             )
 
         # Compute mean and shape based on input type
         if self._input_is_sparse:
-            # For sparse tensor, convert to dense for mean calculation
-            # (mean operation requires densification anyway)
-            if inputs.is_sparse:
-                self.mean_ = inputs.to_dense().mean(dim=0, keepdim=True)
-            else:
-                self.mean_ = inputs.mean(dim=0, keepdim=True)
+            # Sparse-friendly column mean: sum sparse columns then divide by n_samples.
             self.n_samples_, self.n_features_in_ = inputs.shape
+            col_sums = torch.sparse.sum(inputs, dim=0).to_dense()
+            self.mean_ = (col_sums / self.n_samples_).reshape(1, -1)
         else:
             self.mean_ = inputs.mean(dim=-2, keepdim=True)
             self.n_samples_, self.n_features_in_ = inputs.shape[-2:]
 
-        # Handle ARPACK solver for sparse matrices
-        if self.svd_solver_ == "arpack":
-            from .sparse_utils import numpy_to_torch
-            import numpy as np
-
-            # Validate n_components
-            max_arpack_components = min(self.n_samples_, self.n_features_in_) - 1
-
+        if self.svd_solver_ == "lobpcg":
+            max_lobpcg_components = min(self.n_samples_, self.n_features_in_) - 1
+            if max_lobpcg_components < 1:
+                raise ValueError(
+                    "lobpcg requires at least 2 samples/features after centering."
+                )
             if self.n_components_ is None:
-                self.n_components_ = max_arpack_components
+                self.n_components_ = max_lobpcg_components
             elif isinstance(self.n_components_, str):
                 raise ValueError(
-                    f"ARPACK solver does not support n_components='{self.n_components_}'. "
+                    f"LOBPCG solver does not support n_components='{self.n_components_}'. "
                     "Please specify an integer value."
                 )
             elif isinstance(self.n_components_, float):
                 raise ValueError(
-                    "ARPACK solver does not support float n_components (variance threshold). "
+                    "LOBPCG solver does not support float n_components (variance threshold). "
                     "Please specify an integer value."
                 )
-            elif self.n_components_ >= max_arpack_components:
+            elif self.n_components_ > max_lobpcg_components:
                 raise ValueError(
-                    f"ARPACK requires n_components < min(n_samples, n_features) - 1. "
-                    f"Got n_components={self.n_components_}, max allowed is {max_arpack_components}"
+                    f"LOBPCG requires n_components <= min(n_samples, n_features) - 1. "
+                    f"Got n_components={self.n_components_}, max allowed is {max_lobpcg_components}"
+                )
+            self.n_components_ = int(self.n_components_)
+
+            if self._input_is_sparse:
+                gram = self._compute_sparse_gram_matrix(inputs)
+                mean_vec = self.mean_.reshape(-1)
+                covariance = (
+                    gram - self.n_samples_ * torch.outer(mean_vec, mean_vec)
+                ) / (self.n_samples_ - 1)
+            else:
+                inputs_centered = inputs - self.mean_
+                covariance = (inputs_centered.T @ inputs_centered) / (self.n_samples_ - 1)
+
+            covariance = 0.5 * (covariance + covariance.T)
+            cov_size = covariance.shape[0]
+            # CUDA LOBPCG can be unstable/slow for moderate-sized covariance matrices.
+            # Prefer exact eigh in this regime while staying fully in PyTorch.
+            prefer_eigh = covariance.is_cuda and cov_size <= 4096
+            if prefer_eigh or self.n_components_ >= cov_size - 1:
+                eigenvals, eigenvecs = torch.linalg.eigh(covariance)
+                eigenvals = eigenvals[-self.n_components_:]
+                eigenvecs = eigenvecs[:, -self.n_components_:]
+            else:
+                init_vecs = None
+                if isinstance(self.random_state, int):
+                    gen = torch.Generator(device=covariance.device)
+                    gen.manual_seed(self.random_state)
+                    init_vecs = torch.randn(
+                        cov_size,
+                        self.n_components_,
+                        device=covariance.device,
+                        dtype=covariance.dtype,
+                        generator=gen,
+                    )
+                eigenvals, eigenvecs = torch.lobpcg(
+                    covariance,
+                    k=self.n_components_,
+                    X=init_vecs,
+                    largest=True,
+                    method="ortho",
                 )
 
-            # Compute ARPACK SVD with mean centering
-            # ARPACK svds is CPU-only, so use the original scipy sparse matrix
-            mean_np = self.mean_.cpu().numpy().ravel()
-            u_mat, coefs, vh_mat = arpack_svd(
-                inputs=inputs_scipy,  # Use scipy sparse matrix for ARPACK
-                n_components=self.n_components_,
-                mean_vector=mean_np,
-                random_state=self.random_state if isinstance(self.random_state, int) else None
+            order = torch.argsort(eigenvals, descending=True)
+            explained_variance = torch.clamp(eigenvals[order], min=0.0)
+            components = eigenvecs[:, order].T
+            coefs = torch.sqrt(explained_variance * (self.n_samples_ - 1))
+            vh_mat = components
+            u_mat = None
+            total_var = torch.clamp(
+                torch.trace(covariance),
+                min=torch.finfo(covariance.dtype).eps,
             )
-
-            # Convert results to PyTorch tensors (can be on GPU)
-            device = inputs.device if hasattr(inputs, 'device') else torch.device('cpu')
-            vh_mat = numpy_to_torch(vh_mat, device=device, dtype=torch.float32)
-            coefs = numpy_to_torch(coefs, device=device, dtype=torch.float32)
-            u_mat = numpy_to_torch(u_mat, device=device, dtype=torch.float32) if u_mat is not None else None
-
-            # Apply deterministic sign flip if requested
-            if determinist:
-                u_mat, vh_mat = svd_flip(u_mat, vh_mat)
-
-            # Compute explained variance
-            explained_variance = coefs**2 / (self.n_samples_ - 1)
-
-            # Compute total variance
-            # For ARPACK with fewer components, total variance is approximate
-            total_var = torch.sum(explained_variance)
-            if self.n_components_ < max_arpack_components:
-                import warnings
-                warnings.warn(
-                    f"ARPACK with n_components={self.n_components_} < {max_arpack_components}: "
-                    "Total variance is approximate. explained_variance_ratio_ may be underestimated.",
-                    UserWarning
-                )
         elif self.svd_solver_ == "full":
             inputs_centered = inputs - self.mean_
             u_mat, coefs, vh_mat = torch.linalg.svd(  # pylint: disable=E1102
@@ -352,13 +497,25 @@ class PCA:
         self.explained_variance_ = explained_variance[: self.n_components_]
         self.explained_variance_ratio_ = explained_variance_ratio[: self.n_components_]
         self.singular_values_ = coefs[: self.n_components_]
-        # Compute noise covariance using Probabilistic PCA model
-        # The sigma2 maximum likelihood (cf. eq. 12.46)
-        self.noise_variance_ = (
-            torch.mean(explained_variance[self.n_components_ :])
-            if self.n_components_ < min(inputs.shape[-2:])
-            else torch.tensor(0.0)
-        )
+        # Compute noise covariance using Probabilistic PCA model.
+        if self.svd_solver_ == "lobpcg":
+            remaining = self.n_features_in_ - self.n_components_
+            if remaining > 0:
+                residual = torch.clamp(
+                    total_var - torch.sum(self.explained_variance_),
+                    min=0.0,
+                )
+                self.noise_variance_ = residual / remaining
+            else:
+                self.noise_variance_ = torch.tensor(
+                    0.0, device=explained_variance.device, dtype=explained_variance.dtype
+                )
+        elif self.n_components_ < explained_variance.shape[0]:
+            self.noise_variance_ = torch.mean(explained_variance[self.n_components_ :])
+        else:
+            self.noise_variance_ = torch.tensor(
+                0.0, device=explained_variance.device, dtype=explained_variance.dtype
+            )
         return self
 
     def _check_fitted(self, method_name: str) -> None:
@@ -418,7 +575,10 @@ class PCA:
                 transformed = transformed - mean_projection
             elif center == "input":
                 # Compute input mean and subtract its projection
-                input_mean = inputs_sparse.to_dense().mean(dim=0, keepdim=True)
+                input_mean = (
+                    torch.sparse.sum(inputs_sparse, dim=0).to_dense().reshape(1, -1)
+                    / inputs_sparse.shape[0]
+                )
                 mean_projection = input_mean @ self.components_.T
                 transformed = transformed - mean_projection
             elif center != "none":
@@ -437,7 +597,10 @@ class PCA:
                 mean_projection = self.mean_ @ self.components_.T
                 transformed = transformed - mean_projection
             elif center == "input":
-                input_mean = inputs.to_dense().mean(dim=0, keepdim=True)
+                input_mean = (
+                    torch.sparse.sum(inputs, dim=0).to_dense().reshape(1, -1)
+                    / inputs.shape[0]
+                )
                 mean_projection = input_mean @ self.components_.T
                 transformed = transformed - mean_projection
             elif center != "none":

@@ -32,6 +32,26 @@ from datetime import datetime
 
 # Default number of PCs
 N_PCS = 50
+HIGH_DENSITY_SPARSE_THRESHOLD = 0.2
+AUTO_DENSE_CHUNK_TARGET_ELEMENTS = 8_000_000
+
+
+def _sparse_density(x: CSBase) -> float:
+    """Compute sparse matrix density in [0, 1]."""
+    total = int(x.shape[0]) * int(x.shape[1])
+    if total <= 0:
+        return 0.0
+    return float(x.nnz) / float(total)
+
+
+def _auto_dense_chunk_size(n_obs: int, n_vars: int) -> int:
+    """Heuristic chunk size for dense chunked PCA accumulation."""
+    if n_obs <= 0:
+        return 1
+    n_vars = max(int(n_vars), 1)
+    suggested = AUTO_DENSE_CHUNK_TARGET_ELEMENTS // n_vars
+    suggested = max(256, min(8192, int(suggested)))
+    return max(1, min(int(n_obs), suggested))
 
 
 def mean_var(X, axis=0, correction=0):
@@ -371,6 +391,241 @@ def _ensure_numpy_array(x):
     return x
 
 
+def _infer_solver_used(
+    pca_obj,
+    *,
+    requested_solver: str | None,
+    chunked: bool,
+    zero_center: bool | None,
+) -> str:
+    """Infer the effective PCA solver/backend for runtime reporting."""
+    # torch_pca
+    solver = getattr(pca_obj, "svd_solver_", None)
+    if isinstance(solver, str) and solver:
+        return solver
+
+    # sklearn PCA internals
+    solver = getattr(pca_obj, "_fit_svd_solver", None)
+    if isinstance(solver, str) and solver:
+        return solver
+
+    # sklearn/dask API
+    solver = getattr(pca_obj, "svd_solver", None)
+    if isinstance(solver, str) and solver:
+        return solver
+
+    # TruncatedSVD
+    algo = getattr(pca_obj, "algorithm", None)
+    if isinstance(algo, str) and algo:
+        return algo
+
+    # Last-resort semantic fallback
+    if chunked:
+        return "incremental"
+    if zero_center is False:
+        return "truncated_svd"
+    if requested_solver is not None:
+        return str(requested_solver)
+    return "unknown"
+
+
+def _torch_chunked_covariance_pca(
+    adata_comp: AnnData,
+    *,
+    n_comps: int,
+    chunk_size: int | None,
+    device,
+    random_state: int | None,
+    force_dense_sparse: bool = False,
+):
+    """Torch chunked PCA via covariance accumulation.
+
+    This keeps memory bounded by `chunk_size` and can auto-densify sparse chunks
+    when the matrix is effectively dense.
+    """
+    import gc
+    import torch
+    from numpy import zeros
+
+    from ..external.torch_pca import PCA as TorchPCA
+    from ..external.torch_pca.sparse_utils import scipy_sparse_to_torch_sparse
+
+    n_samples, n_features = adata_comp.shape
+    max_components = min(n_samples, n_features) - 1
+    if max_components < 1:
+        raise ValueError("PCA requires at least 2 samples/features.")
+    k = int(n_comps)
+    if k > max_components:
+        raise ValueError(
+            f"n_comps={k} exceeds max supported {max_components} for chunked PCA."
+        )
+
+    effective_chunk_size = (
+        _auto_dense_chunk_size(n_samples, n_features)
+        if chunk_size is None
+        else int(chunk_size)
+    )
+    effective_chunk_size = max(1, min(n_samples, effective_chunk_size))
+
+    col_sum = torch.zeros(n_features, dtype=torch.float32, device=device)
+    gram = torch.zeros((n_features, n_features), dtype=torch.float32, device=device)
+
+    for chunk, _, _ in adata_comp.chunked_X(effective_chunk_size):
+        if isinstance(chunk, CSBase):
+            chunk_density = _sparse_density(chunk)
+            use_dense_chunk = force_dense_sparse or (
+                chunk_density >= HIGH_DENSITY_SPARSE_THRESHOLD
+            )
+
+            if use_dense_chunk:
+                chunk_t = torch.from_numpy(
+                    np.asarray(chunk.toarray(), dtype=np.float32)
+                ).to(device=device)
+                col_sum += torch.sum(chunk_t, dim=0)
+                gram += chunk_t.T @ chunk_t
+            else:
+                chunk_t = scipy_sparse_to_torch_sparse(
+                    chunk, device=device, dtype=torch.float32
+                )
+                col_sum += torch.sparse.sum(chunk_t, dim=0).to_dense()
+                chunk_t_t = chunk_t.transpose(0, 1)
+                try:
+                    gram += torch.sparse.mm(chunk_t_t, chunk_t).to_dense()
+                except RuntimeError as err:
+                    err_msg = str(err).lower()
+                    if not any(
+                        tok in err_msg
+                        for tok in (
+                            "dense",
+                            "strided",
+                            "cusparse",
+                            "spgemm",
+                            "insufficient resources",
+                        )
+                    ):
+                        raise
+                    dense_chunk_t = chunk_t.to_dense()
+                    gram += dense_chunk_t.T @ dense_chunk_t
+        else:
+            chunk_t = torch.from_numpy(np.asarray(chunk, dtype=np.float32)).to(
+                device=device
+            )
+            col_sum += torch.sum(chunk_t, dim=0)
+            gram += chunk_t.T @ chunk_t
+
+    mean_vec = col_sum / n_samples
+    covariance = (
+        gram - n_samples * torch.outer(mean_vec, mean_vec)
+    ) / (n_samples - 1)
+    covariance = 0.5 * (covariance + covariance.T)
+
+    prefer_eigh = covariance.shape[0] <= 4096
+    if prefer_eigh or k >= covariance.shape[0] - 1:
+        effective_solver = "covariance_eigh"
+        eigenvals, eigenvecs = torch.linalg.eigh(covariance)
+        eigenvals = eigenvals[-k:]
+        eigenvecs = eigenvecs[:, -k:]
+    else:
+        effective_solver = "lobpcg"
+        init_vecs = None
+        if isinstance(random_state, int):
+            gen = torch.Generator(device=device)
+            gen.manual_seed(random_state)
+            init_vecs = torch.randn(
+                covariance.shape[0],
+                k,
+                device=device,
+                dtype=covariance.dtype,
+                generator=gen,
+            )
+        eigenvals, eigenvecs = torch.lobpcg(
+            covariance,
+            k=k,
+            X=init_vecs,
+            largest=True,
+            method="ortho",
+        )
+
+    order = torch.argsort(eigenvals, descending=True)
+    explained_variance = torch.clamp(eigenvals[order], min=0.0)
+    components = eigenvecs[:, order].T
+    singular_values = torch.sqrt(explained_variance * (n_samples - 1))
+    total_var = torch.clamp(
+        torch.trace(covariance),
+        min=torch.finfo(covariance.dtype).eps,
+    )
+    explained_variance_ratio = explained_variance / total_var
+    mean_2d = mean_vec.reshape(1, -1)
+    mean_projection = mean_2d @ components.T
+
+    X_pca = zeros((n_samples, k), np.float32)
+    for chunk, start, end in adata_comp.chunked_X(effective_chunk_size):
+        if isinstance(chunk, CSBase):
+            chunk_density = _sparse_density(chunk)
+            use_dense_chunk = force_dense_sparse or (
+                chunk_density >= HIGH_DENSITY_SPARSE_THRESHOLD
+            )
+            if use_dense_chunk:
+                chunk_t = torch.from_numpy(
+                    np.asarray(chunk.toarray(), dtype=np.float32)
+                ).to(device=device)
+                chunk_pca = chunk_t @ components.T
+            else:
+                chunk_t = scipy_sparse_to_torch_sparse(
+                    chunk, device=device, dtype=torch.float32
+                )
+                try:
+                    chunk_pca = torch.sparse.mm(chunk_t, components.T)
+                except RuntimeError as err:
+                    err_msg = str(err).lower()
+                    if not any(
+                        tok in err_msg
+                        for tok in (
+                            "dense",
+                            "strided",
+                            "cusparse",
+                            "spgemm",
+                            "insufficient resources",
+                        )
+                    ):
+                        raise
+                    chunk_pca = chunk_t.to_dense() @ components.T
+        else:
+            chunk_t = torch.from_numpy(np.asarray(chunk, dtype=np.float32)).to(
+                device=device
+            )
+            chunk_pca = chunk_t @ components.T
+        chunk_pca = chunk_pca - mean_projection
+        X_pca[start:end] = chunk_pca.detach().cpu().numpy()
+
+    pca_ = TorchPCA(
+        n_components=k,
+        svd_solver="lobpcg",
+        random_state=random_state if isinstance(random_state, int) else None,
+    )
+    pca_.svd_solver_ = effective_solver
+    pca_.components_ = components
+    pca_.explained_variance_ = explained_variance
+    pca_.explained_variance_ratio_ = explained_variance_ratio
+    pca_.mean_ = mean_2d
+    pca_.n_components_ = k
+    pca_.n_samples_ = n_samples
+    pca_.n_features_in_ = n_features
+    pca_.singular_values_ = singular_values
+    remaining = n_features - k
+    if remaining > 0:
+        residual = torch.clamp(total_var - torch.sum(explained_variance), min=0.0)
+        pca_.noise_variance_ = residual / remaining
+    else:
+        pca_.noise_variance_ = torch.tensor(0.0, device=device, dtype=covariance.dtype)
+
+    gc.collect()
+    if getattr(device, "type", None) == "cuda":
+        torch.cuda.empty_cache()
+
+    return X_pca, pca_, effective_chunk_size
+
+
 @_doc_params(
     mask_var_hvg=doc_mask_var_hvg,
 )
@@ -380,7 +635,7 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
     *,
     layer: str | None = None,
     zero_center: bool | None = True,
-    svd_solver: SvdSolver | None = None,
+    svd_solver: SvdSolver | None = 'covariance_eigh',
     random_state: _LegacyRandom = 0,
     return_info: bool = False,
     mask_var: NDArray[np.bool_] | str | None | Empty = _empty,
@@ -606,7 +861,6 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
         if use_gpu and not isinstance(X, DaskArray):
             from numpy import zeros
             import torch
-            import gc
             from .._settings import get_optimal_device, prepare_data_for_device
             device = get_optimal_device(prefer_gpu=True, verbose=True)
             
@@ -645,7 +899,6 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                     pca_ = MockPCA(mlx_pca)
                     
                 except (ImportError, Exception) as e:
-                    return e, None
                     logg.info(f"   {EMOJI['warning']} MLX PCA failed ({str(e)}), falling back to sklearn for MPS device (chunked)")
                     print(f"   {EMOJI['warning']} {Colors.WARNING}MLX PCA failed, using sklearn IncrementalPCA backend for MPS device{Colors.ENDC}")
                     
@@ -666,8 +919,6 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                 logg.info(f"   {EMOJI['gpu']} Using torch_pca PCA for {device.type.upper()} GPU (chunked mode)")
                 print(f"   {EMOJI['gpu']} torch_pca PCA backend: {device.type.upper()} GPU computation (supports sparse matrices)")
 
-                from ..external.torch_pca import PCA
-
                 # Prepare data for GPU compatibility (float32 requirement)
                 X = prepare_data_for_device(X, device, verbose=True)
 
@@ -676,41 +927,36 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                 print(f"   {Colors.CYAN}📊 PCA input data type (chunked): {type(X).__name__}, shape: {X.shape}, dtype: {X.dtype}{Colors.ENDC}")
                 if scipy.sparse.issparse(X):
                     print(f"   {Colors.CYAN}📊 Sparse matrix density: {X.nnz / (X.shape[0] * X.shape[1]) * 100:.2f}%{Colors.ENDC}")
+                solver_hint = "covariance_eigh" if X.shape[1] <= 4096 else "lobpcg"
+                print(f"   {Colors.CYAN}🔧 solver_used_in_uns (planned): {solver_hint}{Colors.ENDC}")
 
                 # Reset memory stats only for CUDA devices
                 if device.type == 'cuda':
                     torch.cuda.reset_peak_memory_stats(device)
 
-                # torch_pca supports sparse matrices natively, no need to convert to dense
+                force_dense_sparse = False
                 if isinstance(X, CSBase):
-                    # For sparse matrices, use ARPACK solver which is more memory efficient
-                    pca_ = PCA(n_components=n_comps, svd_solver='arpack',
-                              **incremental_pca_kwargs)
-                    X_pca = pca_.fit_transform(X)
+                    sparse_density = _sparse_density(X)
+                    force_dense_sparse = sparse_density >= HIGH_DENSITY_SPARSE_THRESHOLD
+                    if force_dense_sparse:
+                        print(
+                            f"   {Colors.WARNING}{EMOJI['warning']} Sparse matrix density "
+                            f"{sparse_density * 100:.2f}% is high; using dense chunked "
+                            f"torch accumulation to avoid SpGEMM bottlenecks.{Colors.ENDC}"
+                        )
 
-                    # Convert to numpy if tensor
-                    if hasattr(X_pca, 'cpu'):
-                        X_pca = X_pca.cpu().numpy()
-                else:
-                    # For dense arrays, convert to torch tensor and move to GPU
-                    X_torch = torch.from_numpy(np.asarray(X)).to(device)
-                    pca_ = PCA(n_components=n_comps, svd_solver='randomized',
-                              **incremental_pca_kwargs)
-                    X_pca = pca_.fit_transform(X_torch)
-                    # Move PCA model to GPU
-                    pca_.to(device)
-
-                    # Convert torch tensor back to numpy array
-                    if hasattr(X_pca, 'cpu'):
-                        X_pca = X_pca.cpu().numpy()
-
-                    del X_torch
-
-                gc.collect()
-
-                # Clear cache based on device type
-                if device.type == 'cuda':
-                    torch.cuda.empty_cache()
+                X_pca, pca_, effective_chunk_size = _torch_chunked_covariance_pca(
+                    adata_comp,
+                    n_comps=int(n_comps),
+                    chunk_size=chunk_size,
+                    device=device,
+                    random_state=random_state if isinstance(random_state, int) else None,
+                    force_dense_sparse=force_dense_sparse,
+                )
+                print(
+                    f"   {Colors.CYAN}📦 PCA effective chunk_size: "
+                    f"{effective_chunk_size}{Colors.ENDC}"
+                )
 
         else:
             if isinstance(X, DaskArray):
@@ -736,7 +982,7 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                 X_pca[start:end] = pca_.transform(chunk_dense)
         
     elif zero_center:
-        if isinstance(X, CSBase) and (
+        if isinstance(X, CSBase) and (not use_gpu) and (
             pkg_version("scikit-learn") < Version("1.4") or svd_solver == "lobpcg"
         ):
             if svd_solver not in (
@@ -811,10 +1057,23 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                         import torch
 
                         # Map svd_solver to torch_pca compatible values
-                        if svd_solver == "auto":
-                            svd_solver_mapped = "auto"
+                        if svd_solver in (None, "auto"):
+                            # In cpu-gpu-mixed mode, default to covariance_eigh for
+                            # better stability/consistency on dense or densified inputs.
+                            svd_solver_mapped = "covariance_eigh"
+                        elif svd_solver in {"lobpcg", "arpack"}:
+                            if svd_solver == "arpack":
+                                warnings.warn(
+                                    "svd_solver='arpack' in mixed-mode torch_pca sparse path "
+                                    "is deprecated and mapped to 'lobpcg'.",
+                                    FutureWarning,
+                                    stacklevel=2,
+                                )
+                            svd_solver_mapped = "lobpcg"
                         elif svd_solver in ["gesvd", "gesvdj", "gesvda"]:
                             svd_solver_mapped = "full"
+                        elif svd_solver in {"full", "covariance_eigh", "randomized"}:
+                            svd_solver_mapped = svd_solver
                         else:
                             svd_solver_mapped = "auto"
 
@@ -826,22 +1085,72 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                         print(f"   {Colors.CYAN}📊 PCA input data type: {type(X).__name__}, shape: {X.shape}, dtype: {X.dtype}{Colors.ENDC}")
                         if scipy.sparse.issparse(X):
                             print(f"   {Colors.CYAN}📊 Sparse matrix density: {X.nnz / (X.shape[0] * X.shape[1]) * 100:.2f}%{Colors.ENDC}")
-
-                        # torch_pca natively supports sparse matrices - no need to convert to dense!
-                        # Move tensor to GPU if not sparse
-                        if isinstance(X, CSBase):
-                            # torch_pca handles scipy sparse matrices directly
-                            pass
-                        else:
-                            # Convert dense numpy array to torch tensor on GPU
-                            X = torch.from_numpy(np.asarray(X)).to(device)
-
-                        pca_ = PCA(
-                            n_components=n_comps,
-                            svd_solver=svd_solver_mapped,
-                            random_state=random_state,
+                        print(
+                            f"   {Colors.CYAN}🔧 solver_used_in_uns (planned): "
+                            f"{svd_solver_mapped if svd_solver_mapped != 'auto' else 'covariance_eigh'}"
+                            f"{Colors.ENDC}"
                         )
-                        X_pca = pca_.fit_transform(X)
+
+                        # torch_pca natively supports sparse matrices, but very high-density
+                        # sparse matrices are faster/stabler with dense chunked accumulation.
+                        if isinstance(X, CSBase):
+                            sparse_density = _sparse_density(X)
+                            force_dense_sparse = (
+                                sparse_density >= HIGH_DENSITY_SPARSE_THRESHOLD
+                            )
+                            if force_dense_sparse:
+                                auto_chunk_size = _auto_dense_chunk_size(
+                                    X.shape[0], X.shape[1]
+                                )
+                                print(
+                                    f"   {Colors.WARNING}{EMOJI['warning']} Sparse matrix density "
+                                    f"{sparse_density * 100:.2f}% is high; switching to dense "
+                                    f"chunked torch PCA (chunk_size={auto_chunk_size})."
+                                    f"{Colors.ENDC}"
+                                )
+                                X_pca, pca_, _ = _torch_chunked_covariance_pca(
+                                    adata_comp,
+                                    n_comps=int(n_comps),
+                                    chunk_size=auto_chunk_size,
+                                    device=device,
+                                    random_state=(
+                                        random_state
+                                        if isinstance(random_state, int)
+                                        else None
+                                    ),
+                                    force_dense_sparse=True,
+                                )
+                            else:
+                                from ..external.torch_pca.sparse_utils import (
+                                    scipy_sparse_to_torch_sparse,
+                                )
+
+                                X = scipy_sparse_to_torch_sparse(
+                                    X, device=device, dtype=torch.float32
+                                )
+                                if svd_solver_mapped not in {"auto", "lobpcg"}:
+                                    warnings.warn(
+                                        f"sparse torch_pca only supports lobpcg/auto, got {svd_solver_mapped!r}; "
+                                        "falling back to 'lobpcg'.",
+                                        UserWarning,
+                                        stacklevel=2,
+                                    )
+                                    svd_solver_mapped = "lobpcg"
+                                pca_ = PCA(
+                                    n_components=n_comps,
+                                    svd_solver=svd_solver_mapped,
+                                    random_state=random_state,
+                                )
+                                X_pca = pca_.fit_transform(X)
+                        else:
+                            # Convert dense numpy array to torch tensor on device
+                            X = torch.from_numpy(np.asarray(X)).to(device)
+                            pca_ = PCA(
+                                n_components=n_comps,
+                                svd_solver=svd_solver_mapped,
+                                random_state=random_state,
+                            )
+                            X_pca = pca_.fit_transform(X)
 
                         # Move PCA model to GPU
                         pca_.to(device)
@@ -917,6 +1226,14 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
     # Ensure X_pca is a NumPy array (or sparse) before dtype checks
     X_pca = _ensure_numpy_array(X_pca)
 
+    solver_used = _infer_solver_used(
+        pca_,
+        requested_solver=svd_solver,
+        chunked=chunked,
+        zero_center=zero_center,
+    )
+    print(f"   {Colors.CYAN}🔧 PCA solver used: {solver_used}{Colors.ENDC}")
+
     # Normalize target dtype and cast if needed
     target_dtype = _normalize_to_numpy_dtype(dtype)
     # Use np.asarray to handle cases where X_pca is array-like
@@ -947,6 +1264,7 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
             zero_center=zero_center,
             use_highly_variable=mask_var_param == "highly_variable",
             mask_var=mask_var_param,
+            solver_used=solver_used,
         )
         if layer is not None:
             params["layer"] = layer
