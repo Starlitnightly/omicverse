@@ -171,6 +171,7 @@ nav:
         - ov.Agent PBMC3k: Tutorials-llm/t_ov_agent_pbmc3k.ipynb
         - ov.Agent Ten-Task Suite: Tutorials-llm/ov_agent_ten_task_suite.ipynb
         - MCP Server Guide: Tutorials-llm/t_mcp_guide.md
+        - Using OmicVerse MCP with Claude Code: Tutorials-llm/t_mcp_claude_code.md
         - UCE: Tutorials-llm/t_uce.ipynb
         - scGPT: Tutorials-llm/t_scgpt.ipynb
         - scFoundation: Tutorials-llm/t_scfoundation.ipynb
