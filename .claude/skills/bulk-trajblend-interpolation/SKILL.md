@@ -36,7 +36,18 @@ Invoke this skill when users need to bridge gaps in single-cell developmental tr
    - Compute embeddings with `mde`, visualise with `ov.utils.embedding`, and compare to the original atlas.
 9. **Analyse trajectories**
    - Initialise `ov.single.pyVIA` on both original and interpolated data to derive pseudotime, followed by `get_pseudotime`, `sc.pp.neighbors`, `ov.utils.cal_paga`, and `ov.utils.plot_paga` for topology validation.
-10. **Troubleshooting tips**
+10. **Defensive validation**
+    ```python
+    # Before BulkTrajBlend: verify bulk_group columns exist
+    for g in bulk_group:
+        assert g in bulk_df.columns, f"Bulk group '{g}' not in bulk data columns"
+    # Verify celltype_key exists in reference
+    assert celltype_key in adata.obs.columns, f"Cell type column '{celltype_key}' not in reference AnnData"
+    # Verify gene name overlap
+    shared = set(bulk_df.index) & set(adata.var_names)
+    assert len(shared) > 100, f"Only {len(shared)} shared genes — harmonize gene IDs first"
+    ```
+11. **Troubleshooting tips**
     - If the VAE collapses (high reconstruction loss), lower `learning_rate` or reduce `hidden_size`.
     - Ensure the same generated dataset is used before calling `gnn_train`; regenerating cells changes the graph and can break checkpoint loading.
     - Sparse clusters may need adjusted `cell_target_num` thresholds or a smaller `leiden_size` filter to retain rare populations.

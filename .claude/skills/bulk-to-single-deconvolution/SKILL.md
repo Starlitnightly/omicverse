@@ -34,7 +34,18 @@ Use this skill when a user wants to reconstruct single-cell profiles from bulk R
    - Plot cell-type compositions with `ov.bulk2single.bulk2single_plot_cellprop(...)` for both generated and reference data.
    - Assess correlation using `ov.bulk2single.bulk2single_plot_correlation(single_data, generate_adata, celltype_key='clusters')`.
    - Embed with `generate_adata.obsm['X_mde'] = ov.utils.mde(generate_adata.obsm['X_pca'])` and visualise via `ov.utils.embedding(..., color=['clusters'], palette=ov.utils.pyomic_palette())`.
-8. **Troubleshooting tips**
+8. **Defensive validation**
+   ```python
+   # Before Bulk2Single: verify gene name overlap between bulk and reference
+   shared_genes = set(bulk_df.index) & set(adata.var_names)
+   assert len(shared_genes) > 100, f"Only {len(shared_genes)} shared genes — check gene ID format (Ensembl vs symbol)"
+   # Verify bulk_group column names match
+   for g in bulk_group:
+       assert g in bulk_df.columns, f"Bulk group '{g}' not found in bulk data columns"
+   # Verify cell type key exists
+   assert celltype_key in adata.obs.columns, f"Cell type column '{celltype_key}' not found in reference AnnData"
+   ```
+9. **Troubleshooting tips**
    - If marker selection fails, increase `top_marker_num` or provide a curated marker list.
    - Alignment errors typically stem from mismatched `bulk_group` names—double-check column IDs in the bulk matrix.
    - Training on CPU can take several hours; advise switching `gpu` to an available CUDA device for speed.

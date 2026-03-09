@@ -5,7 +5,7 @@
 import scanpy as sc
 import omicverse as ov
 
-adata = sc.read_10x_mtx('data/filtered_gene_bc_matrices/hg19/', var_names='gene_symbols', cache=True)
+adata = ov.io.read_10x_mtx('data/filtered_gene_bc_matrices/hg19/', var_names='gene_symbols')
 adata = ov.pp.qc(adata, tresh={'mito_perc': 0.05, 'nUMIs': 500, 'detected_genes': 250})
 adata = ov.pp.preprocess(adata, mode='shiftlog|pearson', n_HVGs=2000)
 ov.pp.scale(adata)
@@ -32,7 +32,7 @@ import scanpy as sc
 import omicverse as ov
 
 data_path = 'TiME_adata_scvi.h5ad'  # download from https://figshare.com/ndownloader/files/41440050
-adata = sc.read(data_path)
+adata = ov.read(data_path)
 sc.pp.neighbors(adata, use_rep='X_scVI')
 adata.obsm['X_mde'] = ov.utils.mde(adata.obsm['X_scVI'])
 
@@ -133,8 +133,8 @@ ov.single.gptcelltype_local(
 import scanpy as sc
 import omicverse as ov
 
-rna = sc.read('data/analysis_lymph/rna-emb.h5ad')
-atac = sc.read('data/analysis_lymph/atac-emb.h5ad')
+rna = ov.read('data/analysis_lymph/rna-emb.h5ad')
+atac = ov.read('data/analysis_lymph/atac-emb.h5ad')
 knn_model = ov.utils.weighted_knn_trainer(rna, train_adata_emb='X_glue', n_neighbors=15)
 labels, uncert = ov.utils.weighted_knn_transfer(
     query_adata=atac,

@@ -1,7 +1,7 @@
 ---
 name: data-viz-plots
 title: Data Visualization (Universal)
-description: Create publication-quality plots and visualizations using matplotlib and seaborn. Works with ANY LLM provider (GPT, Gemini, Claude, etc.).
+description: "Publication-quality matplotlib/seaborn plots: scatter, heatmap, violin, bar, line, multi-panel figures. Works with ANY LLM provider."
 ---
 
 # Data Visualization (Universal)
@@ -410,6 +410,24 @@ plt.show()
 6. **Layout**: Always call `plt.tight_layout()` before saving to prevent label clipping
 7. **File Format**: PNG for general use, SVG for vector graphics (editable in Illustrator)
 8. **Close Figures**: Call `plt.close()` after saving to free memory when generating many plots
+
+## Defensive Validation Patterns
+
+```python
+# Before plotting with AnnData color columns: verify they exist
+if hasattr(data, 'obs'):  # AnnData object
+    for col in color_columns:
+        assert col in data.obs.columns, f"Column '{col}' not found in adata.obs"
+    for basis in ['X_umap', 'X_pca']:
+        if basis in plot_args:
+            assert basis in data.obsm, f"Embedding '{basis}' not found. Compute it first."
+
+# Before heatmap: verify data is numeric
+if isinstance(data, pd.DataFrame):
+    non_numeric = data.select_dtypes(exclude='number').columns.tolist()
+    if non_numeric:
+        print(f"WARNING: Non-numeric columns will be skipped: {non_numeric}")
+```
 
 ## Troubleshooting
 
