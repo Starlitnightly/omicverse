@@ -48,6 +48,7 @@ import requests
 
 from ..agent_bridge import AgentBridge
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
+from ..model_help import render_model_help
 
 logger = logging.getLogger("omicverse.jarvis.qq")
 
@@ -1002,12 +1003,9 @@ class QQRuntime:
     async def _handle_model(self, target: QQTarget, msg_id: Optional[str], model_name: str) -> None:
         model_name = (model_name or "").strip()
         if not model_name:
-            cur = getattr(self._sm, "_model", "unknown")
-            await asyncio.to_thread(
-                self._send_text, target,
-                f"当前模型: {cur}\n使用 /model <名称> 切换，切换后请 /reset 使新模型生效。",
-                msg_id,
-            )
+            text = render_model_help(getattr(self._sm, "_model", "unknown"))
+            for chunk in self._text_chunks(text, limit=1800):
+                await asyncio.to_thread(self._send_text, target, chunk, msg_id)
             return
         self._sm._model = model_name
         await asyncio.to_thread(
