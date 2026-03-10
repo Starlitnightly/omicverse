@@ -165,27 +165,37 @@ nav:
             - ChatCell (Conversational):
                 - Guide: Tutorials-llm/t_fm_chatcell_guide.md
                 - Tutorial: Tutorials-llm/t_fm_chatcell.ipynb
-    - J.A.R.V.I.S.:
-        - Notebook/pipeline: 
-            - J.A.R.V.I.S. with PBMC3k: Tutorials-llm/t_ov_agent_pbmc3k.ipynb
-            - J.A.R.V.I.S. with Ten-Task Suite: Tutorials-llm/ov_agent_ten_task_suite.ipynb
-        - MCP Server:
-            - Overview: Tutorials-llm/t_mcp_guide.md
-            - Quick Start: Tutorials-llm/t_mcp_quickstart.md
-            - Full Start: Tutorials-llm/t_mcp_full_start.md
-            - Tool Catalog: Tutorials-llm/t_mcp_tools.md
-            - Clients and Deployment: Tutorials-llm/t_mcp_clients.md
-            - Runtime and Troubleshooting: Tutorials-llm/t_mcp_runtime.md
-            - Reference: Tutorials-llm/t_mcp_reference.md
-            - Claude Code Walkthrough: Tutorials-llm/t_mcp_claude_code.md
-        - Domain Research:  
-            - Basic Usage: Tutorials-llm/t_dr.ipynb
-            - Live Web: Tutorials-llm/t_dr_web.md
     - Plotting:
         - Visualization of single cell RNA-seq: Tutorials-plotting/t_visualize_single.ipynb
         - Visualization of bulk RNA-seq: Tutorials-plotting/t_visualize_bulk.ipynb
         - Palette optimization for publication-quality single-cell & spatial plots: Tutorials-plotting/t_palette.ipynb
         - Color system: Tutorials-plotting/t_visualize_colorsystem.ipynb
+- J.A.R.V.I.S. Tutorial:
+    - General[Notebook/pipeline]: 
+        - J.A.R.V.I.S. with PBMC3k: Tutorials-llm/t_ov_agent_pbmc3k.ipynb
+        - J.A.R.V.I.S. with Ten-Task Suite: Tutorials-llm/ov_agent_ten_task_suite.ipynb
+    - MCP Server[cli/agent]:
+        - Overview: Tutorials-llm/t_mcp_guide.md
+        - Quick Start: Tutorials-llm/t_mcp_quickstart.md
+        - Full Start: Tutorials-llm/t_mcp_full_start.md
+        - Tool Catalog: Tutorials-llm/t_mcp_tools.md
+        - Clients and Deployment: Tutorials-llm/t_mcp_clients.md
+        - Runtime and Troubleshooting: Tutorials-llm/t_mcp_runtime.md
+        - Reference: Tutorials-llm/t_mcp_reference.md
+        - Claude Code Walkthrough: Tutorials-llm/t_mcp_claude_code.md
+    - Msg Bot[telegram/feishu]:
+        - Overview: Tutorials-jarvis/t_msg_bot_overview.md
+        - Setup and Auth: Tutorials-jarvis/t_setup_auth.md
+        - Channel Entry Points: 
+            - Telegram Tutorial: Tutorials-jarvis/t_channel_telegram.md
+            - Feishu Tutorial: Tutorials-jarvis/t_channel_feishu.md
+            - iMessage Tutorial: Tutorials-jarvis/t_channel_imessage.md
+            - QQ Tutorial: Tutorials-jarvis/t_channel_qq.md
+        - Session Workflow: Tutorials-jarvis/t_session_commands.md
+        - Common Issues: Tutorials-jarvis/t_troubleshooting.md
+    - Domain Research:  
+        - Basic Usage: Tutorials-llm/t_dr.ipynb
+        - Live Web: Tutorials-llm/t_dr_web.md   
 - GPU Support: GPU_supported_registry_functions.md
 - API documentation: $api/omicverse.***
 - Release notes: Release_notes.md
