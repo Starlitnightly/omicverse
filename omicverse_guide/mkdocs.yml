@@ -170,8 +170,14 @@ nav:
             - J.A.R.V.I.S. with PBMC3k: Tutorials-llm/t_ov_agent_pbmc3k.ipynb
             - J.A.R.V.I.S. with Ten-Task Suite: Tutorials-llm/ov_agent_ten_task_suite.ipynb
         - MCP Server:
-            - MCP Server Guide: Tutorials-llm/t_mcp_guide.md
-            - Using OmicVerse MCP with Claude Code: Tutorials-llm/t_mcp_claude_code.md
+            - Overview: Tutorials-llm/t_mcp_guide.md
+            - Quick Start: Tutorials-llm/t_mcp_quickstart.md
+            - Full Start: Tutorials-llm/t_mcp_full_start.md
+            - Tool Catalog: Tutorials-llm/t_mcp_tools.md
+            - Clients and Deployment: Tutorials-llm/t_mcp_clients.md
+            - Runtime and Troubleshooting: Tutorials-llm/t_mcp_runtime.md
+            - Reference: Tutorials-llm/t_mcp_reference.md
+            - Claude Code Walkthrough: Tutorials-llm/t_mcp_claude_code.md
         - Domain Research:  
             - Basic Usage: Tutorials-llm/t_dr.ipynb
             - Live Web: Tutorials-llm/t_dr_web.md
