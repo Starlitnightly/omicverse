@@ -25,7 +25,7 @@ import threading
 import traceback
 import logging
 from contextlib import contextmanager
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -54,7 +54,7 @@ if _parent_pkg is not None and _utils_pkg is not None:
         setattr(_utils_pkg, module_name, sys.modules[__name__])
 
 # Internal LLM backend (Pantheon replacement)
-from .agent_backend import OmicVerseLLMBackend
+from .agent_backend import OmicVerseLLMBackend, Usage
 
 # Import registry system and model configuration
 from .._registry import _global_registry
@@ -468,14 +468,17 @@ class OmicVerseAgent:
 
     def _get_registry_stats(self) -> dict:
         """Get statistics about the function registry."""
-        # Get all unique functions from registry
-        unique_functions = set()
-        categories = set()
-        
-        for entry in _global_registry._registry.values():
-            unique_functions.add(entry['full_name'])
-            categories.add(entry['category'])
-        
+        # Use static AST scan to count all registered functions (not just imported ones)
+        static_entries = self._load_static_registry_entries()
+        unique_functions = set(e['full_name'] for e in static_entries)
+        categories = set(e['category'] for e in static_entries)
+
+        # Fall back to runtime registry if static scan finds nothing
+        if not unique_functions:
+            for entry in _global_registry._registry.values():
+                unique_functions.add(entry['full_name'])
+                categories.add(entry['category'])
+
         return {
             'total_functions': len(unique_functions),
             'categories': len(categories),
@@ -1389,6 +1392,803 @@ User request: "quality control with nUMI>500, mito<0.2"
             indent=2,
         )
 
+    @staticmethod
+    def _merge_usage_stats(usages: List[Optional[Usage]]) -> Optional[Usage]:
+        """Merge usage records from multiple lightweight codegen calls."""
+
+        valid = [usage for usage in usages if usage is not None]
+        if not valid:
+            return None
+
+        return Usage(
+            input_tokens=sum(max(0, usage.input_tokens) for usage in valid),
+            output_tokens=sum(max(0, usage.output_tokens) for usage in valid),
+            total_tokens=sum(max(0, usage.total_tokens) for usage in valid),
+            model=valid[-1].model,
+            provider=valid[-1].provider,
+        )
+
+    def _collect_relevant_registry_entries(
+        self,
+        request: str,
+        max_entries: int = 8,
+    ) -> List[Dict[str, Any]]:
+        """Return a compact set of registry entries relevant to a free-form request."""
+
+        if max_entries <= 0:
+            return []
+
+        self._ensure_runtime_registry_for_codegen()
+
+        runtime_entries = self._collect_runtime_registry_entries(
+            request,
+            max_entries=max_entries * 3,
+        )
+        static_entries = self._collect_static_registry_entries(
+            request,
+            max_entries=max_entries * 3,
+        )
+
+        merged: Dict[str, Tuple[float, int, Dict[str, Any]]] = {}
+        for raw_entry in [*runtime_entries, *static_entries]:
+            entry = self._normalize_registry_entry_for_codegen(raw_entry)
+            full_name = entry.get("full_name", "")
+            if not full_name:
+                continue
+            score = self._score_registry_entry_for_codegen(request, entry)
+            if score <= 0:
+                continue
+            # Prefer higher score, then runtime over static when tied.
+            source_rank = 1 if entry.get("source") == "runtime" else 0
+            current = merged.get(full_name)
+            if current is None or (score, source_rank) > (current[0], current[1]):
+                merged[full_name] = (score, source_rank, entry)
+
+        ranked = sorted(
+            merged.values(),
+            key=lambda item: (item[0], item[1], item[2].get("full_name", "")),
+            reverse=True,
+        )
+        return [entry for _, _, entry in ranked[:max_entries]]
+
+    def _ensure_runtime_registry_for_codegen(self) -> None:
+        """Hydrate the runtime registry when a partial lazy-import state is insufficient."""
+
+        if getattr(_global_registry, "_registry", None):
+            return
+
+        try:
+            from ..mcp.manifest import ensure_registry_populated
+
+            ensure_registry_populated()
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Runtime registry hydration for claw failed: %s", exc)
+
+    def _collect_runtime_registry_entries(
+        self,
+        request: str,
+        max_entries: int = 8,
+    ) -> List[Dict[str, Any]]:
+        """Query the in-memory registry when it has been hydrated successfully."""
+
+        if not getattr(_global_registry, "_registry", None):
+            return []
+
+        seen: set = set()
+        entries: List[Dict[str, Any]] = []
+
+        def _add_matches(query: str) -> None:
+            if not query or len(entries) >= max_entries:
+                return
+            for entry in _global_registry.find(query):
+                full_name = entry.get("full_name", "")
+                if not full_name or full_name in seen:
+                    continue
+                seen.add(full_name)
+                entries.append(entry)
+                if len(entries) >= max_entries:
+                    return
+
+        _add_matches(request)
+
+        keywords = [
+            token for token in re.findall(r"[A-Za-z_][A-Za-z0-9_\\.\\-]*", request or "")
+            if len(token) >= 2
+        ]
+        for keyword in keywords[:12]:
+            _add_matches(keyword)
+            if len(entries) >= max_entries:
+                break
+
+        return entries
+
+    def _normalize_registry_entry_for_codegen(self, entry: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert registry entries to public-facing ov.* names for code generation."""
+
+        normalized = dict(entry)
+        source = normalized.get("source")
+        normalized["source"] = "static_ast" if source == "static_ast" else "runtime"
+
+        original_full_name = str(normalized.get("full_name", "") or "")
+        normalized["registry_full_name"] = original_full_name
+
+        public_name = original_full_name
+        short_name = str(normalized.get("short_name") or normalized.get("name") or "")
+
+        if original_full_name.startswith("omicverse."):
+            parts = original_full_name.split(".")
+            if len(parts) >= 2:
+                domain = parts[1]
+                if domain == "_settings":
+                    public_name = f"ov.core.{short_name or parts[-1]}"
+                elif domain:
+                    public_name = f"ov.{domain}.{short_name or parts[-1]}"
+
+        normalized["full_name"] = public_name
+        return normalized
+
+    def _score_registry_entry_for_codegen(
+        self,
+        request: str,
+        entry: Dict[str, Any],
+    ) -> float:
+        """Score a registry entry for lightweight code generation retrieval."""
+
+        query = (request or "").strip().lower()
+        if not query:
+            return 0.0
+
+        tokens = [
+            token for token in re.findall(r"[a-z0-9_\\.\\-]+", query)
+            if len(token) >= 2
+        ]
+        aliases = [str(alias).lower() for alias in (entry.get("aliases") or [])]
+        haystack_parts = [
+            entry.get("name", ""),
+            entry.get("short_name", ""),
+            entry.get("full_name", ""),
+            entry.get("registry_full_name", ""),
+            entry.get("category", ""),
+            entry.get("description", ""),
+            " ".join(aliases),
+            " ".join(entry.get("examples", []) or []),
+        ]
+        haystack = " ".join(str(part) for part in haystack_parts).lower()
+
+        score = 0.0
+        if query == str(entry.get("full_name", "")).lower():
+            score += 10.0
+        if query == str(entry.get("short_name", "")).lower():
+            score += 9.0
+        if query in haystack:
+            score += 4.0
+
+        for alias in aliases:
+            if alias == query:
+                score += 8.0
+            elif alias and alias in query:
+                score += 2.0
+
+        for token in tokens:
+            if token in haystack:
+                score += 1.25
+
+        public_name = str(entry.get("full_name", ""))
+        if public_name.startswith(("ov.pp.", "ov.single.", "ov.pl.", "ov.bulk.", "ov.space.")):
+            score += 0.5
+
+        if public_name.startswith("ov.datasets.") and not any(
+            word in query for word in ("dataset", "download", "read", "load", "example", "demo")
+        ):
+            score -= 2.0
+
+        if public_name.startswith("ov.core.") and not any(
+            word in query for word in ("reference", "table", "gpu", "cpu", "settings")
+        ):
+            score -= 2.0
+
+        return score
+
+    def _load_static_registry_entries(self) -> List[Dict[str, Any]]:
+        """Parse @register_function metadata from source files without importing modules."""
+
+        cached = getattr(self, "_static_registry_entries_cache", None)
+        if cached is not None:
+            return cached
+
+        package_root = Path(__file__).resolve().parents[1]
+        search_roots = (
+            "pp", "pl", "single", "bulk", "space", "utils",
+            "io", "alignment", "external", "biocontext", "bulk2single", "datasets",
+        )
+        entries: List[Dict[str, Any]] = []
+        seen: set = set()
+
+        for root_name in search_roots:
+            root = package_root / root_name
+            if not root.exists():
+                continue
+            for file_path in sorted(root.rglob("*.py")):
+                if file_path.name == "__init__.py":
+                    continue
+                try:
+                    source = file_path.read_text(encoding="utf-8")
+                    tree = ast.parse(source, filename=str(file_path))
+                except Exception:
+                    continue
+
+                for node in tree.body:
+                    if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                        continue
+                    decorator = self._find_register_function_decorator(node)
+                    if decorator is None:
+                        continue
+                    entry = self._build_static_registry_entry(file_path, node, decorator)
+                    if not entry:
+                        continue
+                    full_name = entry.get("full_name", "")
+                    if not full_name or full_name in seen:
+                        continue
+                    seen.add(full_name)
+                    entries.append(entry)
+
+        self._static_registry_entries_cache = entries
+        return entries
+
+    @staticmethod
+    def _find_register_function_decorator(node: Union[ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef]) -> Optional[ast.Call]:
+        """Return the register_function decorator call when present."""
+
+        for decorator in node.decorator_list:
+            if not isinstance(decorator, ast.Call):
+                continue
+            func = decorator.func
+            if isinstance(func, ast.Name) and func.id == "register_function":
+                return decorator
+            if isinstance(func, ast.Attribute) and func.attr == "register_function":
+                return decorator
+        return None
+
+    @staticmethod
+    def _literal_eval_or_default(node: Optional[ast.AST], default: Any) -> Any:
+        if node is None:
+            return default
+        try:
+            return ast.literal_eval(node)
+        except Exception:
+            return default
+
+    @staticmethod
+    def _derive_static_signature(node: Union[ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef]) -> str:
+        """Build a lightweight signature string from AST."""
+
+        if isinstance(node, ast.ClassDef):
+            return f"{node.name}(...)"
+
+        arg_names = [arg.arg for arg in node.args.args]
+        if arg_names and arg_names[0] == "self":
+            arg_names = arg_names[1:]
+        return f"{node.name}({', '.join(arg_names)})"
+
+    def _build_static_registry_entry(
+        self,
+        file_path: Path,
+        node: Union[ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef],
+        decorator: ast.Call,
+    ) -> Optional[Dict[str, Any]]:
+        """Convert one @register_function AST node into a registry-like record."""
+
+        rel = file_path.relative_to(Path(__file__).resolve().parents[1])
+        if not rel.parts:
+            return None
+        domain = rel.parts[0]
+        if domain not in {"pp", "pl", "single", "bulk", "space", "utils"}:
+            return None
+
+        args = list(decorator.args)
+        aliases = self._literal_eval_or_default(args[0], []) if len(args) >= 1 else []
+        category = self._literal_eval_or_default(args[1], "") if len(args) >= 2 else ""
+        description = self._literal_eval_or_default(args[2], "") if len(args) >= 3 else ""
+        examples = self._literal_eval_or_default(args[3], []) if len(args) >= 4 else []
+
+        kw = {item.arg: item.value for item in decorator.keywords if item.arg}
+        aliases = self._literal_eval_or_default(kw.get("aliases"), aliases)
+        category = self._literal_eval_or_default(kw.get("category"), category)
+        description = self._literal_eval_or_default(kw.get("description"), description)
+        examples = self._literal_eval_or_default(kw.get("examples"), examples)
+        related = self._literal_eval_or_default(kw.get("related"), [])
+        prerequisites = self._literal_eval_or_default(kw.get("prerequisites"), {})
+        requires = self._literal_eval_or_default(kw.get("requires"), {})
+        produces = self._literal_eval_or_default(kw.get("produces"), {})
+
+        full_name = f"ov.{domain}.{node.name}"
+        module_name = "omicverse." + ".".join(rel.with_suffix("").parts)
+
+        return {
+            "name": node.name,
+            "short_name": node.name,
+            "full_name": full_name,
+            "module": module_name,
+            "aliases": aliases or [],
+            "category": category or domain,
+            "description": description or (ast.get_docstring(node) or ""),
+            "examples": examples or [],
+            "related": related or [],
+            "signature": self._derive_static_signature(node),
+            "docstring": ast.get_docstring(node) or "",
+            "prerequisites": prerequisites or {},
+            "requires": requires or {},
+            "produces": produces or {},
+            "source": "static_ast",
+        }
+
+    def _collect_static_registry_entries(
+        self,
+        request: str,
+        max_entries: int = 8,
+    ) -> List[Dict[str, Any]]:
+        """Search the static AST-derived registry snapshot."""
+
+        query = (request or "").strip().lower()
+        if not query:
+            return []
+
+        tokens = [token for token in re.findall(r"[a-z0-9_\\.\\-]+", query) if len(token) >= 2]
+        entries = self._load_static_registry_entries()
+        scored: List[Tuple[float, Dict[str, Any]]] = []
+
+        for entry in entries:
+            aliases = entry.get("aliases", []) or []
+            haystack = " ".join(
+                [
+                    entry.get("name", ""),
+                    entry.get("short_name", ""),
+                    entry.get("full_name", ""),
+                    entry.get("category", ""),
+                    entry.get("description", ""),
+                    " ".join(aliases),
+                    " ".join(entry.get("examples", []) or []),
+                ]
+            ).lower()
+
+            score = 0.0
+            if query == entry.get("name", "").lower():
+                score += 8.0
+            if query == entry.get("short_name", "").lower():
+                score += 8.0
+            if query == entry.get("full_name", "").lower():
+                score += 9.0
+            if query in haystack:
+                score += 4.0
+            for alias in aliases:
+                alias_lower = str(alias).lower()
+                if query == alias_lower:
+                    score += 8.0
+                elif alias_lower and alias_lower in query:
+                    score += 2.0
+            for token in tokens:
+                if token and token in haystack:
+                    score += 1.0
+
+            if score > 0:
+                scored.append((score, entry))
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        return [entry for _, entry in scored[:max_entries]]
+
+    def _select_codegen_skill_matches(self, request: str, top_k: int = 2) -> List[SkillMatch]:
+        """Select skills for codegen using the same loaded skill registry as Jarvis."""
+
+        if not self.skill_registry or not self.skill_registry.skill_metadata:
+            return []
+
+        try:
+            router = SkillRouter(self.skill_registry, min_score=0.1)
+            return router.route(request, top_k=top_k)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Skill routing failed for codegen: %s", exc)
+            return []
+
+    def _format_registry_context_for_codegen(
+        self,
+        entries: List[Dict[str, Any]],
+    ) -> str:
+        """Format a compact registry snippet for code-only generation."""
+
+        if not entries:
+            return "No highly relevant registry matches were found. Use the best OmicVerse API you know."
+
+        blocks: List[str] = []
+        for entry in entries:
+            full_name = entry.get("full_name", "")
+            signature = entry.get("signature", "")
+            description = entry.get("description", "")
+            examples = entry.get("examples", [])[:2]
+
+            block = [
+                f"Function: {full_name}",
+                f"Signature: {signature}",
+                f"Description: {description}",
+            ]
+            if examples:
+                block.append("Examples:")
+                for example in examples:
+                    block.append(f"- {example}")
+
+            prereq_text = self._format_prerequisites_for_codegen_entry(entry)
+            if prereq_text:
+                block.append("Prerequisites:")
+                block.append(prereq_text)
+
+            blocks.append("\n".join(block))
+
+        return "\n\n".join(blocks)
+
+    def _format_prerequisites_for_codegen_entry(self, entry: Dict[str, Any]) -> str:
+        """Format prerequisites from runtime registry or static AST metadata."""
+
+        full_name = entry.get("registry_full_name", entry.get("full_name", ""))
+        if getattr(_global_registry, "_registry", None):
+            prereq_text = _global_registry.format_prerequisites_for_llm(full_name)
+            if prereq_text and "not found" not in prereq_text.lower():
+                return prereq_text
+
+        prerequisites = entry.get("prerequisites", {}) or {}
+        requires = entry.get("requires", {}) or {}
+        produces = entry.get("produces", {}) or {}
+
+        parts: List[str] = []
+        required_functions = prerequisites.get("required", []) or prerequisites.get("functions", []) or []
+        optional_functions = prerequisites.get("optional", []) or []
+
+        if required_functions:
+            parts.append("  - Required functions: " + ", ".join(required_functions))
+        if optional_functions:
+            parts.append("  - Optional functions: " + ", ".join(optional_functions))
+
+        req_items = []
+        for key, values in requires.items():
+            for value in values:
+                req_items.append(f"adata.{key}['{value}']")
+        if req_items:
+            parts.append("  - Requires: " + ", ".join(req_items))
+
+        prod_items = []
+        for key, values in produces.items():
+            for value in values:
+                prod_items.append(f"adata.{key}['{value}']")
+        if prod_items:
+            parts.append("  - Produces: " + ", ".join(prod_items))
+
+        return "\n".join(parts)
+
+    def _build_code_generation_system_prompt(self, adata: Any) -> str:
+        """Build the code-only prompt on top of the fully initialized Agent prompt."""
+
+        base_prompt = ""
+        if self._llm is not None and getattr(self._llm, "config", None) is not None:
+            base_prompt = getattr(self._llm.config, "system_prompt", "") or ""
+        if not base_prompt:
+            base_prompt = self._build_agentic_system_prompt()
+
+        dataset_line = (
+            f"Dataset summary: {adata.shape[0]} cells x {adata.shape[1]} features."
+            if adata is not None and hasattr(adata, "shape")
+            else "No dataset object was provided."
+        )
+
+        return (
+            f"{base_prompt}\n\n"
+            "## Claw Code-Only Mode\n"
+            "Return ONLY executable Python code for the user's request.\n"
+            "Do not explain the code. Do not describe future actions. Do not execute tools.\n"
+            "Use OmicVerse APIs (`import omicverse as ov`) for all analysis steps.\n"
+            "Assume every needed Scanpy-style step has an OmicVerse `ov.*` wrapper available.\n"
+            "Do NOT import scanpy and do NOT call `sc.*` anywhere in the output.\n"
+            "If no dataset object is provided, assume an AnnData object named `adata` already exists unless the user explicitly asks to load data from disk.\n"
+            "When using in-place OmicVerse preprocessing functions, call them without assigning their return value.\n"
+            "Include imports that are actually needed.\n"
+            "Produce a single coherent snippet, not multiple alternatives.\n"
+            f"{dataset_line}\n"
+        )
+
+    def _build_code_generation_user_prompt(self, request: str, adata: Any) -> str:
+        """Build the lightweight user prompt for code-only generation."""
+
+        dataset_hint = (
+            "A live dataset object is available as `adata`."
+            if adata is not None
+            else "No live dataset object is available. Generate reusable code that assumes `adata` already exists."
+        )
+        return (
+            f"User request: {request}\n\n"
+            f"{dataset_hint}\n"
+            "Return Python code only."
+        )
+
+    @staticmethod
+    def _contains_forbidden_scanpy_usage(code: str) -> bool:
+        """Disallow raw scanpy usage in registry-first claw generation."""
+
+        if not code:
+            return False
+        patterns = [
+            r"^\s*import\s+scanpy\s+as\s+sc\b",
+            r"^\s*from\s+scanpy\b",
+            r"\bsc\.",
+        ]
+        return any(re.search(pattern, code, re.MULTILINE) for pattern in patterns)
+
+    def _rewrite_scanpy_calls_with_registry(
+        self,
+        code: str,
+        entries: List[Dict[str, Any]],
+    ) -> str:
+        """Best-effort mechanical rewrite from scanpy-style calls to ov.* calls."""
+
+        if not code:
+            return code
+
+        lookup: Dict[str, str] = {}
+        for raw_entry in entries:
+            entry = self._normalize_registry_entry_for_codegen(raw_entry)
+            public_name = str(entry.get("full_name", "") or "")
+            short_name = str(entry.get("short_name") or entry.get("name") or "").strip()
+            if not public_name.startswith("ov.") or not short_name:
+                continue
+            lookup.setdefault(short_name, public_name)
+            for alias in entry.get("aliases", []) or []:
+                alias_key = str(alias).strip().split(".")[-1]
+                if alias_key:
+                    lookup.setdefault(alias_key, public_name)
+
+        rewritten = re.sub(r"^\s*import\s+scanpy\s+as\s+sc\s*$", "", code, flags=re.MULTILINE)
+        rewritten = re.sub(r"^\s*from\s+scanpy\b.*$", "", rewritten, flags=re.MULTILINE)
+
+        def _replace(match: re.Match[str]) -> str:
+            func_name = match.group(1)
+            replacement = lookup.get(func_name)
+            if replacement:
+                return replacement + "("
+            return match.group(0)
+
+        rewritten = re.sub(r"\bsc\.(?:pp|tl|pl)\.([A-Za-z_][A-Za-z0-9_]*)\s*\(", _replace, rewritten)
+        rewritten = re.sub(r"\n{3,}", "\n\n", rewritten).strip()
+        return rewritten
+
+    async def _rewrite_code_without_scanpy(
+        self,
+        code: str,
+        request: str,
+        adata: Any,
+        registry_context: str = "",
+        skill_guidance: str = "",
+    ) -> Tuple[str, Optional[Usage]]:
+        """Rewrite code to strict OmicVerse-only style when scanpy slips in."""
+
+        backend = OmicVerseLLMBackend(
+            system_prompt=(
+                "You rewrite Python snippets to use OmicVerse APIs only.\n"
+                "Return ONLY executable Python code.\n"
+                "Do not import scanpy. Do not call sc.*.\n"
+            ),
+            model=self.model,
+            api_key=self.api_key,
+            endpoint=self.endpoint,
+            max_tokens=4096,
+            temperature=0.0,
+        )
+
+        dataset_line = (
+            f"Dataset summary: {adata.shape[0]} cells x {adata.shape[1]} features."
+            if adata is not None and hasattr(adata, "shape")
+            else "No dataset object is available."
+        )
+
+        prompt = (
+            f"User request: {request}\n"
+            f"{dataset_line}\n\n"
+            "Rewrite the code below so that all analysis calls use `ov.*` APIs only.\n"
+            "Keep the behavior aligned with the initialized OmicVerse Agent prompt.\n"
+        f"```python\n{code}\n```"
+        )
+
+        with self._temporary_api_keys():
+            response = await backend.run(prompt)
+
+        try:
+            rewritten = self._extract_python_code_strict(response)
+        except ValueError:
+            return code, backend.last_usage
+        return rewritten, backend.last_usage
+
+    async def _review_generated_code_lightweight(
+        self,
+        code: str,
+        request: str,
+        adata: Any,
+    ) -> Tuple[str, Optional[Usage]]:
+        """Run a lightweight reflection pass and return improved code if possible."""
+
+        dataset_line = (
+            f"Dataset summary: {adata.shape[0]} cells x {adata.shape[1]} features."
+            if adata is not None and hasattr(adata, "shape")
+            else "No dataset object is available."
+        )
+
+        backend = OmicVerseLLMBackend(
+            system_prompt=(
+                "You are a strict reviewer of OmicVerse Python code.\n"
+                "Return ONLY corrected executable Python code.\n"
+                "Do not add explanations.\n"
+            ),
+            model=self.model,
+            api_key=self.api_key,
+            endpoint=self.endpoint,
+            max_tokens=4096,
+            temperature=0.0,
+        )
+
+        prompt = (
+            f"User request: {request}\n"
+            f"{dataset_line}\n\n"
+            "Review the code below for correctness, OmicVerse API misuse, bad assumptions, "
+            "and obvious syntax/runtime issues. Keep it concise and executable.\n\n"
+            f"```python\n{code}\n```"
+        )
+
+        with self._temporary_api_keys():
+            response = await backend.run(prompt)
+
+        try:
+            return self._extract_python_code_strict(response), backend.last_usage
+        except ValueError:
+            return code, backend.last_usage
+
+    async def generate_code_async(
+        self,
+        request: str,
+        adata: Any = None,
+        *,
+        max_functions: int = 8,
+        progress_callback: Optional[Callable[[str], None]] = None,
+    ) -> str:
+        """Generate OmicVerse Python code without executing it."""
+
+        def _progress(message: str) -> None:
+            if progress_callback is None:
+                return
+            try:
+                progress_callback(message)
+            except Exception:
+                pass
+
+        if not request or not request.strip():
+            raise ValueError("request cannot be empty")
+
+        direct_code = self._detect_direct_python_request(request)
+        if direct_code:
+            self.last_usage = None
+            self.last_usage_breakdown = {
+                'generation': None,
+                'reflection': [],
+                'review': [],
+                'total': None,
+            }
+            return direct_code
+
+        _progress("prepare prompt")
+        backend = OmicVerseLLMBackend(
+            system_prompt=self._build_code_generation_system_prompt(adata),
+            model=self.model,
+            api_key=self.api_key,
+            endpoint=self.endpoint,
+            max_tokens=4096,
+            temperature=0.1,
+        )
+
+        _progress("request model")
+        with self._temporary_api_keys():
+            response_text = await backend.run(
+                self._build_code_generation_user_prompt(request, adata)
+            )
+
+        _progress("extract code")
+        try:
+            code = self._extract_python_code_strict(response_text)
+        except ValueError:
+            code = self._extract_python_code(response_text)
+        reflection_usages: List[Optional[Usage]] = []
+
+        if self.enable_reflection:
+            _progress("review code")
+            code, reflection_usage = await self._review_generated_code_lightweight(
+                code, request, adata
+            )
+            reflection_usages.append(reflection_usage)
+
+        rewrite_usages: List[Optional[Usage]] = []
+        if self._contains_forbidden_scanpy_usage(code):
+            _progress("rewrite scanpy")
+            rewrite_entries = self._collect_runtime_registry_entries(
+                request,
+                max_entries=max(16, max_functions * 2),
+            )
+            if not rewrite_entries:
+                rewrite_entries = self._collect_static_registry_entries(
+                    request,
+                    max_entries=max(16, max_functions * 2),
+                )
+            code = self._rewrite_scanpy_calls_with_registry(code, rewrite_entries)
+            code, rewrite_usage = await self._rewrite_code_without_scanpy(
+                code,
+                request,
+                adata,
+            )
+            rewrite_usages.append(rewrite_usage)
+            if self._contains_forbidden_scanpy_usage(code):
+                code = self._rewrite_scanpy_calls_with_registry(code, rewrite_entries)
+
+        _progress("finalize")
+        self.last_usage = self._merge_usage_stats([backend.last_usage, *reflection_usages, *rewrite_usages])
+        self.last_usage_breakdown = {
+            'generation': backend.last_usage,
+            'reflection': reflection_usages,
+            'review': rewrite_usages,
+            'total': self.last_usage,
+        }
+        return code
+
+    def generate_code(
+        self,
+        request: str,
+        adata: Any = None,
+        *,
+        max_functions: int = 8,
+        progress_callback: Optional[Callable[[str], None]] = None,
+    ) -> str:
+        """Synchronous wrapper for code-only OmicVerse generation."""
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            result_container: Dict[str, Any] = {}
+            error_container: Dict[str, BaseException] = {}
+
+            def _run_in_thread() -> None:
+                try:
+                    result_container["value"] = asyncio.run(
+                        self.generate_code_async(
+                            request,
+                            adata,
+                            max_functions=max_functions,
+                            progress_callback=progress_callback,
+                        )
+                    )
+                except BaseException as exc:  # pragma: no cover - propagate to caller
+                    error_container["error"] = exc
+
+            thread = threading.Thread(target=_run_in_thread, name="OmicVerseCodegenRunner")
+            thread.start()
+            thread.join()
+
+            if "error" in error_container:
+                raise error_container["error"]
+
+            return result_container.get("value", "")
+
+        return asyncio.run(
+            self.generate_code_async(
+                request,
+                adata,
+                max_functions=max_functions,
+                progress_callback=progress_callback,
+            )
+        )
+
     def _extract_python_code(self, response_text: str) -> str:
         """Extract executable Python code from the agent response using AST validation."""
 
@@ -1600,6 +2400,37 @@ User request: "quality control with nUMI>500, mito<0.2"
             dedented = "import omicverse as ov\n" + dedented
 
         return dedented
+
+    def _extract_python_code_strict(self, response_text: str) -> str:
+        """Extract executable Python code without logging errors or falling back."""
+
+        candidates = self._gather_code_candidates(response_text)
+        if not candidates:
+            raise ValueError("no code candidates found")
+
+        syntax_errors: List[str] = []
+        for i, candidate in enumerate(candidates, start=1):
+            try:
+                normalized = self._normalize_code_candidate(candidate)
+            except ValueError as exc:
+                syntax_errors.append(f"Candidate {i}: normalization failed - {exc}")
+                continue
+
+            try:
+                ast.parse(normalized)
+                transformer = ProactiveCodeTransformer()
+                transformed = transformer.transform(normalized)
+                ast.parse(transformed)
+                return transformed
+            except SyntaxError as exc:
+                syntax_errors.append(f"Candidate {i}: syntax error - {exc}")
+                continue
+
+        raise ValueError(
+            "Could not extract executable code: all "
+            f"{len(candidates)} candidate(s) failed validation.\nErrors:\n  - "
+            + "\n  - ".join(syntax_errors)
+        )
 
     async def _review_result(self, original_adata: Any, result_adata: Any, request: str, code: str) -> Dict[str, Any]:
         """
