@@ -31,6 +31,7 @@ import requests
 
 from ..agent_bridge import AgentBridge
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
+from ..model_help import render_model_help
 
 logger = logging.getLogger("omicverse.jarvis.feishu")
 
@@ -1188,11 +1189,9 @@ class FeishuRuntime:
     async def _handle_model(self, chat_id: str, model_name: str) -> None:
         model_name = (model_name or "").strip()
         if not model_name:
-            cur = getattr(self._sm, "_model", "unknown")
-            self._client.send_text(
-                chat_id,
-                f"🤖 当前模型: {cur}\n使用 /model <名称> 切换；切换后请 /reset 使新模型生效。",
-            )
+            text = render_model_help(getattr(self._sm, "_model", "unknown"))
+            for chunk in self._text_chunks(text):
+                self._client.send_text(chat_id, chunk)
             return
         self._sm._model = model_name
         self._client.send_text(
