@@ -7,6 +7,8 @@ import os
 import re
 import shlex
 import subprocess
+import sys
+import importlib
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -20,6 +22,52 @@ from typing import Any, Dict, List, Optional
 ALLOWED_CMDS = {"ls", "find", "cat", "head", "wc", "file", "du", "pwd", "tree"}
 UNLIMITED_PROMPTS_SENTINEL = 10**9
 DEFAULT_KERNEL_NAME = "main"
+
+
+def _ensure_local_omicverse_package_path() -> None:
+    """Ensure imports can resolve the local omicverse source tree in editable-like installs."""
+    package_dir = Path(__file__).resolve().parents[1]
+    utils_dir = package_dir / "utils"
+    repo_root = package_dir.parent
+
+    repo_root_str = str(repo_root)
+    if repo_root_str not in sys.path:
+        sys.path.insert(0, repo_root_str)
+
+    pkg = sys.modules.get("omicverse")
+    if pkg is None:
+        return
+
+    package_paths = getattr(pkg, "__path__", None)
+    if package_paths is None:
+        importlib.invalidate_caches()
+        return
+
+    package_dir_str = str(package_dir)
+    if package_dir_str not in package_paths:
+        package_paths.append(package_dir_str)
+
+    utils_pkg = sys.modules.get("omicverse.utils")
+    if utils_pkg is not None:
+        utils_paths = getattr(utils_pkg, "__path__", None)
+        utils_dir_str = str(utils_dir)
+        if utils_paths is not None and utils_dir_str not in utils_paths:
+            utils_paths.append(utils_dir_str)
+
+    importlib.invalidate_caches()
+
+
+def _load_agent_factory() -> Any:
+    """Return the OmicVerse Agent constructor without relying on top-level package exports."""
+    try:
+        from ..utils.smart_agent import Agent
+
+        return Agent
+    except ImportError:
+        _ensure_local_omicverse_package_path()
+        from omicverse.utils.smart_agent import Agent
+
+        return Agent
 
 
 class WorkspaceShell:
@@ -269,12 +317,14 @@ class SessionManager:
         session_dir: Optional[str] = None,
         model: str = "claude-sonnet-4-6",
         api_key: Optional[str] = None,
+        endpoint: Optional[str] = None,
         max_prompts: int = 0,
         verbose: bool = False,
     ) -> None:
         self._base      = Path(session_dir or os.path.expanduser("~/.ovjarvis"))
         self._model     = model
         self._api_key   = api_key
+        self._endpoint  = endpoint
         self._max_prompts_setting = max_prompts
         self._max_prompts = (
             max_prompts if max_prompts > 0 else UNLIMITED_PROMPTS_SENTINEL
@@ -380,8 +430,6 @@ class SessionManager:
         return names
 
     def _build_agent(self, kernel_root: Path) -> Any:
-        import omicverse as ov
-
         kwargs: Dict[str, Any] = dict(
             model=self._model,
             use_notebook_execution=True,
@@ -394,5 +442,8 @@ class SessionManager:
         )
         if self._api_key:
             kwargs["api_key"] = self._api_key
+        if self._endpoint:
+            kwargs["endpoint"] = self._endpoint
 
-        return ov.Agent(**kwargs)
+        agent_factory = _load_agent_factory()
+        return agent_factory(**kwargs)

@@ -1,6 +1,6 @@
 # OmicVerse Jarvis User Guide
 
-This guide explains how to start and use `omicverse jarvis` (a Telegram assistant for single-cell analysis).
+This guide explains how to start and use `omicverse jarvis` (a multi-channel assistant for single-cell analysis).
 
 ## 1. Install Dependencies
 
@@ -14,6 +14,12 @@ If you do not want editable install:
 
 ```bash
 pip install "omicverse[jarvis]"
+```
+
+For iMessage support on macOS, also install [`imsg`](https://github.com/steipete/imsg):
+
+```bash
+brew install steipete/tap/imsg
 ```
 
 ## 2. Create a Telegram Bot
@@ -53,7 +59,7 @@ Or:
 omicverse jarvis --token "your_telegram_bot_token"
 ```
 
-### 3.2 LLM API Key
+### 3.2 LLM Authentication
 
 Jarvis checks these environment variables in order:
 
@@ -69,12 +75,38 @@ export ANTHROPIC_API_KEY="your_api_key"
 
 You can also pass `--api-key`.
 
+If you want an OpenAI browser login instead of a raw API key, run:
+
+```bash
+omicverse jarvis --setup
+```
+
+The setup wizard can:
+
+- choose `iMessage`, `Telegram`, or `Feishu`
+- save channel credentials into `~/.ovjarvis/config.json`
+- configure OpenAI Codex OAuth (ChatGPT sign-in) or provider-specific API keys
+- pick models across OpenAI, Claude, Qwen, Kimi, DeepSeek, Zhipu, Gemini, Grok, Ollama, and other OpenAI-compatible endpoints
+- save custom endpoint settings for Ollama or other OpenAI-compatible gateways
+
 ## 4. Start Jarvis
 
 Minimal start:
 
 ```bash
 omicverse jarvis
+```
+
+First-run interactive setup:
+
+```bash
+omicverse jarvis --setup
+```
+
+Force the setup wizard language:
+
+```bash
+omicverse jarvis --setup --setup-language zh
 ```
 
 Telegram channel explicitly:
@@ -111,6 +143,15 @@ omicverse jarvis \
 
 For `websocket` mode, configure Feishu event subscription as long connection in the developer console. `--feishu-host/--feishu-port/--feishu-path` are not used.
 
+iMessage channel:
+
+```bash
+omicverse jarvis \
+  --channel imessage \
+  --imessage-cli-path "$(which imsg)" \
+  --imessage-db-path ~/Library/Messages/chat.db
+```
+
 Full example (all current CLI arguments):
 
 ```bash
@@ -128,15 +169,24 @@ omicverse jarvis \
 Parameter reference:
 
 - `--token`: Telegram token (or `TELEGRAM_BOT_TOKEN`)
-- `--channel`: backend channel (`telegram` or `feishu`, default: `telegram`)
+- `--setup`: run the interactive setup wizard
+- `--setup-language`: wizard language (`en` or `zh`, default UI: English)
+- `--config-file`: config path (default: `~/.ovjarvis/config.json`)
+- `--auth-file`: saved auth path (default: `~/.ovjarvis/auth.json`)
+- `--channel`: backend channel (`telegram`, `feishu`, `imessage`, or `qq`; config default if set)
 - `--feishu-app-id`: Feishu app id (or `FEISHU_APP_ID`)
 - `--feishu-app-secret`: Feishu app secret (or `FEISHU_APP_SECRET`)
 - `--feishu-connection-mode`: `webhook` or `websocket` (default: `websocket`)
 - `--feishu-verification-token`: webhook verification token (or `FEISHU_VERIFICATION_TOKEN`)
 - `--feishu-encrypt-key`: webhook encrypt key for encrypted callbacks (or `FEISHU_ENCRYPT_KEY`)
 - `--feishu-host/--feishu-port/--feishu-path`: Feishu webhook listen settings (used in `webhook` mode)
-- `--model`: model name (default: `claude-sonnet-4-6`)
-- `--api-key`: LLM key (or `ANTHROPIC_API_KEY/OPENAI_API_KEY/GEMINI_API_KEY`)
+- `--imessage-cli-path`: path to `imsg`
+- `--imessage-db-path`: path to `chat.db`
+- `--imessage-include-attachments`: include attachment metadata in iMessage watch events
+- `--auth-mode`: saved auth mode (`environment`, `openai_oauth` for OpenAI Codex OAuth, `openai_api_key`, `saved_api_key`, `no_auth`)
+- `--model`: model name (config default if set)
+- `--api-key`: LLM API key (or saved provider auth / provider-specific environment variable)
+- `--endpoint`: custom API base URL for Ollama or another OpenAI-compatible endpoint
 - `--max-prompts`: max prompts per kernel session (`0` disables auto-restart; default: 0)
 - `--session-dir`: session root directory (default: `~/.ovjarvis`)
 - `--allowed-user`: allowed username/ID (repeatable)
