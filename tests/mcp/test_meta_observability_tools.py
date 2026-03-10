@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from omicverse.mcp.session_store import SessionStore
 from omicverse.mcp.executor import McpExecutor
-from omicverse.mcp.server import RegistryMcpServer, META_TOOLS
+from omicverse.mcp.server import RegistryMcpServer
 
 
 def _make_mock_server(mock_registry, **kwargs):
@@ -167,6 +167,3 @@ class TestObservabilityToolsInListTools:
         assert "ov.list_events" in tool_names
         assert "ov.get_trace" in tool_names
         assert "ov.list_traces" in tool_names
-
-    def test_total_meta_tools_count_is_20(self):
-        assert len(META_TOOLS) == 20

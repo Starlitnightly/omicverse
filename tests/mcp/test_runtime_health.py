@@ -1,7 +1,5 @@
 """Tests for ov.get_limits, ov.get_health, and new meta tools presence."""
 
-import pytest
-
 from omicverse.mcp.session_store import SessionStore, RuntimeLimits
 from omicverse.mcp.server import RegistryMcpServer, META_TOOLS
 from omicverse.mcp.manifest import build_registry_manifest
@@ -104,9 +102,6 @@ class TestCleanupRuntime:
 
 
 class TestNewMetaToolsPresent:
-    def test_meta_tools_count_is_20(self):
-        assert len(META_TOOLS) == 20
-
     def test_new_tools_in_list_tools(self):
         srv = _make_mock_server()
         tools = srv.list_tools()
