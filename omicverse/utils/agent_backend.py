@@ -29,6 +29,7 @@ import logging
 import os
 import platform
 import random
+import re
 import ssl
 import textwrap
 import traceback
@@ -370,7 +371,7 @@ class OmicVerseLLMBackend:
         retry_backoff_factor: float = 2.0,
         retry_jitter: float = 0.5
     ) -> None:
-        provider = ModelConfig.get_provider_from_model(model)
+        provider = ModelConfig.get_provider_from_model(model, endpoint)
         self.config = BackendConfig(
             model=model,
             api_key=api_key,
@@ -525,11 +526,150 @@ class OmicVerseLLMBackend:
         used internally for routing but not accepted by the upstream APIs.
         """
         model = self.config.model
-        for prefix in ("anthropic/", "gemini/", "deepseek/", "moonshot/",
-                       "grok/", "zhipu/", "qwen/"):
+        try:
+            model = ModelConfig.normalize_model_id(model)
+        except Exception:
+            # Fall back to the raw configured model if normalization fails.
+            pass
+
+        for prefix in (
+            "openai/",
+            "google/",
+            "anthropic/",
+            "gemini/",
+            "deepseek/",
+            "minimax/",
+            "moonshot/",
+            "qianfan/",
+            "synthetic/",
+            "together/",
+            "xai/",
+            "xiaomi/",
+            "grok/",
+            "zhipu/",
+            "qwen/",
+        ):
             if model.startswith(prefix):
                 return model[len(prefix):]
         return model
+
+    def _effective_wire_api(self, provider_info: Any) -> WireAPI:
+        """Resolve the effective wire API for the configured provider."""
+        wire = provider_info.wire_api if provider_info is not None else WireAPI.CHAT_COMPLETIONS
+        if self.config.endpoint and wire == WireAPI.CHAT_COMPLETIONS:
+            if "claude" in self.config.model.lower():
+                return WireAPI.ANTHROPIC_MESSAGES
+        return wire
+
+    def _missing_api_key_error(self, provider_info: Any, fallback_display_name: str) -> RuntimeError:
+        display_name = fallback_display_name
+        env_key = ""
+        if provider_info is not None:
+            display_name = str(getattr(provider_info, "display_name", "") or display_name)
+            env_key = str(getattr(provider_info, "env_key", "") or "")
+        if env_key:
+            return RuntimeError(f"Missing {env_key} for {display_name} provider")
+        return RuntimeError(f"Missing API key for {display_name} provider")
+
+    def _apply_openai_chat_param_policy(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply known provider/model-specific chat-completions parameter overrides.
+
+        This mirrors OpenClaw's model-aware approach: treat provider/model
+        capabilities as distinct from the generic OpenAI-compatible wire format.
+        """
+        adapted = dict(kwargs)
+        wire_model = str(adapted.get("model") or self._wire_model_name()).strip()
+        wire_model_lower = wire_model.lower()
+
+        # Moonshot Kimi K2.5 currently only accepts temperature=1.
+        if self.config.provider == "moonshot" and wire_model_lower.startswith("kimi-k2.5"):
+            current_temperature = adapted.get("temperature")
+            if current_temperature != 1:
+                logger.info(
+                    "openai_chat_param_override model=%s provider=%s param=temperature from=%s to=1",
+                    self.config.model,
+                    self.config.provider,
+                    current_temperature,
+                )
+                adapted["temperature"] = 1
+
+        return adapted
+
+    def _extract_openai_error_text(self, exc: Exception) -> str:
+        if isinstance(exc, HTTPError):
+            try:
+                body = exc.read().decode("utf-8", errors="ignore").strip()
+                if body:
+                    return body
+            except Exception:
+                pass
+        text = str(exc or "").strip()
+        if text:
+            return text
+        response = getattr(exc, "response", None)
+        if response is not None:
+            body = getattr(response, "text", None)
+            if isinstance(body, str) and body.strip():
+                return body.strip()
+        return repr(exc)
+
+    def _adapt_openai_chat_kwargs_from_error(
+        self,
+        kwargs: Dict[str, Any],
+        exc: Exception,
+    ) -> Optional[tuple[Dict[str, Any], str]]:
+        """Best-effort one-shot adaptation for provider/model parameter mismatches."""
+        text = self._extract_openai_error_text(exc)
+        adapted = dict(kwargs)
+        changes: List[str] = []
+
+        for raw_param in re.findall(r"unsupported parameter:?\s*([a-zA-Z0-9_]+)", text, flags=re.IGNORECASE):
+            target_key = next((key for key in adapted.keys() if key.lower() == raw_param.lower()), None)
+            if target_key and target_key in adapted:
+                adapted.pop(target_key, None)
+                changes.append(f"removed {target_key}")
+
+        if re.search(r"invalid temperature:.*only\s+1\s+is allowed", text, flags=re.IGNORECASE):
+            if adapted.get("temperature") != 1:
+                adapted["temperature"] = 1
+                changes.append("set temperature=1")
+
+        if re.search(
+            r"tool_choice\s*['\"]?required['\"]?\s+is incompatible with thinking enabled",
+            text,
+            flags=re.IGNORECASE,
+        ):
+            if adapted.get("tool_choice") == "required":
+                adapted["tool_choice"] = "auto"
+                changes.append("downgraded tool_choice=auto")
+
+        if not changes or adapted == kwargs:
+            return None
+        return adapted, ", ".join(changes)
+
+    def _call_openai_chat_with_adaptation(
+        self,
+        request_fn: Callable[[Dict[str, Any]], Any],
+        kwargs: Dict[str, Any],
+        *,
+        base_url: str,
+    ) -> Any:
+        """Execute an OpenAI-compatible chat request with one adaptive retry."""
+        try:
+            return request_fn(kwargs)
+        except Exception as exc:
+            adapted = self._adapt_openai_chat_kwargs_from_error(kwargs, exc)
+            if adapted is None:
+                raise
+            retried_kwargs, change_summary = adapted
+            logger.info(
+                "openai_chat_retry_adapted model=%s provider=%s endpoint=%s changes=%s",
+                self.config.model,
+                self.config.provider,
+                base_url,
+                change_summary,
+            )
+            return request_fn(retried_kwargs)
 
     def _chat_sync(
         self,
@@ -544,15 +684,7 @@ class OmicVerseLLMBackend:
                 f"Provider '{self.config.provider}' is not registered."
             )
 
-        # When a custom endpoint is provided, choose protocol based on model:
-        # - Claude models → Anthropic Messages API (handles tool_use/tool_result correctly)
-        # - Other models → OpenAI Chat Completions
-        if self.config.endpoint:
-            if "claude" in self.config.model.lower():
-                return self._chat_tools_anthropic(messages, tools, tool_choice)
-            return self._chat_tools_openai(messages, tools, tool_choice)
-
-        wire = provider_info.wire_api
+        wire = self._effective_wire_api(provider_info)
         if wire == WireAPI.CHAT_COMPLETIONS:
             return self._chat_tools_openai(messages, tools, tool_choice)
         elif wire == WireAPI.ANTHROPIC_MESSAGES:
@@ -615,100 +747,107 @@ class OmicVerseLLMBackend:
             client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout_s)
 
             def _make_call():
-                # GPT-5 series requires max_completion_tokens instead of max_tokens
-                if ModelConfig.requires_responses_api(self.config.model):
-                    token_param = {"max_completion_tokens": self.config.max_tokens}
-                else:
-                    token_param = {"max_tokens": self.config.max_tokens}
+                try:
+                    # GPT-5 series requires max_completion_tokens instead of max_tokens
+                    if ModelConfig.requires_responses_api(self.config.model):
+                        token_param = {"max_completion_tokens": self.config.max_tokens}
+                    else:
+                        token_param = {"max_tokens": self.config.max_tokens}
 
-                kwargs = {
-                    "model": self._wire_model_name(),
-                    "messages": messages,
-                    "temperature": self.config.temperature,
-                    **token_param,
-                }
-                if tools:
-                    kwargs["tools"] = self._convert_tools_openai(tools)
-                    kwargs["tool_choice"] = tool_choice or "auto"
+                    kwargs = self._apply_openai_chat_param_policy({
+                        "model": self._wire_model_name(),
+                        "messages": messages,
+                        "temperature": self.config.temperature,
+                        **token_param,
+                    })
+                    if tools:
+                        kwargs["tools"] = self._convert_tools_openai(tools)
+                        kwargs["tool_choice"] = tool_choice or "auto"
 
-                logger.info(
-                    "openai_tool_chat_start model=%s provider=%s endpoint=%s tool_choice=%s messages=%d tools=%d timeout_s=%.1f",
-                    self.config.model,
-                    self.config.provider,
-                    base_url,
-                    kwargs.get("tool_choice", "none"),
-                    len(messages),
-                    len(tools or []),
-                    timeout_s,
-                )
-                resp = client.chat.completions.create(**kwargs)
-                logger.info(
-                    "openai_tool_chat_done model=%s finish_reason=%s choices=%d",
-                    self.config.model,
-                    getattr((resp.choices or [None])[0], "finish_reason", None),
-                    len(resp.choices or []),
-                )
-                choice = (resp.choices or [None])[0]
-                if not choice or not getattr(choice, "message", None):
-                    raise RuntimeError("No choices returned from the model")
+                    logger.info(
+                        "openai_tool_chat_start model=%s provider=%s endpoint=%s tool_choice=%s messages=%d tools=%d timeout_s=%.1f",
+                        self.config.model,
+                        self.config.provider,
+                        base_url,
+                        kwargs.get("tool_choice", "none"),
+                        len(messages),
+                        len(tools or []),
+                        timeout_s,
+                    )
+                    resp = self._call_openai_chat_with_adaptation(
+                        lambda payload: client.chat.completions.create(**payload),
+                        kwargs,
+                        base_url=base_url,
+                    )
+                    logger.info(
+                        "openai_tool_chat_done model=%s finish_reason=%s choices=%d",
+                        self.config.model,
+                        getattr((resp.choices or [None])[0], "finish_reason", None),
+                        len(resp.choices or []),
+                    )
+                    choice = (resp.choices or [None])[0]
+                    if not choice or not getattr(choice, "message", None):
+                        raise RuntimeError("No choices returned from the model")
 
-                # Capture usage
-                usage_obj = None
-                if hasattr(resp, 'usage') and resp.usage is not None:
-                    usage = resp.usage
-                    pt = _coerce_int(getattr(usage, 'prompt_tokens', None))
-                    ct = _coerce_int(getattr(usage, 'completion_tokens', None))
-                    tt = _compute_total(pt, ct, _coerce_int(getattr(usage, 'total_tokens', None)))
-                    if tt is not None:
-                        usage_obj = Usage(
-                            input_tokens=pt or 0,
-                            output_tokens=ct or 0,
-                            total_tokens=tt,
-                            model=self.config.model,
-                            provider=self.config.provider
-                        )
-                        self.last_usage = usage_obj
+                    # Capture usage
+                    usage_obj = None
+                    if hasattr(resp, 'usage') and resp.usage is not None:
+                        usage = resp.usage
+                        pt = _coerce_int(getattr(usage, 'prompt_tokens', None))
+                        ct = _coerce_int(getattr(usage, 'completion_tokens', None))
+                        tt = _compute_total(pt, ct, _coerce_int(getattr(usage, 'total_tokens', None)))
+                        if tt is not None:
+                            usage_obj = Usage(
+                                input_tokens=pt or 0,
+                                output_tokens=ct or 0,
+                                total_tokens=tt,
+                                model=self.config.model,
+                                provider=self.config.provider
+                            )
+                            self.last_usage = usage_obj
 
-                # Extract content and tool calls
-                msg = choice.message
-                content = msg.content or None
-                tc_list = []
-                if msg.tool_calls:
-                    for tc in msg.tool_calls:
-                        args_str = tc.function.arguments
-                        try:
-                            args = json.loads(args_str)
-                        except (json.JSONDecodeError, TypeError):
-                            args = {"raw": args_str}
-                        tc_list.append(ToolCall(
-                            id=tc.id,
-                            name=tc.function.name,
-                            arguments=args,
-                        ))
+                    # Extract content and tool calls
+                    msg = choice.message
+                    content = msg.content or None
+                    tc_list = []
+                    if msg.tool_calls:
+                        for tc in msg.tool_calls:
+                            args_str = tc.function.arguments
+                            try:
+                                args = json.loads(args_str)
+                            except (json.JSONDecodeError, TypeError):
+                                args = {"raw": args_str}
+                            tc_list.append(ToolCall(
+                                id=tc.id,
+                                name=tc.function.name,
+                                arguments=args,
+                            ))
 
-                stop = "tool_use" if tc_list else "end_turn"
-                if choice.finish_reason == "length":
-                    stop = "max_tokens"
+                    stop = "tool_use" if tc_list else "end_turn"
+                    if choice.finish_reason == "length":
+                        stop = "max_tokens"
 
-                # Build raw message dict for re-injection into messages list
-                raw_msg = {"role": "assistant", "content": content}
-                if tc_list:
-                    raw_msg["tool_calls"] = [
-                        {
-                            "id": tc.id,
-                            "type": "function",
-                            "function": {"name": tc.name, "arguments": json.dumps(tc.arguments)},
-                        }
-                        for tc in tc_list
-                    ]
+                    # Build raw message dict for re-injection into messages list
+                    raw_msg = {"role": "assistant", "content": content}
+                    if tc_list:
+                        raw_msg["tool_calls"] = [
+                            {
+                                "id": tc.id,
+                                "type": "function",
+                                "function": {"name": tc.name, "arguments": json.dumps(tc.arguments)},
+                            }
+                            for tc in tc_list
+                        ]
 
-                return ChatResponse(
-                    content=content,
-                    tool_calls=tc_list,
-                    stop_reason=stop,
-                    usage=usage_obj,
-                    raw_message=raw_msg,
-                )
+                    return ChatResponse(
+                        content=content,
+                        tool_calls=tc_list,
+                        stop_reason=stop,
+                        usage=usage_obj,
+                        raw_message=raw_msg,
+                    )
+                except Exception as exc:
+                    raise self._wrap_openai_connection_error(exc, base_url) from exc
 
             return self._retry(_make_call)
 
@@ -762,6 +901,27 @@ class OmicVerseLLMBackend:
             return f"pi ({system} {release}; {machine})"
         except Exception:
             return "pi (python)"
+
+    @staticmethod
+    def _is_ollama_endpoint(base_url: str) -> bool:
+        normalized = str(base_url or "").strip().lower().rstrip("/")
+        return (
+            "127.0.0.1:11434" in normalized
+            or "localhost:11434" in normalized
+            or normalized.endswith(":11434/v1")
+            or normalized.endswith(":11434")
+        )
+
+    def _wrap_openai_connection_error(self, exc: Exception, base_url: str) -> RuntimeError:
+        exc_name = type(exc).__name__.lower()
+        exc_text = str(exc).lower()
+        if "connection" not in exc_name and "connection" not in exc_text and "refused" not in exc_text:
+            return RuntimeError(str(exc))
+        if self._is_ollama_endpoint(base_url):
+            return RuntimeError(
+                f"Could not connect to Ollama at {base_url}. Start the Ollama server and verify the model is installed."
+            )
+        return RuntimeError(f"OpenAI-compatible connection failed for {base_url}: {exc}")
 
     def _build_openai_responses_request(
         self,
@@ -1217,7 +1377,7 @@ class OmicVerseLLMBackend:
         """Multi-turn chat via Anthropic Messages API with tool support."""
         api_key = self._resolve_api_key()
         if not api_key:
-            raise RuntimeError("Missing ANTHROPIC_API_KEY for Anthropic provider")
+            raise self._missing_api_key_error(get_provider(self.config.provider), "Anthropic")
 
         try:
             import anthropic  # type: ignore
@@ -1542,7 +1702,7 @@ class OmicVerseLLMBackend:
             }
 
         provider_info = get_provider(self.config.provider)
-        wire = provider_info.wire_api if provider_info else WireAPI.CHAT_COMPLETIONS
+        wire = self._effective_wire_api(provider_info)
 
         if wire == WireAPI.ANTHROPIC_MESSAGES:
             return {
@@ -1574,14 +1734,7 @@ class OmicVerseLLMBackend:
                 "Please choose a supported model or register the provider first."
             )
 
-        # Custom endpoint: Claude → Anthropic protocol, others → OpenAI
-        if self.config.endpoint:
-            if "claude" in self.config.model.lower():
-                method_name = _SYNC_DISPATCH.get(WireAPI.ANTHROPIC_MESSAGES)
-            else:
-                method_name = _SYNC_DISPATCH.get(WireAPI.CHAT_COMPLETIONS)
-        else:
-            method_name = _SYNC_DISPATCH.get(provider_info.wire_api)
+        method_name = _SYNC_DISPATCH.get(self._effective_wire_api(provider_info))
         if method_name is None:
             raise RuntimeError(
                 f"Provider '{self.config.provider}' (wire={provider_info.wire_api.value}) "
@@ -1692,17 +1845,23 @@ class OmicVerseLLMBackend:
             from openai import OpenAI  # type: ignore
 
             client = OpenAI(base_url=base_url, api_key=api_key)
+            wire_model = self._wire_model_name()
 
             # Wrap SDK call with retry logic
             def _make_sdk_call():
-                resp = client.chat.completions.create(
-                    model=self.config.model,
-                    messages=[
+                kwargs = self._apply_openai_chat_param_policy({
+                    "model": wire_model,
+                    "messages": [
                         {"role": "system", "content": self.config.system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
-                    temperature=self.config.temperature,
-                    max_tokens=self.config.max_tokens,
+                    "temperature": self.config.temperature,
+                    "max_tokens": self.config.max_tokens,
+                })
+                resp = self._call_openai_chat_with_adaptation(
+                    lambda payload: client.chat.completions.create(**payload),
+                    kwargs,
+                    base_url=base_url,
                 )
                 choice = (resp.choices or [None])[0]
                 if not choice or not getattr(choice, "message", None):
@@ -1748,16 +1907,15 @@ class OmicVerseLLMBackend:
 
     def _chat_via_openai_http(self, base_url: str, api_key: str, user_prompt: str) -> str:
         url = base_url.rstrip("/") + "/chat/completions"
-        body = {
-            "model": self.config.model,
+        body = self._apply_openai_chat_param_policy({
+            "model": self._wire_model_name(),
             "messages": [
                 {"role": "system", "content": self.config.system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": self.config.temperature,
             "max_tokens": self.config.max_tokens,
-        }
-        data = json.dumps(body).encode("utf-8")
+        })
 
         headers = {
             "Content-Type": "application/json",
@@ -1766,20 +1924,19 @@ class OmicVerseLLMBackend:
 
         # Wrap HTTP call with retry logic
         def _make_http_call():
-            req = urllib_request.Request(url, data=data, headers=headers, method="POST")
-            # SSL certificate verification is enabled by default for security
-            ctx = ssl.create_default_context()
-            try:
+            def _request_with_kwargs(payload: Dict[str, Any]) -> str:
+                data = json.dumps(payload).encode("utf-8")
+                req = urllib_request.Request(url, data=data, headers=headers, method="POST")
+                ctx = ssl.create_default_context()
                 with urllib_request.urlopen(req, context=ctx, timeout=90) as resp:
                     content = resp.read().decode("utf-8")
-                    payload = json.loads(content)
-                    choices = payload.get("choices", [])
+                    parsed = json.loads(content)
+                    choices = parsed.get("choices", [])
                     if not choices:
-                        raise RuntimeError(f"No choices in response: {payload}")
+                        raise RuntimeError(f"No choices in response: {parsed}")
                     msg = choices[0].get("message", {})
 
-                    # Capture usage information
-                    usage_data = payload.get("usage", {})
+                    usage_data = parsed.get("usage", {})
                     if usage_data:
                         self.last_usage = Usage(
                             input_tokens=usage_data.get('prompt_tokens', 0),
@@ -1790,6 +1947,13 @@ class OmicVerseLLMBackend:
                         )
 
                     return msg.get("content", "")
+
+            try:
+                return self._call_openai_chat_with_adaptation(
+                    _request_with_kwargs,
+                    body,
+                    base_url=base_url,
+                )
             except Exception as exc:
                 raise RuntimeError(
                     f"OpenAI-compatible HTTP call failed: {type(exc).__name__}: {exc}"
@@ -2288,7 +2452,7 @@ class OmicVerseLLMBackend:
     def _chat_via_anthropic(self, user_prompt: str) -> str:
         api_key = self._resolve_api_key()
         if not api_key:
-            raise RuntimeError("Missing ANTHROPIC_API_KEY for Anthropic provider")
+            raise self._missing_api_key_error(get_provider(self.config.provider), "Anthropic")
         try:
             import anthropic  # type: ignore
 
@@ -2544,19 +2708,25 @@ class OmicVerseLLMBackend:
             from openai import OpenAI  # type: ignore
 
             client = OpenAI(base_url=base_url, api_key=api_key)
+            wire_model = self._wire_model_name()
 
             # Generator function for streaming with retry on session creation
             def _stream_sdk():
                 def _create_stream():
-                    return client.chat.completions.create(
-                        model=self.config.model,
-                        messages=[
+                    kwargs = self._apply_openai_chat_param_policy({
+                        "model": wire_model,
+                        "messages": [
                             {"role": "system", "content": self.config.system_prompt},
                             {"role": "user", "content": user_prompt},
                         ],
-                        temperature=self.config.temperature,
-                        max_tokens=self.config.max_tokens,
-                        stream=True,
+                        "temperature": self.config.temperature,
+                        "max_tokens": self.config.max_tokens,
+                        "stream": True,
+                    })
+                    return self._call_openai_chat_with_adaptation(
+                        lambda payload: client.chat.completions.create(**payload),
+                        kwargs,
+                        base_url=base_url,
                     )
 
                 # Retry stream creation on transient failures
@@ -2739,7 +2909,7 @@ class OmicVerseLLMBackend:
         """Stream responses from Anthropic Claude models with retry on session creation."""
         api_key = self._resolve_api_key()
         if not api_key:
-            raise RuntimeError("Missing ANTHROPIC_API_KEY for Anthropic provider")
+            raise self._missing_api_key_error(get_provider(self.config.provider), "Anthropic")
 
         try:
             import anthropic  # type: ignore

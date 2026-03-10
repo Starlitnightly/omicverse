@@ -270,7 +270,7 @@ class OmicVerseAgent:
         self.api_key = api_key
         self.endpoint = endpoint or ModelConfig.get_endpoint_for_model(model)
         # Store provider to allow provider-aware formatting of skills
-        self.provider = ModelConfig.get_provider_from_model(model)
+        self.provider = ModelConfig.get_provider_from_model(model, self.endpoint)
         self._llm: Optional[OmicVerseLLMBackend] = None
         self.skill_registry: Optional[SkillRegistry] = None
         self._skill_overview_text: str = ""
@@ -314,7 +314,7 @@ class OmicVerseAgent:
         self._initialize_skill_registry()
 
         # Display model info
-        provider = ModelConfig.get_provider_from_model(model)
+        provider = ModelConfig.get_provider_from_model(model, self.endpoint)
         model_desc = ModelConfig.get_model_description(model)
         print(f"    Model: {model_desc}")
         print(f"    Provider: {provider.title()}")
@@ -519,7 +519,7 @@ class OmicVerseAgent:
         if required_key:
             env_mapping[required_key] = api_key
 
-        provider = ModelConfig.get_provider_from_model(self.model)
+        provider = ModelConfig.get_provider_from_model(self.model, self.endpoint)
         if provider == "openai":
             # Ensure OPENAI_API_KEY is always populated for OpenAI-compatible SDKs
             env_mapping.setdefault("OPENAI_API_KEY", api_key)

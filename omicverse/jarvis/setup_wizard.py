@@ -10,7 +10,14 @@ import sys
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from .config import load_auth, save_auth
-from .model_registry import model_description, provider_env_vars, provider_from_model, provider_models
+from .model_registry import (
+    discover_provider_models,
+    model_description,
+    provider_base_url,
+    provider_env_vars,
+    provider_from_model,
+    provider_models,
+)
 from .openai_oauth import OPENAI_CODEX_BASE_URL, OpenAIOAuthManager
 
 Language = str
@@ -25,7 +32,12 @@ _PROVIDER_ORDER: List[str] = [
     "anthropic",
     "dashscope",
     "moonshot",
+    "minimax",
+    "together",
     "deepseek",
+    "qianfan",
+    "xiaomi",
+    "synthetic",
     "zhipu",
     "google",
     "xai",
@@ -57,15 +69,39 @@ _PROVIDER_MODEL_CHOICES: Dict[str, List[str]] = {
         "qwq-plus",
     ],
     "moonshot": [
+        "moonshot/kimi-k2.5",
         "moonshot/kimi-latest",
         "moonshot/kimi-k2-0711-preview",
         "moonshot/kimi-k2-turbo-preview",
         "moonshot/moonshot-v1-32k",
         "moonshot/moonshot-v1-128k",
     ],
+    "minimax": [
+        "minimax/MiniMax-M2.1",
+        "minimax/MiniMax-M2.1-lightning",
+        "minimax/MiniMax-VL-01",
+    ],
+    "together": [
+        "together/moonshotai/Kimi-K2.5",
+        "together/zai-org/GLM-4.7",
+        "together/deepseek-ai/DeepSeek-V3.1",
+        "together/deepseek-ai/DeepSeek-R1",
+    ],
     "deepseek": [
         "deepseek-chat",
         "deepseek-reasoner",
+    ],
+    "qianfan": [
+        "qianfan/deepseek-v3.2",
+        "qianfan/ernie-5.0-thinking-preview",
+    ],
+    "xiaomi": [
+        "xiaomi/mimo-v2-flash",
+    ],
+    "synthetic": [
+        "synthetic/hf:MiniMaxAI/MiniMax-M2.1",
+        "synthetic/hf:moonshotai/Kimi-K2.5",
+        "synthetic/hf:zai-org/GLM-4.5",
     ],
     "zhipu": [
         "zhipu/glm-4.5",
@@ -155,7 +191,12 @@ _COPY: Dict[Language, Dict[str, str]] = {
         "provider_anthropic": "Anthropic (Claude)",
         "provider_dashscope": "Qwen / DashScope",
         "provider_moonshot": "Kimi / Moonshot",
+        "provider_minimax": "MiniMax",
+        "provider_together": "Together AI",
         "provider_deepseek": "DeepSeek",
+        "provider_qianfan": "Baidu Qianfan",
+        "provider_xiaomi": "Xiaomi MiMo",
+        "provider_synthetic": "Synthetic",
         "provider_zhipu": "Zhipu AI (GLM)",
         "provider_google": "Google Gemini",
         "provider_xai": "Grok / xAI",
@@ -236,7 +277,12 @@ _COPY: Dict[Language, Dict[str, str]] = {
         "provider_anthropic": "Anthropic（Claude）",
         "provider_dashscope": "千问 / DashScope",
         "provider_moonshot": "Kimi / Moonshot",
+        "provider_minimax": "MiniMax",
+        "provider_together": "Together AI",
         "provider_deepseek": "DeepSeek",
+        "provider_qianfan": "百度千帆",
+        "provider_xiaomi": "小米 MiMo",
+        "provider_synthetic": "Synthetic",
         "provider_zhipu": "智谱 AI（GLM）",
         "provider_google": "Google Gemini",
         "provider_xai": "Grok / xAI",
@@ -530,6 +576,9 @@ def _default_model_for_provider(provider_name: str) -> str:
     options = _PROVIDER_MODEL_CHOICES.get(provider_name) or []
     if options:
         return options[0]
+    registry_models = list(provider_models(provider_name).keys())
+    if registry_models:
+        return registry_models[0]
     return "gpt-5.4"
 
 
@@ -567,6 +616,8 @@ def _model_label(model: str) -> str:
 def _provider_model_options(
     provider_name: str,
     *,
+    current_model: str = "",
+    discovered_models: Optional[Sequence[str]] = None,
     preferred_models: Optional[Sequence[str]] = None,
     include_registry: bool = True,
 ) -> List[str]:
@@ -575,7 +626,10 @@ def _provider_model_options(
     result: List[str] = []
 
     registry_models = list(provider_models(provider_name).keys()) if include_registry else []
-    for model in preferred + registry_models:
+    dynamic_models = list(discovered_models or [])
+    if current_model:
+        preferred = [current_model, *preferred]
+    for model in dynamic_models + preferred + registry_models:
         if model in seen:
             continue
         seen.add(model)
@@ -588,6 +642,8 @@ def _prompt_model(
     default_model: str,
     language: Language,
     *,
+    current_model: str = "",
+    discovered_models: Optional[Sequence[str]] = None,
     preferred_models: Optional[Sequence[str]] = None,
     include_registry: bool = True,
 ) -> str:
@@ -596,10 +652,12 @@ def _prompt_model(
 
     models = _provider_model_options(
         provider_name,
+        current_model=current_model,
+        discovered_models=discovered_models,
         preferred_models=preferred_models,
         include_registry=include_registry,
     )
-    options: List[Tuple[str, str]] = [(model, _model_label(model)) for model in models[:8]]
+    options: List[Tuple[str, str]] = [(model, _model_label(model)) for model in models[:16]]
     options.append(("__custom__", _copy(language, "custom_model")))
     option_values = {value for value, _label in options}
     selected = _prompt_choice(
@@ -723,6 +781,48 @@ def _prompt_saved_api_key(
     _store_provider_api_key(auth_manager.auth_path, provider_name, api_key)
 
 
+def _discovery_api_key(
+    *,
+    provider_name: str,
+    auth_mode: str,
+    auth_manager: OpenAIOAuthManager,
+) -> Optional[str]:
+    if auth_mode == "saved_api_key":
+        return _saved_provider_api_key(auth_manager.auth_path, provider_name) or None
+    if auth_mode == "environment":
+        for env_name in provider_env_vars(provider_name):
+            value = os.environ.get(env_name)
+            if value:
+                return value
+        return None
+    if auth_mode == "openai_oauth" and provider_name == "openai":
+        try:
+            return auth_manager.ensure_access_token(refresh_if_needed=True)
+        except Exception:
+            return None
+    return None
+
+
+def _discover_models_for_prompt(
+    *,
+    provider_name: str,
+    auth_mode: str,
+    endpoint: Optional[str],
+    auth_manager: OpenAIOAuthManager,
+) -> List[str]:
+    api_key = _discovery_api_key(
+        provider_name=provider_name,
+        auth_mode=auth_mode,
+        auth_manager=auth_manager,
+    )
+    discovered = discover_provider_models(
+        provider_name,
+        endpoint=endpoint,
+        api_key=api_key,
+    )
+    return list(discovered.keys())
+
+
 def _configure_llm(
     config: Dict[str, Any],
     auth_manager: OpenAIOAuthManager,
@@ -775,6 +875,13 @@ def _configure_llm(
                 provider_name,
                 default_model,
                 language,
+                current_model=str(next_config.get("model") or ""),
+                discovered_models=_discover_models_for_prompt(
+                    provider_name=provider_name,
+                    auth_mode=auth_mode,
+                    endpoint=next_config["endpoint"],
+                    auth_manager=auth_manager,
+                ),
                 preferred_models=_OPENAI_CODEX_MODEL_CHOICES,
                 include_registry=False,
             )
@@ -785,7 +892,18 @@ def _configure_llm(
             _prompt_saved_api_key(provider_name=provider_name, auth_manager=auth_manager, language=language)
 
         default_model = _openai_model_default(str(next_config.get("model") or ""), auth_mode)
-        next_config["model"] = _prompt_model(provider_name, default_model, language)
+        next_config["model"] = _prompt_model(
+            provider_name,
+            default_model,
+            language,
+            current_model=str(next_config.get("model") or ""),
+            discovered_models=_discover_models_for_prompt(
+                provider_name=provider_name,
+                auth_mode=auth_mode,
+                endpoint=None,
+                auth_manager=auth_manager,
+            ),
+        )
         return next_config
 
     auth_options: List[Tuple[str, str]] = [
@@ -814,7 +932,7 @@ def _configure_llm(
         print(f"\n{_copy(language, 'endpoint_config')}")
         endpoint = _prompt_text(
             _copy(language, "endpoint_prompt"),
-            str(next_config.get("endpoint") or OLLAMA_DEFAULT_ENDPOINT),
+            str(next_config.get("endpoint") or provider_base_url("ollama") or OLLAMA_DEFAULT_ENDPOINT),
         )
         if not endpoint.strip():
             raise RuntimeError(_copy(language, "endpoint_required"))
@@ -824,7 +942,7 @@ def _configure_llm(
         print(f"\n{_copy(language, 'endpoint_config')}")
         endpoint = _prompt_text(
             _copy(language, "endpoint_prompt"),
-            str(next_config.get("endpoint") or OPENAI_COMPATIBLE_DEFAULT_ENDPOINT),
+            str(next_config.get("endpoint") or provider_base_url("openai_compatible") or OPENAI_COMPATIBLE_DEFAULT_ENDPOINT),
         )
         if not endpoint.strip():
             raise RuntimeError(_copy(language, "endpoint_required"))
@@ -836,7 +954,18 @@ def _configure_llm(
         _prompt_saved_api_key(provider_name=provider_name, auth_manager=auth_manager, language=language)
 
     default_model = _model_default_for_provider(provider_name, str(next_config.get("model") or ""))
-    next_config["model"] = _prompt_model(provider_name, default_model, language)
+    next_config["model"] = _prompt_model(
+        provider_name,
+        default_model,
+        language,
+        current_model=str(next_config.get("model") or ""),
+        discovered_models=_discover_models_for_prompt(
+            provider_name=provider_name,
+            auth_mode=auth_mode,
+            endpoint=next_config.get("endpoint"),
+            auth_manager=auth_manager,
+        ),
+    )
     return next_config
 
 
