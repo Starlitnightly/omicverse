@@ -49,17 +49,52 @@ python -m omicverse.mcp --phase P0+P0.5+P2
 python -m omicverse.mcp --session-id my_analysis --persist-dir /data/ov_persist
 ```
 
-The server uses **stdio transport** (JSON-RPC over stdin/stdout). All log output goes to stderr.
+By default, the server uses **stdio transport** (JSON-RPC over stdin/stdout). All log output goes to stderr.
+
+### Transport Modes
+
+OmicVerse MCP currently supports two local transport modes:
+
+- `stdio`: best for generic MCP clients that launch the server as a subprocess
+- `streamable-http`: useful when you want to keep OmicVerse running as a separate local MCP service and have the client connect to it over localhost
+
+#### Stdio mode
+
+```bash
+python -m omicverse.mcp --transport stdio --phase P0+P0.5
+```
+
+#### Local HTTP mode
+
+```bash
+NUMBA_CACHE_DIR=/tmp/numba_cache MPLCONFIGDIR=/tmp/mpl \
+python -m omicverse.mcp \
+  --transport streamable-http \
+  --host 127.0.0.1 \
+  --port 8765 \
+  --http-path /mcp \
+  --phase P0+P0.5
+```
+
+This starts a local MCP endpoint at `http://127.0.0.1:8765/mcp`.
+
+!!! note "Local OAuth for Claude Code / Claude Desktop"
+
+    In `streamable-http` mode, OmicVerse exposes a minimal localhost OAuth flow for MCP client authentication. This is intended for local development only. Tokens and client registrations are stored in memory and are reset when the server process restarts.
 
 ### CLI Flags
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--phase` | `P0+P0.5` | Rollout phase(s) to expose |
+| `--transport` | `stdio` | MCP transport: `stdio` or `streamable-http` |
 | `--session-id` | `default` | Logical session identifier for handle isolation |
 | `--persist-dir` | (tempdir) | Directory for persisting AnnData via `ov.persist_adata` |
 | `--max-adata` | `50` | Max AnnData handles per session |
 | `--max-artifacts` | `200` | Max artifact handles per session |
+| `--host` | `127.0.0.1` | Bind host for `streamable-http` |
+| `--port` | `8765` | Bind port for `streamable-http` |
+| `--http-path` | `/mcp` | Route path for `streamable-http` |
 | `--version` | — | Show version and exit |
 
 ---
@@ -351,33 +386,68 @@ Artifacts are references to files produced during analysis — plots, tables, ex
 
 ### Claude Code / Claude Desktop
 
-Add the following to your MCP server configuration (`claude_desktop_config.json` or Claude Code settings):
+Claude Code and Claude Desktop support **both** OmicVerse startup styles:
+
+- `stdio`: Claude launches `omicverse.mcp` as a subprocess directly
+- `streamable-http`: you start OmicVerse yourself as a local MCP service, then Claude connects to that local URL
+
+#### Option A: Claude launches OmicVerse directly with stdio
 
 ```json
 {
   "mcpServers": {
     "omicverse": {
       "command": "python",
-      "args": ["-m", "omicverse.mcp", "--phase", "P0+P0.5"],
+      "args": ["-m", "omicverse.mcp", "--transport", "stdio", "--phase", "P0+P0.5"],
       "env": {}
     }
   }
 }
 ```
 
-Or using the CLI entrypoint:
+This is the original and still-supported mode. It is the simplest option when you want Claude to own the MCP process lifecycle.
+
+#### Option B: Run OmicVerse yourself, then connect Claude over local HTTP
+
+Start the server first:
+
+```bash
+python -m omicverse.mcp \
+  --transport streamable-http \
+  --host 127.0.0.1 \
+  --port 8765 \
+  --http-path /mcp \
+  --phase P0+P0.5
+```
+
+Then add the following to your MCP server configuration (`claude_desktop_config.json` or Claude Code settings):
 
 ```json
 {
   "mcpServers": {
     "omicverse": {
-      "command": "omicverse-mcp",
-      "args": ["--phase", "P0+P0.5"],
-      "env": {}
+      "type": "http",
+      "url": "http://127.0.0.1:8765/mcp"
     }
   }
 }
 ```
+
+You can also add it from the CLI:
+
+```bash
+claude mcp add --transport http -s local omicverse http://127.0.0.1:8765/mcp
+```
+
+!!! note "When to prefer local HTTP mode"
+
+    Use `streamable-http` when you want to:
+
+    - inspect the OmicVerse MCP server independently from Claude
+    - keep one local MCP process running across multiple client reconnects
+    - debug server-side logs without relying on Claude-managed subprocess lifecycle
+
+    This mode does **not** replace stdio support. It is an additional localhost forwarding/connection mode for clients that support HTTP MCP.
 
 !!! tip "Adding persistence"
 
@@ -431,7 +501,7 @@ print(result)
 - **P2 tools are availability-gated**: They appear in tool listings but may return `tool_unavailable` if runtime dependencies are missing. Always check with `ov.describe_tool` before calling a P2 tool.
 - **extended-runtime is constrained**: SEACells tools work, but `mira-multiome` is currently blocked (heavy dependencies: torch, pyro-ppl, MOODS-python). Not all P2 tools can run in every environment.
 - **Instance handles are ephemeral**: Class instances (P2) are lost on server restart and cannot be persisted.
-- **stdio transport only**: The server supports stdio (JSON-RPC) transport. HTTP/SSE transport is not available.
+- **Local HTTP auth is development-only**: The built-in localhost OAuth flow is meant for local MCP clients. It is memory-only and should not be exposed to untrusted networks.
 - **Single-process**: The server runs single-threaded. Concurrent tool calls are processed sequentially.
 - **No result streaming**: Large outputs (e.g. marker tables) are returned as complete JSON.
 
@@ -481,3 +551,10 @@ Follow the `suggested_next_tools` in the error response.
 
 - Check stderr for import errors.
 - Ensure `mcp>=1.0` is installed: `pip install "mcp>=1.0"`.
+- If using `streamable-http`, ensure `uvicorn` and `starlette` are installed.
+
+**Claude Code HTTP connection shows auth/discovery errors**
+
+- Make sure you started OmicVerse with `--transport streamable-http`.
+- Verify the configured URL matches the running server exactly, for example `http://127.0.0.1:8765/mcp`.
+- Restart the local OmicVerse MCP server after code changes; local OAuth registrations and tokens are stored in memory only.

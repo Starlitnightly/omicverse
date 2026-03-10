@@ -365,6 +365,8 @@ Claude Code automatically detects the `.mcp.json` and starts the OmicVerse MCP s
 
     Ask Claude: **"List all available OmicVerse MCP tools"** — Claude will call `ov.list_tools` and show you everything that's available.
 
+![step1_img](https://raw.githubusercontent.com/Starlitnightly/ImageStore/main/omicverse_img/20260309173629775.png)
+
 ### Step 2: Load Your Data
 
 > **You:** Load the pbmc3k.h5ad file
@@ -375,7 +377,11 @@ Claude calls `ov.utils.read` and returns something like:
 Loaded AnnData (2700 x 32738). adata_id: adata_a1b2c3d4e5f6
 ```
 
+![step2_img1](https://raw.githubusercontent.com/Starlitnightly/ImageStore/main/omicverse_img/20260309174104707.png)
+
 The `adata_id` is a server-side reference. Claude tracks it automatically — you don't need to remember it.
+
+![step2_img2](https://raw.githubusercontent.com/Starlitnightly/ImageStore/main/omicverse_img/20260309174238355.png)
 
 ### Step 3: Quality Control
 
@@ -386,6 +392,8 @@ Claude calls `ov.pp.qc`, which computes per-cell metrics:
 - `n_genes` — number of genes detected
 - `n_counts` — total UMI counts
 - `pct_counts_mt` — mitochondrial gene percentage
+
+![step3_img1](https://raw.githubusercontent.com/Starlitnightly/ImageStore/main/omicverse_img/20260309174643057.png)
 
 ### Step 4: Preprocessing Pipeline
 

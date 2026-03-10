@@ -7,16 +7,21 @@ meta tools for discovery and session management.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
+import sys
 import time
 import uuid
 from difflib import SequenceMatcher
 from typing import Any, Dict, List, Optional
 
+from pydantic import AnyHttpUrl
+
 from .manifest import build_registry_manifest
 from .session_store import SessionStore, SessionError, TraceRecord, RuntimeLimits
 from .executor import McpExecutor
+from .local_oauth import LocalOAuthProvider, LOCAL_AUTH_SCOPES
 
 logger = logging.getLogger(__name__)
 
@@ -399,6 +404,45 @@ def _extract_refs_out(result: dict) -> List[str]:
     return refs
 
 
+def _summarize_arguments(arguments: dict, max_value_len: int = 120) -> dict:
+    """Build a log-safe summary of tool arguments."""
+    summary: Dict[str, Any] = {}
+    for key, value in (arguments or {}).items():
+        if key in {"adata_id", "instance_id", "path", "tool_name", "action"}:
+            summary[key] = value
+            continue
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            text = repr(value)
+            summary[key] = value if len(text) <= max_value_len else f"{text[:max_value_len - 3]}..."
+            continue
+        if isinstance(value, dict):
+            summary[key] = f"<dict keys={sorted(value.keys())[:10]}>"
+            continue
+        if isinstance(value, list):
+            summary[key] = f"<list len={len(value)}>"
+            continue
+        summary[key] = f"<{type(value).__name__}>"
+    return summary
+
+
+def _summarize_payload(payload: Any, max_value_len: int = 160) -> Any:
+    """Build a compact, log-safe summary for result details/messages."""
+    if isinstance(payload, dict):
+        return {
+            key: _summarize_payload(value, max_value_len=max_value_len)
+            for key, value in list(payload.items())[:20]
+        }
+    if isinstance(payload, list):
+        return [
+            _summarize_payload(value, max_value_len=max_value_len)
+            for value in payload[:10]
+        ]
+    if isinstance(payload, (str, int, float, bool)) or payload is None:
+        text = repr(payload)
+        return payload if len(text) <= max_value_len else f"{text[:max_value_len - 3]}..."
+    return f"<{type(payload).__name__}>"
+
+
 # ---------------------------------------------------------------------------
 # RegistryMcpServer
 # ---------------------------------------------------------------------------
@@ -495,6 +539,12 @@ class RegistryMcpServer:
 
         trace_id = uuid.uuid4().hex[:16]
         started_at = time.time()
+        logger.info(
+            "Tool call start trace_id=%s tool=%s args=%s",
+            trace_id,
+            name,
+            _summarize_arguments(arguments),
+        )
 
         # Dispatch
         if name == "ov.list_tools":
@@ -567,6 +617,26 @@ class RegistryMcpServer:
                 })
         except Exception:
             pass
+
+        logger.info(
+            "Tool call end trace_id=%s tool=%s ok=%s error_code=%s duration_ms=%.2f refs_in=%s refs_out=%s",
+            trace_id,
+            name,
+            result.get("ok", False),
+            result.get("error_code"),
+            (finished_at - started_at) * 1000,
+            _extract_refs_in(arguments),
+            _extract_refs_out(result),
+        )
+        if not result.get("ok", False):
+            logger.error(
+                "Tool call failed trace_id=%s tool=%s error_code=%s message=%s details=%s",
+                trace_id,
+                name,
+                result.get("error_code"),
+                result.get("message"),
+                _summarize_payload(result.get("details", {})),
+            )
 
         return result
 
@@ -1216,6 +1286,57 @@ class RegistryMcpServer:
 
         return score
 
+    # -- MCP SDK transport helpers -------------------------------------------
+
+    def _apply_mcp_runtime_safeguards(self, transport_name: str) -> None:
+        """Disable noisy stdout-oriented runtime output for MCP transports."""
+        monitor_disabled = False
+        try:
+            from .._monitor import set_monitor_display
+            set_monitor_display(False)
+            monitor_disabled = True
+        except Exception:
+            pass
+        logger.info(
+            "MCP %s safeguards enabled: tool stdout redirected to stderr; monitor_display=%s",
+            transport_name,
+            "off" if monitor_disabled else "unknown",
+        )
+
+    def _build_sdk_server(self):
+        """Create and configure the MCP SDK server instance."""
+        try:
+            from mcp.server import Server
+            from mcp.types import Tool, TextContent
+        except ImportError:
+            raise ImportError(
+                "The 'mcp' package is required for MCP transport support. "
+                "Install it with: pip install mcp"
+            )
+
+        server = Server("omicverse-registry")
+
+        @server.list_tools()
+        async def handle_list_tools():
+            logger.info("Received MCP list_tools request")
+            tools = self.list_tools()
+            return [
+                Tool(
+                    name=t["name"],
+                    description=t.get("description", ""),
+                    inputSchema=t.get("inputSchema", {}),
+                )
+                for t in tools
+            ]
+
+        @server.call_tool()
+        async def handle_call_tool(name: str, arguments: dict):
+            with contextlib.redirect_stdout(sys.stderr):
+                result = self.call_tool(name, arguments or {})
+            return [TextContent(type="text", text=json.dumps(result, default=str))]
+
+        return server
+
     # -- Stdio transport (requires mcp SDK) ----------------------------------
 
     def run_stdio(self):
@@ -1229,36 +1350,146 @@ class RegistryMcpServer:
     async def _run_stdio_async(self):
         """Async entrypoint for stdio MCP transport."""
         try:
-            from mcp.server import Server
             from mcp.server.stdio import stdio_server
-            from mcp.types import Tool, TextContent
         except ImportError:
             raise ImportError(
                 "The 'mcp' package is required for stdio transport. "
                 "Install it with: pip install mcp"
             )
 
-        server = Server("omicverse-registry")
-
-        @server.list_tools()
-        async def handle_list_tools():
-            tools = self.list_tools()
-            return [
-                Tool(
-                    name=t["name"],
-                    description=t.get("description", ""),
-                    inputSchema=t.get("inputSchema", {}),
-                )
-                for t in tools
-            ]
-
-        @server.call_tool()
-        async def handle_call_tool(name: str, arguments: dict):
-            result = self.call_tool(name, arguments or {})
-            return [TextContent(type="text", text=json.dumps(result, default=str))]
+        server = self._build_sdk_server()
+        self._apply_mcp_runtime_safeguards("stdio")
 
         async with stdio_server() as (read_stream, write_stream):
+            logger.info("MCP stdio transport ready; awaiting client messages")
             await server.run(read_stream, write_stream, server.create_initialization_options())
+
+    # -- Streamable HTTP transport -------------------------------------------
+
+    def run_streamable_http(
+        self,
+        host: str = "127.0.0.1",
+        port: int = 8765,
+        path: str = "/mcp",
+    ) -> None:
+        """Start the MCP server on local Streamable HTTP transport."""
+        import asyncio
+        asyncio.run(self._run_streamable_http_async(host=host, port=port, path=path))
+
+    async def _run_streamable_http_async(
+        self,
+        host: str = "127.0.0.1",
+        port: int = 8765,
+        path: str = "/mcp",
+    ) -> None:
+        """Async entrypoint for Streamable HTTP MCP transport."""
+        try:
+            import uvicorn
+            from starlette.applications import Starlette
+            from starlette.middleware import Middleware
+            from starlette.middleware.authentication import AuthenticationMiddleware
+            from starlette.routing import Route
+            from mcp.server.auth.middleware.auth_context import AuthContextMiddleware
+            from mcp.server.auth.middleware.bearer_auth import BearerAuthBackend, RequireAuthMiddleware
+            from mcp.server.auth.routes import (
+                build_resource_metadata_url,
+                create_auth_routes,
+                create_protected_resource_routes,
+            )
+            from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
+            from mcp.server.fastmcp.server import StreamableHTTPASGIApp
+            from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+        except ImportError:
+            raise ImportError(
+                "Streamable HTTP transport requires: mcp, uvicorn, and starlette. "
+                "Install them with: pip install mcp uvicorn starlette"
+            )
+
+        if not path.startswith("/"):
+            path = "/" + path
+
+        server = self._build_sdk_server()
+        self._apply_mcp_runtime_safeguards("streamable-http")
+
+        issuer_url = AnyHttpUrl(f"http://{host}:{port}")
+        resource_url = AnyHttpUrl(f"http://{host}:{port}{path}")
+        auth_settings = AuthSettings(
+            issuer_url=issuer_url,
+            resource_server_url=resource_url,
+            client_registration_options=ClientRegistrationOptions(
+                enabled=True,
+                default_scopes=LOCAL_AUTH_SCOPES,
+                valid_scopes=LOCAL_AUTH_SCOPES,
+            ),
+            revocation_options=RevocationOptions(enabled=False),
+            required_scopes=[],
+        )
+        auth_provider = LocalOAuthProvider()
+        token_verifier = auth_provider.build_token_verifier()
+        session_manager = StreamableHTTPSessionManager(app=server)
+        streamable_http_app = StreamableHTTPASGIApp(session_manager)
+        resource_metadata_url = build_resource_metadata_url(resource_url)
+        routes = [
+            Route(
+                path,
+                endpoint=RequireAuthMiddleware(
+                    streamable_http_app,
+                    auth_settings.required_scopes or [],
+                    resource_metadata_url,
+                ),
+            ),
+        ]
+        routes.extend(
+            create_auth_routes(
+                provider=auth_provider,
+                issuer_url=issuer_url,
+                client_registration_options=auth_settings.client_registration_options,
+                revocation_options=auth_settings.revocation_options,
+            )
+        )
+        routes.extend(
+            create_protected_resource_routes(
+                resource_url=resource_url,
+                authorization_servers=[issuer_url],
+                scopes_supported=auth_settings.required_scopes,
+            )
+        )
+        # Claude Code probes a few discovery aliases before settling on the main
+        # authorization metadata endpoints. Serve identical JSON on those aliases
+        # instead of returning bare 404 text.
+        oauth_metadata_handler = routes[1].endpoint
+        protected_metadata_handler = routes[-1].endpoint
+        routes.extend([
+            Route("/.well-known/oauth-authorization-server/mcp", endpoint=oauth_metadata_handler, methods=["GET", "OPTIONS"]),
+            Route("/.well-known/openid-configuration", endpoint=oauth_metadata_handler, methods=["GET", "OPTIONS"]),
+            Route("/.well-known/openid-configuration/mcp", endpoint=oauth_metadata_handler, methods=["GET", "OPTIONS"]),
+            Route(f"{path}/.well-known/openid-configuration", endpoint=oauth_metadata_handler, methods=["GET", "OPTIONS"]),
+            Route("/.well-known/oauth-protected-resource", endpoint=protected_metadata_handler, methods=["GET", "OPTIONS"]),
+        ])
+        app = Starlette(
+            debug=False,
+            routes=routes,
+            middleware=[
+                Middleware(AuthenticationMiddleware, backend=BearerAuthBackend(token_verifier)),
+                Middleware(AuthContextMiddleware),
+            ],
+            lifespan=lambda app: session_manager.run(),
+        )
+
+        logger.info(
+            "MCP streamable-http transport ready on http://%s:%d%s",
+            host,
+            port,
+            path,
+        )
+        config = uvicorn.Config(
+            app,
+            host=host,
+            port=port,
+            log_level="info",
+        )
+        http_server = uvicorn.Server(config)
+        await http_server.serve()
 
 
 # ---------------------------------------------------------------------------
@@ -1280,8 +1511,8 @@ def main():
     import sys
 
     parser = argparse.ArgumentParser(
-        description="OmicVerse Registry MCP Server — exposes analysis tools via stdio MCP transport",
-        epilog="All log output goes to stderr. stdout is reserved for MCP JSON-RPC protocol.",
+        description="OmicVerse Registry MCP Server — exposes analysis tools via stdio or local HTTP MCP transports",
+        epilog="All log output goes to stderr. In stdio mode, stdout is reserved for MCP JSON-RPC protocol.",
     )
     parser.add_argument(
         "--version",
@@ -1293,6 +1524,12 @@ def main():
         default="P0+P0.5",
         help="Rollout phase(s) to expose. Options: P0 (core pipeline), "
              "P0+P0.5 (core + analysis/viz, default), P0+P0.5+P2 (all including class tools)",
+    )
+    parser.add_argument(
+        "--transport",
+        default="stdio",
+        choices=["stdio", "streamable-http"],
+        help="Transport to serve MCP over (default: stdio).",
     )
     parser.add_argument(
         "--session-id",
@@ -1318,6 +1555,22 @@ def main():
         default=None,
         help="Max artifact handles per session (default: 200)",
     )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Bind host for streamable-http transport (default: 127.0.0.1).",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8765,
+        help="Bind port for streamable-http transport (default: 8765).",
+    )
+    parser.add_argument(
+        "--http-path",
+        default="/mcp",
+        help="Route path for streamable-http transport (default: /mcp).",
+    )
     args = parser.parse_args()
 
     # All log output must go to stderr — stdout is reserved for MCP JSON-RPC.
@@ -1342,12 +1595,16 @@ def main():
         limits=limits,
     )
     logger.info(
-        "Starting OmicVerse MCP server (phase=%s, %d tools, session=%s)",
+        "Starting OmicVerse MCP server (transport=%s, phase=%s, %d tools, session=%s)",
+        args.transport,
         args.phase,
         len(srv._manifest),
         srv._store.session_id,
     )
-    srv.run_stdio()
+    if args.transport == "stdio":
+        srv.run_stdio()
+    else:
+        srv.run_streamable_http(host=args.host, port=args.port, path=args.http_path)
 
 
 if __name__ == "__main__":
