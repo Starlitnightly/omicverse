@@ -21,11 +21,13 @@ introduce any runtime dependency on Pantheon.
 from __future__ import annotations
 
 import asyncio
+import base64
 import contextlib
 import io
 import json
 import logging
 import os
+import platform
 import random
 import ssl
 import textwrap
@@ -45,6 +47,9 @@ T = TypeVar('T')
 
 # Logger for retry operations
 logger = logging.getLogger(__name__)
+
+_OPENAI_CODEX_BASE_URL = "https://chatgpt.com/backend-api"
+_OPENAI_CODEX_JWT_CLAIM_PATH = "https://api.openai.com/auth"
 
 
 def _request_timeout_seconds() -> float:
@@ -713,6 +718,219 @@ class OmicVerseLLMBackend:
             )
 
     @staticmethod
+    def _is_openai_codex_base_url(base_url: str) -> bool:
+        normalized = str(base_url or "").strip().rstrip("/")
+        return normalized.startswith(_OPENAI_CODEX_BASE_URL)
+
+    @staticmethod
+    def _resolve_openai_codex_url(base_url: str) -> str:
+        normalized = str(base_url or _OPENAI_CODEX_BASE_URL).strip().rstrip("/")
+        if normalized.endswith("/codex/responses"):
+            return normalized
+        if normalized.endswith("/codex"):
+            return f"{normalized}/responses"
+        return f"{normalized}/codex/responses"
+
+    @staticmethod
+    def _decode_openai_codex_jwt(token: str) -> Dict[str, Any]:
+        parts = str(token or "").split(".")
+        if len(parts) != 3 or not parts[1]:
+            return {}
+        payload = parts[1] + "=" * (-len(parts[1]) % 4)
+        try:
+            raw = base64.urlsafe_b64decode(payload.encode("ascii"))
+            data = json.loads(raw.decode("utf-8"))
+        except Exception:
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    @classmethod
+    def _extract_openai_codex_account_id(cls, token: str) -> str:
+        payload = cls._decode_openai_codex_jwt(token)
+        auth = payload.get(_OPENAI_CODEX_JWT_CLAIM_PATH)
+        if not isinstance(auth, dict):
+            return ""
+        account_id = str(auth.get("chatgpt_account_id") or "").strip()
+        return account_id
+
+    @staticmethod
+    def _openai_codex_user_agent() -> str:
+        try:
+            system = platform.system().lower() or "unknown"
+            release = platform.release() or "unknown"
+            machine = platform.machine() or "unknown"
+            return f"pi ({system} {release}; {machine})"
+        except Exception:
+            return "pi (python)"
+
+    def _build_openai_responses_request(
+        self,
+        *,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict]],
+        tool_choice: Optional[str],
+        include_system_messages: bool,
+    ) -> Dict[str, Any]:
+        input_items = self._convert_messages_openai_responses(messages)
+        if not include_system_messages:
+            input_items = [
+                item for item in input_items
+                if not (isinstance(item, dict) and item.get("role") == "system")
+            ]
+
+        kwargs: Dict[str, Any] = {
+            "model": self._wire_model_name(),
+            "input": input_items,
+            "max_output_tokens": self.config.max_tokens,
+            "reasoning": {"effort": "medium"},
+        }
+        if self.config.system_prompt:
+            kwargs["instructions"] = self.config.system_prompt
+        if tools:
+            kwargs["tools"] = self._convert_tools_openai_responses(tools)
+            kwargs["tool_choice"] = tool_choice or "auto"
+        return kwargs
+
+    @staticmethod
+    def _iter_openai_codex_sse_events(raw_bytes: bytes) -> List[Dict[str, Any]]:
+        text = raw_bytes.decode("utf-8", errors="replace").replace("\r\n", "\n")
+        events: List[Dict[str, Any]] = []
+        for chunk in text.split("\n\n"):
+            data_lines = [
+                line[5:].strip()
+                for line in chunk.split("\n")
+                if line.startswith("data:")
+            ]
+            if not data_lines:
+                continue
+            data = "\n".join(data_lines).strip()
+            if not data or data == "[DONE]":
+                continue
+            try:
+                parsed = json.loads(data)
+            except json.JSONDecodeError:
+                logger.debug("Ignoring non-JSON Codex SSE chunk: %s", data[:200])
+                continue
+            if isinstance(parsed, dict):
+                events.append(parsed)
+        return events
+
+    def _extract_openai_codex_final_response(self, events: List[Dict[str, Any]]) -> Dict[str, Any]:
+        final_payload: Optional[Dict[str, Any]] = None
+        for event in events:
+            event_type = str(event.get("type") or "").strip()
+            if event_type == "error":
+                message = (
+                    str(event.get("message") or "").strip()
+                    or str(event.get("code") or "").strip()
+                    or json.dumps(event)
+                )
+                raise RuntimeError(f"Codex error: {message}")
+            if event_type == "response.failed":
+                response = event.get("response") or {}
+                error = response.get("error") if isinstance(response, dict) else {}
+                message = (
+                    str(error.get("message") or "").strip()
+                    if isinstance(error, dict)
+                    else ""
+                )
+                raise RuntimeError(message or "Codex response failed")
+            if event_type in {"response.completed", "response.done"}:
+                response = event.get("response")
+                if isinstance(response, dict):
+                    final_payload = self._responses_jsonable(response)
+
+        if not final_payload:
+            raise RuntimeError("Codex response stream completed without a final response payload")
+        return final_payload
+
+    def _call_openai_codex_responses(
+        self,
+        *,
+        base_url: str,
+        api_key: str,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict]],
+        tool_choice: Optional[str],
+    ) -> Dict[str, Any]:
+        account_id = self._extract_openai_codex_account_id(api_key)
+        if not account_id:
+            raise RuntimeError(
+                "OpenAI OAuth access token is missing chatgpt_account_id; please rerun `omicverse jarvis --setup`."
+            )
+
+        payload = self._build_openai_responses_request(
+            messages=messages,
+            tools=tools,
+            tool_choice=tool_choice,
+            include_system_messages=False,
+        )
+        payload.pop("max_output_tokens", None)
+        payload.pop("reasoning", None)
+        payload.update(
+            {
+                "store": False,
+                "stream": True,
+                "text": {"verbosity": "medium"},
+                "include": ["reasoning.encrypted_content"],
+                "tool_choice": "auto",
+                "parallel_tool_calls": True,
+            }
+        )
+
+        url = self._resolve_openai_codex_url(base_url)
+        timeout_s = _request_timeout_seconds()
+        request = urllib_request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "chatgpt-account-id": account_id,
+                "OpenAI-Beta": "responses=experimental",
+                "originator": "pi",
+                "User-Agent": self._openai_codex_user_agent(),
+                "accept": "text/event-stream",
+                "content-type": "application/json",
+            },
+            method="POST",
+        )
+
+        logger.info(
+            "openai_codex_responses_start model=%s endpoint=%s tool_choice=%s messages=%d tools=%d timeout_s=%.1f",
+            self.config.model,
+            url,
+            tool_choice or "none",
+            len(messages),
+            len(tools or []),
+            timeout_s,
+        )
+
+        try:
+            with urllib_request.urlopen(
+                request,
+                timeout=timeout_s,
+                context=ssl.create_default_context(),
+            ) as response:
+                raw_bytes = response.read()
+        except HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(
+                f"OpenAI Codex Responses API failed: HTTP {exc.code} {detail[:400]}"
+            ) from exc
+        except URLError as exc:
+            raise RuntimeError(f"OpenAI Codex Responses API failed: {exc}") from exc
+
+        events = self._iter_openai_codex_sse_events(raw_bytes)
+        final_payload = self._extract_openai_codex_final_response(events)
+        logger.info(
+            "openai_codex_responses_done model=%s output_items=%d tool_calls=%d",
+            self.config.model,
+            len(self._extract_responses_output_items(final_payload)),
+            len(self._extract_responses_tool_calls_from_items(self._extract_responses_output_items(final_payload))),
+        )
+        return final_payload
+
+    @staticmethod
     def _responses_jsonable(value: Any) -> Any:
         """Convert SDK response objects into JSON-serializable structures."""
         if value is None or isinstance(value, (str, int, float, bool)):
@@ -876,6 +1094,8 @@ class OmicVerseLLMBackend:
                             parts.append(normalized)
                 converted.append({"role": role, "content": parts})
             else:
+                if isinstance(content, dict):
+                    content = json.dumps(content, ensure_ascii=False)
                 converted.append({"role": role, "content": content})
         return converted
 
@@ -934,6 +1154,19 @@ class OmicVerseLLMBackend:
                 f"Missing API key for provider '{self.config.provider}'."
             )
 
+        if self._is_openai_codex_base_url(base_url):
+            def _make_codex_call():
+                payload = self._call_openai_codex_responses(
+                    base_url=base_url,
+                    api_key=api_key,
+                    messages=messages,
+                    tools=tools,
+                    tool_choice=tool_choice,
+                )
+                return self._build_chat_response_from_responses_payload(payload)
+
+            return self._retry(_make_codex_call)
+
         try:
             from openai import OpenAI  # type: ignore
 
@@ -941,17 +1174,12 @@ class OmicVerseLLMBackend:
             client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout_s)
 
             def _make_call():
-                kwargs: Dict[str, Any] = {
-                    "model": self._wire_model_name(),
-                    "input": self._convert_messages_openai_responses(messages),
-                    "max_output_tokens": self.config.max_tokens,
-                    "reasoning": {"effort": "medium"},
-                }
-                if self.config.system_prompt:
-                    kwargs["instructions"] = self.config.system_prompt
-                if tools:
-                    kwargs["tools"] = self._convert_tools_openai_responses(tools)
-                    kwargs["tool_choice"] = tool_choice or "auto"
+                kwargs = self._build_openai_responses_request(
+                    messages=messages,
+                    tools=tools,
+                    tool_choice=tool_choice,
+                    include_system_messages=True,
+                )
 
                 logger.info(
                     "openai_responses_tool_chat_start model=%s provider=%s endpoint=%s tool_choice=%s messages=%d tools=%d timeout_s=%.1f",
@@ -1407,30 +1635,37 @@ class OmicVerseLLMBackend:
         Consolidates the duplicated extraction logic used in both SDK and
         HTTP paths for the OpenAI Responses API.
         """
-        if payload.get("output_text"):
-            return payload["output_text"]
+        output_text = payload.get("output_text")
+        if isinstance(output_text, str) and output_text:
+            return output_text
 
         output = payload.get("output")
         if output is not None:
             if isinstance(output, str):
                 return output
             if isinstance(output, dict):
-                if output.get("text"):
+                if isinstance(output.get("text"), str) and output.get("text"):
                     return output["text"]
                 content = output.get("content")
                 if isinstance(content, list):
                     for p in content:
-                        if isinstance(p, dict) and p.get("text"):
-                            return p["text"]
+                        if not isinstance(p, dict):
+                            continue
+                        text_value = p.get("text")
+                        if isinstance(text_value, dict):
+                            text_value = text_value.get("value") or text_value.get("text")
+                        if isinstance(text_value, str) and text_value:
+                            return text_value
             if isinstance(output, list) and len(output) > 0:
-                first = output[0]
-                if isinstance(first, str):
-                    return first
-                if isinstance(first, dict) and first.get("text"):
-                    return first["text"]
+                text = OmicVerseLLMBackend._extract_responses_text_from_items(
+                    OmicVerseLLMBackend._extract_responses_output_items(payload)
+                )
+                if text:
+                    return text
 
-        if payload.get("text"):
-            return payload["text"]
+        text_field = payload.get("text")
+        if isinstance(text_field, str) and text_field:
+            return text_field
 
         raise RuntimeError(
             f"Unexpected Responses API response format. "
@@ -1575,6 +1810,41 @@ class OmicVerseLLMBackend:
           encourage plain-text responses suitable for code extraction.
         - Response: prefer output_text; otherwise inspect output.{text|content[*].text} or text
         """
+        if self._is_openai_codex_base_url(base_url):
+            def _make_codex_call():
+                payload = self._call_openai_codex_responses(
+                    base_url=base_url,
+                    api_key=api_key,
+                    messages=[{"role": "user", "content": user_prompt}],
+                    tools=None,
+                    tool_choice=None,
+                )
+                text = self._extract_responses_text_from_dict(payload)
+                if not text:
+                    text = self._extract_responses_text_from_items(
+                        self._extract_responses_output_items(payload)
+                    )
+                usage = payload.get("usage") or {}
+                if usage:
+                    pt = _coerce_int(usage.get("input_tokens"))
+                    if pt is None:
+                        pt = _coerce_int(usage.get("prompt_tokens"))
+                    ct = _coerce_int(usage.get("output_tokens"))
+                    if ct is None:
+                        ct = _coerce_int(usage.get("completion_tokens"))
+                    tt = _compute_total(pt, ct, _coerce_int(usage.get("total_tokens")))
+                    if tt is not None:
+                        self.last_usage = Usage(
+                            input_tokens=pt or 0,
+                            output_tokens=ct or 0,
+                            total_tokens=tt,
+                            model=self.config.model,
+                            provider=self.config.provider,
+                        )
+                return text
+
+            return self._retry(_make_codex_call)
+
         # Try OpenAI SDK first
         try:
             from openai import OpenAI  # type: ignore
@@ -1589,31 +1859,18 @@ class OmicVerseLLMBackend:
                 logger.debug(f"GPT-5 Responses API call: model={self.config.model}, max_tokens={self.config.max_tokens}")
                 logger.debug(f"User prompt length: {len(user_prompt)} chars")
 
-                input_payload = [
-                    {
-                        "role": "system",
-                        "content": [
-                            {"type": "input_text", "text": self.config.system_prompt}
-                        ],
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "input_text", "text": user_prompt}
-                        ],
-                    },
-                ]
+                kwargs = self._build_openai_responses_request(
+                    messages=[{"role": "user", "content": user_prompt}],
+                    tools=None,
+                    tool_choice=None,
+                    include_system_messages=False,
+                )
 
                 # GPT-5 models use reasoning tokens - control effort for response quality
                 # Set reasoning effort to 'high' for maximum reasoning capability and best quality responses
                 logger.debug("Creating GPT-5 Responses API request with high reasoning effort...")
-                resp = client.responses.create(
-                    model=self.config.model,
-                    input=input_payload,
-                    instructions=self.config.system_prompt,
-                    max_output_tokens=self.config.max_tokens,
-                    reasoning={"effort": "high"}  # Use high reasoning effort for better quality responses
-                )
+                kwargs["reasoning"] = {"effort": "high"}
+                resp = client.responses.create(**kwargs)
 
                 logger.debug(f"GPT-5 response received. Type: {type(resp).__name__}")
                 logger.debug(f"Response attributes: {[attr for attr in dir(resp) if not attr.startswith('_')]}")
@@ -2354,6 +2611,16 @@ class OmicVerseLLMBackend:
 
     async def _stream_openai_responses(self, base_url: str, api_key: str, user_prompt: str):
         """Stream responses from OpenAI Responses API (gpt-5 series) with proper streaming support."""
+        if self._is_openai_codex_base_url(base_url):
+            result = await asyncio.to_thread(
+                self._chat_via_openai_responses,
+                base_url,
+                api_key,
+                user_prompt,
+            )
+            yield result
+            return
+
         try:
             from openai import OpenAI  # type: ignore
 
@@ -2364,29 +2631,15 @@ class OmicVerseLLMBackend:
                 def _create_stream():
                     logger.debug(f"Creating GPT-5 Responses API stream: model={self.config.model}")
 
-                    input_payload = [
-                        {
-                            "role": "system",
-                            "content": [
-                                {"type": "input_text", "text": self.config.system_prompt}
-                            ],
-                        },
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "input_text", "text": user_prompt}
-                            ],
-                        },
-                    ]
-
-                    return client.responses.create(
-                        model=self.config.model,
-                        input=input_payload,
-                        instructions=self.config.system_prompt,
-                        max_output_tokens=self.config.max_tokens,
-                        reasoning={"effort": "high"},
-                        stream=True  # Enable streaming for GPT-5 Responses API
+                    kwargs = self._build_openai_responses_request(
+                        messages=[{"role": "user", "content": user_prompt}],
+                        tools=None,
+                        tool_choice=None,
+                        include_system_messages=False,
                     )
+                    kwargs["reasoning"] = {"effort": "high"}
+                    kwargs["stream"] = True
+                    return client.responses.create(**kwargs)
 
                 # Retry stream creation on transient failures
                 stream = self._retry(_create_stream)

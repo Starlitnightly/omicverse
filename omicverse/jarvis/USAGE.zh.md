@@ -1,6 +1,6 @@
 # OmicVerse Jarvis 使用教程
 
-本文档介绍如何启动和使用 `omicverse jarvis`（Telegram 单细胞分析助手）。
+本文档介绍如何启动和使用 `omicverse jarvis`（多渠道单细胞分析助手）。
 
 ## 1. 安装依赖
 
@@ -14,6 +14,12 @@ pip install -e ".[jarvis]"
 
 ```bash
 pip install "omicverse[jarvis]"
+```
+
+如果要启用 macOS iMessage，还需要额外安装 [`imsg`](https://github.com/steipete/imsg)：
+
+```bash
+brew install steipete/tap/imsg
 ```
 
 ## 2. Telegram Bot 申请教程
@@ -53,7 +59,7 @@ export TELEGRAM_BOT_TOKEN="your_telegram_bot_token"
 omicverse jarvis --token "your_telegram_bot_token"
 ```
 
-### 3.2 LLM API Key
+### 3.2 LLM 认证
 
 支持以下环境变量之一（按顺序自动读取）：
 
@@ -69,12 +75,38 @@ export ANTHROPIC_API_KEY="your_api_key"
 
 也可用 `--api-key` 显式传入。
 
+如果你想走 OpenAI 浏览器登录而不是手动填 API key，直接运行：
+
+```bash
+omicverse jarvis --setup
+```
+
+首次向导可以完成：
+
+- 选择 `iMessage`、`Telegram` 或 `Feishu`
+- 把渠道配置保存到 `~/.ovjarvis/config.json`
+- 配置 OpenAI Codex OAuth（ChatGPT 登录）或各 provider 的 API Key
+- 选择 OpenAI、Claude、千问、Kimi、DeepSeek、智谱、Gemini、Grok、Ollama 以及其他 OpenAI 兼容端点上的默认模型
+- 为 Ollama 或其他 OpenAI 兼容网关保存自定义 endpoint
+
 ## 4. 启动 Jarvis
 
 最小启动：
 
 ```bash
 omicverse jarvis
+```
+
+首次交互式配置：
+
+```bash
+omicverse jarvis --setup
+```
+
+强制指定向导语言：
+
+```bash
+omicverse jarvis --setup --setup-language zh
 ```
 
 显式使用 Telegram 渠道：
@@ -110,6 +142,15 @@ omicverse jarvis \
 ```
 
 `websocket` 模式下，请在飞书后台将事件订阅配置为“长连接订阅”；`--feishu-host/--feishu-port/--feishu-path` 不生效。
+
+iMessage 渠道：
+
+```bash
+omicverse jarvis \
+  --channel imessage \
+  --imessage-cli-path "$(which imsg)" \
+  --imessage-db-path ~/Library/Messages/chat.db
+```
 
 ### 4.1 飞书专用部署教程（Webhook 模式）
 
@@ -209,15 +250,24 @@ omicverse jarvis \
 参数总览：
 
 - `--token`: Telegram Bot Token（或 `TELEGRAM_BOT_TOKEN`）
-- `--channel`: 渠道后端（`telegram` 或 `feishu`，默认 `telegram`）
+- `--setup`: 运行交互式设置向导
+- `--setup-language`: 向导语言（`en` 或 `zh`，默认界面为英文）
+- `--config-file`: 配置文件路径（默认 `~/.ovjarvis/config.json`）
+- `--auth-file`: 本地认证状态文件（默认 `~/.ovjarvis/auth.json`）
+- `--channel`: 渠道后端（`telegram`、`feishu`、`imessage` 或 `qq`；若已配置则优先使用配置）
 - `--feishu-app-id`: Feishu app id（或 `FEISHU_APP_ID`）
 - `--feishu-app-secret`: Feishu app secret（或 `FEISHU_APP_SECRET`）
 - `--feishu-connection-mode`: `webhook` 或 `websocket`（默认 `websocket`）
 - `--feishu-verification-token`: Webhook 校验 token（或 `FEISHU_VERIFICATION_TOKEN`）
 - `--feishu-encrypt-key`: Webhook 加密密钥（用于加密回调，或 `FEISHU_ENCRYPT_KEY`）
 - `--feishu-host/--feishu-port/--feishu-path`: Feishu Webhook 监听参数（仅 `webhook` 模式使用）
-- `--model`: 默认 `claude-sonnet-4-6`
-- `--api-key`: LLM key（或 `ANTHROPIC_API_KEY/OPENAI_API_KEY/GEMINI_API_KEY`）
+- `--imessage-cli-path`: `imsg` 可执行文件路径
+- `--imessage-db-path`: `chat.db` 路径
+- `--imessage-include-attachments`: 启用 iMessage 入站附件元数据订阅
+- `--auth-mode`: 保存到本地配置中的认证方式（`environment`、`openai_oauth` 表示 OpenAI Codex OAuth、`openai_api_key`、`saved_api_key`、`no_auth`）
+- `--model`: 默认模型（若已配置则优先使用配置）
+- `--api-key`: LLM API Key（或已保存的 provider 认证 / 对应 provider 的环境变量）
+- `--endpoint`: Ollama 或其他 OpenAI 兼容端点的 API Base URL
 - `--max-prompts`: 单 kernel 最大请求数（`0` 表示不自动重启，默认 0）
 - `--session-dir`: 会话根目录（默认 `~/.ovjarvis`）
 - `--allowed-user`: 允许的用户名/ID（可重复）

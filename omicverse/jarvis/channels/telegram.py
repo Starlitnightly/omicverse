@@ -10,17 +10,30 @@ Architecture (OpenClaw-inspired):
 """
 from __future__ import annotations
 
+import atexit
 import asyncio
+import hashlib
+import json
 import logging
+import os
 import re
+import signal
+import socket
 import time
+from dataclasses import dataclass
 from io import BytesIO
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 from .. import _fmt
+from ..config import default_state_dir
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
+from ..model_help import render_model_help
 
 logger = logging.getLogger("omicverse.jarvis")
+
+_POLLING_RESTART_DELAY_SECONDS = 1.0
+_POLLING_MAX_ATTEMPTS = 2
 
 
 # ---------------------------------------------------------------------------
@@ -58,6 +71,192 @@ class AccessControl:
 # Bot builder
 # ---------------------------------------------------------------------------
 
+
+@dataclass
+class _PollingState:
+    conflict_detected: bool = False
+    conflict_message: str = ""
+
+
+def _token_fingerprint(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()[:16]
+
+
+def _telegram_runtime_dir() -> Path:
+    runtime_dir = default_state_dir() / "runtime"
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    return runtime_dir
+
+
+def _telegram_lock_path(token: str) -> Path:
+    return _telegram_runtime_dir() / f"telegram-{_token_fingerprint(token)}.json"
+
+
+def _load_runtime_record(path: Path) -> Dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _write_runtime_record(path: Path, token: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "pid": os.getpid(),
+        "token_hash": _token_fingerprint(token),
+        "hostname": socket.gethostname(),
+        "started_at": time.time(),
+    }
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _cleanup_runtime_record(path: Path) -> None:
+    record = _load_runtime_record(path)
+    if int(record.get("pid") or 0) != os.getpid():
+        return
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        return
+    except OSError:
+        logger.debug("Failed to remove Telegram runtime record %s", path, exc_info=True)
+
+
+def _process_exists(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _terminate_process(pid: int, *, label: str, grace_seconds: float = 5.0) -> bool:
+    if pid <= 0 or pid == os.getpid():
+        return True
+    if not _process_exists(pid):
+        return True
+
+    logger.warning("Stopping %s (pid=%s) before Telegram polling takeover.", label, pid)
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return True
+    except PermissionError:
+        logger.warning("Cannot stop %s (pid=%s): permission denied.", label, pid)
+        return False
+
+    deadline = time.time() + max(grace_seconds, 0.0)
+    while time.time() < deadline:
+        if not _process_exists(pid):
+            return True
+        time.sleep(0.1)
+
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except ProcessLookupError:
+        return True
+    except PermissionError:
+        logger.warning("Cannot force stop %s (pid=%s): permission denied.", label, pid)
+        return False
+
+    for _ in range(10):
+        if not _process_exists(pid):
+            return True
+        time.sleep(0.1)
+    return not _process_exists(pid)
+
+
+def _claim_telegram_instance(token: str) -> Path:
+    path = _telegram_lock_path(token)
+    record = _load_runtime_record(path)
+    previous_pid = int(record.get("pid") or 0)
+    if (
+        previous_pid
+        and previous_pid != os.getpid()
+        and str(record.get("token_hash") or "") == _token_fingerprint(token)
+    ):
+        stopped = _terminate_process(
+            previous_pid,
+            label="existing OmicVerse Jarvis Telegram bot",
+        )
+        if not stopped:
+            logger.warning(
+                "Tracked Telegram bot instance pid=%s is still running; polling will retry once if Telegram returns 409 Conflict.",
+                previous_pid,
+            )
+
+    _write_runtime_record(path, token)
+    atexit.register(_cleanup_runtime_record, path)
+    return path
+
+
+def _register_polling_error_handler(app: Any, *, polling_state: _PollingState, conflict_type: type[BaseException]) -> None:
+    async def _handle_error(update: object, context: Any) -> None:
+        error = getattr(context, "error", None)
+        if isinstance(error, conflict_type):
+            polling_state.conflict_detected = True
+            polling_state.conflict_message = str(error)
+            logger.warning(
+                "Telegram returned 409 Conflict because another getUpdates consumer is active. "
+                "Stopping this polling loop and retrying once."
+            )
+            context.application.stop_running()
+            return
+
+        if error is not None:
+            logger.error(
+                "Unhandled Telegram bot error: %s",
+                error,
+                exc_info=(type(error), error, error.__traceback__),
+            )
+
+    app.add_error_handler(_handle_error)
+
+
+def _telegram_conflict_error(conflict_message: str) -> str:
+    detail = f" ({conflict_message})" if conflict_message else ""
+    return (
+        "Telegram polling still conflicts with another bot instance after Jarvis retried once"
+        f"{detail}. Stop the other process using this bot token and start `omicverse jarvis` again."
+    )
+
+
+def _run_polling_with_restart(
+    *,
+    application_factory: Any,
+    conflict_type: type[BaseException],
+    restart_delay_seconds: float = _POLLING_RESTART_DELAY_SECONDS,
+    max_attempts: int = _POLLING_MAX_ATTEMPTS,
+) -> None:
+    last_conflict_message = ""
+    attempts = max(1, int(max_attempts))
+    for attempt in range(1, attempts + 1):
+        app = application_factory()
+        polling_state = _PollingState()
+        _register_polling_error_handler(
+            app,
+            polling_state=polling_state,
+            conflict_type=conflict_type,
+        )
+        logger.info("OmicVerse Jarvis bot starting (polling)...")
+        app.run_polling(drop_pending_updates=True)
+        if not polling_state.conflict_detected:
+            return
+        last_conflict_message = polling_state.conflict_message
+        if attempt >= attempts:
+            break
+        time.sleep(max(restart_delay_seconds, 0.0))
+
+    raise RuntimeError(_telegram_conflict_error(last_conflict_message))
+
+
 def run_bot(
     token: str,
     session_manager: Any,
@@ -66,6 +265,7 @@ def run_bot(
 ) -> None:
     """Build and start the Telegram application (blocking)."""
     try:
+        from telegram.error import Conflict
         from telegram.ext import Application
     except ImportError as exc:
         raise ImportError(
@@ -73,10 +273,17 @@ def run_bot(
             "Install with: pip install omicverse[jarvis]"
         ) from exc
 
-    app = Application.builder().token(token).concurrent_updates(True).build()
-    _register_handlers(app, session_manager, access_control, verbose)
-    logger.info("OmicVerse Jarvis bot starting (polling)...")
-    app.run_polling(drop_pending_updates=True)
+    _claim_telegram_instance(token)
+
+    def _build_application() -> Any:
+        app = Application.builder().token(token).concurrent_updates(True).build()
+        _register_handlers(app, session_manager, access_control, verbose)
+        return app
+
+    _run_polling_with_restart(
+        application_factory=_build_application,
+        conflict_type=Conflict,
+    )
 
 
 def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> None:
@@ -137,7 +344,9 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
             await update.message.reply_text(
                 _fmt.error_message(
                     f"Agent 初始化失败：{exc}\n"
-                    "请检查 --model 参数，运行 ov.list_supported_models() 查看可用模型。"
+                    "请检查 --model 参数，或运行 "
+                    "<code>import omicverse as ov; print(ov.list_supported_models())</code> "
+                    "查看可用模型。"
                 ),
                 parse_mode="HTML",
             )
@@ -603,15 +812,8 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         args = context.args or []
 
         if not args:
-            current = sm._model
             await update.message.reply_text(
-                f"🤖  当前模型：<code>{_fmt.esc(current)}</code>\n"
-                f"{_fmt._DIV}\n"
-                f"切换示例：\n"
-                f"• <code>/model claude-sonnet-4-6</code>\n"
-                f"• <code>/model claude-opus-4-6</code>\n"
-                f"• <code>/model claude-haiku-4-5-20251001</code>\n\n"
-                f"<i>切换后请 /reset 重启 kernel 使新模型生效。</i>",
+                render_model_help(sm._model, html=True),
                 parse_mode="HTML",
             )
             return
