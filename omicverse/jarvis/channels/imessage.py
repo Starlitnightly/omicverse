@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,6 +23,11 @@ logger = logging.getLogger("omicverse.jarvis.imessage")
 _BORING_SUMMARIES = {"分析完成", "分析完成。", "task completed", "done", "完成"}
 _MAX_TEXT = 3800
 _PROGRESS_GAP = 5.0
+_DEFAULT_IMESSAGE_PROBE_TIMEOUT = 10.0
+_IMSG_PERMISSION_DENIED_RE = re.compile(
+    r'permissionDenied\(path:\s*"(?P<path>[^"]+)"(?:,\s*underlying:\s*(?P<detail>.+?))?\)$',
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -120,6 +126,71 @@ def _message_target(message: Dict[str, Any]) -> Optional[str]:
     return sender or None
 
 
+def _resolve_cli_path(cli_path: str) -> Optional[str]:
+    value = str(cli_path or "imsg").strip()
+    if not value:
+        return None
+    expanded = os.path.expanduser(value)
+    if os.path.sep in expanded:
+        return expanded if os.path.isfile(expanded) and os.access(expanded, os.X_OK) else None
+    return shutil.which(expanded)
+
+
+async def _probe_rpc_support(cli_path: str, timeout: float) -> None:
+    resolved_cli = _resolve_cli_path(cli_path)
+    if resolved_cli is None:
+        raise RuntimeError(
+            f"无法找到 imsg 可执行文件（当前路径: {cli_path}）。"
+        )
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            resolved_cli,
+            "rpc",
+            "--help",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            f"无法启动 imsg。请先安装它，例如：brew install steipete/tap/imsg（当前路径: {cli_path}）"
+        ) from exc
+
+    try:
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+    except asyncio.TimeoutError:
+        proc.kill()
+        await proc.communicate()
+        raise RuntimeError("imsg rpc --help 超时，无法确认当前 imsg 是否支持 rpc 子命令。")
+
+    combined = "\n".join(
+        part.decode("utf-8", errors="ignore").strip()
+        for part in (stdout, stderr)
+        if part
+    ).strip()
+    normalized = combined.lower()
+    if "unknown command" in normalized and "rpc" in normalized:
+        raise RuntimeError('当前 imsg 不支持 "rpc" 子命令，请先升级 imsg。')
+    if proc.returncode not in (0, None):
+        raise RuntimeError(
+            combined or f"imsg rpc --help failed (code {proc.returncode})"
+        )
+
+
+async def probe_imessage(
+    *,
+    cli_path: str = "imsg",
+    db_path: Optional[str] = None,
+    timeout: float = _DEFAULT_IMESSAGE_PROBE_TIMEOUT,
+) -> None:
+    await _probe_rpc_support(cli_path, timeout)
+    client = IMessageRpcClient(cli_path=cli_path, db_path=db_path)
+    try:
+        await client.request("chats.list", {"limit": 1}, timeout=timeout)
+    finally:
+        await client.stop()
+
+
 class IMessageRpcClient:
     def __init__(
         self,
@@ -137,6 +208,7 @@ class IMessageRpcClient:
         self._next_id = 1
         self._stdout_task: Optional[asyncio.Task] = None
         self._stderr_task: Optional[asyncio.Task] = None
+        self._terminal_error: Optional[RuntimeError] = None
 
     async def start(self) -> None:
         if self._proc is not None:
@@ -172,7 +244,7 @@ class IMessageRpcClient:
         for task in (self._stdout_task, self._stderr_task):
             if task is not None:
                 task.cancel()
-        self._fail_all(RuntimeError("imsg rpc closed"))
+        self._fail_all(self._terminal_error or RuntimeError("imsg rpc closed"))
 
     async def wait_closed(self) -> None:
         if self._proc is None:
@@ -243,6 +315,11 @@ class IMessageRpcClient:
                 try:
                     payload = json.loads(line)
                 except Exception:
+                    parsed_error = self._parse_terminal_error(line)
+                    if parsed_error is not None:
+                        self._terminal_error = parsed_error
+                        self._fail_all(parsed_error)
+                        continue
                     logger.warning("Failed to parse imsg rpc line: %s", line[:200])
                     continue
                 if payload.get("id") is not None:
@@ -264,7 +341,7 @@ class IMessageRpcClient:
                 if method and isinstance(params, dict) and self._on_notification is not None:
                     await self._on_notification(method, params)
         finally:
-            self._fail_all(RuntimeError("imsg rpc closed"))
+            self._fail_all(self._terminal_error or RuntimeError("imsg rpc closed"))
 
     async def _read_stderr(self) -> None:
         assert self._proc is not None and self._proc.stderr is not None
@@ -274,6 +351,10 @@ class IMessageRpcClient:
                 break
             line = raw.decode("utf-8", errors="ignore").strip()
             if line:
+                parsed_error = self._parse_terminal_error(line)
+                if parsed_error is not None:
+                    self._terminal_error = parsed_error
+                    self._fail_all(parsed_error)
                 logger.warning("imsg rpc: %s", line)
 
     def _fail_all(self, error: Exception) -> None:
@@ -281,6 +362,25 @@ class IMessageRpcClient:
             if not future.done():
                 future.set_exception(error)
         self._pending.clear()
+
+    @staticmethod
+    def _parse_terminal_error(line: str) -> Optional[RuntimeError]:
+        text = str(line or "").strip()
+        if not text:
+            return None
+
+        match = _IMSG_PERMISSION_DENIED_RE.search(text)
+        if match:
+            denied_path = match.group("path") or "~/Library/Messages/chat.db"
+            detail = str(match.group("detail") or "authorization denied").strip()
+            return RuntimeError(
+                "imsg cannot access the Messages database at "
+                f"{denied_path}. macOS denied permission ({detail}). "
+                "Grant Full Disk Access to the app that launches Jarvis "
+                "(for example Terminal, iTerm, or Python) and retry."
+            )
+
+        return None
 
 
 class IMessageJarvisBot:
@@ -305,6 +405,10 @@ class IMessageJarvisBot:
         )
 
     async def run(self) -> None:
+        await probe_imessage(
+            cli_path=self._cli_path,
+            db_path=self._db_path,
+        )
         await self._client.start()
         logger.info("OmicVerse Jarvis iMessage channel starting via imsg rpc")
         await self._client.request(
