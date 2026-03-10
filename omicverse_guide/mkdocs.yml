@@ -174,6 +174,9 @@ nav:
     - General[Notebook/pipeline]: 
         - J.A.R.V.I.S. with PBMC3k: Tutorials-llm/t_ov_agent_pbmc3k.ipynb
         - J.A.R.V.I.S. with Ten-Task Suite: Tutorials-llm/ov_agent_ten_task_suite.ipynb
+    - Claw [cli/openclaw]:
+        - Overview and CLI: Tutorials-jarvis/t_claw_cli.md
+        - OpenClaw Integration: Tutorials-jarvis/t_claw_openclaw.md
     - MCP Server[cli/agent]:
         - Overview: Tutorials-llm/t_mcp_guide.md
         - Quick Start: Tutorials-llm/t_mcp_quickstart.md
