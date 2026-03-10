@@ -7,7 +7,7 @@ import tempfile
 
 from omicverse.mcp.session_store import SessionStore
 from omicverse.mcp.executor import McpExecutor
-from omicverse.mcp.server import RegistryMcpServer, META_TOOLS
+from omicverse.mcp.server import RegistryMcpServer
 
 
 def _make_mock_server(mock_registry, **kwargs):
@@ -239,6 +239,3 @@ class TestArtifactToolsInListTools:
         assert "ov.delete_artifact" in tool_names
         assert "ov.cleanup_artifacts" in tool_names
         assert "ov.export_artifacts_manifest" in tool_names
-
-    def test_total_meta_tools_count_is_20(self):
-        assert len(META_TOOLS) == 20

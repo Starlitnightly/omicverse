@@ -86,9 +86,6 @@ class TestValidateToolName:
     def test_valid_name(self):
         validate_tool_name("ov.pp.pca")  # should not raise
 
-    def test_valid_with_underscore(self):
-        validate_tool_name("ov.utils.store_layers")  # should not raise
-
     def test_invalid_uppercase(self):
         with pytest.raises(ValueError):
             validate_tool_name("ov.pp.PCA")

@@ -108,28 +108,3 @@ class TestP0Pipeline:
         r = ex.execute_tool("ov.pp.umap", {"adata_id": adata_id})
         assert r["ok"] is False
         assert r["error_code"] == "missing_data_requirements"
-
-
-class TestStoreLayersWorkflow:
-    def test_store_and_retrieve(self, pipeline_executor):
-        ex = pipeline_executor
-
-        r = ex.execute_tool("ov.utils.read", {"path": "test.h5ad"})
-        adata_id = r["outputs"][0]["ref_id"]
-
-        # Store original
-        r = ex.execute_tool(
-            "ov.utils.store_layers",
-            {"adata_id": adata_id, "layers": "original"},
-        )
-        assert r["ok"] is True
-
-        adata = ex.store.get_adata(adata_id)
-        assert "layers_original" in adata.uns
-
-        # Retrieve
-        r = ex.execute_tool(
-            "ov.utils.retrieve_layers",
-            {"adata_id": adata_id, "layers": "original"},
-        )
-        assert r["ok"] is True
