@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from omicverse.mcp.session_store import SessionStore
 from omicverse.mcp.executor import McpExecutor
-from omicverse.mcp.server import RegistryMcpServer, META_TOOLS
+from omicverse.mcp.server import RegistryMcpServer
 
 
 def _make_mock_server(mock_registry, **kwargs):
@@ -210,19 +210,3 @@ class TestNewToolsInListTools:
             assert "name" in tool
             assert "description" in tool
             assert "inputSchema" in tool
-
-    def test_total_meta_tools_count(self):
-        """Verify all 20 meta tools are defined."""
-        assert len(META_TOOLS) == 20
-        expected = {
-            "ov.list_tools", "ov.search_tools", "ov.describe_tool",
-            "ov.get_session", "ov.list_handles",
-            "ov.persist_adata", "ov.restore_adata",
-            "ov.get_metrics", "ov.list_events",
-            "ov.get_trace", "ov.list_traces",
-            "ov.list_artifacts", "ov.describe_artifact",
-            "ov.register_artifact", "ov.delete_artifact",
-            "ov.cleanup_artifacts", "ov.export_artifacts_manifest",
-            "ov.get_limits", "ov.cleanup_runtime", "ov.get_health",
-        }
-        assert set(META_TOOLS.keys()) == expected

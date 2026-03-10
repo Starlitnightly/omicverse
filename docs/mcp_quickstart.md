@@ -92,6 +92,25 @@ Use `--phase P0+P0.5+P2` to include these tools, or `ov.describe_tool` to check 
 
 ### Meta Tools (always available)
 
+Representative meta tools include:
+
+- `ov.list_tools`
+- `ov.describe_tool`
+- `ov.get_session`
+- `ov.get_health`
+- `ov.get_limits`
+- `ov.list_handles`
+- `ov.list_artifacts`
+- `ov.export_artifacts_manifest`
+
+AnnData inspection meta tools are also available:
+
+- `ov.adata.describe`
+- `ov.adata.peek`
+- `ov.adata.find_var`
+- `ov.adata.value_counts`
+- `ov.adata.inspect`
+
 #### Discovery
 
 | Tool Name | Description | Required Params |
