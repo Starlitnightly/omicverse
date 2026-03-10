@@ -6,6 +6,7 @@ Entry point: ``omicverse`` (registered via pyproject.toml scripts).
 Sub-commands
 ------------
 jarvis        Launch the Telegram bot for mobile bioinformatics.
+claw          Generate OmicVerse Python code from a natural-language request.
 skill-seeker  OmicVerse Skill Seeker utilities (list/validate/package skills).
 """
 from __future__ import annotations
@@ -25,6 +26,11 @@ def _run_skill_seeker(argv: List[str]) -> int:
     return ss_main(argv)
 
 
+def _run_claw(argv: List[str]) -> int:
+    from omicverse.claw import main as claw_main
+    return claw_main(argv)
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         prog="omicverse",
@@ -37,6 +43,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Launch Telegram bot for mobile single-cell analysis.",
         add_help=False,
     ).set_defaults(func=_run_jarvis)
+
+    subparsers.add_parser(
+        "claw",
+        help="Generate OmicVerse Python code from a natural-language request.",
+        add_help=False,
+    ).set_defaults(func=_run_claw)
 
     subparsers.add_parser(
         "skill-seeker",
