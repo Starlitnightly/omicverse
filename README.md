@@ -1,6 +1,5 @@
-<h1 align="center">
-<img src="https://raw.githubusercontent.com/Starlitnightly/omicverse/master/README.assets/logo.png" width="400">
-</h1>
+
+<img src="https://raw.githubusercontent.com/Starlitnightly/ImageStore/main/omicverse_img/firstpage4.jpg" >
 
 <div align="center">
   <a href="READMEM/README_CN.md">中文</a> | <a href="READMEM/README_ES.md">Español</a> | <a href="READMEM/README_JP.md">日本語</a> | <a href="READMEM/README_DE.md">Deutsch</a> | <a href="READMEM/README_FR.md">Français</a> | <a href="READMEM/README_KR.md">한국어</a>
@@ -62,13 +61,13 @@
 
 ## `1` [Introduction][docs-feat-provider]
 
-The original name of the omicverse was [Pyomic](https://pypi.org/project/Pyomic/), but we wanted to address a whole universe of transcriptomics, so we changed the name to **`OmicVerse`**, it aimed to solve all task in RNA-seq.
+**OmicVerse v2** is a unified Python project for modern transcriptomics and multi-omics analysis. It brings together bulk RNA-seq, single-cell, spatial transcriptomics, downstream visualization, model-based analysis, and AI-assisted workflows in one package and documentation system.
 
 > [!NOTE]
-> **BulkTrajBlend** algorithm in OmicVerse that combines Beta-Variational AutoEncoder for deconvolution and graph neural networks for overlapping community discovery to effectively interpolate and restore the continuity of **"omission"** cells in the original scRNA-seq data.
+> OmicVerse v2 is organized as a broader analysis platform rather than a single-method package. In addition to core analysis modules, it now includes agent-style workflows through **J.A.R.V.I.S.**, MCP-based tool serving for AI clients, and a growing documentation/tutorial system under `omicverse_guide`.
 
-![omicverse-light](omicverse_guide/docs/img/omicverse.png#gh-light-mode-only)
-![omicverse-dark](omicverse_guide/docs/img/omicverse_dark.png#gh-dark-mode-only)
+![omicverse-light](https://raw.githubusercontent.com/Starlitnightly/ImageStore/main/omicverse_img/background_light.png#gh-light-mode-only)
+![omicverse-dark](https://raw.githubusercontent.com/Starlitnightly/ImageStore/main/omicverse_img/background_dark.png#gh-dark-mode-only)
 
 
 ## `2` [Directory structure](#)
@@ -77,12 +76,13 @@ The original name of the omicverse was [Pyomic](https://pypi.org/project/Pyomic/
 .
 ├── omicverse                  # Main Python package
 ├── omicverse_guide            # Documentation files
+├── omicverse_web              # Web Analysis Platform
 ├── sample                     # Some test data
 ├── LICENSE
 └── README.md
 ````
 
-## `3` [Getting Started ](#)
+## `3` [General Getting Started](#)
 
 OmicVerse can be installed via conda or pypi and you need to install `pytorch` at first. Please refer to the [installation tutorial](https://starlitnightly.github.io/omicverse/Installation_guild/) for more detailed installation steps and adaptations for different platforms (`Windows`, `Linux` or `Mac OS`).
 
@@ -91,25 +91,48 @@ You can use `conda install omicverse -c conda-forge` or `pip install -U omicvers
 Please checkout the documentations and tutorials at [omicverse page](https://starlitnightly.github.io/omicverse/) or [omicverse.readthedocs.io](https://omicverse.readthedocs.io/en/latest/index.html).
 
 
-### MCP Server (Model Context Protocol)
+## `4` [J.A.R.V.I.S Getting Started](#)
 
-OmicVerse provides an MCP server that exposes registered analysis tools to AI assistants (Claude Code, etc.) via the standard [Model Context Protocol](https://modelcontextprotocol.io/).
+### 4.1 OpenClaw 
+
+OmicVerse provide an directly interact analysis with OpenClaw project. You can use
+
+```bash
+omicverse claw 'help me annotate the lung scrna-seq'
+```
+
+This module supported by `ov.Agent` function. And i think that will be convinent for you to analysis the anndata using OpenClaw. 
+
+The full tutorial could be found at [here](https://omicverse.readthedocs.io/en/latest/Tutorials-llm/t_ov_agent_pbmc3k/)
+
+### 4.2 MCP Server (Model Context Protocol)
+
+OmicVerse provide an MCP server that exposes registered analysis tools to AI assistants (Claude Code, etc.) via the standard [Model Context Protocol](https://modelcontextprotocol.io/).
+
 
 ```bash
 # Install with MCP dependencies
-pip install -e ".[mcp]"
+pip install -e "omicverse[mcp]"
 
 # Start the server (stdio transport)
 python -m omicverse.mcp        # or: omicverse-mcp
 python -m omicverse.mcp --phase P0   # core pipeline tools only
 ```
+The full tutorial could be found at [here](https://omicverse.readthedocs.io/en/latest/Tutorials-llm/t_mcp_guide/)
 
-**Tool phases**: P0 covers the core single-cell pipeline (read, qc, scale, pca, neighbors, umap, leiden). P0.5 adds marker gene analysis and visualization. P2 adds availability-gated class tools (pyDEG, pySCSA, MetaCell). 20 built-in meta tools provide tool discovery, session management, observability, artifact management, and runtime safety (quotas, TTL, cleanup).
+### 4.3 J.A.R.V.I.S Msg system
 
-**Testing**: 4 CI profiles — fast-mock (PR default), core-runtime, scientific-runtime, extended-runtime. Run `bash scripts/ci/mcp-fast-mock.sh` locally. See [CI profiles](docs/mcp_ci_profiles.md) and [runtime matrix](docs/mcp_runtime_matrix.md).
+If you want to analysis the `AnnData` using Mobile Phone, maybe you can try 
 
-- [Quickstart Guide](docs/mcp_quickstart.md) — installation, tool tables, response format, full pipeline walkthrough
-- [Integration Guide](docs/mcp_integration.md) — client setup (Claude Code, generic MCP), phase selection, session config
+```bash
+# Install with jarvis dependencies
+pip install "omicverse[jarvis]"
+
+# Start to chat with JARVIS using telegram
+omicverse jarvis --channel telegram --token "$TELEGRAM_BOT_TOKEN"
+```
+The full tutorial could be found at [here](https://omicverse.readthedocs.io/en/latest/Tutorials-jarvis/t_msg_bot_overview/)
+
 
 ## `4` [Data Framework and Reference](#)
 
