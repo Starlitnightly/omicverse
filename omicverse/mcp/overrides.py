@@ -20,8 +20,6 @@ PHASE_WHITELIST: Dict[str, List[str]] = {
     "P0": [
         "omicverse.io.single._read.read",
         "omicverse.utils._data.read",
-        "omicverse.utils._data.store_layers",
-        "omicverse.utils._data.retrieve_layers",
         "omicverse.pp._qc.qc",
         "omicverse.pp._preprocess.scale",
         "omicverse.pp._preprocess.pca",
