@@ -1,6 +1,5 @@
-<h1 align="center">
-<img src="https://raw.githubusercontent.com/Starlitnightly/omicverse/master/README.assets/logo.png" width="400">
-</h1>
+<img src="https://raw.githubusercontent.com/Starlitnightly/ImageStore/main/omicverse_img/firstpage4.jpg" >
+
 
 <div align="center">
   <a href="../README.md">English</a> | <a href="README_CN.md">中文</a> | <a href="README_JP.md">日本語</a> | <a href="README_DE.md">Deutsch</a> | <a href="README_FR.md">Français</a> | <a href="README_KR.md">한국어</a>
@@ -38,7 +37,7 @@
 </div>
 
 
-**`OmicVerse`** es el paquete fundamental para análisis multi-ómicos que incluye análisis de **bulk, célula única y RNA-seq espacial** con Python. Para más información, lee nuestro artículo: [OmicVerse: a framework for bridging and deepening insights across bulk and single-cell sequencing](https://www.nature.com/articles/s41467-024-50194-3)
+**`OmicVerse v2`** es un proyecto unificado de Python para transcriptómica y análisis multi-ómicos modernos. Cubre RNA-seq bulk, análisis de célula única, transcriptómica espacial, visualización, análisis basados en modelos y flujos de trabajo asistidos por IA. Para más contexto, lee nuestro artículo: [OmicVerse: a framework for bridging and deepening insights across bulk and single-cell sequencing](https://www.nature.com/articles/s41467-024-50194-3)
 
 > [!IMPORTANT]
 >
@@ -56,13 +55,13 @@
 
 ## `1` [Introducción][docs-feat-provider]
 
-El nombre original de omicverse era [Pyomic](https://pypi.org/project/Pyomic/), pero queríamos abordar todo un universo de transcriptómica, así que cambiamos el nombre a **`OmicVerse`**, que tiene como objetivo resolver todas las tareas en RNA-seq.
+**OmicVerse v2** es un proyecto unificado de Python para análisis modernos de transcriptómica y multi-ómica. Reúne RNA-seq bulk, análisis de célula única, transcriptómica espacial, visualización, análisis basados en modelos y flujos de trabajo asistidos por IA en un mismo paquete y sistema de documentación.
 
 > [!NOTE]
-> El algoritmo **BulkTrajBlend** en OmicVerse que combina el autocodificador variacional Beta para deconvolución y redes neuronales gráficas para descubrimiento de comunidades superpuestas para interpolar y restaurar efectivamente la continuidad de células "omitidas" en los datos originales de scRNA-seq.
+> OmicVerse v2 está organizado ahora como una plataforma de análisis más amplia, no como un paquete de un solo método. Además de los módulos principales de análisis, incorpora flujos de trabajo tipo agente mediante **J.A.R.V.I.S.**, servicio de herramientas basado en MCP para clientes de IA y un sistema creciente de documentación y tutoriales en `omicverse_guide`.
 
-![omicverse-light](../omicverse_guide/docs/img/omicverse.png#gh-light-mode-only)
-![omicverse-dark](../omicverse_guide/docs/img/omicverse_dark.png#gh-dark-mode-only)
+![omicverse-light](https://raw.githubusercontent.com/Starlitnightly/ImageStore/main/omicverse_img/background_light.png#gh-light-mode-only)
+![omicverse-dark](https://raw.githubusercontent.com/Starlitnightly/ImageStore/main/omicverse_img/background_dark.png#gh-dark-mode-only)
 
 ## `2` [Estructura de Directorios](#)
 
@@ -70,6 +69,7 @@ El nombre original de omicverse era [Pyomic](https://pypi.org/project/Pyomic/), 
 .
 ├── omicverse                  # Paquete principal de Python
 ├── omicverse_guide            # Archivos de documentación
+├── omicverse_web              # Plataforma web de análisis
 ├── sample                     # Algunos datos de prueba
 ├── LICENSE
 └── README.md
@@ -83,7 +83,51 @@ Puedes usar `conda install omicverse -c conda-forge` o `pip install -U omicverse
 
 Consulta la documentación y tutoriales en [página de omicverse](https://starlitnightly.github.io/omicverse/) o [omicverse.readthedocs.io](https://omicverse.readthedocs.io/en/latest/index.html).
 
-## `4` [Marco de Datos y Referencia](#)
+## `4` [Introducción a J.A.R.V.I.S](#)
+
+### 4.1 OpenClaw
+
+OmicVerse ahora permite análisis interactivos directos con el proyecto OpenClaw. Por ejemplo:
+
+```bash
+omicverse claw 'help me annotate the lung scrna-seq'
+```
+
+Este módulo está soportado por `ov.Agent` y resulta útil para analizar `AnnData` mediante conversación.
+
+El tutorial completo puede encontrarse [aquí](https://omicverse.readthedocs.io/en/latest/Tutorials-llm/t_ov_agent_pbmc3k/)
+
+### 4.2 Servidor MCP (Model Context Protocol)
+
+OmicVerse ofrece un servidor MCP que expone herramientas de análisis registradas a asistentes de IA como Claude Code mediante el estándar [Model Context Protocol](https://modelcontextprotocol.io/).
+
+```bash
+# Instalar con dependencias de MCP
+pip install -e "omicverse[mcp]"
+
+# Iniciar el servidor (transporte stdio)
+python -m omicverse.mcp        # o: omicverse-mcp
+python -m omicverse.mcp --phase P0   # solo herramientas del flujo principal
+```
+
+El tutorial completo puede encontrarse [aquí](https://omicverse.readthedocs.io/en/latest/Tutorials-llm/t_mcp_guide/)
+
+### 4.3 Sistema de mensajes J.A.R.V.I.S
+
+Si quieres analizar `AnnData` desde el móvil o desde un canal de mensajería, puedes probar:
+
+```bash
+# Instalar con dependencias de jarvis
+pip install "omicverse[jarvis]"
+
+# Iniciar J.A.R.V.I.S mediante Telegram
+omicverse jarvis --channel telegram --token "$TELEGRAM_BOT_TOKEN"
+```
+
+El tutorial completo puede encontrarse [aquí](https://omicverse.readthedocs.io/en/latest/Tutorials-jarvis/t_msg_bot_overview/)
+
+
+## `5` [Marco de Datos y Referencia](#)
 
 omicverse se implementa como una infraestructura basada en las siguientes cuatro estructuras de datos.
 
@@ -231,12 +275,12 @@ La tabla contiene las herramientas que han sido publicadas
 - [2] [pegasus](https://github.com/lilab-bcb/pegasus/) es una herramienta para analizar transcriptomas de millones de células individuales. Es una herramienta de línea de comandos, un paquete de python y una base para flujos de trabajo de análisis basados en la nube.
 - [3] [cNMF](https://github.com/dylkot/cNMF) es una canalización de análisis para inferir programas de expresión génica a partir de datos de RNA-Seq de células individuales (scRNA-Seq).
 
-## `5` [Contacto](#)
+## `6` [Contacto](#)
 
 - Zehua Zeng ([starlitnightly@gmail.com](mailto:starlitnightly@gmail.com) o [zehuazeng@xs.ustb.edu.cn](mailto:zehuazeng@xs.ustb.edu.cn))
 - Lei Hu ([hulei@westlake.edu.cn](mailto:hulei@westlake.edu.cn))
 
-## `6` [Guía del Desarrollador y Contribución](#)
+## `7` [Guía del Desarrollador y Contribución](#)
 
 Si deseas contribuir a omicverse, consulta nuestra [documentación para desarrolladores](https://omicverse.readthedocs.io/en/latest/Developer_guild/).
 
@@ -266,7 +310,7 @@ El extra opcional `tests` y el archivo `requirements-latest.txt` ya incluyen `py
 > Nos gustaría agradecer a las siguientes cuentas oficiales de WeChat por promover Omicverse.
 > <p align="center"> <a href="https://mp.weixin.qq.com/s/egAnRfr3etccU_RsN-zIlg" target="_blank" rel="noreferrer"> <img src="../README.assets/image-20230701163953794.png" alt="linux" width="50" height="50"/> </a> <a href="https://zhuanlan.zhihu.com/c_1257815636945915904?page=3" target="_blank" rel="noreferrer"> <img src="../README.assets/WechatIMG688.png" alt="linux" width="50" height="50"/> </a> </p>
 
-## `7` [Cita](https://doi.org/10.1038/s41467-024-50194-3)
+## `8` [Cita](https://doi.org/10.1038/s41467-024-50194-3)
 
 Si usas `omicverse` en tu trabajo, cita la publicación de `omicverse` de la siguiente manera:
 
@@ -284,7 +328,7 @@ Aquí hay algunos otros paquetes relacionados, ¡siéntete libre de referenciarl
 >
 > _imetaomics_ 6 Nov 2025. doi: [10.1002/imo2.70064](https://doi.org/10.1002/imo2.70064).
 
-## `8` [Otros](#)
+## `9` [Otros](#)
 
 Si deseas patrocinar el desarrollo de nuestro proyecto, puedes ir al sitio web de afdian (https://ifdian.net/a/starlitnightly) y patrocinarnos.
 
