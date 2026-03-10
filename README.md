@@ -1,5 +1,5 @@
 
-<img src="https://raw.githubusercontent.com/Starlitnightly/ImageStore/main/omicverse_img/firstpage6.jpg" >
+<img src="https://raw.githubusercontent.com/Starlitnightly/ImageStore/main/omicverse_img/firstpage.webp" >
 
 <div align="center">
   <a href="READMEM/README_CN.md">中文</a> | <a href="READMEM/README_ES.md">Español</a> | <a href="READMEM/README_JP.md">日本語</a> | <a href="READMEM/README_DE.md">Deutsch</a> | <a href="READMEM/README_FR.md">Français</a> | <a href="READMEM/README_KR.md">한국어</a>
@@ -21,6 +21,8 @@
 [preprint-link]: https://doi.org/10.1038/s41467-024-50194-3
         
         
+        
+        
 [pypi-badge]: https://img.shields.io/pypi/v/omicverse
 [pypi-link]: https://pypi.org/project/omicverse
 [pypi-download-badge]:https://static.pepy.tech/badge/omicverse
@@ -38,7 +40,11 @@
 [citation-badge]:https://citations.njzjz.win/10.1038/s41467-024-50194-3
         
         
+        
+        
 [citation-link]:https://doi.org/10.1038/s41467-024-50194-3
+        
+        
         
         
 
