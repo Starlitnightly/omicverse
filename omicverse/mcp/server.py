@@ -83,6 +83,170 @@ META_TOOLS: Dict[str, dict] = {
             "required": ["tool_name"],
         },
     },
+    "ov.adata.describe": {
+        "tool_name": "ov.adata.describe",
+        "description": "Describe the current AnnData object: shape, names, slots, columns, and a small preview summary",
+        "category": "adata",
+        "execution_class": "stateless",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "adata_id": {
+                    "type": "string",
+                    "description": "Session dataset reference",
+                },
+                "preview_n": {
+                    "type": "integer",
+                    "default": 5,
+                    "description": "How many obs_names/var_names to preview",
+                },
+            },
+            "required": ["adata_id"],
+        },
+    },
+    "ov.adata.peek": {
+        "tool_name": "ov.adata.peek",
+        "description": "Preview rows from adata.obs or adata.var, including index names and selected columns",
+        "category": "adata",
+        "execution_class": "stateless",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "adata_id": {
+                    "type": "string",
+                    "description": "Session dataset reference",
+                },
+                "axis": {
+                    "type": "string",
+                    "enum": ["obs", "var"],
+                    "description": "Which annotation table to preview",
+                },
+                "n": {
+                    "type": "integer",
+                    "default": 5,
+                    "description": "Number of rows to preview",
+                },
+                "columns": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional subset of columns to include",
+                },
+                "include_index": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Whether to include obs_names/var_names as the first column",
+                },
+            },
+            "required": ["adata_id", "axis"],
+        },
+    },
+    "ov.adata.find_var": {
+        "tool_name": "ov.adata.find_var",
+        "description": "Search adata.var_names for genes/features by exact, prefix, or substring match",
+        "category": "adata",
+        "execution_class": "stateless",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "adata_id": {
+                    "type": "string",
+                    "description": "Session dataset reference",
+                },
+                "query": {
+                    "type": "string",
+                    "description": "Gene/feature query, e.g. CD3D",
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": ["exact", "prefix", "contains"],
+                    "default": "exact",
+                    "description": "Matching strategy",
+                },
+                "ignore_case": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Whether to ignore case when matching",
+                },
+                "limit": {
+                    "type": "integer",
+                    "default": 20,
+                    "description": "Maximum number of matches to return",
+                },
+            },
+            "required": ["adata_id", "query"],
+        },
+    },
+    "ov.adata.value_counts": {
+        "tool_name": "ov.adata.value_counts",
+        "description": "Compute value counts for a column in adata.obs or adata.var",
+        "category": "adata",
+        "execution_class": "stateless",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "adata_id": {
+                    "type": "string",
+                    "description": "Session dataset reference",
+                },
+                "axis": {
+                    "type": "string",
+                    "enum": ["obs", "var"],
+                    "default": "obs",
+                    "description": "Which annotation table contains the column",
+                },
+                "column": {
+                    "type": "string",
+                    "description": "Column name to count",
+                },
+                "limit": {
+                    "type": "integer",
+                    "default": 20,
+                    "description": "Maximum number of categories to return",
+                },
+                "dropna": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Whether to drop NA values before counting",
+                },
+            },
+            "required": ["adata_id", "column"],
+        },
+    },
+    "ov.adata.inspect": {
+        "tool_name": "ov.adata.inspect",
+        "description": "Inspect the contents of adata slots such as obs, var, obsm, layers, obsp, varm, or uns",
+        "category": "adata",
+        "execution_class": "stateless",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "adata_id": {
+                    "type": "string",
+                    "description": "Session dataset reference",
+                },
+                "slot": {
+                    "type": "string",
+                    "enum": ["obs", "var", "obsm", "varm", "layers", "obsp", "uns"],
+                    "description": "Which AnnData slot to inspect",
+                },
+                "key": {
+                    "type": "string",
+                    "description": "Key inside the slot. Required for obsm/varm/layers/obsp, optional for uns",
+                },
+                "n": {
+                    "type": "integer",
+                    "default": 5,
+                    "description": "Preview rows/items",
+                },
+                "m": {
+                    "type": "integer",
+                    "default": 5,
+                    "description": "Preview columns for matrix-like objects",
+                },
+            },
+            "required": ["adata_id", "slot"],
+        },
+    },
     # -- Session management meta tools ---------------------------------------
     "ov.get_session": {
         "tool_name": "ov.get_session",
@@ -516,6 +680,22 @@ class RegistryMcpServer:
 
         return tools
 
+    @staticmethod
+    def _meta_tool_entry(name: str, meta: dict) -> dict:
+        return {
+            "tool_name": name,
+            "description": meta.get("description", ""),
+            "category": meta.get("category", "meta"),
+            "execution_class": meta.get("execution_class", "stateless"),
+            "risk_level": meta.get("risk_level", "low"),
+            "status": meta.get("status", "available"),
+            "availability": meta.get("availability", {"available": True}),
+            "aliases": meta.get("aliases", []),
+            "parameter_schema": meta.get("parameter_schema", meta.get("inputSchema", {"type": "object", "properties": {}})),
+            "inputSchema": meta.get("inputSchema", {"type": "object", "properties": {}}),
+            "kind": "meta",
+        }
+
     def call_tool(self, name: str, arguments: dict) -> dict:
         """Dispatch a tool call.
 
@@ -556,6 +736,16 @@ class RegistryMcpServer:
             result = self._handle_search_tools(arguments)
         elif name == "ov.describe_tool":
             result = self._handle_describe_tool(arguments)
+        elif name == "ov.adata.describe":
+            result = self._handle_adata_describe(arguments)
+        elif name == "ov.adata.peek":
+            result = self._handle_adata_peek(arguments)
+        elif name == "ov.adata.find_var":
+            result = self._handle_adata_find_var(arguments)
+        elif name == "ov.adata.value_counts":
+            result = self._handle_adata_value_counts(arguments)
+        elif name == "ov.adata.inspect":
+            result = self._handle_adata_inspect(arguments)
         elif name == "ov.get_session":
             result = self._handle_get_session(arguments)
         elif name == "ov.list_handles":
@@ -725,6 +915,557 @@ class RegistryMcpServer:
             return False
         return entry.get("execution_class") == "adata"
 
+    def _iter_discoverable_entries(self) -> List[dict]:
+        entries = [self._meta_tool_entry(name, meta) for name, meta in META_TOOLS.items()]
+        entries.extend(self._manifest)
+        return entries
+
+    def _handle_list_tools(self, args: dict) -> dict:
+        """Implement ``ov.list_tools``."""
+        category = args.get("category")
+        execution_class = args.get("execution_class")
+
+        tools = []
+        for entry in self._iter_discoverable_entries():
+            if category and entry.get("category") != category:
+                continue
+            if execution_class and entry.get("execution_class") != execution_class:
+                continue
+            tools.append({
+                "tool_name": entry["tool_name"],
+                "description": entry.get("description", ""),
+                "category": entry.get("category", ""),
+                "execution_class": entry.get("execution_class", ""),
+                "risk_level": entry.get("risk_level", ""),
+                "status": entry.get("status", ""),
+                "availability": entry.get("availability", {}).get("available", True),
+            })
+
+        return {
+            "ok": True,
+            "tool_name": "ov.list_tools",
+            "summary": f"Found {len(tools)} tools",
+            "outputs": [{"type": "json", "data": tools}],
+            "state_updates": {},
+            "warnings": [],
+        }
+
+    def _handle_search_tools(self, args: dict) -> dict:
+        """Implement ``ov.search_tools``."""
+        query = args.get("query", "").lower()
+        max_results = args.get("max_results", 10)
+
+        if not query:
+            return {
+                "ok": False,
+                "error_code": "invalid_arguments",
+                "message": "query is required",
+                "details": {},
+                "suggested_next_tools": [],
+            }
+
+        scored: List[tuple] = []
+        for entry in self._iter_discoverable_entries():
+            score = self._search_score(query, entry)
+            if score > 0:
+                scored.append((score, entry))
+
+        scored.sort(key=lambda x: -x[0])
+        results = []
+        for score, entry in scored[:max_results]:
+            results.append({
+                "tool_name": entry["tool_name"],
+                "description": entry.get("description", ""),
+                "category": entry.get("category", ""),
+                "score": round(score, 3),
+                "availability": entry.get("availability", {}).get("available", True),
+            })
+
+        return {
+            "ok": True,
+            "tool_name": "ov.search_tools",
+            "summary": f"Found {len(results)} matches for '{query}'",
+            "outputs": [{"type": "json", "data": results}],
+            "state_updates": {},
+            "warnings": [],
+        }
+
+    def _handle_describe_tool(self, args: dict) -> dict:
+        """Implement ``ov.describe_tool``."""
+        tool_name = args.get("tool_name", "")
+        if tool_name in META_TOOLS:
+            desc = self._meta_tool_entry(tool_name, META_TOOLS[tool_name])
+            return {
+                "ok": True,
+                "tool_name": "ov.describe_tool",
+                "summary": f"Description for {tool_name}",
+                "outputs": [{"type": "json", "data": desc}],
+                "state_updates": {},
+                "warnings": [],
+            }
+        entry = self._executor.resolve_entry(tool_name)
+
+        if entry is None:
+            return {
+                "ok": False,
+                "error_code": "tool_not_found",
+                "message": f"Unknown tool: {tool_name}",
+                "details": {},
+                "suggested_next_tools": ["ov.list_tools", "ov.search_tools"],
+            }
+
+        # Return full manifest entry (minus internal function ref)
+        desc = {k: v for k, v in entry.items() if not k.startswith("_")}
+
+        # For class tools: refresh runtime availability and ensure actions shown
+        if entry.get("execution_class") == "class":
+            from .class_specs import get_spec as _get_class_spec
+            from .availability import check_class_availability
+            spec = _get_class_spec(entry.get("full_name", ""))
+            if spec is not None:
+                avail_ok, avail_reason = check_class_availability(spec)
+                desc.setdefault("availability", {})
+                desc["availability"] = dict(desc["availability"])
+                desc["availability"]["available"] = avail_ok
+                desc["availability"]["reason"] = avail_reason
+                if "class_actions" not in desc:
+                    from .manifest import _build_class_actions_summary
+                    desc["class_actions"] = _build_class_actions_summary(spec)
+
+        return {
+            "ok": True,
+            "tool_name": "ov.describe_tool",
+            "summary": f"Description for {tool_name}",
+            "outputs": [{"type": "json", "data": desc}],
+            "state_updates": {},
+            "warnings": [],
+        }
+
+    def _get_adata_or_error(self, adata_id: str):
+        if not adata_id:
+            return None, {
+                "ok": False,
+                "error_code": "invalid_arguments",
+                "message": "adata_id is required",
+                "details": {},
+                "suggested_next_tools": ["ov.list_handles"],
+            }
+        try:
+            return self._store.get_adata(adata_id), None
+        except SessionError as exc:
+            return None, {
+                "ok": False,
+                "error_code": exc.error_code,
+                "message": str(exc),
+                "details": exc.details,
+                "suggested_next_tools": ["ov.list_handles"],
+            }
+        except KeyError:
+            return None, {
+                "ok": False,
+                "error_code": "handle_not_found",
+                "message": f"Dataset not found: {adata_id}",
+                "details": {"adata_id": adata_id},
+                "suggested_next_tools": ["ov.list_handles", "ov.utils.read"],
+            }
+
+    @staticmethod
+    def _to_json_scalar(value: Any) -> Any:
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+        try:
+            json.dumps(value)
+            return value
+        except Exception:
+            return str(value)
+
+    @classmethod
+    def _frame_to_table(cls, frame, *, limit: int = 200) -> dict:
+        subset = frame.head(limit)
+        return {
+            "columns": list(subset.columns),
+            "data": [
+                [cls._to_json_scalar(v) for v in row]
+                for row in subset.itertuples(index=False, name=None)
+            ],
+            "shape": [int(frame.shape[0]), int(frame.shape[1])],
+            "truncated": int(frame.shape[0]) > limit,
+        }
+
+    def _handle_adata_describe(self, args: dict) -> dict:
+        adata_id = args.get("adata_id", "")
+        adata, error = self._get_adata_or_error(adata_id)
+        if error:
+            return error
+
+        preview_n = max(1, min(int(args.get("preview_n", 5)), 20))
+        x_obj = getattr(adata, "X", None)
+        x_summary = {
+            "type": type(x_obj).__name__ if x_obj is not None else None,
+            "dtype": str(getattr(x_obj, "dtype", "")) if x_obj is not None else None,
+        }
+        if x_obj is not None and hasattr(x_obj, "shape"):
+            x_summary["shape"] = [int(x_obj.shape[0]), int(x_obj.shape[1])]
+        if x_obj is not None and hasattr(x_obj, "nnz"):
+            total = max(1, int(adata.shape[0]) * int(adata.shape[1]))
+            x_summary["nnz"] = int(x_obj.nnz)
+            x_summary["density"] = float(x_obj.nnz / total)
+
+        payload = {
+            "adata_id": adata_id,
+            "revision": self._store.get_adata_revision(adata_id),
+            "shape": [int(adata.shape[0]), int(adata.shape[1])],
+            "n_obs": int(adata.n_obs),
+            "n_vars": int(adata.n_vars),
+            "obs_columns": [str(c) for c in list(getattr(adata.obs, "columns", []))],
+            "var_columns": [str(c) for c in list(getattr(adata.var, "columns", []))],
+            "layers": [str(k) for k in list(adata.layers.keys())],
+            "obsm_keys": [str(k) for k in list(adata.obsm.keys())],
+            "varm_keys": [str(k) for k in list(adata.varm.keys())],
+            "obsp_keys": [str(k) for k in list(adata.obsp.keys())],
+            "uns_keys": [str(k) for k in list(adata.uns.keys())],
+            "obs_names_preview": [str(x) for x in list(adata.obs_names[:preview_n])],
+            "var_names_preview": [str(x) for x in list(adata.var_names[:preview_n])],
+            "first_obs_name": str(adata.obs_names[0]) if adata.n_obs else None,
+            "first_var_name": str(adata.var_names[0]) if adata.n_vars else None,
+            "obs_names_unique": bool(getattr(adata.obs_names, "is_unique", False)),
+            "var_names_unique": bool(getattr(adata.var_names, "is_unique", False)),
+            "x_summary": x_summary,
+        }
+        return {
+            "ok": True,
+            "tool_name": "ov.adata.describe",
+            "summary": f"adata {adata_id}: {adata.n_obs} obs x {adata.n_vars} vars",
+            "outputs": [{"type": "json", "data": payload}],
+            "state_updates": {},
+            "warnings": [],
+        }
+
+    def _handle_adata_peek(self, args: dict) -> dict:
+        import pandas as pd
+
+        adata_id = args.get("adata_id", "")
+        adata, error = self._get_adata_or_error(adata_id)
+        if error:
+            return error
+
+        axis = args.get("axis")
+        if axis not in {"obs", "var"}:
+            return {
+                "ok": False,
+                "error_code": "invalid_arguments",
+                "message": "axis must be one of: obs, var",
+                "details": {"axis": axis},
+                "suggested_next_tools": ["ov.adata.describe"],
+            }
+        n = max(1, min(int(args.get("n", 5)), 50))
+        include_index = bool(args.get("include_index", True))
+        columns = args.get("columns")
+        frame = getattr(adata, axis)
+        index_label = "obs_name" if axis == "obs" else "var_name"
+
+        if columns:
+            missing = [col for col in columns if col not in frame.columns]
+            if missing:
+                return {
+                    "ok": False,
+                    "error_code": "invalid_arguments",
+                    "message": f"Unknown {axis} columns: {missing}",
+                    "details": {"axis": axis, "missing_columns": missing},
+                    "suggested_next_tools": ["ov.adata.describe"],
+                }
+            data = frame.loc[:, list(columns)].head(n).copy()
+        else:
+            data = frame.head(n).copy()
+            if len(data.columns) > 10:
+                data = data.iloc[:, :10].copy()
+
+        if include_index:
+            data.insert(0, index_label, [str(x) for x in data.index])
+        elif data.shape[1] == 0:
+            data = pd.DataFrame({index_label: [str(x) for x in frame.index[:n]]})
+
+        return {
+            "ok": True,
+            "tool_name": "ov.adata.peek",
+            "summary": f"{axis} preview for {adata_id}",
+            "outputs": [{"type": "table", "data": self._frame_to_table(data, limit=n)}],
+            "state_updates": {},
+            "warnings": [],
+        }
+
+    def _handle_adata_find_var(self, args: dict) -> dict:
+        adata_id = args.get("adata_id", "")
+        adata, error = self._get_adata_or_error(adata_id)
+        if error:
+            return error
+
+        query = str(args.get("query", "")).strip()
+        if not query:
+            return {
+                "ok": False,
+                "error_code": "invalid_arguments",
+                "message": "query is required",
+                "details": {},
+                "suggested_next_tools": ["ov.adata.describe"],
+            }
+        mode = args.get("mode", "exact")
+        if mode not in {"exact", "prefix", "contains"}:
+            return {
+                "ok": False,
+                "error_code": "invalid_arguments",
+                "message": "mode must be one of: exact, prefix, contains",
+                "details": {"mode": mode},
+                "suggested_next_tools": [],
+            }
+        ignore_case = bool(args.get("ignore_case", True))
+        limit = max(1, min(int(args.get("limit", 20)), 100))
+
+        matches = []
+        normalized_query = query.lower() if ignore_case else query
+        for idx, name in enumerate(adata.var_names):
+            value = str(name)
+            candidate = value.lower() if ignore_case else value
+            matched = (
+                candidate == normalized_query if mode == "exact" else
+                candidate.startswith(normalized_query) if mode == "prefix" else
+                normalized_query in candidate
+            )
+            if matched:
+                matches.append({"var_name": value, "index": idx})
+                if len(matches) >= limit:
+                    break
+
+        payload = {
+            "adata_id": adata_id,
+            "query": query,
+            "mode": mode,
+            "ignore_case": ignore_case,
+            "exists": bool(matches),
+            "matches": matches,
+            "returned_matches": len(matches),
+        }
+        summary = f"{len(matches)} matches for {query} in adata.var_names"
+        if mode == "exact":
+            summary = f"{query} {'found' if matches else 'not found'} in adata.var_names"
+        return {
+            "ok": True,
+            "tool_name": "ov.adata.find_var",
+            "summary": summary,
+            "outputs": [{"type": "json", "data": payload}],
+            "state_updates": {},
+            "warnings": [],
+        }
+
+    def _handle_adata_value_counts(self, args: dict) -> dict:
+        import pandas as pd
+
+        adata_id = args.get("adata_id", "")
+        adata, error = self._get_adata_or_error(adata_id)
+        if error:
+            return error
+
+        axis = args.get("axis", "obs")
+        if axis not in {"obs", "var"}:
+            return {
+                "ok": False,
+                "error_code": "invalid_arguments",
+                "message": "axis must be one of: obs, var",
+                "details": {"axis": axis},
+                "suggested_next_tools": ["ov.adata.describe"],
+            }
+        column = args.get("column", "")
+        if not column:
+            return {
+                "ok": False,
+                "error_code": "invalid_arguments",
+                "message": "column is required",
+                "details": {},
+                "suggested_next_tools": ["ov.adata.describe"],
+            }
+        frame = getattr(adata, axis)
+        if column not in frame.columns:
+            return {
+                "ok": False,
+                "error_code": "invalid_arguments",
+                "message": f"Unknown {axis} column: {column}",
+                "details": {"axis": axis, "column": column},
+                "suggested_next_tools": ["ov.adata.describe", "ov.adata.peek"],
+            }
+        limit = max(1, min(int(args.get("limit", 20)), 200))
+        dropna = bool(args.get("dropna", True))
+        counts = frame[column].value_counts(dropna=dropna).head(limit)
+        table = pd.DataFrame({
+            "value": [self._to_json_scalar(v) for v in counts.index.tolist()],
+            "count": [int(v) for v in counts.tolist()],
+        })
+        return {
+            "ok": True,
+            "tool_name": "ov.adata.value_counts",
+            "summary": f"Value counts for {axis}.{column}",
+            "outputs": [{"type": "table", "data": self._frame_to_table(table, limit=limit)}],
+            "state_updates": {},
+            "warnings": [],
+        }
+
+    def _handle_adata_inspect(self, args: dict) -> dict:
+        adata_id = args.get("adata_id", "")
+        adata, error = self._get_adata_or_error(adata_id)
+        if error:
+            return error
+
+        slot = args.get("slot")
+        valid_slots = {"obs", "var", "obsm", "varm", "layers", "obsp", "uns"}
+        if slot not in valid_slots:
+            return {
+                "ok": False,
+                "error_code": "invalid_arguments",
+                "message": f"slot must be one of: {sorted(valid_slots)}",
+                "details": {"slot": slot},
+                "suggested_next_tools": ["ov.adata.describe"],
+            }
+
+        key = args.get("key")
+        n = max(1, min(int(args.get("n", 5)), 20))
+        m = max(1, min(int(args.get("m", 5)), 20))
+
+        if slot in {"obs", "var"}:
+            if key:
+                frame = getattr(adata, slot)
+                if key not in frame.columns:
+                    return {
+                        "ok": False,
+                        "error_code": "invalid_arguments",
+                        "message": f"Unknown {slot} column: {key}",
+                        "details": {"slot": slot, "key": key},
+                        "suggested_next_tools": ["ov.adata.describe", "ov.adata.peek"],
+                    }
+                series = frame[key]
+                preview = [self._to_json_scalar(v) for v in series.head(n).tolist()]
+                payload = {
+                    "slot": slot,
+                    "key": key,
+                    "dtype": str(series.dtype),
+                    "n_values": int(series.shape[0]),
+                    "n_unique": int(series.nunique(dropna=False)),
+                    "preview": preview,
+                }
+                return {
+                    "ok": True,
+                    "tool_name": "ov.adata.inspect",
+                    "summary": f"Inspected {slot}.{key}",
+                    "outputs": [{"type": "json", "data": payload}],
+                    "state_updates": {},
+                    "warnings": [],
+                }
+            return self._handle_adata_peek({
+                "adata_id": adata_id,
+                "axis": slot,
+                "n": n,
+                "include_index": True,
+            }) | {"tool_name": "ov.adata.inspect"}
+
+        slot_obj = getattr(adata, slot)
+        if slot == "uns" and not key:
+            keys = [str(k) for k in list(slot_obj.keys())]
+            preview = {}
+            for uns_key in keys[: min(n, 10)]:
+                preview[uns_key] = self._summarize_slot_value(slot_obj[uns_key], n=n, m=m, depth=0)
+            return {
+                "ok": True,
+                "tool_name": "ov.adata.inspect",
+                "summary": f"Inspected uns for {adata_id}",
+                "outputs": [{"type": "json", "data": {
+                    "slot": "uns",
+                    "keys": keys,
+                    "preview": preview,
+                }}],
+                "state_updates": {},
+                "warnings": [],
+            }
+
+        if slot != "uns" and not key:
+            return {
+                "ok": False,
+                "error_code": "invalid_arguments",
+                "message": f"key is required for slot {slot}",
+                "details": {"slot": slot},
+                "suggested_next_tools": ["ov.adata.describe"],
+            }
+
+        try:
+            value = slot_obj[key]
+        except Exception:
+            return {
+                "ok": False,
+                "error_code": "invalid_arguments",
+                "message": f"Unknown key {key!r} in adata.{slot}",
+                "details": {"slot": slot, "key": key},
+                "suggested_next_tools": ["ov.adata.describe"],
+            }
+
+        payload = {
+            "slot": slot,
+            "key": key,
+            "summary": self._summarize_slot_value(value, n=n, m=m, depth=0),
+        }
+        return {
+            "ok": True,
+            "tool_name": "ov.adata.inspect",
+            "summary": f"Inspected {slot}[{key}]",
+            "outputs": [{"type": "json", "data": payload}],
+            "state_updates": {},
+            "warnings": [],
+        }
+
+    @classmethod
+    def _matrix_preview(cls, value: Any, *, n: int, m: int) -> Any:
+        try:
+            subset = value[:n, :m]
+        except Exception:
+            return None
+        if hasattr(subset, "toarray"):
+            subset = subset.toarray()
+        if hasattr(subset, "tolist"):
+            subset = subset.tolist()
+        if isinstance(subset, list):
+            return [[cls._to_json_scalar(v) for v in row] if isinstance(row, list) else cls._to_json_scalar(row) for row in subset]
+        return cls._to_json_scalar(subset)
+
+    @classmethod
+    def _summarize_slot_value(cls, value: Any, *, n: int, m: int, depth: int) -> Any:
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+        if depth >= 2:
+            return {"type": type(value).__name__, "repr": str(value)[:200]}
+        if isinstance(value, dict):
+            keys = [str(k) for k in list(value.keys())]
+            preview = {
+                str(k): cls._summarize_slot_value(v, n=n, m=m, depth=depth + 1)
+                for k, v in list(value.items())[: min(n, 10)]
+            }
+            return {"type": "dict", "n_keys": len(keys), "keys": keys[:50], "preview": preview}
+        if isinstance(value, (list, tuple)):
+            items = [cls._summarize_slot_value(v, n=n, m=m, depth=depth + 1) for v in list(value)[:n]]
+            return {"type": type(value).__name__, "length": len(value), "preview": items}
+        if hasattr(value, "columns") and hasattr(value, "head"):
+            return {"type": type(value).__name__, "table": cls._frame_to_table(value, limit=n)}
+        summary = {"type": type(value).__name__}
+        if hasattr(value, "shape"):
+            try:
+                shape = list(value.shape)
+            except Exception:
+                shape = None
+            summary["shape"] = shape
+            summary["preview"] = cls._matrix_preview(value, n=n, m=m)
+        if hasattr(value, "dtype"):
+            summary["dtype"] = str(value.dtype)
+        if hasattr(value, "nnz"):
+            summary["nnz"] = int(value.nnz)
+        if "preview" not in summary:
+            summary["repr"] = str(value)[:500]
+        return summary
+
     def _record_trace_and_logs(
         self,
         *,
@@ -777,119 +1518,6 @@ class RegistryMcpServer:
                 result.get("message", ""),
                 _summarize_payload(result.get("details", {})),
             )
-
-    # -- Discovery meta tool handlers ----------------------------------------
-
-    def _handle_list_tools(self, args: dict) -> dict:
-        """Implement ``ov.list_tools``."""
-        category = args.get("category")
-        execution_class = args.get("execution_class")
-
-        tools = []
-        for entry in self._manifest:
-            if category and entry.get("category") != category:
-                continue
-            if execution_class and entry.get("execution_class") != execution_class:
-                continue
-            tools.append({
-                "tool_name": entry["tool_name"],
-                "description": entry.get("description", ""),
-                "category": entry.get("category", ""),
-                "execution_class": entry.get("execution_class", ""),
-                "risk_level": entry.get("risk_level", ""),
-                "status": entry.get("status", ""),
-                "availability": entry.get("availability", {}).get("available", True),
-            })
-
-        return {
-            "ok": True,
-            "tool_name": "ov.list_tools",
-            "summary": f"Found {len(tools)} tools",
-            "outputs": [{"type": "json", "data": tools}],
-            "state_updates": {},
-            "warnings": [],
-        }
-
-    def _handle_search_tools(self, args: dict) -> dict:
-        """Implement ``ov.search_tools``."""
-        query = args.get("query", "").lower()
-        max_results = args.get("max_results", 10)
-
-        if not query:
-            return {
-                "ok": False,
-                "error_code": "invalid_arguments",
-                "message": "query is required",
-                "details": {},
-                "suggested_next_tools": [],
-            }
-
-        scored: List[tuple] = []
-        for entry in self._manifest:
-            score = self._search_score(query, entry)
-            if score > 0:
-                scored.append((score, entry))
-
-        scored.sort(key=lambda x: -x[0])
-        results = []
-        for score, entry in scored[:max_results]:
-            results.append({
-                "tool_name": entry["tool_name"],
-                "description": entry.get("description", ""),
-                "category": entry.get("category", ""),
-                "score": round(score, 3),
-                "availability": entry.get("availability", {}).get("available", True),
-            })
-
-        return {
-            "ok": True,
-            "tool_name": "ov.search_tools",
-            "summary": f"Found {len(results)} matches for '{query}'",
-            "outputs": [{"type": "json", "data": results}],
-            "state_updates": {},
-            "warnings": [],
-        }
-
-    def _handle_describe_tool(self, args: dict) -> dict:
-        """Implement ``ov.describe_tool``."""
-        tool_name = args.get("tool_name", "")
-        entry = self._executor.resolve_entry(tool_name)
-
-        if entry is None:
-            return {
-                "ok": False,
-                "error_code": "tool_not_found",
-                "message": f"Unknown tool: {tool_name}",
-                "details": {},
-                "suggested_next_tools": ["ov.list_tools", "ov.search_tools"],
-            }
-
-        # Return full manifest entry (minus internal function ref)
-        desc = {k: v for k, v in entry.items() if not k.startswith("_")}
-
-        # For class tools: refresh runtime availability and ensure actions shown
-        if entry.get("execution_class") == "class":
-            from .class_specs import get_spec as _get_class_spec
-            from .availability import check_class_availability
-            spec = _get_class_spec(entry.get("full_name", ""))
-            if spec is not None:
-                avail_ok, avail_reason = check_class_availability(spec)
-                desc.setdefault("availability", {})
-                desc["availability"] = dict(desc["availability"])
-                desc["availability"]["available"] = avail_ok
-                desc["availability"]["reason"] = avail_reason
-                if "class_actions" not in desc:
-                    from .manifest import _build_class_actions_summary
-                    desc["class_actions"] = _build_class_actions_summary(spec)
-
-        return {
-            "ok": True,
-            "tool_name": "ov.describe_tool",
-            "summary": f"Description for {tool_name}",
-            "outputs": [{"type": "json", "data": desc}],
-            "state_updates": {},
-            "warnings": [],
-        }
 
     # -- Session management meta tool handlers -------------------------------
 
