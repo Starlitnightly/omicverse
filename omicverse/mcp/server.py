@@ -7,6 +7,7 @@ meta tools for discovery and session management.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import json
 import logging
@@ -22,6 +23,7 @@ from .manifest import build_registry_manifest
 from .session_store import SessionStore, SessionError, TraceRecord, RuntimeLimits
 from .executor import McpExecutor
 from .local_oauth import LocalOAuthProvider, LOCAL_AUTH_SCOPES
+from .adata_kernel_runtime import AdataKernelRuntime
 
 logger = logging.getLogger(__name__)
 
@@ -471,6 +473,7 @@ class RegistryMcpServer:
     ):
         self._phase = phase
         self._store = SessionStore(session_id=session_id, persist_dir=persist_dir, limits=limits)
+        self._adata_runtime = AdataKernelRuntime(store=self._store)
 
         # Build manifest for the requested phase
         self._manifest = build_registry_manifest(phase=phase)
@@ -640,6 +643,141 @@ class RegistryMcpServer:
 
         return result
 
+    async def call_tool_async(self, name: str, arguments: dict) -> dict:
+        """Async dispatch used by MCP transports to preserve cancellation."""
+        if self._store.check_session_expired():
+            self._store._obs_metrics["expired_handle_rejections_total"] += 1
+            try:
+                self._store.record_event("session_expired", {
+                    "session_id": self._store.session_id,
+                    "session_ttl": self._store.limits.session_ttl_seconds,
+                })
+            except Exception:
+                pass
+            return {
+                "ok": False,
+                "error_code": "session_expired",
+                "message": f"Session {self._store.session_id!r} has expired",
+                "details": {"session_id": self._store.session_id},
+                "suggested_next_tools": [],
+            }
+
+        trace_id = uuid.uuid4().hex[:16]
+        started_at = time.time()
+        logger.info(
+            "Tool call start trace_id=%s tool=%s args=%s",
+            trace_id,
+            name,
+            _summarize_arguments(arguments),
+        )
+
+        try:
+            if self._should_route_to_adata_runtime(name, arguments):
+                entry = self._executor.resolve_entry(name)
+                if entry is None:
+                    result = {
+                        "ok": False,
+                        "error_code": "tool_not_found",
+                        "message": f"Unknown tool: {name}",
+                        "details": {"tool_name": name},
+                        "suggested_next_tools": [],
+                    }
+                else:
+                    result = await self._adata_runtime.execute(entry, arguments)
+            else:
+                if name == "ov.persist_adata" and arguments.get("adata_id"):
+                    try:
+                        await self._adata_runtime.flush_dirty(arguments["adata_id"])
+                    except Exception:
+                        pass
+                result = self.call_tool(name, arguments)
+                return result
+        except asyncio.CancelledError:
+            logger.warning("Tool call cancelled trace_id=%s tool=%s", trace_id, name)
+            raise
+        except Exception as exc:
+            result = {
+                "ok": False,
+                "error_code": "execution_failed",
+                "message": str(exc),
+                "details": {"tool_name": name},
+                "suggested_next_tools": [],
+            }
+
+        finished_at = time.time()
+        self._record_trace_and_logs(
+            trace_id=trace_id,
+            tool_name=name,
+            arguments=arguments,
+            result=result,
+            started_at=started_at,
+            finished_at=finished_at,
+        )
+        return result
+
+    def _should_route_to_adata_runtime(self, name: str, arguments: dict) -> bool:
+        if name in META_TOOLS:
+            return False
+        if "adata_id" not in arguments:
+            return False
+        entry = self._executor.resolve_entry(name)
+        if entry is None:
+            return False
+        return entry.get("execution_class") == "adata"
+
+    def _record_trace_and_logs(
+        self,
+        *,
+        trace_id: str,
+        tool_name: str,
+        arguments: dict,
+        result: dict,
+        started_at: float,
+        finished_at: float,
+    ) -> None:
+        try:
+            self._store.record_trace(TraceRecord(
+                trace_id=trace_id,
+                session_id=self._store.session_id,
+                tool_name=tool_name,
+                tool_type=self._classify_tool_type(tool_name),
+                started_at=started_at,
+                finished_at=finished_at,
+                duration_ms=(finished_at - started_at) * 1000,
+                ok=result.get("ok", False),
+                error_code=result.get("error_code"),
+                handle_refs_in=_extract_refs_in(arguments),
+                handle_refs_out=_extract_refs_out(result),
+            ))
+            event_type = "tool_called" if result.get("ok") else "tool_failed"
+            self._store.record_event(event_type, {
+                "tool_name": tool_name,
+                "trace_id": trace_id,
+                "ok": result.get("ok"),
+                "error_code": result.get("error_code"),
+            })
+        except Exception:
+            pass
+
+        duration_ms = (finished_at - started_at) * 1000
+        logger.info(
+            "Tool call end trace_id=%s tool=%s ok=%s error_code=%s duration_ms=%.1f",
+            trace_id,
+            tool_name,
+            result.get("ok", False),
+            result.get("error_code"),
+            duration_ms,
+        )
+        if not result.get("ok", False):
+            logger.error(
+                "Tool call failed trace_id=%s tool=%s error_code=%s message=%s details=%s",
+                trace_id,
+                tool_name,
+                result.get("error_code"),
+                result.get("message", ""),
+                _summarize_payload(result.get("details", {})),
+            )
+
     # -- Discovery meta tool handlers ----------------------------------------
 
     def _handle_list_tools(self, args: dict) -> dict:
@@ -794,6 +932,14 @@ class RegistryMcpServer:
                 "details": {},
                 "suggested_next_tools": ["ov.list_handles"],
             }
+
+        try:
+            asyncio.run(self._adata_runtime.flush_dirty(adata_id))
+        except RuntimeError:
+            # Already inside an event loop or no loop available; best effort only.
+            pass
+        except Exception:
+            pass
 
         try:
             result = self._store.persist_adata(adata_id, path=path)
@@ -1332,7 +1478,7 @@ class RegistryMcpServer:
         @server.call_tool()
         async def handle_call_tool(name: str, arguments: dict):
             with contextlib.redirect_stdout(sys.stderr):
-                result = self.call_tool(name, arguments or {})
+                result = await self.call_tool_async(name, arguments or {})
             return [TextContent(type="text", text=json.dumps(result, default=str))]
 
         return server

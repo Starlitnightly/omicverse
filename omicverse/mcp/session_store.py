@@ -33,6 +33,7 @@ class AdataHandle:
     created_at: float
     last_accessed: float
     metadata: Dict[str, Any] = field(default_factory=dict)
+    revision: int = 1
 
 
 @dataclass
@@ -268,9 +269,48 @@ class SessionStore:
             created_at=now,
             last_accessed=now,
             metadata=meta,
+            revision=1,
         )
         try:
             self.record_event("adata_created", {"adata_id": adata_id, "shape": meta.get("shape")})
+        except Exception:
+            pass
+        return adata_id
+
+    def inject_adata(
+        self,
+        adata_id: str,
+        obj: Any,
+        metadata: Optional[dict] = None,
+        *,
+        revision: int = 1,
+    ) -> str:
+        """Insert or replace an AnnData handle with an explicit ``adata_id``.
+
+        This is intended for trusted internal use such as worker-process state
+        synchronization. It preserves the caller-provided handle identity rather
+        than generating a new one.
+        """
+        now = time.time()
+        meta = metadata or {}
+        if hasattr(obj, "shape"):
+            meta.setdefault("shape", list(obj.shape))
+        if hasattr(obj, "obs") and hasattr(obj.obs, "columns"):
+            meta.setdefault("obs_columns", list(obj.obs.columns)[:20])
+
+        self._session_adata()[adata_id] = AdataHandle(
+            adata_id=adata_id,
+            obj=obj,
+            created_at=now,
+            last_accessed=now,
+            metadata=meta,
+            revision=max(1, int(revision)),
+        )
+        try:
+            self.record_event(
+                "adata_injected",
+                {"adata_id": adata_id, "shape": meta.get("shape"), "revision": revision},
+            )
         except Exception:
             pass
         return adata_id
@@ -322,8 +362,28 @@ class SessionStore:
             raise KeyError(f"Unknown adata_id: {adata_id!r}")
         handle.obj = obj
         handle.last_accessed = time.time()
+        handle.revision += 1
         if hasattr(obj, "shape"):
             handle.metadata["shape"] = list(obj.shape)
+
+    def get_adata_revision(self, adata_id: str) -> int:
+        """Return the monotonic revision for an ``adata_id``."""
+        handle = self._session_adata().get(adata_id)
+        if handle is None:
+            owner = self._find_handle_session(adata_id, self._adata)
+            if owner is not None:
+                raise SessionError(
+                    "cross_session_access",
+                    f"adata_id {adata_id!r} belongs to session {owner!r}, "
+                    f"not current session {self._session_id!r}",
+                    {
+                        "adata_id": adata_id,
+                        "owner_session": owner,
+                        "current_session": self._session_id,
+                    },
+                )
+            raise KeyError(f"Unknown adata_id: {adata_id!r}")
+        return handle.revision
 
     def list_adata(self) -> List[dict]:
         """Return summaries of all active datasets in the current session."""
@@ -334,6 +394,7 @@ class SessionStore:
                 "created_at": h.created_at,
                 "last_accessed": h.last_accessed,
                 "metadata": h.metadata,
+                "revision": h.revision,
             }
             result.append(info)
         return result

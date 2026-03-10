@@ -888,6 +888,9 @@ warnings.filterwarnings('ignore')""")
                     continue
                 raise
 
+            if msg.get('parent_header', {}).get('msg_id') != msg_id:
+                continue
+
             msg_type = msg['msg_type']
             content = msg['content']
 
