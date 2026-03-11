@@ -304,6 +304,8 @@ class LLMTableSelector:
         "celltypist annotation",
         "scsa annotation",
         "gpt4celltype annotation",
+        'annotate single cell',
+        'annotate single cell type',
     ],
     category="single",
     description="Single-cell annotation manager supporting CellTypist, SCSA, GPT-based marker annotation, and reference-mapping workflows.",

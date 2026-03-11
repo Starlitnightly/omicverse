@@ -2045,6 +2045,123 @@ User request: "quality control with nUMI>500, mito<0.2"
         except ValueError:
             return code, backend.last_usage
 
+    def _capture_code_only_snippet(self, code: str, description: str = "") -> None:
+        """Store the latest code snippet captured from execute_code in code-only mode."""
+
+        history = getattr(self, "_code_only_captured_history", None)
+        if history is None:
+            history = []
+            self._code_only_captured_history = history
+        history.append({
+            "code": code,
+            "description": description or "",
+        })
+        self._code_only_captured_code = code
+
+    def _build_code_only_agentic_request(self, request: str, adata: Any) -> str:
+        """Wrap a raw claw request so the normal agentic loop produces code instead of running it."""
+
+        dataset_hint = (
+            "A live dataset object is available as `adata`. Reuse the normal Jarvis workflow, "
+            "but stop at code generation."
+            if adata is not None
+            else "No live dataset object is available. Unless the user explicitly asks to load data, "
+            "assume an AnnData object named `adata` already exists in the generated code."
+        )
+        return (
+            f"{request}\n\n"
+            "CLAW REQUEST MODE:\n"
+            "- Use the same OmicVerse Agent logic as Jarvis.\n"
+            "- Use search_functions and search_skills when helpful.\n"
+            "- Produce the final answer by calling execute_code with the final Python script.\n"
+            "- In this mode, execute_code captures code without running it.\n"
+            "- After execute_code, call finish.\n"
+            f"{dataset_hint}"
+        )
+
+    async def _generate_code_via_agentic_loop(
+        self,
+        request: str,
+        adata: Any,
+        *,
+        progress_callback: Optional[Callable[[str], None]] = None,
+    ) -> str:
+        """Run the normal Jarvis agentic loop and capture the final execute_code snippet."""
+
+        captured_chunks: List[str] = []
+        captured_errors: List[str] = []
+
+        def _progress(message: str) -> None:
+            if progress_callback is None:
+                return
+            try:
+                progress_callback(message)
+            except Exception:
+                pass
+
+        async def _event_callback(event: Dict[str, Any]) -> None:
+            event_type = str(event.get("type") or "")
+            content = event.get("content")
+            if event_type == "tool_call":
+                tool_name = ""
+                if isinstance(content, dict):
+                    tool_name = str(content.get("name") or "")
+                _progress(f"tool: {tool_name or 'unknown'}")
+            elif event_type == "code":
+                code = str(content or "")
+                if code:
+                    captured_chunks.append(code)
+                _progress("captured code")
+            elif event_type == "error":
+                captured_errors.append(str(content or "unknown error"))
+                _progress("agent error")
+            elif event_type == "done":
+                _progress("finish")
+
+        previous_mode = getattr(self, "_code_only_mode", False)
+        previous_code = getattr(self, "_code_only_captured_code", "")
+        previous_history = getattr(self, "_code_only_captured_history", None)
+        self._code_only_mode = True
+        self._code_only_captured_code = ""
+        self._code_only_captured_history = []
+        try:
+            _progress("start agentic loop")
+            await self._run_agentic_loop(
+                self._build_code_only_agentic_request(request, adata),
+                adata,
+                event_callback=_event_callback,
+            )
+        finally:
+            captured_code = str(getattr(self, "_code_only_captured_code", "") or "")
+            captured_history = list(getattr(self, "_code_only_captured_history", []) or [])
+            self._code_only_mode = previous_mode
+            self._code_only_captured_code = previous_code
+            self._code_only_captured_history = previous_history
+
+        if captured_code:
+            return captured_code
+
+        for item in reversed(captured_history):
+            code = str(item.get("code", "") or "")
+            if code:
+                return code
+
+        for chunk in reversed(captured_chunks):
+            try:
+                return self._extract_python_code_strict(chunk)
+            except ValueError:
+                continue
+
+        if captured_errors:
+            raise RuntimeError(
+                "Jarvis-style code generation did not reach execute_code. "
+                + "; ".join(captured_errors[:3])
+            )
+        raise RuntimeError(
+            "Jarvis-style code generation did not emit executable code. "
+            "The agent finished without calling execute_code."
+        )
+
     async def generate_code_async(
         self,
         request: str,
@@ -2054,14 +2171,6 @@ User request: "quality control with nUMI>500, mito<0.2"
         progress_callback: Optional[Callable[[str], None]] = None,
     ) -> str:
         """Generate OmicVerse Python code without executing it."""
-
-        def _progress(message: str) -> None:
-            if progress_callback is None:
-                return
-            try:
-                progress_callback(message)
-            except Exception:
-                pass
 
         if not request or not request.strip():
             raise ValueError("request cannot be empty")
@@ -2077,66 +2186,11 @@ User request: "quality control with nUMI>500, mito<0.2"
             }
             return direct_code
 
-        _progress("prepare prompt")
-        backend = OmicVerseLLMBackend(
-            system_prompt=self._build_code_generation_system_prompt(adata),
-            model=self.model,
-            api_key=self.api_key,
-            endpoint=self.endpoint,
-            max_tokens=4096,
-            temperature=0.1,
+        code = await self._generate_code_via_agentic_loop(
+            request,
+            adata,
+            progress_callback=progress_callback,
         )
-
-        _progress("request model")
-        with self._temporary_api_keys():
-            response_text = await backend.run(
-                self._build_code_generation_user_prompt(request, adata)
-            )
-
-        _progress("extract code")
-        try:
-            code = self._extract_python_code_strict(response_text)
-        except ValueError:
-            code = self._extract_python_code(response_text)
-        reflection_usages: List[Optional[Usage]] = []
-
-        if self.enable_reflection:
-            _progress("review code")
-            code, reflection_usage = await self._review_generated_code_lightweight(
-                code, request, adata
-            )
-            reflection_usages.append(reflection_usage)
-
-        rewrite_usages: List[Optional[Usage]] = []
-        if self._contains_forbidden_scanpy_usage(code):
-            _progress("rewrite scanpy")
-            rewrite_entries = self._collect_runtime_registry_entries(
-                request,
-                max_entries=max(16, max_functions * 2),
-            )
-            if not rewrite_entries:
-                rewrite_entries = self._collect_static_registry_entries(
-                    request,
-                    max_entries=max(16, max_functions * 2),
-                )
-            code = self._rewrite_scanpy_calls_with_registry(code, rewrite_entries)
-            code, rewrite_usage = await self._rewrite_code_without_scanpy(
-                code,
-                request,
-                adata,
-            )
-            rewrite_usages.append(rewrite_usage)
-            if self._contains_forbidden_scanpy_usage(code):
-                code = self._rewrite_scanpy_calls_with_registry(code, rewrite_entries)
-
-        _progress("finalize")
-        self.last_usage = self._merge_usage_stats([backend.last_usage, *reflection_usages, *rewrite_usages])
-        self.last_usage_breakdown = {
-            'generation': backend.last_usage,
-            'reflection': reflection_usages,
-            'review': rewrite_usages,
-            'total': self.last_usage,
-        }
         return code
 
     def generate_code(

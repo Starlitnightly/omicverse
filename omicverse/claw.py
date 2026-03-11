@@ -12,7 +12,7 @@ import socket
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional, TextIO, Tuple
+from typing import Any, Callable, Dict, List, Optional, TextIO, Tuple
 
 
 _DEFAULT_SOCKET_ENV = "OMICVERSE_CLAW_SOCKET"
@@ -186,6 +186,51 @@ def _forward_captured_output_to_stderr(buffer: io.StringIO) -> None:
         print(text, file=sys.stderr)
 
 
+class _StdoutRelay(io.TextIOBase):
+    """Capture stdout while mirroring lines to stderr or daemon events in real time."""
+
+    def __init__(
+        self,
+        *,
+        mirror_stream: Optional[TextIO] = None,
+        emit_line: Optional[Callable[[str], None]] = None,
+    ) -> None:
+        self._buffer = io.StringIO()
+        self._mirror_stream = mirror_stream
+        self._emit_line = emit_line
+        self._line_buffer = ""
+
+    def write(self, text: str) -> int:
+        if not text:
+            return 0
+        self._buffer.write(text)
+        if self._mirror_stream is not None:
+            self._mirror_stream.write(text)
+            self._mirror_stream.flush()
+        if self._emit_line is not None:
+            self._line_buffer += text
+            while "\n" in self._line_buffer:
+                line, self._line_buffer = self._line_buffer.split("\n", 1)
+                stripped = line.rstrip()
+                if stripped:
+                    self._emit_line(stripped)
+        return len(text)
+
+    def flush(self) -> None:
+        if self._mirror_stream is not None:
+            self._mirror_stream.flush()
+
+    def finalize(self) -> None:
+        if self._emit_line is not None:
+            trailing = self._line_buffer.rstrip()
+            if trailing:
+                self._emit_line(trailing)
+        self._line_buffer = ""
+
+    def getvalue(self) -> str:
+        return self._buffer.getvalue()
+
+
 class _DebugProgress:
     """Small stderr progress helper used only for `--debug-registry`."""
 
@@ -308,7 +353,7 @@ def _request_daemon_stream(
                 if not line:
                     continue
                 message = json.loads(line)
-                if message.get("type") == "progress":
+                if message.get("type") in {"progress", "log"}:
                     if on_event is not None:
                         on_event(message)
                 elif message.get("type") == "final":
@@ -407,8 +452,17 @@ def _handle_daemon_generate(
         if agent is None:
             if emit_event is not None:
                 emit_event({"type": "progress", "message": "daemon: init agent"})
-            with contextlib.redirect_stdout(captured_output):
+            init_relay = _StdoutRelay(
+                emit_line=(
+                    None
+                    if emit_event is None
+                    else lambda line: emit_event({"type": "log", "message": line})
+                )
+            )
+            with contextlib.redirect_stdout(init_relay):
                 agent = _build_agent_from_payload(effective_payload)
+            init_relay.finalize()
+            captured_output.write(init_relay.getvalue())
             agent_cache[cache_key] = agent
         elif emit_event is not None:
             emit_event({"type": "progress", "message": "daemon: reuse agent"})
@@ -418,7 +472,14 @@ def _handle_daemon_generate(
             raise ValueError("question cannot be empty")
 
         max_functions = int(effective_payload.get("max_functions") or 8)
-        with contextlib.redirect_stdout(captured_output):
+        generate_relay = _StdoutRelay(
+            emit_line=(
+                None
+                if emit_event is None
+                else lambda line: emit_event({"type": "log", "message": line})
+            )
+        )
+        with contextlib.redirect_stdout(generate_relay):
             if agent_reused:
                 _print_registry_loaded(agent, stream=debug_output)
             if effective_payload.get("debug_registry"):
@@ -430,18 +491,20 @@ def _handle_daemon_generate(
                     max_functions=max_functions,
                     stream=debug_output,
                 )
-            code = agent.generate_code(
-                question,
-                adata=None,
+                code = agent.generate_code(
+                    question,
+                    adata=None,
                 max_functions=max_functions,
                 progress_callback=(
                     None
                     if emit_event is None
                     else lambda message: emit_event(
                         {"type": "progress", "message": f"daemon: {message}"}
-                    )
-                ),
-            )
+                        )
+                    ),
+                )
+        generate_relay.finalize()
+        captured_output.write(generate_relay.getvalue())
         if emit_event is not None:
             emit_event({"type": "progress", "message": "daemon: finalize"})
         return {
@@ -543,10 +606,19 @@ def _run_via_daemon(args: argparse.Namespace, question: str) -> int:
 
     progress = _DebugProgress(enabled=bool(args.debug_registry), total=2)
     progress.step("daemon: send request")
+
+    def _handle_event(event: Dict[str, Any]) -> None:
+        event_type = str(event.get("type") or "")
+        message = str(event.get("message") or "")
+        if event_type == "progress":
+            progress.step(message or "daemon")
+        elif event_type == "log" and message:
+            print(message, file=sys.stderr)
+
     response = _request_daemon_stream(
         socket_path,
         _build_daemon_payload(args, question),
-        on_event=lambda event: progress.step(str(event.get("message") or "daemon")),
+        on_event=_handle_event,
     )
     if response.get("logs"):
         print(str(response["logs"]).strip(), file=sys.stderr)
@@ -601,27 +673,30 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     progress = _DebugProgress(enabled=bool(args.debug_registry), total=8)
     try:
-        with contextlib.redirect_stdout(init_output):
+        init_relay = _StdoutRelay(mirror_stream=sys.stderr)
+        with contextlib.redirect_stdout(init_relay):
             agent = _build_agent(args)
-        _forward_captured_output_to_stderr(init_output)
+        init_relay.finalize()
+        init_output.write(init_relay.getvalue())
         progress.step("init agent")
-        with contextlib.redirect_stdout(captured_output):
-            if args.debug_registry:
-                _print_debug_registry(
-                    agent,
-                    question,
-                    max_functions=max(1, args.max_functions),
-                )
+        if args.debug_registry:
+            _print_debug_registry(
+                agent,
+                question,
+                max_functions=max(1, args.max_functions),
+            )
         progress.step("inspect registry")
-        with contextlib.redirect_stdout(captured_output):
+        generate_relay = _StdoutRelay(mirror_stream=sys.stderr)
+        with contextlib.redirect_stdout(generate_relay):
             code = agent.generate_code(
                 question,
                 adata=None,
                 max_functions=max(1, args.max_functions),
                 progress_callback=_make_progress_callback(progress),
             )
+        generate_relay.finalize()
+        captured_output.write(generate_relay.getvalue())
         progress.close()
-        _forward_captured_output_to_stderr(captured_output)
     except Exception as exc:
         progress.close()
         _forward_captured_output_to_stderr(init_output)
