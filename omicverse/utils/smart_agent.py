@@ -1507,7 +1507,7 @@ User request: "quality control with nUMI>500, mito<0.2"
 
         normalized = dict(entry)
         source = normalized.get("source")
-        normalized["source"] = "static_ast" if source == "static_ast" else "runtime"
+        normalized["source"] = source if str(source).startswith("static_ast") else "runtime"
 
         original_full_name = str(normalized.get("full_name", "") or "")
         normalized["registry_full_name"] = original_full_name
@@ -1552,6 +1552,7 @@ User request: "quality control with nUMI>500, mito<0.2"
             entry.get("description", ""),
             " ".join(aliases),
             " ".join(entry.get("examples", []) or []),
+            " ".join(entry.get("imports", []) or []),
         ]
         haystack = " ".join(str(part) for part in haystack_parts).lower()
 
@@ -1590,7 +1591,7 @@ User request: "quality control with nUMI>500, mito<0.2"
         return score
 
     def _load_static_registry_entries(self) -> List[Dict[str, Any]]:
-        """Parse @register_function metadata from source files without importing modules."""
+        """Parse @register_function metadata plus nested method/branch capabilities."""
 
         cached = getattr(self, "_static_registry_entries_cache", None)
         if cached is not None:
@@ -1611,6 +1612,8 @@ User request: "quality control with nUMI>500, mito<0.2"
             for file_path in sorted(root.rglob("*.py")):
                 if file_path.name == "__init__.py":
                     continue
+                if "__pycache__" in file_path.parts or ".ipynb_checkpoints" in file_path.parts:
+                    continue
                 try:
                     source = file_path.read_text(encoding="utf-8")
                     tree = ast.parse(source, filename=str(file_path))
@@ -1623,14 +1626,12 @@ User request: "quality control with nUMI>500, mito<0.2"
                     decorator = self._find_register_function_decorator(node)
                     if decorator is None:
                         continue
-                    entry = self._build_static_registry_entry(file_path, node, decorator)
-                    if not entry:
-                        continue
-                    full_name = entry.get("full_name", "")
-                    if not full_name or full_name in seen:
-                        continue
-                    seen.add(full_name)
-                    entries.append(entry)
+                    for entry in self._build_static_registry_entries(file_path, node, decorator):
+                        full_name = entry.get("full_name", "")
+                        if not full_name or full_name in seen:
+                            continue
+                        seen.add(full_name)
+                        entries.append(entry)
 
         self._static_registry_entries_cache = entries
         return entries
@@ -1669,6 +1670,241 @@ User request: "quality control with nUMI>500, mito<0.2"
         if arg_names and arg_names[0] == "self":
             arg_names = arg_names[1:]
         return f"{node.name}({', '.join(arg_names)})"
+
+    def _build_static_registry_entries(
+        self,
+        file_path: Path,
+        node: Union[ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef],
+        decorator: ast.Call,
+    ) -> List[Dict[str, Any]]:
+        """Build the primary static entry plus nested method/branch entries."""
+
+        base_entry = self._build_static_registry_entry(file_path, node, decorator)
+        if not base_entry:
+            return []
+
+        entries = [base_entry]
+        entries.extend(self._build_nested_static_registry_entries(node, base_entry))
+        return entries
+
+    def _build_nested_static_registry_entries(
+        self,
+        node: Union[ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef],
+        base_entry: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        """Expand registered classes/functions into searchable method and branch entries."""
+
+        nested: List[Dict[str, Any]] = []
+        if isinstance(node, ast.ClassDef):
+            for child in node.body:
+                if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                if child.name.startswith("_"):
+                    continue
+                method_entry = self._build_static_method_entry(base_entry, node, child)
+                if not method_entry:
+                    continue
+                nested.append(method_entry)
+                nested.extend(self._build_static_branch_entries(child, method_entry, base_entry))
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            nested.extend(self._build_static_branch_entries(node, base_entry, base_entry))
+        return nested
+
+    def _build_static_method_entry(
+        self,
+        base_entry: Dict[str, Any],
+        class_node: ast.ClassDef,
+        method_node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
+    ) -> Optional[Dict[str, Any]]:
+        """Create a searchable entry for a public method on a registered class."""
+
+        aliases: List[str] = [
+            method_node.name,
+            f"{class_node.name}.{method_node.name}",
+            f"{base_entry.get('short_name', class_node.name)} {method_node.name}",
+        ]
+        for alias in (base_entry.get("aliases") or [])[:8]:
+            alias = str(alias).strip()
+            if alias:
+                aliases.append(f"{alias} {method_node.name}")
+
+        description = ast.get_docstring(method_node) or (
+            f"Method `{method_node.name}` on {base_entry.get('full_name', class_node.name)}."
+        )
+
+        return {
+            "name": method_node.name,
+            "short_name": method_node.name,
+            "full_name": f"{base_entry.get('full_name', class_node.name)}.{method_node.name}",
+            "module": base_entry.get("module", ""),
+            "aliases": list(dict.fromkeys(aliases)),
+            "category": base_entry.get("category", ""),
+            "description": description,
+            "examples": self._filter_examples_for_method(base_entry.get("examples", []), method_node.name),
+            "related": [base_entry.get("full_name", "")],
+            "signature": self._derive_static_signature(method_node),
+            "docstring": ast.get_docstring(method_node) or "",
+            "prerequisites": base_entry.get("prerequisites", {}) or {},
+            "requires": base_entry.get("requires", {}) or {},
+            "produces": base_entry.get("produces", {}) or {},
+            "source": "static_ast_method",
+            "parent_full_name": base_entry.get("full_name", ""),
+            "imports": self._collect_import_targets(method_node.body),
+        }
+
+    @staticmethod
+    def _filter_examples_for_method(examples: List[str], method_name: str) -> List[str]:
+        """Keep examples most relevant to a nested method entry."""
+
+        if not examples:
+            return []
+        matches = [example for example in examples if method_name in str(example)]
+        return matches[:3] if matches else list(examples[:2])
+
+    def _build_static_branch_entries(
+        self,
+        node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
+        parent_entry: Dict[str, Any],
+        owner_entry: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        """Create searchable entries for string-dispatched branches like method='celltypist'."""
+
+        entries: List[Dict[str, Any]] = []
+        seen: set[Tuple[str, str]] = set()
+
+        for child in ast.walk(node):
+            if not isinstance(child, ast.If):
+                continue
+            for param_name, branch_value in self._extract_branch_variants(child.test):
+                key = (param_name, branch_value)
+                if key in seen:
+                    continue
+                seen.add(key)
+                imports = self._collect_import_targets(child.body)
+                aliases = [
+                    branch_value,
+                    f"{node.name} {branch_value}",
+                    f"{param_name} {branch_value}",
+                    f"{parent_entry.get('short_name', node.name)} {branch_value}",
+                ]
+                for alias in (owner_entry.get("aliases") or [])[:8]:
+                    alias = str(alias).strip()
+                    if alias:
+                        aliases.append(f"{alias} {branch_value}")
+                examples = self._filter_examples_for_branch(
+                    parent_entry.get("examples", []),
+                    param_name,
+                    branch_value,
+                )
+                description = (
+                    f"Variant of `{parent_entry.get('full_name', node.name)}` when "
+                    f"`{param_name}='{branch_value}'`."
+                )
+                if imports:
+                    description += " Imports/uses: " + ", ".join(imports) + "."
+
+                entries.append({
+                    "name": branch_value,
+                    "short_name": branch_value,
+                    "full_name": f"{parent_entry.get('full_name', node.name)}[{param_name}={branch_value}]",
+                    "module": parent_entry.get("module", ""),
+                    "aliases": list(dict.fromkeys(aliases)),
+                    "category": parent_entry.get("category", ""),
+                    "description": description,
+                    "examples": examples,
+                    "related": [parent_entry.get("full_name", "")],
+                    "signature": parent_entry.get("signature", self._derive_static_signature(node)),
+                    "docstring": parent_entry.get("docstring", ""),
+                    "prerequisites": parent_entry.get("prerequisites", {}) or {},
+                    "requires": parent_entry.get("requires", {}) or {},
+                    "produces": parent_entry.get("produces", {}) or {},
+                    "source": "static_ast_branch",
+                    "parent_full_name": parent_entry.get("full_name", ""),
+                    "branch_parameter": param_name,
+                    "branch_value": branch_value,
+                    "imports": imports,
+                })
+
+        return entries
+
+    @staticmethod
+    def _filter_examples_for_branch(examples: List[str], param_name: str, branch_value: str) -> List[str]:
+        """Keep examples mentioning the relevant branch parameter/value when possible."""
+
+        if not examples:
+            return []
+        value_lower = branch_value.lower()
+        param_lower = param_name.lower()
+        matches = [
+            example for example in examples
+            if value_lower in str(example).lower() or param_lower in str(example).lower()
+        ]
+        return matches[:3] if matches else list(examples[:2])
+
+    def _extract_branch_variants(self, test: ast.AST) -> List[Tuple[str, str]]:
+        """Extract simple string-dispatch branches from an ``if`` test."""
+
+        variants: List[Tuple[str, str]] = []
+        if isinstance(test, ast.BoolOp) and isinstance(test.op, ast.Or):
+            for value in test.values:
+                variants.extend(self._extract_branch_variants(value))
+            return variants
+
+        if not isinstance(test, ast.Compare) or len(test.ops) != 1 or len(test.comparators) != 1:
+            return variants
+
+        subject = self._branch_subject_name(test.left)
+        comparator = test.comparators[0]
+        op = test.ops[0]
+        values: List[str] = []
+
+        if isinstance(op, ast.Eq):
+            values = self._branch_string_values(comparator)
+        elif isinstance(op, ast.In):
+            values = self._branch_string_values(comparator)
+
+        if subject and values:
+            variants.extend((subject, value) for value in values)
+        return variants
+
+    @staticmethod
+    def _branch_subject_name(node: ast.AST) -> str:
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Attribute):
+            return node.attr
+        return ""
+
+    @staticmethod
+    def _branch_string_values(node: ast.AST) -> List[str]:
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return [node.value]
+        if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+            values: List[str] = []
+            for child in node.elts:
+                if isinstance(child, ast.Constant) and isinstance(child.value, str):
+                    values.append(child.value)
+            return values
+        return []
+
+    @staticmethod
+    def _collect_import_targets(statements: List[ast.stmt]) -> List[str]:
+        """Collect import targets mentioned inside a function or branch body."""
+
+        module = ast.Module(body=list(statements), type_ignores=[])
+        imports: List[str] = []
+        for child in ast.walk(module):
+            if isinstance(child, ast.Import):
+                for alias in child.names:
+                    if alias.name:
+                        imports.append(alias.name.split(".")[0])
+            elif isinstance(child, ast.ImportFrom):
+                if child.module:
+                    imports.append(child.module.split(".")[0])
+                for alias in child.names:
+                    if alias.name and alias.name != "*":
+                        imports.append(alias.name.split(".")[0])
+        return list(dict.fromkeys(imports))
 
     def _build_static_registry_entry(
         self,
@@ -1748,6 +1984,7 @@ User request: "quality control with nUMI>500, mito<0.2"
                     entry.get("description", ""),
                     " ".join(aliases),
                     " ".join(entry.get("examples", []) or []),
+                    " ".join(entry.get("imports", []) or []),
                 ]
             ).lower()
 
