@@ -55,6 +55,7 @@ PHASE_WHITELIST: Dict[str, List[str]] = {
         "omicverse.single._anno.pySCSA",
         "omicverse.single._metacell.MetaCell",
         "omicverse.single._deg_ct.DCT",
+        "omicverse.single._scenic.SCENIC",
         "omicverse.utils._cluster.LDA_topic",
     ],
 }

@@ -193,6 +193,16 @@ class PromptBuilder:
             "- Subagents have their own context window (prevents context overflow)\n"
         )
 
+        if getattr(self._ctx, "_code_only_mode", False):
+            prompt += (
+                "\nCLAW CODE-ONLY MODE:\n"
+                "- Reuse the normal OmicVerse Agent workflow, tools, search_functions, and search_skills logic.\n"
+                "- In this mode, execute_code captures the final Python code instead of running it.\n"
+                "- Use the same planning and tool-calling behavior you would use in Jarvis.\n"
+                "- When ready, call execute_code with the final OmicVerse Python snippet, then call finish.\n"
+                "- Do not stop at a prose-only plan when executable code is requested.\n"
+            )
+
         registry = self._ctx.skill_registry
         if registry is not None and getattr(registry, "skill_metadata", None):
             prompt += "\nAvailable domain skills (use search_skills for detailed guidance):\n"
@@ -206,6 +216,26 @@ class PromptBuilder:
 
     def build_initial_user_message(self, request: str, adata: Any) -> str:
         msg = f"Task: {request}\n\n"
+        if getattr(self._ctx, "_code_only_mode", False):
+            if adata is not None:
+                dtype = type(adata).__name__
+                if hasattr(adata, "shape"):
+                    msg += f"Dataset ({dtype}): {adata.shape[0]} cells x {adata.shape[1]} features\n"
+                if dtype == "MuData" and hasattr(adata, "mod"):
+                    msg += f"Modalities: {list(adata.mod.keys())}\n"
+                msg += (
+                    "This is a Claw code-only request. Inspect/search as needed, then call "
+                    "execute_code with the final script. The code will be captured, not run."
+                )
+            else:
+                msg += (
+                    "No live dataset object is loaded for this Claw code-only request.\n"
+                    "Assume an AnnData object named `adata` already exists unless the user "
+                    "explicitly asks to load data from disk.\n"
+                    "Use the normal Jarvis tool workflow, then call execute_code with the "
+                    "final OmicVerse Python script. The code will be captured, not run."
+                )
+            return msg
         if adata is not None:
             dtype = type(adata).__name__
             if hasattr(adata, "shape"):

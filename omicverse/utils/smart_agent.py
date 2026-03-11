@@ -1507,7 +1507,7 @@ User request: "quality control with nUMI>500, mito<0.2"
 
         normalized = dict(entry)
         source = normalized.get("source")
-        normalized["source"] = "static_ast" if source == "static_ast" else "runtime"
+        normalized["source"] = source if str(source).startswith("static_ast") else "runtime"
 
         original_full_name = str(normalized.get("full_name", "") or "")
         normalized["registry_full_name"] = original_full_name
@@ -1552,6 +1552,7 @@ User request: "quality control with nUMI>500, mito<0.2"
             entry.get("description", ""),
             " ".join(aliases),
             " ".join(entry.get("examples", []) or []),
+            " ".join(entry.get("imports", []) or []),
         ]
         haystack = " ".join(str(part) for part in haystack_parts).lower()
 
@@ -1590,7 +1591,7 @@ User request: "quality control with nUMI>500, mito<0.2"
         return score
 
     def _load_static_registry_entries(self) -> List[Dict[str, Any]]:
-        """Parse @register_function metadata from source files without importing modules."""
+        """Parse @register_function metadata plus nested method/branch capabilities."""
 
         cached = getattr(self, "_static_registry_entries_cache", None)
         if cached is not None:
@@ -1611,6 +1612,8 @@ User request: "quality control with nUMI>500, mito<0.2"
             for file_path in sorted(root.rglob("*.py")):
                 if file_path.name == "__init__.py":
                     continue
+                if "__pycache__" in file_path.parts or ".ipynb_checkpoints" in file_path.parts:
+                    continue
                 try:
                     source = file_path.read_text(encoding="utf-8")
                     tree = ast.parse(source, filename=str(file_path))
@@ -1623,14 +1626,12 @@ User request: "quality control with nUMI>500, mito<0.2"
                     decorator = self._find_register_function_decorator(node)
                     if decorator is None:
                         continue
-                    entry = self._build_static_registry_entry(file_path, node, decorator)
-                    if not entry:
-                        continue
-                    full_name = entry.get("full_name", "")
-                    if not full_name or full_name in seen:
-                        continue
-                    seen.add(full_name)
-                    entries.append(entry)
+                    for entry in self._build_static_registry_entries(file_path, node, decorator):
+                        full_name = entry.get("full_name", "")
+                        if not full_name or full_name in seen:
+                            continue
+                        seen.add(full_name)
+                        entries.append(entry)
 
         self._static_registry_entries_cache = entries
         return entries
@@ -1669,6 +1670,241 @@ User request: "quality control with nUMI>500, mito<0.2"
         if arg_names and arg_names[0] == "self":
             arg_names = arg_names[1:]
         return f"{node.name}({', '.join(arg_names)})"
+
+    def _build_static_registry_entries(
+        self,
+        file_path: Path,
+        node: Union[ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef],
+        decorator: ast.Call,
+    ) -> List[Dict[str, Any]]:
+        """Build the primary static entry plus nested method/branch entries."""
+
+        base_entry = self._build_static_registry_entry(file_path, node, decorator)
+        if not base_entry:
+            return []
+
+        entries = [base_entry]
+        entries.extend(self._build_nested_static_registry_entries(node, base_entry))
+        return entries
+
+    def _build_nested_static_registry_entries(
+        self,
+        node: Union[ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef],
+        base_entry: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        """Expand registered classes/functions into searchable method and branch entries."""
+
+        nested: List[Dict[str, Any]] = []
+        if isinstance(node, ast.ClassDef):
+            for child in node.body:
+                if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                if child.name.startswith("_"):
+                    continue
+                method_entry = self._build_static_method_entry(base_entry, node, child)
+                if not method_entry:
+                    continue
+                nested.append(method_entry)
+                nested.extend(self._build_static_branch_entries(child, method_entry, base_entry))
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            nested.extend(self._build_static_branch_entries(node, base_entry, base_entry))
+        return nested
+
+    def _build_static_method_entry(
+        self,
+        base_entry: Dict[str, Any],
+        class_node: ast.ClassDef,
+        method_node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
+    ) -> Optional[Dict[str, Any]]:
+        """Create a searchable entry for a public method on a registered class."""
+
+        aliases: List[str] = [
+            method_node.name,
+            f"{class_node.name}.{method_node.name}",
+            f"{base_entry.get('short_name', class_node.name)} {method_node.name}",
+        ]
+        for alias in (base_entry.get("aliases") or [])[:8]:
+            alias = str(alias).strip()
+            if alias:
+                aliases.append(f"{alias} {method_node.name}")
+
+        description = ast.get_docstring(method_node) or (
+            f"Method `{method_node.name}` on {base_entry.get('full_name', class_node.name)}."
+        )
+
+        return {
+            "name": method_node.name,
+            "short_name": method_node.name,
+            "full_name": f"{base_entry.get('full_name', class_node.name)}.{method_node.name}",
+            "module": base_entry.get("module", ""),
+            "aliases": list(dict.fromkeys(aliases)),
+            "category": base_entry.get("category", ""),
+            "description": description,
+            "examples": self._filter_examples_for_method(base_entry.get("examples", []), method_node.name),
+            "related": [base_entry.get("full_name", "")],
+            "signature": self._derive_static_signature(method_node),
+            "docstring": ast.get_docstring(method_node) or "",
+            "prerequisites": base_entry.get("prerequisites", {}) or {},
+            "requires": base_entry.get("requires", {}) or {},
+            "produces": base_entry.get("produces", {}) or {},
+            "source": "static_ast_method",
+            "parent_full_name": base_entry.get("full_name", ""),
+            "imports": self._collect_import_targets(method_node.body),
+        }
+
+    @staticmethod
+    def _filter_examples_for_method(examples: List[str], method_name: str) -> List[str]:
+        """Keep examples most relevant to a nested method entry."""
+
+        if not examples:
+            return []
+        matches = [example for example in examples if method_name in str(example)]
+        return matches[:3] if matches else list(examples[:2])
+
+    def _build_static_branch_entries(
+        self,
+        node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
+        parent_entry: Dict[str, Any],
+        owner_entry: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        """Create searchable entries for string-dispatched branches like method='celltypist'."""
+
+        entries: List[Dict[str, Any]] = []
+        seen: set[Tuple[str, str]] = set()
+
+        for child in ast.walk(node):
+            if not isinstance(child, ast.If):
+                continue
+            for param_name, branch_value in self._extract_branch_variants(child.test):
+                key = (param_name, branch_value)
+                if key in seen:
+                    continue
+                seen.add(key)
+                imports = self._collect_import_targets(child.body)
+                aliases = [
+                    branch_value,
+                    f"{node.name} {branch_value}",
+                    f"{param_name} {branch_value}",
+                    f"{parent_entry.get('short_name', node.name)} {branch_value}",
+                ]
+                for alias in (owner_entry.get("aliases") or [])[:8]:
+                    alias = str(alias).strip()
+                    if alias:
+                        aliases.append(f"{alias} {branch_value}")
+                examples = self._filter_examples_for_branch(
+                    parent_entry.get("examples", []),
+                    param_name,
+                    branch_value,
+                )
+                description = (
+                    f"Variant of `{parent_entry.get('full_name', node.name)}` when "
+                    f"`{param_name}='{branch_value}'`."
+                )
+                if imports:
+                    description += " Imports/uses: " + ", ".join(imports) + "."
+
+                entries.append({
+                    "name": branch_value,
+                    "short_name": branch_value,
+                    "full_name": f"{parent_entry.get('full_name', node.name)}[{param_name}={branch_value}]",
+                    "module": parent_entry.get("module", ""),
+                    "aliases": list(dict.fromkeys(aliases)),
+                    "category": parent_entry.get("category", ""),
+                    "description": description,
+                    "examples": examples,
+                    "related": [parent_entry.get("full_name", "")],
+                    "signature": parent_entry.get("signature", self._derive_static_signature(node)),
+                    "docstring": parent_entry.get("docstring", ""),
+                    "prerequisites": parent_entry.get("prerequisites", {}) or {},
+                    "requires": parent_entry.get("requires", {}) or {},
+                    "produces": parent_entry.get("produces", {}) or {},
+                    "source": "static_ast_branch",
+                    "parent_full_name": parent_entry.get("full_name", ""),
+                    "branch_parameter": param_name,
+                    "branch_value": branch_value,
+                    "imports": imports,
+                })
+
+        return entries
+
+    @staticmethod
+    def _filter_examples_for_branch(examples: List[str], param_name: str, branch_value: str) -> List[str]:
+        """Keep examples mentioning the relevant branch parameter/value when possible."""
+
+        if not examples:
+            return []
+        value_lower = branch_value.lower()
+        param_lower = param_name.lower()
+        matches = [
+            example for example in examples
+            if value_lower in str(example).lower() or param_lower in str(example).lower()
+        ]
+        return matches[:3] if matches else list(examples[:2])
+
+    def _extract_branch_variants(self, test: ast.AST) -> List[Tuple[str, str]]:
+        """Extract simple string-dispatch branches from an ``if`` test."""
+
+        variants: List[Tuple[str, str]] = []
+        if isinstance(test, ast.BoolOp) and isinstance(test.op, ast.Or):
+            for value in test.values:
+                variants.extend(self._extract_branch_variants(value))
+            return variants
+
+        if not isinstance(test, ast.Compare) or len(test.ops) != 1 or len(test.comparators) != 1:
+            return variants
+
+        subject = self._branch_subject_name(test.left)
+        comparator = test.comparators[0]
+        op = test.ops[0]
+        values: List[str] = []
+
+        if isinstance(op, ast.Eq):
+            values = self._branch_string_values(comparator)
+        elif isinstance(op, ast.In):
+            values = self._branch_string_values(comparator)
+
+        if subject and values:
+            variants.extend((subject, value) for value in values)
+        return variants
+
+    @staticmethod
+    def _branch_subject_name(node: ast.AST) -> str:
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Attribute):
+            return node.attr
+        return ""
+
+    @staticmethod
+    def _branch_string_values(node: ast.AST) -> List[str]:
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return [node.value]
+        if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+            values: List[str] = []
+            for child in node.elts:
+                if isinstance(child, ast.Constant) and isinstance(child.value, str):
+                    values.append(child.value)
+            return values
+        return []
+
+    @staticmethod
+    def _collect_import_targets(statements: List[ast.stmt]) -> List[str]:
+        """Collect import targets mentioned inside a function or branch body."""
+
+        module = ast.Module(body=list(statements), type_ignores=[])
+        imports: List[str] = []
+        for child in ast.walk(module):
+            if isinstance(child, ast.Import):
+                for alias in child.names:
+                    if alias.name:
+                        imports.append(alias.name.split(".")[0])
+            elif isinstance(child, ast.ImportFrom):
+                if child.module:
+                    imports.append(child.module.split(".")[0])
+                for alias in child.names:
+                    if alias.name and alias.name != "*":
+                        imports.append(alias.name.split(".")[0])
+        return list(dict.fromkeys(imports))
 
     def _build_static_registry_entry(
         self,
@@ -1748,6 +1984,7 @@ User request: "quality control with nUMI>500, mito<0.2"
                     entry.get("description", ""),
                     " ".join(aliases),
                     " ".join(entry.get("examples", []) or []),
+                    " ".join(entry.get("imports", []) or []),
                 ]
             ).lower()
 
@@ -2045,6 +2282,123 @@ User request: "quality control with nUMI>500, mito<0.2"
         except ValueError:
             return code, backend.last_usage
 
+    def _capture_code_only_snippet(self, code: str, description: str = "") -> None:
+        """Store the latest code snippet captured from execute_code in code-only mode."""
+
+        history = getattr(self, "_code_only_captured_history", None)
+        if history is None:
+            history = []
+            self._code_only_captured_history = history
+        history.append({
+            "code": code,
+            "description": description or "",
+        })
+        self._code_only_captured_code = code
+
+    def _build_code_only_agentic_request(self, request: str, adata: Any) -> str:
+        """Wrap a raw claw request so the normal agentic loop produces code instead of running it."""
+
+        dataset_hint = (
+            "A live dataset object is available as `adata`. Reuse the normal Jarvis workflow, "
+            "but stop at code generation."
+            if adata is not None
+            else "No live dataset object is available. Unless the user explicitly asks to load data, "
+            "assume an AnnData object named `adata` already exists in the generated code."
+        )
+        return (
+            f"{request}\n\n"
+            "CLAW REQUEST MODE:\n"
+            "- Use the same OmicVerse Agent logic as Jarvis.\n"
+            "- Use search_functions and search_skills when helpful.\n"
+            "- Produce the final answer by calling execute_code with the final Python script.\n"
+            "- In this mode, execute_code captures code without running it.\n"
+            "- After execute_code, call finish.\n"
+            f"{dataset_hint}"
+        )
+
+    async def _generate_code_via_agentic_loop(
+        self,
+        request: str,
+        adata: Any,
+        *,
+        progress_callback: Optional[Callable[[str], None]] = None,
+    ) -> str:
+        """Run the normal Jarvis agentic loop and capture the final execute_code snippet."""
+
+        captured_chunks: List[str] = []
+        captured_errors: List[str] = []
+
+        def _progress(message: str) -> None:
+            if progress_callback is None:
+                return
+            try:
+                progress_callback(message)
+            except Exception:
+                pass
+
+        async def _event_callback(event: Dict[str, Any]) -> None:
+            event_type = str(event.get("type") or "")
+            content = event.get("content")
+            if event_type == "tool_call":
+                tool_name = ""
+                if isinstance(content, dict):
+                    tool_name = str(content.get("name") or "")
+                _progress(f"tool: {tool_name or 'unknown'}")
+            elif event_type == "code":
+                code = str(content or "")
+                if code:
+                    captured_chunks.append(code)
+                _progress("captured code")
+            elif event_type == "error":
+                captured_errors.append(str(content or "unknown error"))
+                _progress("agent error")
+            elif event_type == "done":
+                _progress("finish")
+
+        previous_mode = getattr(self, "_code_only_mode", False)
+        previous_code = getattr(self, "_code_only_captured_code", "")
+        previous_history = getattr(self, "_code_only_captured_history", None)
+        self._code_only_mode = True
+        self._code_only_captured_code = ""
+        self._code_only_captured_history = []
+        try:
+            _progress("start agentic loop")
+            await self._run_agentic_loop(
+                self._build_code_only_agentic_request(request, adata),
+                adata,
+                event_callback=_event_callback,
+            )
+        finally:
+            captured_code = str(getattr(self, "_code_only_captured_code", "") or "")
+            captured_history = list(getattr(self, "_code_only_captured_history", []) or [])
+            self._code_only_mode = previous_mode
+            self._code_only_captured_code = previous_code
+            self._code_only_captured_history = previous_history
+
+        if captured_code:
+            return captured_code
+
+        for item in reversed(captured_history):
+            code = str(item.get("code", "") or "")
+            if code:
+                return code
+
+        for chunk in reversed(captured_chunks):
+            try:
+                return self._extract_python_code_strict(chunk)
+            except ValueError:
+                continue
+
+        if captured_errors:
+            raise RuntimeError(
+                "Jarvis-style code generation did not reach execute_code. "
+                + "; ".join(captured_errors[:3])
+            )
+        raise RuntimeError(
+            "Jarvis-style code generation did not emit executable code. "
+            "The agent finished without calling execute_code."
+        )
+
     async def generate_code_async(
         self,
         request: str,
@@ -2054,14 +2408,6 @@ User request: "quality control with nUMI>500, mito<0.2"
         progress_callback: Optional[Callable[[str], None]] = None,
     ) -> str:
         """Generate OmicVerse Python code without executing it."""
-
-        def _progress(message: str) -> None:
-            if progress_callback is None:
-                return
-            try:
-                progress_callback(message)
-            except Exception:
-                pass
 
         if not request or not request.strip():
             raise ValueError("request cannot be empty")
@@ -2077,66 +2423,11 @@ User request: "quality control with nUMI>500, mito<0.2"
             }
             return direct_code
 
-        _progress("prepare prompt")
-        backend = OmicVerseLLMBackend(
-            system_prompt=self._build_code_generation_system_prompt(adata),
-            model=self.model,
-            api_key=self.api_key,
-            endpoint=self.endpoint,
-            max_tokens=4096,
-            temperature=0.1,
+        code = await self._generate_code_via_agentic_loop(
+            request,
+            adata,
+            progress_callback=progress_callback,
         )
-
-        _progress("request model")
-        with self._temporary_api_keys():
-            response_text = await backend.run(
-                self._build_code_generation_user_prompt(request, adata)
-            )
-
-        _progress("extract code")
-        try:
-            code = self._extract_python_code_strict(response_text)
-        except ValueError:
-            code = self._extract_python_code(response_text)
-        reflection_usages: List[Optional[Usage]] = []
-
-        if self.enable_reflection:
-            _progress("review code")
-            code, reflection_usage = await self._review_generated_code_lightweight(
-                code, request, adata
-            )
-            reflection_usages.append(reflection_usage)
-
-        rewrite_usages: List[Optional[Usage]] = []
-        if self._contains_forbidden_scanpy_usage(code):
-            _progress("rewrite scanpy")
-            rewrite_entries = self._collect_runtime_registry_entries(
-                request,
-                max_entries=max(16, max_functions * 2),
-            )
-            if not rewrite_entries:
-                rewrite_entries = self._collect_static_registry_entries(
-                    request,
-                    max_entries=max(16, max_functions * 2),
-                )
-            code = self._rewrite_scanpy_calls_with_registry(code, rewrite_entries)
-            code, rewrite_usage = await self._rewrite_code_without_scanpy(
-                code,
-                request,
-                adata,
-            )
-            rewrite_usages.append(rewrite_usage)
-            if self._contains_forbidden_scanpy_usage(code):
-                code = self._rewrite_scanpy_calls_with_registry(code, rewrite_entries)
-
-        _progress("finalize")
-        self.last_usage = self._merge_usage_stats([backend.last_usage, *reflection_usages, *rewrite_usages])
-        self.last_usage_breakdown = {
-            'generation': backend.last_usage,
-            'reflection': reflection_usages,
-            'review': rewrite_usages,
-            'total': self.last_usage,
-        }
         return code
 
     def generate_code(
