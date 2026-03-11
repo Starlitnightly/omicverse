@@ -58,11 +58,11 @@ def ensure_registry_populated():
     for mod_path in sorted(modules):
         try:
             importlib.import_module(mod_path)
-        except ImportError:
-            # Package __init__ may drag in heavy deps.
+        except Exception as exc:
+            # Package __init__ may drag in heavy deps or runtime-only failures.
             # Try loading the leaf file directly.
             if not _try_load_leaf_module(mod_path):
-                logger.warning("Could not import %s", mod_path)
+                logger.warning("Could not import %s: %s", mod_path, exc)
 
 
 def _try_load_leaf_module(mod_path: str) -> bool:
@@ -254,6 +254,9 @@ def build_manifest_entry(
     seen_names: Dict[str, dict],
 ) -> Optional[dict]:
     """Build a single manifest entry from a registry entry."""
+    if entry.get("virtual_entry"):
+        return None
+
     full_name = entry.get("full_name", "")
     if not full_name:
         return None

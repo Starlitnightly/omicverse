@@ -2,7 +2,32 @@ import numpy as np
 import anndata as ad
 import pandas as pd
 
+from .._registry import register_function
 
+
+@register_function(
+    aliases=[
+        'SCENIC',
+        'SCENIC分析器',
+        'GRN inference',
+        'gene regulatory network inference',
+        'regulon inference',
+        'RegDiffusion wrapper',
+        'regdiffusion scenic wrapper',
+    ],
+    category="single",
+    description="SCENIC-based gene regulatory network analysis workflow with RegDiffusion, GRNBoost2 and GENIE3 backends for regulon and GRN inference.",
+    prerequisites={'optional_functions': ['pp.preprocess', 'pp.qc']},
+    requires={'layers': ['counts'], 'var': ['gene names'], 'obs': ['cell metadata (optional)']},
+    produces={'uns': ['SCENIC/GRN metadata'], 'varm': ['regulon or GRN-related scores (workflow dependent)']},
+    auto_fix='escalate',
+    examples=[
+        'scenic = ov.single.SCENIC(adata, db_glob="cisTarget/*.feather", motif_path="motifs.tbl")',
+        'scenic.cal_grn(method="regdiffusion", layer="counts")',
+        'scenic.cal_grn(method="grnboost2", layer="counts")',
+    ],
+    related=['single.SCENIC', 'single.Velo', 'single.pyCEFCON']
+)
 class SCENIC:
 
     def __init__(

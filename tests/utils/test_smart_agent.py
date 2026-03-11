@@ -263,6 +263,32 @@ def test_tool_execute_code_in_code_only_mode_captures_without_execution():
     assert "ov.pp.pca" in captured["code"]
 
 
+def test_static_registry_scanner_indexes_celltypist_method_branch():
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+
+    entries = agent._load_static_registry_entries()
+
+    assert any(
+        entry.get("source") == "static_ast_branch"
+        and "celltypist" == str(entry.get("branch_value", "")).lower()
+        and "Annotation.annotate" in str(entry.get("full_name", ""))
+        for entry in entries
+    )
+
+
+def test_static_registry_scanner_indexes_dynamo_method_branch():
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+
+    entries = agent._load_static_registry_entries()
+
+    assert any(
+        entry.get("source") == "static_ast_branch"
+        and "dynamo" == str(entry.get("branch_value", "")).lower()
+        and "Velo" in str(entry.get("full_name", ""))
+        for entry in entries
+    )
+
+
 @pytest.mark.skipif(
     not _RUN_HARNESS_TESTS,
     reason="Loop retry regression is validated only in the Taiwan harness environment.",
