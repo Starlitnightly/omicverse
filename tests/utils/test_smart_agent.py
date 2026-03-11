@@ -46,6 +46,7 @@ smart_agent_spec.loader.exec_module(smart_agent_module)
 
 OmicVerseAgent = smart_agent_module.OmicVerseAgent
 from omicverse.utils.harness import build_stream_event
+from omicverse.utils.ovagent.tool_runtime import ToolRuntime
 
 _RUN_HARNESS_TESTS = os.environ.get("OV_AGENT_RUN_HARNESS_TESTS", "").lower() in {
     "1",
@@ -184,6 +185,108 @@ def test_url_request_requires_tool_action_and_promissory_text_retries():
         had_meaningful_tool_call=False,
         forced_retry=False,
     ) == "required"
+
+
+def test_generate_code_async_reuses_agentic_loop_and_captures_execute_code():
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    agent.provider = "openai"
+    agent._code_only_mode = False
+    agent._code_only_captured_code = ""
+    agent._code_only_captured_history = []
+
+    seen = {}
+
+    async def _fake_run_agentic_loop(self, request, adata, event_callback=None, cancel_event=None, history=None, approval_handler=None):
+        seen["request"] = request
+        assert self._code_only_mode is True
+        self._capture_code_only_snippet("import omicverse as ov\nov.pp.qc(adata)")
+        await event_callback(build_stream_event(
+            "tool_call",
+            {"name": "execute_code", "arguments": {"description": "qc"}},
+            turn_id="turn-1",
+            trace_id="trace-1",
+            session_id="session-1",
+            category="tool",
+        ))
+        await event_callback(build_stream_event(
+            "code",
+            "import omicverse as ov\nov.pp.qc(adata)",
+            turn_id="turn-1",
+            trace_id="trace-1",
+            session_id="session-1",
+            category="execution",
+        ))
+        await event_callback(build_stream_event(
+            "done",
+            "captured",
+            turn_id="turn-1",
+            trace_id="trace-1",
+            session_id="session-1",
+            category="lifecycle",
+        ))
+
+    agent._run_agentic_loop = MethodType(_fake_run_agentic_loop, agent)
+
+    result = asyncio.run(agent.generate_code_async("basic qc and clustering", None))
+
+    assert result == "import omicverse as ov\nov.pp.qc(adata)"
+    assert "CLAW REQUEST MODE" in seen["request"]
+    assert "basic qc and clustering" in seen["request"]
+    assert agent._code_only_mode is False
+
+
+def test_tool_execute_code_in_code_only_mode_captures_without_execution():
+    runtime = ToolRuntime.__new__(ToolRuntime)
+    captured = {}
+
+    class _Ctx:
+        _code_only_mode = True
+
+        def _capture_code_only_snippet(self, code, description=""):
+            captured["code"] = code
+            captured["description"] = description
+
+    class _Executor:
+        def check_code_prerequisites(self, code, adata):
+            raise AssertionError("should not check prerequisites in code-only mode")
+
+        def execute_generated_code(self, code, adata, capture_stdout=True):
+            raise AssertionError("should not execute code in code-only mode")
+
+    runtime._ctx = _Ctx()
+    runtime._executor = _Executor()
+
+    result = runtime._tool_execute_code("import omicverse as ov\nov.pp.pca(adata)", "pca", None)
+
+    assert "captured generated Python code" in result["output"]
+    assert captured["description"] == "pca"
+    assert "ov.pp.pca" in captured["code"]
+
+
+def test_static_registry_scanner_indexes_celltypist_method_branch():
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+
+    entries = agent._load_static_registry_entries()
+
+    assert any(
+        entry.get("source") == "static_ast_branch"
+        and "celltypist" == str(entry.get("branch_value", "")).lower()
+        and "Annotation.annotate" in str(entry.get("full_name", ""))
+        for entry in entries
+    )
+
+
+def test_static_registry_scanner_indexes_dynamo_method_branch():
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+
+    entries = agent._load_static_registry_entries()
+
+    assert any(
+        entry.get("source") == "static_ast_branch"
+        and "dynamo" == str(entry.get("branch_value", "")).lower()
+        and "Velo" in str(entry.get("full_name", ""))
+        for entry in entries
+    )
 
 
 @pytest.mark.skipif(

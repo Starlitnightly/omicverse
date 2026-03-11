@@ -322,6 +322,18 @@ class ToolRuntime:
         from .analysis_executor import ProactiveCodeTransformer
 
         code = ProactiveCodeTransformer().transform(code)
+        if getattr(self._ctx, "_code_only_mode", False):
+            capture = getattr(self._ctx, "_capture_code_only_snippet", None)
+            if callable(capture):
+                capture(code, description=description)
+            return {
+                "adata": adata,
+                "output": (
+                    "CODE ONLY MODE: captured generated Python code without "
+                    "executing it."
+                ),
+            }
+
         prereq_warnings = self._executor.check_code_prerequisites(code, adata)
 
         try:

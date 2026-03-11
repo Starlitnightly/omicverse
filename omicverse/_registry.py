@@ -5,14 +5,61 @@ This module provides a decorator-based function registration system that allows
 users to discover functions using natural language queries, aliases, and semantic search.
 """
 
-from typing import Dict, List, Optional, Callable, Any, Union
+from typing import Dict, List, Optional, Callable, Any, Union, Tuple
 from functools import wraps
 from datetime import datetime, timezone
+import ast
 import inspect
+import textwrap
 from difflib import get_close_matches
 import warnings
 import json
 from pathlib import Path
+
+_CAPABILITY_BRANCH_PARAMS = {
+    "method",
+    "backend",
+    "mode",
+    "source",
+    "task",
+    "provider",
+    "api_type",
+    "model",
+    "doublets_method",
+    "correction_method",
+    "prediction_mode",
+    "classifier",
+    "organism",
+}
+
+_NON_CAPABILITY_BRANCH_PARAMS = {
+    "name",
+    "format",
+    "key",
+    "tag",
+    "cmd",
+    "kind",
+    "platform",
+    "cmap_name",
+    "__name__",
+    "file_type",
+}
+
+_CAPABILITY_BRANCH_SUFFIXES = (
+    "_method",
+    "_backend",
+    "_provider",
+    "_source",
+    "_classifier",
+)
+
+_CAPABILITY_BRANCH_IMPORT_SUFFIXES = (
+    "_mode",
+    "_model",
+    "_type",
+    "_organism",
+    "_task",
+)
 
 
 class FunctionRegistry:
@@ -27,6 +74,46 @@ class FunctionRegistry:
         self._registry: Dict[str, Dict[str, Any]] = {}
         self._function_map: Dict[Callable, str] = {}  # Maps functions to their primary keys
         self._categories: Dict[str, List[str]] = {}  # Category to function mapping
+
+    def _store_entry(
+        self,
+        entry: Dict[str, Any],
+        *,
+        register_short_name: bool = True,
+        override_aliases: bool = True,
+        map_function: Optional[Callable] = None,
+    ) -> None:
+        """Store one registry entry and its aliases."""
+
+        full_name = str(entry.get("full_name", "") or "").lower()
+        short_name = str(entry.get("short_name", "") or "").lower()
+        aliases = [str(alias).strip().lower() for alias in (entry.get("aliases") or []) if str(alias).strip()]
+
+        def _maybe_store(key: str) -> None:
+            if not key:
+                return
+            if override_aliases or key not in self._registry:
+                self._registry[key] = entry
+
+        for alias in aliases:
+            _maybe_store(alias)
+
+        if register_short_name:
+            _maybe_store(short_name)
+
+        if full_name:
+            self._registry[full_name] = entry
+
+        category = str(entry.get("category", "") or "")
+        full_name_value = str(entry.get("full_name", "") or "")
+        if category and full_name_value:
+            if category not in self._categories:
+                self._categories[category] = []
+            if full_name_value not in self._categories[category]:
+                self._categories[category].append(full_name_value)
+
+        if map_function is not None and not entry.get("virtual_entry"):
+            self._function_map[map_function] = entry.get("full_name", "")
         
     def register(self,
                  func: Callable,
@@ -180,26 +267,301 @@ class FunctionRegistry:
             'prerequisites': prerequisites or {},
             'requires': requires or {},
             'produces': produces or {},
-            'auto_fix': auto_fix
+            'auto_fix': auto_fix,
+            'virtual_entry': False,
+            'source': 'runtime',
         }
-        
-        # Register under all aliases
-        for alias in aliases:
-            self._registry[alias.lower()] = entry
-            
-        # Register under function name
-        self._registry[func_name.lower()] = entry
-        self._registry[full_name.lower()] = entry
-        
-        # Map function to primary key
-        self._function_map[func] = full_name
-        
-        # Update category index
-        if category not in self._categories:
-            self._categories[category] = []
-        self._categories[category].append(full_name)
+
+        self._store_entry(
+            entry,
+            register_short_name=True,
+            override_aliases=True,
+            map_function=func,
+        )
+
+        for derived_entry in self._derive_runtime_entries(func, entry):
+            self._store_entry(
+                derived_entry,
+                register_short_name=False,
+                override_aliases=False,
+            )
         
         return func
+
+    def _derive_runtime_entries(self, func: Callable, base_entry: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Expand a registered callable into searchable virtual registry entries."""
+
+        try:
+            source = inspect.getsource(func)
+        except Exception:
+            return []
+
+        try:
+            tree = ast.parse(textwrap.dedent(source))
+        except Exception:
+            return []
+
+        node = None
+        for child in tree.body:
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                node = child
+                break
+        if node is None:
+            return []
+
+        entries: List[Dict[str, Any]] = []
+        if isinstance(node, ast.ClassDef):
+            for child in node.body:
+                if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                if child.name.startswith("_"):
+                    continue
+                method_entry = self._build_runtime_method_entry(base_entry, node, child)
+                entries.append(method_entry)
+                entries.extend(self._build_runtime_branch_entries(child, method_entry, base_entry, func))
+        else:
+            entries.extend(self._build_runtime_branch_entries(node, base_entry, base_entry, func))
+
+        return entries
+
+    def _build_runtime_method_entry(
+        self,
+        base_entry: Dict[str, Any],
+        class_node: ast.ClassDef,
+        method_node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
+    ) -> Dict[str, Any]:
+        aliases = [
+            f"{class_node.name}.{method_node.name}",
+            f"{base_entry.get('short_name', class_node.name)} {method_node.name}",
+        ]
+        for alias in (base_entry.get("aliases") or [])[:8]:
+            alias = str(alias).strip()
+            if alias:
+                aliases.append(f"{alias} {method_node.name}")
+
+        return {
+            'function': base_entry.get('function'),
+            'full_name': f"{base_entry.get('full_name', class_node.name)}.{method_node.name}",
+            'short_name': method_node.name,
+            'module': base_entry.get('module', ''),
+            'aliases': list(dict.fromkeys(aliases)),
+            'category': base_entry.get('category', ''),
+            'description': ast.get_docstring(method_node) or f"Method `{method_node.name}` on {base_entry.get('full_name', class_node.name)}.",
+            'examples': self._filter_examples_for_variant(base_entry.get('examples', []), method_node.name),
+            'related': [base_entry.get('full_name', '')],
+            'signature': self._derive_signature_from_ast(method_node),
+            'parameters': self._parameters_from_ast(method_node),
+            'docstring': ast.get_docstring(method_node) or "",
+            'prerequisites': base_entry.get('prerequisites', {}) or {},
+            'requires': base_entry.get('requires', {}) or {},
+            'produces': base_entry.get('produces', {}) or {},
+            'auto_fix': base_entry.get('auto_fix', 'none'),
+            'virtual_entry': True,
+            'source': 'runtime_derived_method',
+            'parent_full_name': base_entry.get('full_name', ''),
+            'imports': self._collect_import_targets(method_node.body),
+        }
+
+    def _build_runtime_branch_entries(
+        self,
+        node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
+        parent_entry: Dict[str, Any],
+        owner_entry: Dict[str, Any],
+        func: Callable,
+    ) -> List[Dict[str, Any]]:
+        entries: List[Dict[str, Any]] = []
+        seen: set[Tuple[str, str]] = set()
+
+        for child in ast.walk(node):
+            if not isinstance(child, ast.If):
+                continue
+            for param_name, branch_value in self._extract_branch_variants(child.test):
+                if not self._should_index_branch_variant(
+                    param_name,
+                    branch_value,
+                    child.body,
+                ):
+                    continue
+                key = (param_name, branch_value)
+                if key in seen:
+                    continue
+                seen.add(key)
+                imports = self._collect_import_targets(child.body)
+                aliases = [
+                    branch_value,
+                    f"{node.name} {branch_value}",
+                    f"{param_name} {branch_value}",
+                    f"{parent_entry.get('short_name', node.name)} {branch_value}",
+                ]
+                for alias in (owner_entry.get('aliases') or [])[:8]:
+                    alias = str(alias).strip()
+                    if alias:
+                        aliases.append(f"{alias} {branch_value}")
+                entries.append({
+                    'function': func,
+                    'full_name': f"{parent_entry.get('full_name', node.name)}[{param_name}={branch_value}]",
+                    'short_name': branch_value,
+                    'module': parent_entry.get('module', ''),
+                    'aliases': list(dict.fromkeys(aliases)),
+                    'category': parent_entry.get('category', ''),
+                    'description': self._build_branch_description(parent_entry, param_name, branch_value, imports),
+                    'examples': self._filter_examples_for_variant(parent_entry.get('examples', []), branch_value, param_name),
+                    'related': [parent_entry.get('full_name', '')],
+                    'signature': parent_entry.get('signature', self._derive_signature_from_ast(node)),
+                    'parameters': list(parent_entry.get('parameters', []) or []),
+                    'docstring': parent_entry.get('docstring', ''),
+                    'prerequisites': parent_entry.get('prerequisites', {}) or {},
+                    'requires': parent_entry.get('requires', {}) or {},
+                    'produces': parent_entry.get('produces', {}) or {},
+                    'auto_fix': parent_entry.get('auto_fix', 'none'),
+                    'virtual_entry': True,
+                    'source': 'runtime_derived_branch',
+                    'parent_full_name': parent_entry.get('full_name', ''),
+                    'branch_parameter': param_name,
+                    'branch_value': branch_value,
+                    'imports': imports,
+                })
+
+        return entries
+
+    @staticmethod
+    def _build_branch_description(
+        parent_entry: Dict[str, Any],
+        param_name: str,
+        branch_value: str,
+        imports: List[str],
+    ) -> str:
+        description = (
+            f"Variant of `{parent_entry.get('full_name', '')}` when "
+            f"`{param_name}='{branch_value}'`."
+        )
+        if imports:
+            description += " Imports/uses: " + ", ".join(imports) + "."
+        return description
+
+    @staticmethod
+    def _filter_examples_for_variant(examples: List[str], *keywords: str) -> List[str]:
+        if not examples:
+            return []
+        lowered = [str(keyword).lower() for keyword in keywords if str(keyword).strip()]
+        matches = [
+            example for example in examples
+            if any(keyword in str(example).lower() for keyword in lowered)
+        ]
+        return matches[:3] if matches else list(examples[:2])
+
+    @staticmethod
+    def _derive_signature_from_ast(node: Union[ast.FunctionDef, ast.AsyncFunctionDef]) -> str:
+        arg_names = [arg.arg for arg in node.args.args]
+        if arg_names and arg_names[0] == "self":
+            arg_names = arg_names[1:]
+        return f"({', '.join(arg_names)})"
+
+    @staticmethod
+    def _parameters_from_ast(node: Union[ast.FunctionDef, ast.AsyncFunctionDef]) -> List[str]:
+        params: List[str] = []
+        arg_names = list(node.args.args)
+        defaults = list(node.args.defaults)
+        offset = len(arg_names) - len(defaults)
+        for idx, arg in enumerate(arg_names):
+            if idx == 0 and arg.arg == "self":
+                continue
+            param = arg.arg
+            default_node = defaults[idx - offset] if idx >= offset else None
+            if default_node is not None:
+                try:
+                    param += "=" + repr(ast.literal_eval(default_node))
+                except Exception:
+                    pass
+            params.append(param)
+        return params
+
+    def _extract_branch_variants(self, test: ast.AST) -> List[Tuple[str, str]]:
+        variants: List[Tuple[str, str]] = []
+        if isinstance(test, ast.BoolOp) and isinstance(test.op, ast.Or):
+            for value in test.values:
+                variants.extend(self._extract_branch_variants(value))
+            return variants
+
+        if not isinstance(test, ast.Compare) or len(test.ops) != 1 or len(test.comparators) != 1:
+            return variants
+
+        subject = self._branch_subject_name(test.left)
+        comparator = test.comparators[0]
+        op = test.ops[0]
+        values: List[str] = []
+        if isinstance(op, ast.Eq):
+            values = self._branch_string_values(comparator)
+        elif isinstance(op, ast.In):
+            values = self._branch_string_values(comparator)
+
+        if subject and values:
+            variants.extend((subject, value) for value in values)
+        return variants
+
+    def _should_index_branch_variant(
+        self,
+        param_name: str,
+        branch_value: str,
+        statements: List[ast.stmt],
+    ) -> bool:
+        """Return True when a string-dispatch branch likely represents a user-facing capability."""
+
+        name = (param_name or "").strip().lower()
+        value = (branch_value or "").strip().lower()
+        if not name or not value:
+            return False
+        if name in _NON_CAPABILITY_BRANCH_PARAMS:
+            return False
+        if name in _CAPABILITY_BRANCH_PARAMS:
+            return True
+        if any(name.endswith(suffix) for suffix in _CAPABILITY_BRANCH_SUFFIXES):
+            return True
+
+        imports = self._collect_import_targets(statements)
+        if imports and any(name.endswith(suffix) for suffix in _CAPABILITY_BRANCH_IMPORT_SUFFIXES):
+            return True
+        if imports:
+            return True
+
+        return False
+
+    @staticmethod
+    def _branch_subject_name(node: ast.AST) -> str:
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Attribute):
+            return node.attr
+        return ""
+
+    @staticmethod
+    def _branch_string_values(node: ast.AST) -> List[str]:
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return [node.value]
+        if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+            values: List[str] = []
+            for child in node.elts:
+                if isinstance(child, ast.Constant) and isinstance(child.value, str):
+                    values.append(child.value)
+            return values
+        return []
+
+    @staticmethod
+    def _collect_import_targets(statements: List[ast.stmt]) -> List[str]:
+        module = ast.Module(body=list(statements), type_ignores=[])
+        imports: List[str] = []
+        for child in ast.walk(module):
+            if isinstance(child, ast.Import):
+                for alias in child.names:
+                    if alias.name:
+                        imports.append(alias.name.split(".")[0])
+            elif isinstance(child, ast.ImportFrom):
+                if child.module:
+                    imports.append(child.module.split(".")[0])
+                for alias in child.names:
+                    if alias.name and alias.name != "*":
+                        imports.append(alias.name.split(".")[0])
+        return list(dict.fromkeys(imports))
     
     def find(self, query: str, threshold: float = 0.6) -> List[Dict[str, Any]]:
         """
@@ -232,12 +594,20 @@ class FunctionRegistry:
             if self._registry[match] not in results:
                 results.append(self._registry[match])
         
-        # Search in descriptions
+        # Search in descriptions, examples, docstrings, imports, and aliases
         for entry in self._registry.values():
             if entry not in results:
-                if query_lower in entry['description'].lower():
-                    results.append(entry)
-                elif any(query_lower in alias.lower() for alias in entry['aliases']):
+                haystack = " ".join([
+                    str(entry.get('description', '') or ''),
+                    str(entry.get('docstring', '') or ''),
+                    " ".join(entry.get('aliases', []) or []),
+                    " ".join(entry.get('examples', []) or []),
+                    " ".join(entry.get('related', []) or []),
+                    " ".join(entry.get('imports', []) or []),
+                    str(entry.get('full_name', '') or ''),
+                    str(entry.get('short_name', '') or ''),
+                ]).lower()
+                if query_lower in haystack:
                     results.append(entry)
         
         # Remove duplicates while preserving order
@@ -963,8 +1333,20 @@ def export_registry(filepath: Optional[str] = None,
             'examples': entry['examples'],
             'related': entry['related'],
             'signature': entry['signature'],
-            'docstring': entry['docstring']
+            'docstring': entry['docstring'],
+            'source': entry.get('source', 'runtime'),
+            'virtual_entry': bool(entry.get('virtual_entry', False)),
         }
+
+        for optional_key in (
+            'parent_full_name',
+            'branch_parameter',
+            'branch_value',
+            'imports',
+            'parameters',
+        ):
+            if optional_key in entry:
+                func_data[optional_key] = entry.get(optional_key)
         
         if include_source:
             try:
