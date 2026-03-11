@@ -371,7 +371,11 @@ class OmicVerseLLMBackend:
         retry_backoff_factor: float = 2.0,
         retry_jitter: float = 0.5
     ) -> None:
-        provider = ModelConfig.get_provider_from_model(model, endpoint)
+        try:
+            provider = ModelConfig.get_provider_from_model(model, endpoint)
+        except TypeError:
+            # Some tests monkeypatch the older single-argument signature.
+            provider = ModelConfig.get_provider_from_model(model)
         self.config = BackendConfig(
             model=model,
             api_key=api_key,
