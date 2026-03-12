@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 from omicverse.utils.ovagent.tool_runtime import ToolRuntime
+from omicverse.utils.ovagent import tool_runtime as tool_runtime_module
 
 
 class _DummyExecutor:
@@ -30,10 +31,7 @@ def test_tool_search_functions_falls_back_to_static_registry(monkeypatch):
     runtime = ToolRuntime(_DummyCtx(), _DummyExecutor())
     fake_registry = SimpleNamespace(find=lambda query: [])
 
-    monkeypatch.setattr(
-        "omicverse.utils.ovagent.tool_runtime._global_registry",
-        fake_registry,
-    )
+    monkeypatch.setattr(tool_runtime_module, "_global_registry", fake_registry)
 
     result = runtime._tool_search_functions("dynamo")
 
