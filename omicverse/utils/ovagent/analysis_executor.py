@@ -52,8 +52,16 @@ class ProactiveCodeTransformer:
         (r"mu(?:on)?\.atac\.tl\.lsi", "n_components"): "n_comps",
     }
 
+    # Prepended to all agent-generated code to prevent GUI windows
+    _MATPLOTLIB_PREAMBLE = (
+        "import matplotlib as _mpl; _mpl.use('Agg')\n"
+        "import matplotlib.pyplot as _plt; _plt.ioff()\n"
+    )
+
     def transform(self, code: str) -> str:
         try:
+            code = self._prepend_matplotlib_noninteractive(code)
+            code = self._fix_show_true(code)
             code = self._fix_inplace_assignments_regex(code)
             code = self._fix_fstring_print_regex(code)
             code = self._fix_cat_accessor_regex(code)
@@ -66,6 +74,16 @@ class ProactiveCodeTransformer:
         except Exception as e:
             logger.debug("ProactiveCodeTransformer: unexpected error %s, returning original", e)
             return code
+
+    def _prepend_matplotlib_noninteractive(self, code: str) -> str:
+        """Ensure matplotlib uses non-interactive backend to prevent GUI hang."""
+        if "_mpl.use('Agg')" in code:
+            return code
+        return self._MATPLOTLIB_PREAMBLE + code
+
+    def _fix_show_true(self, code: str) -> str:
+        """Replace show=True with show=False in plotting calls to avoid blocking."""
+        return re.sub(r'\bshow\s*=\s*True\b', 'show=False', code)
 
     def _fix_inplace_assignments_regex(self, code: str) -> str:
         inplace_pattern = "|".join(self.INPLACE_FUNCTIONS)
@@ -525,6 +543,7 @@ class AnalysisExecutor:
                         f"Notebook execution failed and fallback is disabled: {e}"
                     ) from e
                 elif fb == SandboxFallbackPolicy.WARN_AND_FALLBACK:
+                    self._notebook_fallback_error = str(e)
                     if hasattr(self._ctx, "_emit"):
                         self._ctx._emit(EventLevel.WARNING, f"Session execution failed: {e}", "execution")
                         self._ctx._emit(EventLevel.INFO, "Falling back to in-process execution...", "execution")

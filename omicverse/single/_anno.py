@@ -359,7 +359,7 @@ def scanpy_lazy(adata:anndata.AnnData,min_genes:int=200,min_cells:int=3,drop_dou
         "                                    clustertype='leiden',",
         "                                    key_added='manual_celltype')",
         "# Compare with automatic annotation",
-        "ov.utils.embedding(adata, color=['manual_celltype', 'scsa_celltype'])"
+        "ov.pl.embedding(adata, color=['manual_celltype', 'scsa_celltype'])"
     ],
     related=["single.pySCSA", "single.get_celltype_marker", "utils.embedding"]
 )

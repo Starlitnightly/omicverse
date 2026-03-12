@@ -65,11 +65,11 @@ ov.bulk2single.bulk2single_plot_correlation(single_adata, filtered, celltype_key
 plt.grid(False)
 
 filtered.obsm['X_mde'] = ov.utils.mde(filtered.obsm['X_pca'])
-ov.utils.embedding(
+ov.pl.embedding(
     filtered,
     basis='X_mde',
     color=['clusters'],
-    palette=ov.utils.pyomic_palette(),
+    palette=ov.pl.sc_color(),
     frameon='small',
 )
 ```

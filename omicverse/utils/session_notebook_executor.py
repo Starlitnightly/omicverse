@@ -311,10 +311,18 @@ class SessionNotebookExecutor:
             if not km.is_alive():
                 return False
 
-            # Try to communicate with kernel
+            # Send kernel_info_request and wait for the matching reply,
+            # draining any stale messages that may be ahead in the queue.
             kc.kernel_info()
-            reply = kc.get_shell_msg(timeout=2.0)
-            return reply['msg_type'] == 'kernel_info_reply'
+            deadline = time.time() + 5.0
+            while time.time() < deadline:
+                try:
+                    reply = kc.get_shell_msg(timeout=0.5)
+                    if reply['msg_type'] == 'kernel_info_reply':
+                        return True
+                except Exception:
+                    break
+            return False
 
         except Exception:
             return False
@@ -539,11 +547,14 @@ print("✓ [OK] Session re-initialized after recovery")
 
         # Initialize session imports
         init_code = """
+import matplotlib
+matplotlib.use('Agg')
 import omicverse as ov
 import scanpy as sc
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+plt.ioff()
 import seaborn as sns
 import warnings
 warnings.filterwarnings('ignore')
@@ -707,9 +718,12 @@ warnings.filterwarnings('ignore')""")
             return  # nbformat not available
 
         try:
+            import nbformat
             from nbformat.v4 import new_markdown_cell, new_code_cell
         except ImportError:
             return
+
+        _node = nbformat.from_dict
 
         nb = self.current_session['notebook']
 
@@ -723,38 +737,38 @@ warnings.filterwarnings('ignore')""")
 
         # Add stdout outputs
         if outputs['stdout']:
-            code_cell.outputs.append({
+            code_cell.outputs.append(_node({
                 'output_type': 'stream',
                 'name': 'stdout',
                 'text': ''.join(outputs['stdout'])
-            })
+            }))
 
         # Add stderr outputs
         if outputs['stderr']:
-            code_cell.outputs.append({
+            code_cell.outputs.append(_node({
                 'output_type': 'stream',
                 'name': 'stderr',
                 'text': ''.join(outputs['stderr'])
-            })
+            }))
 
         # Add error outputs
         if outputs['errors']:
             for error in outputs['errors']:
-                code_cell.outputs.append({
+                code_cell.outputs.append(_node({
                     'output_type': 'error',
                     'ename': error['ename'],
                     'evalue': error['evalue'],
                     'traceback': error['traceback']
-                })
+                }))
 
         # Add display data outputs
         if outputs['display_data']:
             for data in outputs['display_data']:
-                code_cell.outputs.append({
+                code_cell.outputs.append(_node({
                     'output_type': 'display_data',
                     'data': data,
                     'metadata': {}
-                })
+                }))
 
         nb.cells.append(code_cell)
 

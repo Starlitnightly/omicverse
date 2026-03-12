@@ -32,6 +32,7 @@ import requests
 from ..agent_bridge import AgentBridge
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from ..model_help import render_model_help
+from ..runtime import ConversationRoute
 
 logger = logging.getLogger("omicverse.jarvis.feishu")
 
@@ -513,6 +514,12 @@ def _process_feishu_event_payload(
         return True
     message_type = (msg.get("message_type") or "").strip().lower()
     chat_id = (event.get("chat_id") or msg.get("chat_id") or "").strip()
+    chat_type = (
+        event.get("chat_type")
+        or msg.get("chat_type")
+        or event.get("conversation_type")
+        or msg.get("conversation_type")
+    )
     thread_id = (
         event.get("root_id")
         or msg.get("root_id")
@@ -526,15 +533,22 @@ def _process_feishu_event_payload(
     if message_type == "text":
         text = (content.get("text") or "").strip()
         if text:
-            runtime.submit(runtime.handle_text(chat_id, thread_id, text))
+            runtime.submit(runtime.handle_text(chat_id, thread_id, text, chat_type=chat_type))
     elif message_type in {"file", "media"}:
         file_key = (content.get("file_key") or "").strip()
         file_name = (content.get("file_name") or content.get("name") or "upload.bin").strip()
         if file_key:
-            runtime.submit(runtime.handle_file(chat_id, thread_id, file_key, file_name))
+            runtime.submit(
+                runtime.handle_file(chat_id, thread_id, file_key, file_name, chat_type=chat_type)
+            )
     elif message_type == "image":
         runtime.submit(
-            runtime.handle_text(chat_id, thread_id, "收到图片。若需分析请上传 .h5ad 或发送文字指令。")
+            runtime.handle_text(
+                chat_id,
+                thread_id,
+                "收到图片。若需分析请上传 .h5ad 或发送文字指令。",
+                chat_type=chat_type,
+            )
         )
     return True
 
@@ -561,13 +575,41 @@ class FeishuRuntime:
     def _parse_command(text: str) -> List[str]:
         return (text or "").strip().split()
 
-    def _session_key(self, chat_id: str, thread_id: Optional[str]) -> SessionKey:
-        return SessionKey(
+    @staticmethod
+    def _route(
+        chat_id: str,
+        thread_id: Optional[str],
+        chat_type: Optional[str] = None,
+    ) -> ConversationRoute:
+        norm = (chat_type or "").strip().lower()
+        if norm in {"p2p", "private", "direct", "dm"}:
+            scope_type = "dm"
+        elif norm in {"group", "chat", "room"}:
+            scope_type = "group"
+        else:
+            scope_type = "chat"
+        return ConversationRoute(
             channel="feishu",
-            scope_type="chat",
+            scope_type=scope_type,
             scope_id=str(chat_id),
             thread_id=(str(thread_id) if thread_id else None),
         )
+
+    def _session_key(
+        self,
+        chat_id: str,
+        thread_id: Optional[str],
+        chat_type: Optional[str] = None,
+    ) -> SessionKey:
+        return self._route(chat_id, thread_id, chat_type).to_session_key()
+
+    def _route_key(
+        self,
+        chat_id: str,
+        thread_id: Optional[str],
+        chat_type: Optional[str] = None,
+    ) -> str:
+        return self._route(chat_id, thread_id, chat_type).route_key()
 
     # ------------------------------------------------------------------
     # Helpers mirroring Telegram feature set
@@ -707,12 +749,19 @@ class FeishuRuntime:
             except Exception:
                 pass
 
-    async def handle_text(self, chat_id: str, thread_id: Optional[str], text: str) -> None:
+    async def handle_text(
+        self,
+        chat_id: str,
+        thread_id: Optional[str],
+        text: str,
+        *,
+        chat_type: Optional[str] = None,
+    ) -> None:
         text = (text or "").strip()
         if not text:
             return
-        sk = self._session_key(chat_id, thread_id)
-        route = sk.as_key()
+        sk = self._session_key(chat_id, thread_id, chat_type)
+        route = self._route_key(chat_id, thread_id, chat_type)
         session = self._registry.get_or_create(sk)
 
         tokens = self._parse_command(text)
@@ -806,8 +855,10 @@ class FeishuRuntime:
         thread_id: Optional[str],
         file_key: str,
         file_name: str,
+        *,
+        chat_type: Optional[str] = None,
     ) -> None:
-        sk = self._session_key(chat_id, thread_id)
+        sk = self._session_key(chat_id, thread_id, chat_type)
         session = self._registry.get_or_create(sk)
         safe_name = Path(file_name or "uploaded.bin").name
         if not safe_name.lower().endswith(".h5ad"):

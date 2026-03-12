@@ -3,9 +3,9 @@
 ```python
 import omicverse as ov
 
-ov.utils.ov_plot_set()
+ov.style()
 
-data = ov.utils.read('sample/counts.txt', index_col=0, header=1)
+data = ov.io.read('sample/counts.txt', index_col=0, header=1)
 data.columns = [c.split('/')[-1].replace('.bam', '') for c in data.columns]
 
 ov.utils.download_geneid_annotation_pair()

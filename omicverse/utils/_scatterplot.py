@@ -71,13 +71,13 @@ def _get_vector_friendly():
     description="Scatter plot visualization of single-cell embeddings with flexible coloring options",
     examples=[
         "# Basic UMAP visualization",
-        "ov.utils.embedding(adata, basis='X_umap', color='leiden')",
+        "ov.pl.embedding(adata, basis='X_umap', color='leiden')",
         "# Multiple color variables",
-        "ov.utils.embedding(adata, basis='X_pca', color=['n_genes', 'leiden', 'CD14'])",
+        "ov.pl.embedding(adata, basis='X_pca', color=['n_genes', 'leiden', 'CD14'])",
         "# Gene expression visualization",
-        "ov.utils.embedding(adata, basis='X_tsne', color=['CD3D', 'CD79A'])",
+        "ov.pl.embedding(adata, basis='X_tsne', color=['CD3D', 'CD79A'])",
         "# Custom visualization settings",
-        "ov.utils.embedding(adata, basis='X_umap', color='celltype',",
+        "ov.pl.embedding(adata, basis='X_umap', color='celltype',",
         "                   frameon=False, legend_loc='right margin')"
     ],
     related=["pp.pca", "utils.mde", "pl.umap", "pl.tsne"]
