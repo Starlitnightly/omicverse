@@ -25,6 +25,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PACKAGE_ROOT = PROJECT_ROOT / "omicverse"
 
 # Ensure test can import minimal omicverse.utils without pulling heavy modules
+_ORIGINAL_MODULES = {
+    name: sys.modules.get(name)
+    for name in [
+        "omicverse",
+        "omicverse.utils",
+        "omicverse.utils.agent_backend",
+    ]
+}
 for name in [
     "omicverse",
     "omicverse.utils",
@@ -58,6 +66,12 @@ utils_pkg.agent_backend = agent_backend_module
 
 OmicVerseLLMBackend = agent_backend_module.OmicVerseLLMBackend
 Usage = agent_backend_module.Usage
+
+for name, module in _ORIGINAL_MODULES.items():
+    if module is None:
+        sys.modules.pop(name, None)
+    else:
+        sys.modules[name] = module
 
 
 class TestUsageDataclass:

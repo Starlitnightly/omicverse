@@ -3,10 +3,19 @@ import types, sys, pathlib, importlib
 
 def load_components():
     repo = pathlib.Path(__file__).resolve().parents[2] / "omicverse"
-    omv = types.ModuleType("omicverse"); omv.__path__=[str(repo)]; sys.modules.setdefault("omicverse", omv)
-    llm = types.ModuleType("omicverse.llm"); llm.__path__=[str(repo/"llm")]; sys.modules.setdefault("omicverse.llm", llm)
-    dr = types.ModuleType("omicverse.llm.dr"); dr.__path__=[str(repo/"llm"/"dr")]; sys.modules.setdefault("omicverse.llm.dr", dr)
-    ov = types.ModuleType("OvIntelligence"); sys.modules.setdefault("OvIntelligence", ov)
+    managed = [
+        "omicverse",
+        "omicverse.llm",
+        "omicverse.llm.dr",
+        "OvIntelligence",
+        "OvIntelligence.query_manager",
+        "omicverse.llm.model_factory",
+    ]
+    original = {name: sys.modules.get(name) for name in managed}
+    omv = types.ModuleType("omicverse"); omv.__path__=[str(repo)]; sys.modules["omicverse"] = omv
+    llm = types.ModuleType("omicverse.llm"); llm.__path__=[str(repo/"llm")]; sys.modules["omicverse.llm"] = llm
+    dr = types.ModuleType("omicverse.llm.dr"); dr.__path__=[str(repo/"llm"/"dr")]; sys.modules["omicverse.llm.dr"] = dr
+    ov = types.ModuleType("OvIntelligence"); sys.modules["OvIntelligence"] = ov
     oq = types.ModuleType("OvIntelligence.query_manager")
     class QM:
         @staticmethod
@@ -21,10 +30,17 @@ def load_components():
             return object()
     mf.ModelFactory = DummyFactory
     sys.modules["omicverse.llm.model_factory"] = mf
-    rm_module = importlib.import_module("omicverse.llm.dr.research_manager")
-    scope_module = importlib.import_module("omicverse.llm.dr.scope.brief")
-    agent_module = importlib.import_module("omicverse.llm.dr.research.agent")
-    return rm_module.ResearchManager, scope_module.ProjectBrief, agent_module.Finding, agent_module.SourceCitation
+    try:
+        rm_module = importlib.import_module("omicverse.llm.dr.research_manager")
+        scope_module = importlib.import_module("omicverse.llm.dr.scope.brief")
+        agent_module = importlib.import_module("omicverse.llm.dr.research.agent")
+        return rm_module.ResearchManager, scope_module.ProjectBrief, agent_module.Finding, agent_module.SourceCitation
+    finally:
+        for name, module in original.items():
+            if module is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = module
 
 
 ResearchManager, ProjectBrief, Finding, SourceCitation = load_components()

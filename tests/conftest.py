@@ -15,6 +15,19 @@ import tempfile
 import os
 from pathlib import Path
 
+_TEST_CACHE_ROOT = Path(tempfile.gettempdir()) / "omicverse-test-cache"
+_TEST_CACHE_ROOT.mkdir(parents=True, exist_ok=True)
+
+# Scientific-stack imports (scanpy/matplotlib/numba) assume writable cache dirs.
+# In CI and sandboxed runs, the default user cache locations are often read-only.
+for env_name, subdir in {
+    "MPLCONFIGDIR": "matplotlib",
+    "NUMBA_CACHE_DIR": "numba",
+}.items():
+    target = _TEST_CACHE_ROOT / subdir
+    target.mkdir(parents=True, exist_ok=True)
+    os.environ.setdefault(env_name, str(target))
+
 
 @pytest.fixture
 def tmp_path_factory_session(tmp_path_factory):

@@ -2,6 +2,7 @@ import importlib
 import importlib.util
 import sys
 import types
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -39,20 +40,38 @@ def ensure_service_path(filename: str) -> Path:
     return path
 
 
-def register_web_namespace_packages() -> None:
+@contextmanager
+def register_web_namespace_packages():
     ensure_web_checkout()
-    omicverse_pkg = types.ModuleType("omicverse")
-    omicverse_pkg.__path__ = [str(OMICVERSE_ROOT)]
-    utils_pkg = types.ModuleType("omicverse.utils")
-    utils_pkg.__path__ = [str(UTILS_ROOT)]
-    sys.modules.setdefault("omicverse", omicverse_pkg)
-    sys.modules.setdefault("omicverse.utils", utils_pkg)
-    web_pkg = types.ModuleType("omicverse_web")
-    web_pkg.__path__ = [str(WEB_ROOT)]
-    services_pkg = types.ModuleType("omicverse_web.services")
-    services_pkg.__path__ = [str(SERVICES_ROOT)]
-    sys.modules.setdefault("omicverse_web", web_pkg)
-    sys.modules.setdefault("omicverse_web.services", services_pkg)
+    managed = [
+        "omicverse",
+        "omicverse.utils",
+        "omicverse.utils.harness",
+        "omicverse_web",
+        "omicverse_web.services",
+    ]
+    original = {name: sys.modules.get(name) for name in managed}
+
+    if "omicverse" not in sys.modules:
+        omicverse_pkg = types.ModuleType("omicverse")
+        omicverse_pkg.__path__ = [str(OMICVERSE_ROOT)]
+        sys.modules["omicverse"] = omicverse_pkg
+
+    if "omicverse.utils" not in sys.modules:
+        utils_pkg = types.ModuleType("omicverse.utils")
+        utils_pkg.__path__ = [str(UTILS_ROOT)]
+        sys.modules["omicverse.utils"] = utils_pkg
+
+    if "omicverse_web" not in sys.modules:
+        web_pkg = types.ModuleType("omicverse_web")
+        web_pkg.__path__ = [str(WEB_ROOT)]
+        sys.modules["omicverse_web"] = web_pkg
+
+    if "omicverse_web.services" not in sys.modules:
+        services_pkg = types.ModuleType("omicverse_web.services")
+        services_pkg.__path__ = [str(SERVICES_ROOT)]
+        sys.modules["omicverse_web.services"] = services_pkg
+
     harness_path = HARNESS_ROOT / "__init__.py"
     if "omicverse.utils.harness" not in sys.modules and harness_path.exists():
         spec = importlib.util.spec_from_file_location(
@@ -65,16 +84,32 @@ def register_web_namespace_packages() -> None:
         sys.modules["omicverse.utils.harness"] = module
         spec.loader.exec_module(module)
 
+    try:
+        yield
+    finally:
+        for name, module in original.items():
+            if module is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = module
+
 
 def load_service_module(module_name: str, filename: str):
-    register_web_namespace_packages()
-    path = ensure_service_path(filename)
-    spec = importlib.util.spec_from_file_location(module_name, path)
-    module = importlib.util.module_from_spec(spec)
-    assert spec is not None and spec.loader is not None
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)
-    return module
+    with register_web_namespace_packages():
+        path = ensure_service_path(filename)
+        original = sys.modules.get(module_name)
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        sys.modules[module_name] = module
+        try:
+            spec.loader.exec_module(module)
+            return module
+        finally:
+            if original is None:
+                sys.modules.pop(module_name, None)
+            else:
+                sys.modules[module_name] = original
 
 
 def import_web_module(module_name: str):

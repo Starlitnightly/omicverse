@@ -18,6 +18,10 @@ PACKAGE_ROOT = PROJECT_ROOT / "omicverse"
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+_ORIGINAL_MODULES = {
+    name: sys.modules.get(name)
+    for name in ["omicverse", "omicverse.utils", "omicverse.utils.smart_agent"]
+}
 for name in ["omicverse", "omicverse.utils", "omicverse.utils.smart_agent"]:
     sys.modules.pop(name, None)
 
@@ -47,6 +51,12 @@ smart_agent_spec.loader.exec_module(smart_agent_module)
 OmicVerseAgent = smart_agent_module.OmicVerseAgent
 from omicverse.utils.harness import build_stream_event
 from omicverse.utils.ovagent.tool_runtime import ToolRuntime
+
+for name, module in _ORIGINAL_MODULES.items():
+    if module is None:
+        sys.modules.pop(name, None)
+    else:
+        sys.modules[name] = module
 
 _RUN_HARNESS_TESTS = os.environ.get("OV_AGENT_RUN_HARNESS_TESTS", "").lower() in {
     "1",
