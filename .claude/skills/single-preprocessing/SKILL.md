@@ -7,7 +7,7 @@ description: "Single-cell QC, normalization, HVG detection, PCA, neighbor graph,
 # Single-cell preprocessing with omicverse
 
 ## Overview
-Follow this skill when a user needs to reproduce the preprocessing workflow from the omicverse notebooks [`t_preprocess.ipynb`](../../omicverse_guide/docs/Tutorials-single/t_preprocess.ipynb), [`t_preprocess_cpu.ipynb`](../../omicverse_guide/docs/Tutorials-single/t_preprocess_cpu.ipynb), and [`t_preprocess_gpu.ipynb`](../../omicverse_guide/docs/Tutorials-single/t_preprocess_gpu.ipynb). The tutorials operate on the 10x PBMC3k dataset and cover QC filtering, normalisation, highly variable gene (HVG) detection, dimensionality reduction, and downstream embeddings.
+Follow this skill when a user needs to reproduce the preprocessing workflow from the omicverse notebooks [`t_preprocess.ipynb`](../../../omicverse_guide/docs/Tutorials-single/t_preprocess.ipynb), [`t_preprocess_cpu.ipynb`](../../../omicverse_guide/docs/Tutorials-single/t_preprocess_cpu.ipynb), and [`t_preprocess_gpu.ipynb`](../../../omicverse_guide/docs/Tutorials-single/t_preprocess_gpu.ipynb). The tutorials operate on the 10x PBMC3k dataset and cover QC filtering, normalisation, highly variable gene (HVG) detection, dimensionality reduction, and downstream embeddings.
 
 ## Instructions
 1. **Set up the environment**
@@ -43,7 +43,7 @@ Follow this skill when a user needs to reproduce the preprocessing workflow from
              ov.pp.neighbors(adata, n_neighbors=15, use_rep='X_pca')
          ov.single.leiden(adata, resolution=1.0)
      ```
-   - Plot embeddings with `ov.pl.embedding(...)` or `ov.utils.embedding(...)`, colouring by `leiden` clusters and marker genes. Always verify that the column specified in `color=` parameter exists in `adata.obs` before plotting.
+   - Plot embeddings with `ov.pl.embedding(...)` or `ov.pl.umap(...)`, colouring by `leiden` clusters and marker genes. Always verify that the column specified in `color=` parameter exists in `adata.obs` before plotting.
 9. **Document outputs**
    - Encourage saving intermediate AnnData objects (`adata.write('write/pbmc3k_preprocessed.h5ad')`) and figure exports using Matplotlib’s `plt.savefig(...)` to preserve QC summaries and embeddings.
 10. **Notebook-specific notes**
@@ -180,5 +180,5 @@ def safe_highly_variable_genes(adata, batch_key='batch', n_top_genes=2000):
 - "Provision a RAPIDS environment, transfer AnnData to GPU, run `method='cagra'` neighbours, and return embeddings to CPU for plotting."
 
 ## References
-- Detailed walkthrough notebooks: [`t_preprocess.ipynb`](../../omicverse_guide/docs/Tutorials-single/t_preprocess.ipynb), [`t_preprocess_cpu.ipynb`](../../omicverse_guide/docs/Tutorials-single/t_preprocess_cpu.ipynb), [`t_preprocess_gpu.ipynb`](../../omicverse_guide/docs/Tutorials-single/t_preprocess_gpu.ipynb)
+- Detailed walkthrough notebooks: [`t_preprocess.ipynb`](../../../omicverse_guide/docs/Tutorials-single/t_preprocess.ipynb), [`t_preprocess_cpu.ipynb`](../../../omicverse_guide/docs/Tutorials-single/t_preprocess_cpu.ipynb), [`t_preprocess_gpu.ipynb`](../../../omicverse_guide/docs/Tutorials-single/t_preprocess_gpu.ipynb)
 - Quick copy/paste commands: [`reference.md`](reference.md)

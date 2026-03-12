@@ -31,11 +31,11 @@ ble.
    - Encourage saving both tables (`.to_csv(...)`) plus the harmonised AnnData (`adata.write_h5ad('adata_batch.h5ad', compressio
 n='gzip')`).
 6. **Benchmark the correction**
-   - For per-sample variance checks, draw before/after boxplots and recolour boxes using `ov.utils.red_color`, `blue_color`, `gree
+   - For per-sample variance checks, draw before/after boxplots and recolour boxes using `ov.pl.red_color`, `blue_color`, `gree
 n_color` palettes to match batches.
    - Copy raw counts to a named layer with `adata.layers['raw'] = adata.X.copy()` before PCA.
    - Run `ov.pp.pca(adata, layer='raw', n_pcs=50)` and `ov.pp.pca(adata, layer='batch_correction', n_pcs=50)`.
-   - Visualise embeddings with `ov.utils.embedding(..., basis='raw|original|X_pca', color='batch', frameon='small')` and repeat fo
+   - Visualise embeddings with `ov.pl.embedding(..., basis='raw|original|X_pca', color='batch', frameon='small')` and repeat fo
 r the corrected layer to verify mixing.
 7. **Defensive validation**
    ```python
