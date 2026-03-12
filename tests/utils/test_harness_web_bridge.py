@@ -1,27 +1,9 @@
 import os
-import importlib.util
-from pathlib import Path
-import sys
-import types
 
 import pytest
+from tests.utils._web_test_support import load_service_module
 
-_ROOT = Path(__file__).resolve().parents[2]
-_WEB_ROOT = _ROOT / "omicverse_web"
-_SERVICES_ROOT = _WEB_ROOT / "services"
-_SERVICE_PATH = _SERVICES_ROOT / "agent_service.py"
-
-web_pkg = types.ModuleType("omicverse_web")
-web_pkg.__path__ = [str(_WEB_ROOT)]
-services_pkg = types.ModuleType("omicverse_web.services")
-services_pkg.__path__ = [str(_SERVICES_ROOT)]
-sys.modules.setdefault("omicverse_web", web_pkg)
-sys.modules.setdefault("omicverse_web.services", services_pkg)
-
-_SPEC = importlib.util.spec_from_file_location("omicverse_web.services.agent_service", _SERVICE_PATH)
-_MODULE = importlib.util.module_from_spec(_SPEC)
-assert _SPEC is not None and _SPEC.loader is not None
-_SPEC.loader.exec_module(_MODULE)
+_MODULE = load_service_module("omicverse_web.services.agent_service", "agent_service.py")
 
 get_harness_capabilities = _MODULE.get_harness_capabilities
 stream_agent_events = _MODULE.stream_agent_events

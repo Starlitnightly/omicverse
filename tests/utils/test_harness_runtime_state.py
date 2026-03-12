@@ -1,38 +1,15 @@
-import importlib.util
 import os
-import sys
 import threading
-import types
-from pathlib import Path
 
 import pytest
+from tests.utils._web_test_support import load_service_module
 
 
-ROOT = Path(__file__).resolve().parents[2]
-WEB_ROOT = ROOT / "omicverse_web"
-SERVICES_ROOT = WEB_ROOT / "services"
-AGENT_SERVICE_PATH = SERVICES_ROOT / "agent_service.py"
-SESSION_SERVICE_PATH = SERVICES_ROOT / "agent_session_service.py"
-
-web_pkg = types.ModuleType("omicverse_web")
-web_pkg.__path__ = [str(WEB_ROOT)]
-services_pkg = types.ModuleType("omicverse_web.services")
-services_pkg.__path__ = [str(SERVICES_ROOT)]
-sys.modules.setdefault("omicverse_web", web_pkg)
-sys.modules.setdefault("omicverse_web.services", services_pkg)
-
-
-def _load_module(module_name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(module_name, path)
-    module = importlib.util.module_from_spec(spec)
-    assert spec is not None and spec.loader is not None
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-_AGENT_SERVICE = _load_module("omicverse_web.services.agent_service", AGENT_SERVICE_PATH)
-_SESSION_SERVICE = _load_module("omicverse_web.services.agent_session_service", SESSION_SERVICE_PATH)
+_AGENT_SERVICE = load_service_module("omicverse_web.services.agent_service", "agent_service.py")
+_SESSION_SERVICE = load_service_module(
+    "omicverse_web.services.agent_session_service",
+    "agent_session_service.py",
+)
 
 get_harness_capabilities = _AGENT_SERVICE.get_harness_capabilities
 AgentSession = _SESSION_SERVICE.AgentSession

@@ -1,4 +1,7 @@
-from omicverse_web import start_server
+from tests.utils._web_test_support import import_web_module
+
+
+start_server = import_web_module("omicverse_web.start_server")
 
 
 def test_resolve_bind_host_ignores_unresolvable_cli_host(monkeypatch):
