@@ -36,7 +36,7 @@ from services.agent_session_service import session_manager
 from utils.notebook_helpers import ensure_default_notebook
 
 # Import blueprints
-from routes import kernel, files, data, notebooks
+from routes import kernel, files, data, notebooks, skills
 from routes.terminal import terminal_bp
 
 # Suppress warnings
@@ -273,6 +273,9 @@ data.bp.upload_folder = app.config['UPLOAD_FOLDER']
 # Notebooks blueprint
 app.register_blueprint(notebooks.bp, url_prefix='/api/notebooks')
 notebooks.bp.notebook_root = state.notebook_root
+
+# Skills blueprint
+app.register_blueprint(skills.bp, url_prefix='/api/skills')
 
 # Terminal blueprint (PTY-based interactive shell)
 app.register_blueprint(terminal_bp)

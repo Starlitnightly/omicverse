@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-OmicVerse Single Cell Analysis Platform Launcher
+OmicVerse Single Cell Analysis Platform Launcher.
 
-This script provides a convenient way to start the web server with proper
-configuration and dependency checking.
+Starts the web server with dependency checks and safer host resolution.
 """
 
 import sys
@@ -11,10 +10,11 @@ import os
 import subprocess
 import importlib
 import argparse
+import socket
 from pathlib import Path
 
 def check_dependencies():
-    """Check if all required dependencies are available"""
+    """Check if all required dependencies are available."""
     required_packages = [
         ('flask', 'Flask'),
         ('flask_cors', 'Flask-CORS'),
@@ -31,37 +31,37 @@ def check_dependencies():
     missing_required = []
     missing_optional = []
     
-    print("🔍 检查依赖包...")
+    print("Checking dependencies...")
     
     # Check required packages
     for package, name in required_packages:
         try:
             importlib.import_module(package)
-            print(f"✅ {name} - 已安装")
+            print(f"[ok] {name} installed")
         except ImportError:
             missing_required.append((package, name))
-            print(f"❌ {name} - 未安装")
+            print(f"[missing] {name} not installed")
     
     # Check optional packages
     for package, name in optional_packages:
         try:
             importlib.import_module(package)
-            print(f"✅ {name} - 已安装 (可选)")
+            print(f"[ok] {name} installed (optional)")
         except ImportError:
             missing_optional.append((package, name))
-            print(f"⚠️  {name} - 未安装 (可选，但推荐安装)")
-    
+            print(f"[warning] {name} not installed (optional)")
+
     if missing_required:
-        print("\n❌ 缺少必需的依赖包:")
+        print("\nMissing required dependencies:")
         for package, name in missing_required:
             print(f"   - {name} ({package})")
-        print("\n请运行以下命令安装:")
+        print("\nInstall them with:")
         packages = " ".join([pkg for pkg, _ in missing_required])
         print(f"   pip install {packages}")
         return False
-    
+
     if missing_optional:
-        print("\n⚠️  建议安装以下可选包以获得完整功能:")
+        print("\nRecommended optional dependencies:")
         for package, name in missing_optional:
             print(f"   - {name} ({package})")
         packages = " ".join([pkg for pkg, _ in missing_optional])
@@ -70,26 +70,26 @@ def check_dependencies():
     return True
 
 def check_files():
-    """Check if required files exist"""
+    """Check if required files exist."""
     current_dir = Path(__file__).parent
     required_files = [
         'app.py',
         'single_cell_analysis_standalone.html',
     ]
     
-    print("\n🔍 检查必需文件...")
+    print("\nChecking required files...")
     
     missing_files = []
     for file_path in required_files:
         full_path = current_dir / file_path
         if full_path.exists():
-            print(f"✅ {file_path}")
+            print(f"[ok] {file_path}")
         else:
             missing_files.append(file_path)
-            print(f"❌ {file_path}")
-    
+            print(f"[missing] {file_path}")
+
     if missing_files:
-        print("\n❌ 缺少必需文件:")
+        print("\nMissing required files:")
         for file_path in missing_files:
             print(f"   - {file_path}")
         return False
@@ -97,9 +97,7 @@ def check_files():
     return True
 
 def get_available_port(start_port=5050):
-    """Find an available port starting from start_port"""
-    import socket
-    
+    """Find an available port starting from ``start_port``."""
     for port in range(start_port, start_port + 100):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -111,7 +109,43 @@ def get_available_port(start_port=5050):
     return None
 
 
-def _parse_args():
+def _default_bind_host(remote_mode: bool) -> str:
+    return "127.0.0.1" if remote_mode else "0.0.0.0"
+
+
+def _can_bind_host(host: str) -> bool:
+    candidate = (host or "").strip()
+    if not candidate:
+        return False
+    try:
+        socket.getaddrinfo(candidate, 0, type=socket.SOCK_STREAM)
+        return True
+    except socket.gaierror:
+        return False
+
+
+def _resolve_bind_host(cli_host: str | None, remote_mode: bool) -> tuple[str, str | None]:
+    explicit = (cli_host or "").strip()
+    if explicit:
+        if _can_bind_host(explicit):
+            return explicit, None
+        fallback = _default_bind_host(remote_mode)
+        return fallback, f"Requested host {explicit!r} could not be resolved; falling back to {fallback}"
+
+    env_host = (os.environ.get("OV_WEB_HOST") or "").strip()
+    if env_host:
+        if _can_bind_host(env_host):
+            return env_host, None
+        fallback = _default_bind_host(remote_mode)
+        return fallback, f"Environment variable OV_WEB_HOST={env_host!r} could not be resolved; falling back to {fallback}"
+
+    legacy_host = (os.environ.get("HOST") or "").strip()
+    if legacy_host and _can_bind_host(legacy_host):
+        return legacy_host, None
+    return _default_bind_host(remote_mode), None
+
+
+def _parse_args(argv=None):
     """Parse launcher CLI arguments."""
     remote_mode = os.environ.get("OV_WEB_REMOTE_MODE", "0") == "1"
 
@@ -121,7 +155,7 @@ def _parse_args():
     parser.add_argument(
         "--host",
         # Remote mode defaults to loopback for safety (require tunnel/proxy)
-        default=os.environ.get("HOST", "127.0.0.1" if remote_mode else "0.0.0.0"),
+        default=None,
         help="Host to bind (default: 127.0.0.1 in remote mode, 0.0.0.0 otherwise).",
     )
     parser.add_argument(
@@ -148,22 +182,24 @@ def _parse_args():
         help="Enable remote mode (bind loopback, require tunnel/proxy).",
     )
     parser.set_defaults(debug=False)
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
-def main():
-    """Main launcher function"""
-    args = _parse_args()
+def main(argv=None):
+    """Run the launcher."""
+    args = _parse_args(argv)
+    resolved_host, host_note = _resolve_bind_host(args.host, args.remote)
+    args.host = resolved_host
 
-    print("🚀 OmicVerse 单细胞分析平台启动器")
+    print("OmicVerse Single Cell Analysis Launcher")
     print("=" * 50)
     
     # Check Python version
     if sys.version_info < (3, 8):
-        print("❌ Python 3.8+ 是必需的")
-        print(f"   当前版本: {sys.version}")
+        print("Python 3.8+ is required")
+        print(f"   Current version: {sys.version}")
         return 1
-    
-    print(f"✅ Python {sys.version.split()[0]}")
+
+    print(f"Python {sys.version.split()[0]}")
     
     # Check dependencies
     if not check_dependencies():
@@ -176,10 +212,13 @@ def main():
     # Resolve port (explicit first, then auto-discovery)
     port = args.port if args.port > 0 else get_available_port()
     if port is None:
-        print("❌ 无法找到可用端口")
+        print("Could not find an available port")
         return 1
 
-    print(f"\n🌐 服务将在端口 {port} 启动")
+    if host_note:
+        print(f"Warning: {host_note}")
+
+    print(f"\nServer will start on port {port}")
 
     # Set environment variables
     os.environ['PORT'] = str(port)
@@ -193,17 +232,17 @@ def main():
             args.host = '127.0.0.1'
 
     # Start the server
-    print("\n🎯 启动服务器...")
+    print("\nStarting server...")
     print("-" * 50)
     if args.remote:
-        print(f"🔒 Remote mode: bound to {args.host}:{port} (loopback only)")
-        print(f"   Access via SSH tunnel:")
+        print(f"Remote mode: bound to {args.host}:{port} (loopback only)")
+        print("   Access via SSH tunnel:")
         print(f"     ssh -L {port}:127.0.0.1:{port} user@server")
         print(f"   Then open: http://localhost:{port}")
     else:
-        print(f"📱 本地访问: http://localhost:{port}")
-        print(f"🌍 网络访问: http://{args.host}:{port}")
-    print("⌨️  按 Ctrl+C 停止服务器")
+        print(f"Local access:  http://localhost:{port}")
+        print(f"Network bind:  http://{args.host}:{port}")
+    print("Press Ctrl+C to stop the server")
     print("-" * 50)
     
     try:
@@ -212,10 +251,10 @@ def main():
         from app import app
         app.run(debug=args.debug, host=args.host, port=port, use_reloader=False)
     except KeyboardInterrupt:
-        print("\n\n👋 服务器已停止")
+        print("\n\nServer stopped")
         return 0
     except Exception as e:
-        print(f"\n❌ 启动失败: {e}")
+        print(f"\nStartup failed: {e}")
         return 1
 
 if __name__ == '__main__':

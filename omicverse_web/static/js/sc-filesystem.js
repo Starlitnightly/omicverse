@@ -4,6 +4,25 @@
 
 Object.assign(SingleCellAnalysis.prototype, {
 
+    destroyActiveEditors() {
+        if (this._cmEditor) {
+            this._cmEditor.toTextArea();
+            this._cmEditor = null;
+        }
+        if (this._mdEditor) {
+            this._mdEditor.toTextArea();
+            this._mdEditor = null;
+        }
+    },
+
+    refreshMarkdownPreview(preview, content) {
+        if (!preview) return;
+        preview.innerHTML = this.renderMarkdown(content || '');
+        if (window.Prism && typeof window.Prism.highlightAllUnder === 'function') {
+            window.Prism.highlightAllUnder(preview);
+        }
+    },
+
     setupFileUpload() {
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
@@ -439,6 +458,32 @@ Object.assign(SingleCellAnalysis.prototype, {
         this.setActiveTab(id);
     },
 
+    openSkillTab(tab) {
+        this.persistActiveTab();
+        const existing = this.openTabs.find(t => t.type === 'skill' && t.path === tab.path);
+        if (existing) {
+            existing.content = tab.content || existing.content || '';
+            existing.name = tab.name || existing.name;
+            existing.referenceContent = tab.referenceContent || existing.referenceContent || '';
+            existing.referencePath = tab.referencePath || existing.referencePath || '';
+            existing.editable = tab.editable !== false;
+            this.setActiveTab(existing.id);
+            return;
+        }
+        const id = `tab-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        this.openTabs.push({
+            id,
+            name: tab.name || 'SKILL.md',
+            path: tab.path,
+            type: 'skill',
+            content: tab.content || '',
+            referenceContent: tab.referenceContent || '',
+            referencePath: tab.referencePath || '',
+            editable: tab.editable !== false,
+        });
+        this.setActiveTab(id);
+    },
+
     openImageTab(tab) {
         this.persistActiveTab();
         const existing = this.openTabs.find(t => t.path === tab.path);
@@ -481,8 +526,17 @@ Object.assign(SingleCellAnalysis.prototype, {
         } else if (tab.type === 'text') {
             this.showTextFile(tab.content || '', tab.name || '');
             this.updateKernelSelectorForTab(null);
+        } else if (tab.type === 'skill') {
+            this.showMarkdownFile(tab.content || '', {
+                filename: tab.name || 'SKILL.md',
+                editable: tab.editable !== false,
+            });
+            this.updateKernelSelectorForTab(null);
         } else if (tab.type === 'markdown') {
-            this.showMarkdownFile(tab.content || '');
+            this.showMarkdownFile(tab.content || '', {
+                filename: tab.name || 'README.md',
+                editable: true,
+            });
             this.updateKernelSelectorForTab(null);
         } else if (tab.type === 'image') {
             this.showImageFile(tab);
@@ -577,23 +631,46 @@ Object.assign(SingleCellAnalysis.prototype, {
         if (imageView)  imageView.style.display   = 'none';
         if (textView)   textView.style.display    = 'block';
 
-        // Destroy any previous CodeMirror instance
-        if (this._cmEditor) {
-            this._cmEditor.toTextArea();
-            this._cmEditor = null;
-        }
+        this.destroyActiveEditors();
 
         // Determine CodeMirror mode from file extension
-        const ext = (filename || '').split('.').pop().toLowerCase();
+        const normalizedName = String(filename || '').trim().toLowerCase();
+        const ext = normalizedName.includes('.') ? normalizedName.split('.').pop() : normalizedName;
         const CM_MODE_MAP = {
             py:   'python',
             js:   'javascript',
             ts:   'javascript',
             json: 'application/json',
             sh:   'shell',
+            bash: 'shell',
+            zsh:  'shell',
+            yaml: 'yaml',
+            yml:  'yaml',
+            toml: 'toml',
+            ini:  'properties',
+            cfg:  'properties',
+            conf: 'properties',
+            env:  'properties',
+            properties: 'properties',
+            html: 'htmlmixed',
+            htm:  'htmlmixed',
+            css:  'css',
+            xml:  'xml',
             r:    'r',
         };
-        const cmMode = CM_MODE_MAP[ext];
+        let cmMode = CM_MODE_MAP[ext];
+        if (!cmMode) {
+            if (normalizedName === 'dockerfile' || normalizedName.endsWith('/dockerfile')) {
+                cmMode = 'shell';
+            } else if (
+                normalizedName.endsWith('.bashrc') ||
+                normalizedName.endsWith('.bash_profile') ||
+                normalizedName.endsWith('.zshrc') ||
+                normalizedName.endsWith('.zprofile')
+            ) {
+                cmMode = 'shell';
+            }
+        }
 
         if (cmMode && window.CodeMirror) {
             // ── CodeMirror highlighted editor ────────────────────────────
@@ -633,7 +710,7 @@ Object.assign(SingleCellAnalysis.prototype, {
         }
     },
 
-    showMarkdownFile(content) {
+    showMarkdownFile(content, options = {}) {
         const container = document.getElementById('code-cells-container');
         const textView = document.getElementById('text-file-view');
         const varView = document.getElementById('var-detail-view');
@@ -646,15 +723,45 @@ Object.assign(SingleCellAnalysis.prototype, {
         if (varView) varView.style.display = 'none';
         if (imageView) imageView.style.display = 'none';
         if (mdView) mdView.style.display = 'flex';
-        if (editor) {
-            editor.value = content;
+        this.destroyActiveEditors();
+        if (!editor) {
+            this.refreshMarkdownPreview(preview, content);
+            return;
+        }
+
+        editor.value = content || '';
+        editor.style.display = '';
+        editor.readOnly = options.editable === false;
+
+        const isDark = document.documentElement.classList.contains('app-skin-dark') ||
+                       document.body.classList.contains('app-skin-dark');
+
+        if (window.CodeMirror) {
+            this._mdEditor = window.CodeMirror.fromTextArea(editor, {
+                mode: 'markdown',
+                theme: isDark ? 'dracula' : 'default',
+                lineNumbers: true,
+                lineWrapping: true,
+                indentUnit: 2,
+                tabSize: 2,
+                indentWithTabs: false,
+                autofocus: true,
+                readOnly: options.editable === false,
+            });
+            this._mdEditor.on('change', (cm) => {
+                this.refreshMarkdownPreview(preview, cm.getValue());
+            });
+            this._mdEditor.setValue(content || '');
+            setTimeout(() => {
+                if (this._mdEditor) this._mdEditor.refresh();
+            }, 50);
+        } else {
             editor.oninput = () => {
-                if (preview) preview.innerHTML = this.renderMarkdown(editor.value);
+                this.refreshMarkdownPreview(preview, editor.value);
             };
         }
-        if (preview) {
-            preview.innerHTML = this.renderMarkdown(content);
-        }
+
+        this.refreshMarkdownPreview(preview, content);
     },
 
     showImageFile(tab) {
@@ -669,6 +776,7 @@ Object.assign(SingleCellAnalysis.prototype, {
         if (varView) varView.style.display = 'none';
         if (mdView) mdView.style.display = 'none';
         if (imageView) imageView.style.display = 'block';
+        this.destroyActiveEditors();
         if (image && tab.content) {
             image.src = `data:${tab.mime};base64,${tab.content}`;
         }
@@ -860,7 +968,7 @@ Object.assign(SingleCellAnalysis.prototype, {
             active.scrollPos = this._getNotebookScrollTop();
             return;
         }
-        if (active.type === 'markdown' || active.type === 'text') {
+        if (active.type === 'markdown' || active.type === 'text' || active.type === 'skill') {
             active.content = this.getTextEditorContent();
             return;
         }

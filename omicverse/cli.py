@@ -7,6 +7,7 @@ Sub-commands
 ------------
 jarvis        Launch the Telegram bot for mobile bioinformatics.
 claw          Generate OmicVerse Python code from a natural-language request.
+web           Launch the OmicVerse web interface.
 skill-seeker  OmicVerse Skill Seeker utilities (list/validate/package skills).
 """
 from __future__ import annotations
@@ -31,6 +32,20 @@ def _run_claw(argv: List[str]) -> int:
     return claw_main(argv)
 
 
+def _run_web(argv: List[str]) -> int:
+    try:
+        from omicverse_web.start_server import main as web_main
+    except ImportError as exc:
+        print(
+            "OmicVerse web interface is unavailable. "
+            "Ensure `omicverse_web` is installed and on PYTHONPATH.",
+            file=sys.stderr,
+        )
+        print(f"Import error: {exc}", file=sys.stderr)
+        return 1
+    return web_main(argv)
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         prog="omicverse",
@@ -49,6 +64,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Generate OmicVerse Python code from a natural-language request.",
         add_help=False,
     ).set_defaults(func=_run_claw)
+
+    subparsers.add_parser(
+        "web",
+        help="Launch the OmicVerse web interface.",
+        add_help=False,
+    ).set_defaults(func=_run_web)
 
     subparsers.add_parser(
         "skill-seeker",

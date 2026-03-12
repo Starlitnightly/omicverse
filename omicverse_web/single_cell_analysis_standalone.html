@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 
 <head>
     <meta charset="utf-8">
@@ -38,11 +38,30 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-r.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markdown.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
     <!-- CodeMirror 5 — editable Python syntax highlighting in file editor -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/theme/dracula.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/addon/mode/overlay.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/mode/shell/shell.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/mode/r/r.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/mode/htmlmixed/htmlmixed.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/mode/properties/properties.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/mode/toml/toml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/mode/yaml/yaml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/mode/markdown/markdown.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.17/mode/gfm/gfm.min.js"></script>
     <!-- xterm.js — embedded terminal emulator -->
     <link rel="stylesheet" href="https://unpkg.com/xterm@5.3.0/css/xterm.css">
     <script src="https://unpkg.com/xterm@5.3.0/lib/xterm.js"></script>
@@ -379,6 +398,9 @@
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-primary" id="view-agent-btn" onclick="singleCellApp.switchView('agent')">
                                 <i class="feather-message-circle me-1"></i>Agent
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="view-skills-btn" onclick="singleCellApp.switchView('skills')">
+                                <i class="feather-grid me-1"></i><span data-i18n="view.skills">Skills</span>
                             </button>
                         </div>
                     </div>
@@ -1498,6 +1520,55 @@
                 </div>
                 <!-- End Agent View -->
 
+                <!-- Skills View -->
+                <div id="skills-view" class="content-view" style="display: none;">
+                    <div class="skills-view-shell">
+                        <div class="skills-hero">
+                            <div>
+                                <div class="skills-kicker">Skill Store</div>
+                                <h2 class="skills-title" data-i18n="skills.title">Skill Store</h2>
+                                <p class="skills-subtitle" data-i18n="skills.subtitle">Browse local skills, import new ones, and open any skill for editing.</p>
+                            </div>
+                            <div class="skills-toolbar-actions">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.refreshSkills()">
+                                    <i class="feather-refresh-cw me-1"></i><span data-i18n="common.refresh">Refresh</span>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="singleCellApp.triggerSkillImport()">
+                                    <i class="feather-download me-1"></i><span data-i18n="skills.import">Import Skill</span>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-primary" onclick="singleCellApp.createSkill()">
+                                    <i class="feather-plus me-1"></i><span data-i18n="skills.create">New Skill</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="skills-toolbar">
+                            <div class="skills-search-wrap">
+                                <i class="feather-search"></i>
+                                <input type="text" id="skills-search-input" class="form-control" placeholder="Search skills by name or description" data-i18n-placeholder="skills.searchPlaceholder" oninput="singleCellApp.filterSkills(this.value)">
+                            </div>
+                            <div class="skills-toolbar-right">
+                                <div class="skills-layout-toggle" role="group" aria-label="Skill layout">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="skills-layout-card-btn" onclick="singleCellApp.setSkillsLayout('card')">
+                                        <i class="feather-grid me-1"></i><span data-i18n="skills.cardView">Cards</span>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="skills-layout-list-btn" onclick="singleCellApp.setSkillsLayout('list')">
+                                        <i class="feather-align-left me-1"></i><span data-i18n="skills.listView">List</span>
+                                    </button>
+                                </div>
+                                <div class="skills-summary" id="skills-store-meta">0 skills</div>
+                            </div>
+                        </div>
+                        <div id="skills-store-grid" class="skills-grid">
+                            <div class="skills-empty-state">
+                                <div class="skills-empty-icon"><i class="feather-grid"></i></div>
+                                <h3 data-i18n="skills.emptyTitle">No skills yet</h3>
+                                <p data-i18n="skills.emptyBody">Create or import a skill to populate the store.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- End Skills View -->
+
                 <!-- Terminal View — fills nxl-container; session list is in nxl-navigation -->
                 <div id="terminal-view" class="content-view term-full-view" style="display:none;">
                     <div id="term-panels"></div>
@@ -1670,6 +1741,8 @@
 
       </div>
     </div><!-- /env-info-modal -->
+
+    <input type="file" id="skill-import-input" accept=".md,.txt" style="display:none;" onchange="singleCellApp.handleSkillImportFile(event)">
 
     <!-- Main application (split into functional modules) -->
     <script src="static/js/sc-core.js"></script>

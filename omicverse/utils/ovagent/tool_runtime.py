@@ -448,37 +448,57 @@ class ToolRuntime:
             return f"ERROR: {e}"
 
     def _tool_search_functions(self, query: str) -> str:
-        query_lower = query.lower()
-        matches = []
-        for entry in _global_registry._registry.values():
-            searchable = (
-                entry.get("short_name", "").lower()
-                + " "
-                + entry.get("full_name", "").lower()
-                + " "
-                + entry.get("description", "").lower()
-                + " "
-                + entry.get("category", "").lower()
-                + " "
-                + " ".join(entry.get("aliases", [])).lower()
-            )
-            if any(word in searchable for word in query_lower.split()):
+        query = (query or "").strip()
+        if not query:
+            return "Please provide a non-empty function search query."
+
+        matches: List[Dict[str, Any]] = []
+        seen_full_names: set[str] = set()
+
+        def _extend(entries: List[Dict[str, Any]]) -> None:
+            for entry in entries or []:
+                full_name = str(
+                    entry.get("full_name")
+                    or entry.get("short_name")
+                    or entry.get("name")
+                    or ""
+                )
+                if not full_name or full_name in seen_full_names:
+                    continue
+                seen_full_names.add(full_name)
                 matches.append(entry)
+
+        try:
+            runtime_matches = list(_global_registry.find(query))
+        except Exception:
+            runtime_matches = []
+        _extend(runtime_matches)
+
+        static_search = getattr(self._ctx, "_collect_static_registry_entries", None)
+        if callable(static_search):
+            try:
+                static_matches = list(static_search(query, max_entries=20))
+            except TypeError:
+                static_matches = list(static_search(query))
+            except Exception:
+                static_matches = []
+            _extend(static_matches)
 
         if not matches:
             return f"No functions found matching '{query}'. Try broader keywords."
 
         results: List[str] = []
-        seen: set[str] = set()
         for m in matches[:20]:
             fname = m.get("full_name", m.get("short_name", ""))
-            if fname in seen:
-                continue
-            seen.add(fname)
             sig = m.get("signature", "")
             desc = m.get("description", "")[:300]
 
             entry_text = f"  {fname}({sig})\n    {desc}"
+
+            branch_parameter = m.get("branch_parameter")
+            branch_value = m.get("branch_value")
+            if branch_parameter and branch_value:
+                entry_text += f"\n    Branch: {branch_parameter}='{branch_value}'"
 
             prereqs = m.get("prerequisites", {})
             req_funcs = prereqs.get("functions", [])
