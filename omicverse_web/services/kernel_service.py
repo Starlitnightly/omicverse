@@ -14,6 +14,7 @@ import time
 import uuid
 import asyncio
 import json
+import builtins
 from contextlib import redirect_stdout, redirect_stderr
 
 import scanpy as sc
@@ -97,6 +98,38 @@ class InProcessKernelExecutor:
         # Expose as 'odata' only — keeps 'adata' free for user-defined variables
         self.shell.user_ns['odata'] = adata
 
+    def _ensure_user_ns_runtime(self, namespace):
+        """Seed a custom namespace with the minimum IPython runtime globals.
+
+        ``InteractiveShell.run_cell()`` expects history/displayhook storage such
+        as ``_oh`` to exist in ``shell.user_ns``. When we temporarily swap in a
+        per-tab namespace, those hidden variables are absent unless we add them.
+        """
+        self._ensure_kernel()
+        if namespace is None:
+            return None
+
+        history = getattr(self.shell, 'history_manager', None)
+        if history is not None:
+            namespace.setdefault('_ih', history.input_hist_parsed)
+            namespace.setdefault('_oh', history.output_hist)
+            namespace.setdefault('_dh', history.dir_hist)
+            namespace.setdefault('In', history.input_hist_parsed)
+            namespace.setdefault('Out', history.output_hist)
+        else:
+            namespace.setdefault('_ih', [])
+            namespace.setdefault('_oh', {})
+            namespace.setdefault('_dh', [])
+            namespace.setdefault('In', namespace['_ih'])
+            namespace.setdefault('Out', namespace['_oh'])
+
+        namespace.setdefault('__builtin__', builtins)
+        namespace.setdefault('get_ipython', self.shell.get_ipython)
+        namespace.setdefault('exit', getattr(self.shell, 'exiter', None))
+        namespace.setdefault('quit', getattr(self.shell, 'exiter', None))
+        namespace.setdefault('open', builtins.open)
+        return namespace
+
     def execute(self, code, adata=None, user_ns=None, timeout=300, stdout=None, stderr=None):
         """Execute code with interrupt support.
 
@@ -177,6 +210,7 @@ class InProcessKernelExecutor:
             try:
                 original_ns = self.shell.user_ns
                 if user_ns is not None:
+                    self._ensure_user_ns_runtime(user_ns)
                     self.shell.user_ns = user_ns
                 if adata is not None:
                     self.shell.user_ns['odata'] = adata
@@ -256,11 +290,24 @@ def build_kernel_namespace(include_adata=False, current_adata=None):
     Returns:
         Dictionary with standard namespace objects
     """
+    input_history = []
+    output_history = {}
+    dir_history = []
     namespace = {
         'sc': sc,
         'pd': pd,
         'np': np,
         'plt': plt,
+        '_ih': input_history,
+        '_oh': output_history,
+        '_dh': dir_history,
+        'In': input_history,
+        'Out': output_history,
+        '__builtin__': builtins,
+        '_': None,
+        '__': None,
+        '___': None,
+        'open': builtins.open,
     }
     if include_adata and current_adata is not None:
         namespace['adata'] = current_adata
