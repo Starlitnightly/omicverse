@@ -457,8 +457,10 @@ class TelegramRuntimePresenter:
                         target="analysis-draft",
                         text=final_html,
                         text_format="html",
+                        controls=("save", "status", "memory"),
                     )
                 )
+                return events
         else:
             events.append(
                 DeliveryEvent(
@@ -679,7 +681,9 @@ class TelegramDelivery:
                 reply_markup=reply_markup,
             )
             return True
-        except Exception:
+        except Exception as exc:
+            if self._is_not_modified_error(exc):
+                return True
             pass
         try:
             await self._bot.edit_message_text(
@@ -689,7 +693,9 @@ class TelegramDelivery:
                 reply_markup=reply_markup,
             )
             return True
-        except Exception:
+        except Exception as exc:
+            if self._is_not_modified_error(exc):
+                return True
             return False
 
     async def _send_photo_or_file(
@@ -745,6 +751,10 @@ class TelegramDelivery:
     @staticmethod
     def _strip_html(text: str) -> str:
         return re.sub(r"<[^>]+>", "", text or "")
+
+    @staticmethod
+    def _is_not_modified_error(exc: Exception) -> bool:
+        return "message is not modified" in str(exc).strip().lower()
 
 
 # ---------------------------------------------------------------------------
