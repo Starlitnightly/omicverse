@@ -990,7 +990,7 @@ def plot_embedding_celltype(adata:anndata.AnnData,figsize:tuple=(6,4),basis:str=
     examples=[
         "# Basic cluster labeling",
         "fig, ax = plt.subplots()",
-        "ov.utils.embedding(adata, basis='X_umap', color='leiden', ax=ax)",
+        "ov.pl.embedding(adata, basis='X_umap', color='leiden', ax=ax)",
         "ov.utils.gen_mpl_labels(adata, groupby='leiden', ax=ax)",
         "# Custom basis and text styling",
         "ov.utils.gen_mpl_labels(adata, groupby='celltype', basis='X_tsne',",
@@ -1226,7 +1226,7 @@ def stacking_vol(data_dict:dict,color_dict:dict,
     examples=[
         "# Basic convex hull for a cluster",
         "fig, ax = plt.subplots()",
-        "ov.utils.embedding(adata, basis='X_umap', color='leiden', ax=ax)",
+        "ov.pl.embedding(adata, basis='X_umap', color='leiden', ax=ax)",
         "ov.utils.plot_ConvexHull(adata, basis='X_umap', cluster_key='leiden',",
         "                         hull_cluster='0', ax=ax)",
         "# Custom color and transparency",
@@ -1262,7 +1262,7 @@ def plot_ConvexHull(adata:anndata.AnnData,basis:str,cluster_key:str,
         >>> import matplotlib.pyplot as plt
         >>> # Create embedding plot with convex hull
         >>> fig, ax = plt.subplots()
-        >>> ov.utils.embedding(adata, basis='X_umap', color='leiden', ax=ax)
+        >>> ov.pl.embedding(adata, basis='X_umap', color='leiden', ax=ax)
         >>> ov.utils.plot_ConvexHull(adata, basis='X_umap', cluster_key='leiden',
         ...                          hull_cluster='0', ax=ax)
     """

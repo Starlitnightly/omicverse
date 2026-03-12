@@ -23,12 +23,19 @@ import time
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from .. import _fmt
 from ..config import default_state_dir
-from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from ..model_help import render_model_help
+from ..runtime import (
+    AgentBridgeExecutionAdapter,
+    ConversationRoute,
+    DeliveryEvent,
+    MessageEnvelope,
+    MessageRuntime,
+    MessageRouter,
+)
 
 logger = logging.getLogger("omicverse.jarvis")
 
@@ -65,6 +72,679 @@ class AccessControl:
         if username and username.lower() in self._usernames:
             return True
         return False
+
+
+def telegram_route_from_update(update: Any) -> ConversationRoute:
+    chat = getattr(update, "effective_chat", None)
+    msg = getattr(update, "effective_message", None)
+    user = getattr(update, "effective_user", None)
+    scope_type = "dm" if (chat and chat.type == "private") else "group"
+    scope_id = str(chat.id if chat else getattr(user, "id", ""))
+    thread_id = getattr(msg, "message_thread_id", None) if msg is not None else None
+    return ConversationRoute(
+        channel="telegram",
+        scope_type=scope_type,
+        scope_id=scope_id,
+        thread_id=(str(thread_id) if thread_id else None),
+        sender_id=(str(user.id) if user else None),
+    )
+
+
+def _normalize_bot_username(username: Optional[str]) -> str:
+    return (username or "").lstrip("@").strip().lower()
+
+
+def _message_mentions_bot(message: Any, bot_username: Optional[str]) -> bool:
+    name = _normalize_bot_username(bot_username)
+    text = (getattr(message, "text", None) or "").strip()
+    if not name or not text:
+        return False
+
+    mention_token = f"@{name}"
+    if mention_token in text.lower():
+        return True
+
+    entities = list(getattr(message, "entities", None) or [])
+    for entity in entities:
+        entity_type = str(getattr(entity, "type", "")).lower()
+        if "mention" not in entity_type:
+            continue
+        offset = int(getattr(entity, "offset", 0) or 0)
+        length = int(getattr(entity, "length", 0) or 0)
+        token = text[offset : offset + length].strip().lower()
+        if token == mention_token:
+            return True
+    return False
+
+
+def _message_replies_to_bot(message: Any, bot_username: Optional[str]) -> bool:
+    reply = getattr(message, "reply_to_message", None)
+    if reply is None:
+        return False
+    from_user = getattr(reply, "from_user", None)
+    if from_user is None:
+        return False
+    if getattr(from_user, "is_bot", False):
+        name = _normalize_bot_username(bot_username)
+        reply_name = _normalize_bot_username(getattr(from_user, "username", None))
+        return not name or name == reply_name
+    return False
+
+
+def telegram_trigger_for_update(update: Any, bot_username: Optional[str]) -> Optional[str]:
+    route = telegram_route_from_update(update)
+    if route.is_direct:
+        return "direct"
+
+    message = getattr(update, "effective_message", None)
+    text = (getattr(message, "text", None) or "").strip()
+    if not text:
+        return None
+    if _message_mentions_bot(message, bot_username):
+        return "mention"
+    if _message_replies_to_bot(message, bot_username):
+        return "reply"
+    return None
+
+
+def _strip_leading_bot_mention(text: str, bot_username: Optional[str]) -> str:
+    name = _normalize_bot_username(bot_username)
+    if not name:
+        return text.strip()
+    pattern = rf"^\s*@{re.escape(name)}[\s,:-]*"
+    return re.sub(pattern, "", text.strip(), count=1, flags=re.IGNORECASE)
+
+
+def telegram_runtime_envelope(update: Any, bot_username: Optional[str]) -> Optional[MessageEnvelope]:
+    message = getattr(update, "effective_message", None)
+    user = getattr(update, "effective_user", None)
+    text = (getattr(message, "text", None) or "").strip()
+    if not text or user is None:
+        return None
+
+    route = telegram_route_from_update(update)
+    trigger = telegram_trigger_for_update(update, bot_username) or "implicit"
+    normalized = _strip_leading_bot_mention(text, bot_username) if trigger == "mention" else text
+    normalized = normalized.strip()
+    if not normalized:
+        return None
+
+    return MessageEnvelope(
+        route=route,
+        text=normalized,
+        sender_id=str(user.id),
+        sender_username=getattr(user, "username", None),
+        message_id=str(getattr(message, "message_id", "")) or None,
+        trigger=trigger,
+        explicit_trigger=(trigger != "implicit"),
+    )
+
+
+class TelegramRuntimePresenter:
+    _BORING = {"分析完成", "分析完成。", "task completed", "done", "完成"}
+    _ARTIFACT_EXTS = r"pdf|csv|tsv|txt|xlsx|html|json|h5ad|png|jpg|svg"
+    _DRAFT_MAX = 2800
+
+    def ack(self, envelope: MessageEnvelope, session: Any) -> List[DeliveryEvent]:
+        if session.adata is not None:
+            a = session.adata
+            text = _fmt.ack_message(
+                envelope.text,
+                adata_info=f"{a.n_obs:,} cells × {a.n_vars:,} genes",
+            )
+        else:
+            h5ad_files = session.list_h5ad_files()
+            if h5ad_files:
+                names = "\n".join(
+                    f"  • <code>{_fmt.esc(f.name)}</code>" for f in h5ad_files[:5]
+                )
+                hint = (
+                    f"💡  workspace 中检测到 {len(h5ad_files)} 个文件：\n"
+                    f"{names}\n使用 <code>/load &lt;文件名&gt;</code> 加载"
+                )
+            else:
+                hint = "💡  未检测到已加载数据，Agent 将自行加载数据"
+            text = _fmt.ack_message(envelope.text, workspace_hint=hint)
+        return [
+            DeliveryEvent(
+                route=envelope.route,
+                kind="text",
+                text=text,
+                text_format="html",
+            )
+        ]
+
+    def queue_started(self, route: ConversationRoute, queued_count: int) -> List[DeliveryEvent]:
+        return [
+            DeliveryEvent(
+                route=route,
+                kind="text",
+                text=f"⏭  开始执行队列中的 {queued_count} 条请求…",
+                text_format="html",
+            )
+        ]
+
+    def draft_open(self, route: ConversationRoute) -> DeliveryEvent:
+        return DeliveryEvent(
+            route=route,
+            kind="text",
+            mode="open",
+            target="analysis-draft",
+            text="💭  <b>思考中…</b>",
+            text_format="html",
+        )
+
+    def draft_update(self, route: ConversationRoute, llm_text: str, progress: str) -> DeliveryEvent:
+        body = _fmt.md_to_html(self._trim_for_draft(llm_text)) if llm_text.strip() else "<i>思考中…</i>"
+        if progress:
+            text = f"🔄  <code>{_fmt.esc(progress[:180])}</code>\n\n💭  {body}"
+        else:
+            text = f"💭  {body}"
+        return DeliveryEvent(
+            route=route,
+            kind="text",
+            mode="edit",
+            target="analysis-draft",
+            text=text,
+            text_format="html",
+        )
+
+    def draft_cancelled(self, route: ConversationRoute) -> DeliveryEvent:
+        return DeliveryEvent(
+            route=route,
+            kind="text",
+            mode="edit",
+            target="analysis-draft",
+            text="🚫  分析已取消。",
+            text_format="html",
+        )
+
+    def analysis_error(self, route: ConversationRoute, error_text: str) -> DeliveryEvent:
+        return DeliveryEvent(
+            route=route,
+            kind="text",
+            mode="edit",
+            target="analysis-draft",
+            text=_fmt.error_message(error_text),
+            text_format="html",
+        )
+
+    def typing(self, route: ConversationRoute) -> Optional[DeliveryEvent]:
+        return DeliveryEvent(route=route, kind="typing")
+
+    def quick_chat_reply(self, route: ConversationRoute, text: str) -> DeliveryEvent:
+        return DeliveryEvent(
+            route=route,
+            kind="text",
+            text=_fmt.md_to_html(text),
+            text_format="html",
+        )
+
+    def quick_chat_fallback(self, route: ConversationRoute) -> DeliveryEvent:
+        return DeliveryEvent(
+            route=route,
+            kind="text",
+            text="⏳  后台分析进行中，请等待完成。使用 <code>/cancel</code> 取消。",
+            text_format="html",
+        )
+
+    def analysis_status(
+        self,
+        route: ConversationRoute,
+        *,
+        has_media: bool,
+        has_reports: bool,
+        has_artifacts: bool,
+    ) -> Optional[DeliveryEvent]:
+        if has_media:
+            status = "✅  正在发送图片…"
+        elif has_reports:
+            status = "✅  正在发送报告…"
+        elif has_artifacts:
+            status = "✅  结果如下"
+        else:
+            return None
+        return DeliveryEvent(
+            route=route,
+            kind="text",
+            mode="edit",
+            target="analysis-draft",
+            text=status,
+            text_format="html",
+        )
+
+    def final_events(
+        self,
+        route: ConversationRoute,
+        *,
+        session: Any,
+        user_text: str,
+        llm_text: str,
+        result: Any,
+    ) -> List[DeliveryEvent]:
+        del user_text
+        events: List[DeliveryEvent] = []
+
+        a_cur = result.adata or session.adata
+        a_info = f"{a_cur.n_obs:,} cells × {a_cur.n_vars:,} genes" if a_cur else ""
+
+        summary = self._strip_local_paths((result.summary or "").strip())
+        has_summary = bool(summary and summary.lower() not in self._BORING)
+        long_summary = has_summary and len(summary) > 1200
+        final_text = _fmt.md_to_html(summary) if has_summary and not long_summary else ""
+        if (not final_text) and a_info:
+            final_text = f"📊  <code>{_fmt.esc(a_info)}</code>"
+        if not final_text:
+            final_text = _fmt._DIV
+
+        has_media = bool(result.figures)
+        has_reports = bool(result.reports)
+        artifacts = list(getattr(result, "artifacts", []) or [])
+        has_artifacts = bool(artifacts)
+        is_complex = has_media or has_reports or has_artifacts or long_summary
+
+        if is_complex:
+            explain = summary if has_summary else self._strip_local_paths(llm_text.strip())
+            for i, rep in enumerate(result.reports or [], start=1):
+                header = "📝  <b>分析报告</b>" if i == 1 else f"📝  <b>分析报告（续 {i}）</b>"
+                events.append(
+                    DeliveryEvent(
+                        route=route,
+                        kind="prose",
+                        text=rep,
+                        metadata={"header": header, "always_expand": False},
+                    )
+                )
+            n_figs = len(result.figures or [])
+            for i, png_bytes in enumerate(result.figures or [], start=1):
+                events.append(
+                    DeliveryEvent(
+                        route=route,
+                        kind="photo",
+                        binary=png_bytes,
+                        caption=_fmt.figure_caption(i, n_figs),
+                    )
+                )
+            for art in artifacts:
+                events.append(
+                    DeliveryEvent(
+                        route=route,
+                        kind="document",
+                        binary=art.data,
+                        filename=art.filename,
+                        caption=f"📎  {art.filename}",
+                    )
+                )
+
+            if explain:
+                if len(explain) > 1200:
+                    events.append(
+                        DeliveryEvent(
+                            route=route,
+                            kind="prose",
+                            text=explain,
+                            metadata={"always_expand": False},
+                        )
+                    )
+                    events.append(
+                        DeliveryEvent(
+                            route=route,
+                            kind="text",
+                            text=_fmt._DIV,
+                            text_format="html",
+                            controls=("save", "status", "memory"),
+                        )
+                    )
+                else:
+                    events.append(
+                        DeliveryEvent(
+                            route=route,
+                            kind="text",
+                            text=_fmt.md_to_html(explain),
+                            text_format="html",
+                            controls=("save", "status", "memory"),
+                        )
+                    )
+            else:
+                events.append(
+                    DeliveryEvent(
+                        route=route,
+                        kind="text",
+                        text=final_text,
+                        text_format="html",
+                        controls=("save", "status", "memory"),
+                    )
+                )
+            events.append(
+                DeliveryEvent(
+                    route=route,
+                    kind="text",
+                    mode="edit",
+                    target="analysis-draft",
+                    text="✅  分析完成",
+                    text_format="html",
+                )
+            )
+            return events
+
+        if llm_text.strip():
+            final_html = _fmt.md_to_html(llm_text.strip())
+            if len(final_html) > 3200 or "<pre>" in final_html:
+                events.append(
+                    DeliveryEvent(
+                        route=route,
+                        kind="text",
+                        mode="edit",
+                        target="analysis-draft",
+                        text="✅  分析完成，正文如下。",
+                        text_format="html",
+                    )
+                )
+                events.append(
+                    DeliveryEvent(
+                        route=route,
+                        kind="prose",
+                        text=llm_text.strip(),
+                        metadata={"always_expand": False},
+                    )
+                )
+            else:
+                events.append(
+                    DeliveryEvent(
+                        route=route,
+                        kind="text",
+                        mode="edit",
+                        target="analysis-draft",
+                        text=final_html,
+                        text_format="html",
+                    )
+                )
+        else:
+            events.append(
+                DeliveryEvent(
+                    route=route,
+                    kind="text",
+                    mode="edit",
+                    target="analysis-draft",
+                    text="✅  分析完成",
+                    text_format="html",
+                )
+            )
+
+        events.append(
+            DeliveryEvent(
+                route=route,
+                kind="text",
+                text=final_text,
+                text_format="html",
+                controls=("save", "status", "memory"),
+            )
+        )
+        return events
+
+    @classmethod
+    def _trim_for_draft(cls, text: str, max_len: int = _DRAFT_MAX) -> str:
+        if len(text) <= max_len:
+            return text
+        head = int(max_len * 0.55)
+        tail = max_len - head - 40
+        if tail < 200:
+            tail = 200
+        return (
+            text[:head].rstrip()
+            + "\n\n[...内容较长，已省略中间部分...]\n\n"
+            + text[-tail:].lstrip()
+        )
+
+    @classmethod
+    def _strip_local_paths(cls, text: str) -> str:
+        t = text or ""
+        t = re.sub(r'`[^`\n]*(?:/[^`\n]*){2,}`', '', t)
+        t = re.sub(r'/(?:Users|home|tmp|var|opt|root|data|mnt|private)/\S+', '', t)
+        t = re.sub(r'~[/\\]\S+', '', t)
+        t = re.sub(
+            rf'\.?/?(?:\w[\w/-]*/)+\w[\w.-]*\.(?:{cls._ARTIFACT_EXTS})',
+            '',
+            t,
+            flags=re.IGNORECASE,
+        )
+        t = re.sub(r'[ \t]{2,}', ' ', t)
+        t = re.sub(r'\n{3,}', '\n\n', t)
+        return t.strip()
+
+
+class TelegramDelivery:
+    def __init__(
+        self,
+        *,
+        bot: Any,
+        chat_lock_factory: Callable[[int], asyncio.Lock],
+        keyboard_factory: Callable[[Tuple[str, ...]], Any],
+    ) -> None:
+        self._bot = bot
+        self._chat_lock_factory = chat_lock_factory
+        self._keyboard_factory = keyboard_factory
+        self._targets: Dict[str, int] = {}
+
+    async def deliver(self, event: DeliveryEvent) -> None:
+        chat_id = int(event.route.scope_id)
+        thread_id = int(event.route.thread_id) if event.route.thread_id else None
+        if event.kind == "typing":
+            try:
+                kwargs = {"chat_id": chat_id, "action": "typing"}
+                if thread_id is not None:
+                    kwargs["message_thread_id"] = thread_id
+                await self._bot.send_chat_action(**kwargs)
+            except Exception:
+                pass
+            return
+
+        if event.kind == "prose":
+            async with self._chat_lock_factory(chat_id):
+                await _fmt.send_prose(
+                    self._bot,
+                    chat_id,
+                    event.text,
+                    header=str(event.metadata.get("header") or ""),
+                    always_expand=bool(event.metadata.get("always_expand")),
+                    message_thread_id=thread_id,
+                )
+            return
+
+        if event.kind == "photo":
+            async with self._chat_lock_factory(chat_id):
+                await self._send_photo_or_file(
+                    chat_id,
+                    event.binary or b"",
+                    event.caption,
+                    thread_id=thread_id,
+                )
+            return
+
+        if event.kind == "document":
+            async with self._chat_lock_factory(chat_id):
+                await self._send_document(
+                    chat_id,
+                    filename=event.filename or "artifact.bin",
+                    data=event.binary or b"",
+                    caption=event.caption,
+                    thread_id=thread_id,
+                )
+            return
+
+        if event.kind != "text":
+            return
+
+        reply_markup = self._keyboard_factory(event.controls) if event.controls else None
+        parse_mode = "HTML" if event.text_format == "html" else None
+        async with self._chat_lock_factory(chat_id):
+            if event.mode == "open":
+                msg_id = await self._send_text(
+                    chat_id,
+                    event.text,
+                    parse_mode=parse_mode,
+                    reply_markup=reply_markup,
+                    thread_id=thread_id,
+                )
+                if msg_id is not None and event.target:
+                    self._targets[self._target_key(event)] = msg_id
+                return
+
+            if event.mode == "edit":
+                target_id = self._targets.get(self._target_key(event))
+                if target_id is not None:
+                    ok = await self._edit_text(
+                        chat_id,
+                        target_id,
+                        event.text,
+                        parse_mode=parse_mode,
+                        reply_markup=reply_markup,
+                    )
+                    if ok:
+                        return
+                msg_id = await self._send_text(
+                    chat_id,
+                    event.text,
+                    parse_mode=parse_mode,
+                    reply_markup=reply_markup,
+                    thread_id=thread_id,
+                )
+                if msg_id is not None and event.target:
+                    self._targets[self._target_key(event)] = msg_id
+                return
+
+            await self._send_text(
+                chat_id,
+                event.text,
+                parse_mode=parse_mode,
+                reply_markup=reply_markup,
+                thread_id=thread_id,
+            )
+
+    @staticmethod
+    def _target_key(event: DeliveryEvent) -> str:
+        return f"{event.route.route_key()}::{event.target or ''}"
+
+    async def _send_text(
+        self,
+        chat_id: int,
+        text: str,
+        *,
+        parse_mode: Optional[str] = "HTML",
+        reply_markup: Any = None,
+        thread_id: Optional[int] = None,
+    ) -> Optional[int]:
+        try:
+            kwargs = {
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": parse_mode,
+                "reply_markup": reply_markup,
+            }
+            if thread_id is not None:
+                kwargs["message_thread_id"] = thread_id
+            message = await self._bot.send_message(**kwargs)
+            return getattr(message, "message_id", None)
+        except Exception:
+            pass
+        try:
+            kwargs = {
+                "chat_id": chat_id,
+                "text": self._strip_html(text),
+                "reply_markup": reply_markup,
+            }
+            if thread_id is not None:
+                kwargs["message_thread_id"] = thread_id
+            message = await self._bot.send_message(**kwargs)
+            return getattr(message, "message_id", None)
+        except Exception as exc:
+            logger.warning("Failed to send message: %s", exc)
+            return None
+
+    async def _edit_text(
+        self,
+        chat_id: int,
+        message_id: int,
+        text: str,
+        *,
+        parse_mode: Optional[str] = "HTML",
+        reply_markup: Any = None,
+    ) -> bool:
+        try:
+            await self._bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                parse_mode=parse_mode,
+                reply_markup=reply_markup,
+            )
+            return True
+        except Exception:
+            pass
+        try:
+            await self._bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=self._strip_html(text),
+                reply_markup=reply_markup,
+            )
+            return True
+        except Exception:
+            return False
+
+    async def _send_photo_or_file(
+        self,
+        chat_id: int,
+        png_bytes: bytes,
+        caption: str,
+        *,
+        thread_id: Optional[int] = None,
+    ) -> None:
+        try:
+            kwargs = {
+                "chat_id": chat_id,
+                "photo": BytesIO(png_bytes),
+                "caption": caption,
+            }
+            if thread_id is not None:
+                kwargs["message_thread_id"] = thread_id
+            await self._bot.send_photo(**kwargs)
+            return
+        except Exception:
+            pass
+        await self._send_document(
+            chat_id,
+            filename="figure.png",
+            data=png_bytes,
+            caption=caption,
+            thread_id=thread_id,
+        )
+
+    async def _send_document(
+        self,
+        chat_id: int,
+        *,
+        filename: str,
+        data: bytes,
+        caption: str,
+        thread_id: Optional[int] = None,
+    ) -> None:
+        try:
+            kwargs = {
+                "chat_id": chat_id,
+                "document": BytesIO(data),
+                "filename": filename,
+                "caption": caption,
+            }
+            if thread_id is not None:
+                kwargs["message_thread_id"] = thread_id
+            await self._bot.send_document(**kwargs)
+        except Exception as exc:
+            logger.warning("Failed to send artifact %s: %s", filename, exc)
+
+    @staticmethod
+    def _strip_html(text: str) -> str:
+        return re.sub(r"<[^>]+>", "", text or "")
 
 
 # ---------------------------------------------------------------------------
@@ -300,15 +980,8 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         filters,
     )
 
-    # Per-user background analysis tasks
-    _tasks: Dict[int, asyncio.Task] = {}
-    # Human-readable description of each user's running analysis (for concurrent chat)
-    _task_requests: Dict[int, str] = {}
-    # OpenClaw Collect mode: messages queued while analysis runs, coalesced after
-    _pending: Dict[int, List[str]] = {}
     # Per-chat outbound lock (OpenClaw-style channel sequencing)
     _chat_locks: Dict[int, asyncio.Lock] = {}
-    _route_registry = GatewaySessionRegistry(sm)
 
     # ------------------------------------------------------------------
     # Guard / session helpers
@@ -323,22 +996,9 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
             return False
         return True
 
-    async def _get_session(update: Update):
+    async def _get_session(update: Update, route: Optional[ConversationRoute] = None):
         try:
-            chat = update.effective_chat
-            msg = update.effective_message
-            scope_type = "dm" if (chat and chat.type == "private") else "group"
-            scope_id = str(chat.id if chat else update.effective_user.id)
-            thread_id = None
-            if msg is not None:
-                thread_id = getattr(msg, "message_thread_id", None)
-            sk = SessionKey(
-                channel="telegram",
-                scope_type=scope_type,
-                scope_id=scope_id,
-                thread_id=(str(thread_id) if thread_id else None),
-            )
-            return _route_registry.get_or_create(sk)
+            return runtime.get_session(route or telegram_route_from_update(update))
         except Exception as exc:
             logger.exception("Failed to create session")
             await update.message.reply_text(
@@ -351,19 +1011,6 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
                 parse_mode="HTML",
             )
             return None
-
-    async def _cancel_user_task(user_id: int) -> bool:
-        """Cancel running analysis task and flush pending queue. Returns True if a task existed."""
-        _pending.pop(user_id, None)
-        task = _tasks.get(user_id)
-        if task and not task.done():
-            task.cancel()
-            try:
-                await asyncio.wait_for(asyncio.shield(task), timeout=5.0)
-            except Exception:
-                pass
-            return True
-        return False
 
     def _analysis_keyboard() -> InlineKeyboardMarkup:
         return InlineKeyboardMarkup([[
@@ -379,205 +1026,22 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
             _chat_locks[chat_id] = lock
         return lock
 
-    async def _quick_chat(
-        session: Any,
-        user_text: str,
-        chat_id: int,
-        bot: Any,
-        running_request: str = "",
-        queued: bool = False,
-    ) -> None:
-        """OpenClaw-style concurrent chat: typing indicator + fast LLM reply while analysis runs.
+    def _keyboard_for_controls(controls: Tuple[str, ...]) -> Any:
+        if set(controls) == {"save", "status", "memory"}:
+            return _analysis_keyboard()
+        return None
 
-        queued=True hints the system prompt that this message has also been enqueued so the
-        LLM can mention it to the user naturally.
-        """
-        # Typing indicator — instant UX feedback (OpenClaw pattern)
-        try:
-            await bot.send_chat_action(chat_id=chat_id, action="typing")
-        except Exception:
-            pass
-
-        try:
-            system_lines = [
-                "You are OmicVerse Jarvis, a bioinformatics AI assistant.",
-                "The user is chatting with you while a background analysis is running in the background.",
-                "Answer concisely and helpfully. Do NOT execute code or call tools.",
-                "Reply in the same language the user uses.",
-            ]
-            if running_request:
-                system_lines.append(f"\nCurrently running analysis: {running_request[:300]}")
-            if queued:
-                system_lines.append(
-                    "If the user's message looks like a new analysis request, "
-                    "inform them it has been queued and will start automatically after the current analysis finishes."
-                )
-            if session.adata is not None:
-                a = session.adata
-                system_lines.append(f"Loaded data: {a.n_obs:,} cells × {a.n_vars:,} genes")
-            memory_ctx = session.get_memory_context()
-            if memory_ctx:
-                system_lines.append(f"\nRecent analysis history:\n{memory_ctx[:600]}")
-
-            messages = [
-                {"role": "system", "content": "\n".join(system_lines)},
-                {"role": "user",   "content": user_text},
-            ]
-            response = await session.agent._llm.chat(messages, tools=None, tool_choice=None)
-            reply = (response.content or "").strip() or "💬  分析进行中，稍后再试。"
-            async with _chat_lock(chat_id):
-                await _safe_send_message(
-                    bot, chat_id, _fmt.md_to_html(reply), parse_mode="HTML"
-                )
-        except Exception as exc:
-            logger.warning("Quick chat failed: %s", exc)
-            try:
-                async with _chat_lock(chat_id):
-                    await _safe_send_message(
-                        bot, chat_id,
-                        "⏳  后台分析进行中，请等待完成。使用 <code>/cancel</code> 取消。",
-                        parse_mode="HTML",
-                    )
-            except Exception:
-                pass
-
-    async def _send_photo_or_file(bot: Any, chat_id: int, png_bytes: bytes, caption: str) -> None:
-        try:
-            await bot.send_photo(chat_id=chat_id, photo=BytesIO(png_bytes), caption=caption)
-            return
-        except Exception:
-            pass
-        # Fallback: send as document if Telegram photo pipeline rejects bytes.
-        try:
-            await bot.send_document(
-                chat_id=chat_id,
-                document=BytesIO(png_bytes),
-                filename="figure.png",
-                caption=caption,
-            )
-        except Exception as exc:
-            logger.warning("Failed to send figure as photo/document: %s", exc)
-
-    async def _send_artifact_document(
-        bot: Any,
-        chat_id: int,
-        filename: str,
-        data: bytes,
-    ) -> None:
-        try:
-            await bot.send_document(
-                chat_id=chat_id,
-                document=BytesIO(data),
-                filename=filename,
-                caption=f"📎  {filename}",
-            )
-        except Exception as exc:
-            logger.warning("Failed to send artifact %s: %s", filename, exc)
-
-    def _strip_html(text: str) -> str:
-        return re.sub(r"<[^>]+>", "", text or "")
-
-    # File extensions harvested as artifacts (must stay in sync with agent_bridge.py).
-    _ARTIFACT_EXTS = r"pdf|csv|tsv|txt|xlsx|html|json|h5ad|png|jpg|svg"
-
-    def _strip_local_paths(text: str) -> str:
-        """Remove local filesystem path references so Telegram doesn't show dead links.
-
-        Files are always delivered as sendDocument instead of clickable local links.
-        """
-        t = text or ""
-        # Backtick-wrapped paths with ≥2 directory levels
-        t = re.sub(r'`[^`\n]*(?:/[^`\n]*){2,}`', '', t)
-        # Absolute Unix paths starting with common root prefixes
-        t = re.sub(r'/(?:Users|home|tmp|var|opt|root|data|mnt|private)/\S+', '', t)
-        # ~/paths
-        t = re.sub(r'~[/\\]\S+', '', t)
-        # Relative paths ending with a known artifact extension:
-        #   ./output/report.html  or  output/report.html  (with/without leading ./)
-        _ext = _ARTIFACT_EXTS
-        t = re.sub(
-            rf'\.?/?(?:\w[\w/-]*/)+\w[\w.-]*\.(?:{_ext})',
-            '', t, flags=re.IGNORECASE,
-        )
-        # Collapse whitespace artifacts left by removals
-        t = re.sub(r'[ \t]{2,}', ' ', t)
-        t = re.sub(r'\n{3,}', '\n\n', t)
-        return t.strip()
-
-    async def _safe_send_message(
-        bot: Any,
-        chat_id: int,
-        text: str,
-        *,
-        parse_mode: Optional[str] = "HTML",
-        reply_markup: Any = None,
-    ) -> None:
-        try:
-            await bot.send_message(
-                chat_id=chat_id,
-                text=text,
-                parse_mode=parse_mode,
-                reply_markup=reply_markup,
-            )
-            return
-        except Exception:
-            pass
-        try:
-            await bot.send_message(
-                chat_id=chat_id,
-                text=_strip_html(text),
-                reply_markup=reply_markup,
-            )
-        except Exception as exc:
-            logger.warning("Failed to send message: %s", exc)
-
-    async def _safe_edit_message(
-        bot: Any,
-        chat_id: int,
-        message_id: int,
-        text: str,
-        *,
-        parse_mode: Optional[str] = "HTML",
-        reply_markup: Any = None,
-    ) -> bool:
-        try:
-            await bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=message_id,
-                text=text,
-                parse_mode=parse_mode,
-                reply_markup=reply_markup,
-            )
-            return True
-        except Exception:
-            pass
-        try:
-            await bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=message_id,
-                text=_strip_html(text),
-                reply_markup=reply_markup,
-            )
-            return True
-        except Exception:
-            return False
-
-    async def _send_prose_locked(
-        bot: Any,
-        chat_id: int,
-        raw_text: str,
-        *,
-        header: str = "",
-        always_expand: bool = False,
-    ) -> None:
-        async with _chat_lock(chat_id):
-            await _fmt.send_prose(
-                bot,
-                chat_id,
-                raw_text,
-                header=header,
-                always_expand=always_expand,
-            )
+    delivery = TelegramDelivery(
+        bot=app.bot,
+        chat_lock_factory=_chat_lock,
+        keyboard_factory=_keyboard_for_controls,
+    )
+    runtime = MessageRuntime(
+        router=MessageRouter(sm),
+        presenter=TelegramRuntimePresenter(),
+        execution_adapter=AgentBridgeExecutionAdapter(),
+        deliver=delivery.deliver,
+    )
 
     # ------------------------------------------------------------------
     # /start
@@ -665,7 +1129,8 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         if not await _guard(update):
             return
         user    = update.effective_user
-        session = await _get_session(update)
+        route = telegram_route_from_update(update)
+        session = await _get_session(update, route)
         if session is None:
             return
 
@@ -685,8 +1150,7 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
             lines.append("📭  暂无数据  ·  使用 <code>/load</code> 加载")
 
         # Task status
-        task = _tasks.get(user.id)
-        if task and not task.done():
+        if runtime.task_state(route).running:
             lines.append("⚙️  分析中…  ·  <code>/cancel</code> 取消")
 
         try:
@@ -709,9 +1173,9 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
     async def handle_reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not await _guard(update):
             return
-        user_id = update.effective_user.id
-        await _cancel_user_task(user_id)
-        session = await _get_session(update)
+        route = telegram_route_from_update(update)
+        await runtime.cancel(route)
+        session = await _get_session(update, route)
         if session is None:
             return
         session.reset()
@@ -728,8 +1192,7 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
     async def handle_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not await _guard(update):
             return
-        user_id = update.effective_user.id
-        cancelled = await _cancel_user_task(user_id)
+        cancelled = await runtime.cancel(telegram_route_from_update(update))
         if cancelled:
             await update.message.reply_text("🚫  分析已取消。")
         else:
@@ -838,7 +1301,8 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
 
         # /kernel  -> status of active kernel
         if not args:
-            session = await _get_session(update)
+            route = telegram_route_from_update(update)
+            session = await _get_session(update, route)
             if session is None:
                 return
             st    = session.kernel_status()
@@ -867,8 +1331,7 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
                     "⚠️  即将到达上限，下次分析后 kernel 将重启（变量清空）。",
                     "   可用 <code>/reset</code> 手动重启，或启动时增大 <code>--max-prompts</code>。",
                 ]
-            task = _tasks.get(user_id)
-            if task and not task.done():
+            if runtime.task_state(route).running:
                 lines += ["", "⚙️  当前有分析正在运行  ·  <code>/cancel</code> 取消"]
             await update.message.reply_text("\n".join(lines), parse_mode="HTML")
             return
@@ -893,8 +1356,7 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
             return
 
         if sub in {"new", "create", "use", "switch"}:
-            task = _tasks.get(user_id)
-            if task and not task.done():
+            if runtime.task_state(telegram_route_from_update(update)).running:
                 await update.message.reply_text(
                     "⏳  当前有分析正在运行，请先等待完成或使用 <code>/cancel</code>。",
                     parse_mode="HTML",
@@ -1098,13 +1560,15 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         if session is None:
             return
         text = session.get_recent_memory_text()
-        await _send_prose_locked(
-            context.bot,
-            update.effective_chat.id,
-            text,
-            header="🧠  <b>分析历史</b>（近两天）",
-            always_expand=True,
-        )
+        async with _chat_lock(update.effective_chat.id):
+            await _fmt.send_prose(
+                context.bot,
+                update.effective_chat.id,
+                text,
+                header="🧠  <b>分析历史</b>（近两天）",
+                always_expand=True,
+                message_thread_id=getattr(update.effective_message, "message_thread_id", None),
+            )
 
     # ------------------------------------------------------------------
     # Document handler (.h5ad upload)
@@ -1159,7 +1623,18 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
 
         data = query.data or ""
         try:
-            session = sm.get_or_create(user.id)
+            route = ConversationRoute(
+                channel="telegram",
+                scope_type="dm" if query.message.chat.type == "private" else "group",
+                scope_id=str(chat_id),
+                thread_id=(
+                    str(query.message.message_thread_id)
+                    if getattr(query.message, "message_thread_id", None)
+                    else None
+                ),
+                sender_id=str(user.id),
+            )
+            session = runtime.get_session(route)
         except Exception:
             return
 
@@ -1195,280 +1670,15 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
 
         elif data == "jarvis:memory":
             text = session.get_recent_memory_text()
-            await _send_prose_locked(
-                context.bot,
-                chat_id,
-                text,
-                header="🧠  <b>分析历史</b>",
-                always_expand=True,
-            )
-
-    # ------------------------------------------------------------------
-    # OpenClaw buffered-block dispatcher
-    # ------------------------------------------------------------------
-
-    async def _dispatch_final_blocks(
-        bot: Any,
-        chat_id: int,
-        *,
-        reports: List[str],
-        figures: List[bytes],
-        artifacts: List[Any],
-        explain: str,
-        final_text: str,
-        keyboard: Any,
-    ) -> None:
-        """Deliver all reply blocks in sequence (OpenClaw lane-delivery pattern).
-
-        Block order:  reports → figures (sendPhoto) → artifacts (sendDocument) → summary+keyboard
-
-        Each block type goes through the correct Telegram API.
-        Files are ALWAYS sent via sendDocument — never as local path links.
-        """
-        n_figs = len(figures)
-
-        # Block 1 – Reports (long markdown/text blocks)
-        for i, rep in enumerate(reports, start=1):
-            header = "📝  <b>分析报告</b>" if i == 1 else f"📝  <b>分析报告（续 {i}）</b>"
-            await _send_prose_locked(bot, chat_id, rep, header=header, always_expand=False)
-
-        # Block 2 – Figures → sendPhoto (sendDocument fallback on error)
-        for i, png_bytes in enumerate(figures, start=1):
             async with _chat_lock(chat_id):
-                await _send_photo_or_file(
-                    bot, chat_id, png_bytes, _fmt.figure_caption(i, n_figs)
+                await _fmt.send_prose(
+                    context.bot,
+                    chat_id,
+                    text,
+                    header="🧠  <b>分析历史</b>",
+                    always_expand=True,
+                    message_thread_id=getattr(query.message, "message_thread_id", None),
                 )
-
-        # Block 3 – Artifacts → sendDocument (never local path links)
-        for art in artifacts:
-            async with _chat_lock(chat_id):
-                await _send_artifact_document(bot, chat_id, art.filename, art.data)
-
-        # Block 4 – Summary + keyboard (final text block)
-        if explain:
-            if len(explain) > 1200:
-                await _send_prose_locked(bot, chat_id, explain)
-                async with _chat_lock(chat_id):
-                    await _safe_send_message(bot, chat_id, _fmt._DIV, reply_markup=keyboard)
-            else:
-                async with _chat_lock(chat_id):
-                    await _safe_send_message(
-                        bot, chat_id,
-                        _fmt.md_to_html(explain),
-                        parse_mode="HTML",
-                        reply_markup=keyboard,
-                    )
-        else:
-            async with _chat_lock(chat_id):
-                await _safe_send_message(
-                    bot, chat_id, final_text, parse_mode="HTML", reply_markup=keyboard
-                )
-
-    # ------------------------------------------------------------------
-    # Background analysis runner  (OpenClaw sub-agent pattern)
-    # ------------------------------------------------------------------
-
-    async def _run_analysis_bg(
-        session:      Any,
-        user_text:    str,
-        chat_id:      int,
-        full_request: str,
-        bot:          Any,
-    ) -> None:
-        """OpenClaw-style: draft stream first, then finalize via one outbound sequence."""
-        stream_msg_id: Optional[int] = None
-        last_edit = 0.0
-        llm_buf = ""
-        last_progress = ""
-        EDIT_GAP = 1.5
-        DRAFT_MAX = 2800
-
-        def _trim_for_draft(text: str, max_len: int = DRAFT_MAX) -> str:
-            """Keep draft readable without cutting from a random middle position."""
-            if len(text) <= max_len:
-                return text
-            head = int(max_len * 0.55)
-            tail = max_len - head - 40
-            if tail < 200:
-                tail = 200
-            return (
-                text[:head].rstrip()
-                + "\n\n[...内容较长，已省略中间部分...]\n\n"
-                + text[-tail:].lstrip()
-            )
-
-        def _draft_text() -> str:
-            body = _fmt.md_to_html(_trim_for_draft(llm_buf)) if llm_buf.strip() else "<i>思考中…</i>"
-            if last_progress:
-                return f"🔄  <code>{_fmt.esc(last_progress[:180])}</code>\n\n💭  {body}"
-            return f"💭  {body}"
-
-        async def _edit_draft(html: str, force: bool = False) -> None:
-            nonlocal last_edit
-            if stream_msg_id is None:
-                return
-            now = time.monotonic()
-            if (not force) and (now - last_edit < EDIT_GAP):
-                return
-            async with _chat_lock(chat_id):
-                try:
-                    ok = await _safe_edit_message(
-                        bot,
-                        chat_id,
-                        stream_msg_id,
-                        html,
-                        parse_mode="HTML",
-                    )
-                    if ok:
-                        last_edit = now
-                except Exception:
-                    last_edit = now
-                    pass
-
-        async def llm_chunk_cb(chunk: str) -> None:
-            nonlocal llm_buf
-            if not chunk:
-                return
-            llm_buf += chunk
-            await _edit_draft(_draft_text(), force=False)
-
-        async def progress_cb(msg: str) -> None:
-            nonlocal last_progress
-            last_progress = msg
-            await _edit_draft(_draft_text(), force=True)
-
-        # Draft placeholder
-        async with _chat_lock(chat_id):
-            try:
-                stream_msg = await bot.send_message(
-                    chat_id=chat_id,
-                    text="💭  <b>思考中…</b>",
-                    parse_mode="HTML",
-                )
-                stream_msg_id = stream_msg.message_id
-            except Exception:
-                stream_msg_id = None
-
-        from ..agent_bridge import AgentBridge
-        bridge = AgentBridge(session.agent, progress_cb, llm_chunk_cb)
-
-        try:
-            result = await bridge.run(full_request, session.adata)
-        except asyncio.CancelledError:
-            await _edit_draft("🚫  分析已取消。", force=True)
-            raise
-
-        # Persist state
-        if result.adata is not None:
-            session.adata = result.adata
-            session.prompt_count += 1
-            try:
-                session.save_adata()
-            except Exception:
-                pass
-        if result.usage is not None:
-            session.last_usage = result.usage
-
-        a_cur = result.adata or session.adata
-        a_info = f"{a_cur.n_obs:,} cells × {a_cur.n_vars:,} genes" if a_cur else ""
-        try:
-            session.append_memory_log(
-                request=user_text,
-                summary=result.summary or "分析完成",
-                adata_info=a_info,
-            )
-        except Exception:
-            pass
-
-        keyboard = _analysis_keyboard()
-
-        # Error finalization
-        if result.error:
-            err_text = _fmt.error_message(result.error)
-            edited = False
-            if stream_msg_id is not None:
-                async with _chat_lock(chat_id):
-                    edited = await _safe_edit_message(
-                        bot,
-                        chat_id,
-                        stream_msg_id,
-                        err_text,
-                        parse_mode="HTML",
-                    )
-            if not edited:
-                async with _chat_lock(chat_id):
-                    await _safe_send_message(
-                        bot,
-                        chat_id,
-                        err_text,
-                        parse_mode="HTML",
-                    )
-            return
-
-        # Build final text payload
-        # Strip local path references: OpenClaw pattern — files are sent via
-        # sendDocument, not as clickable local links.
-        _BORING = {"分析完成", "分析完成。", "task completed", "done", "完成"}
-        summary = _strip_local_paths((result.summary or "").strip())
-        has_summary = bool(summary and summary.lower() not in _BORING)
-        long_summary = has_summary and len(summary) > 1200
-        final_text = _fmt.md_to_html(summary) if has_summary and not long_summary else ""
-        if (not final_text) and a_info:
-            final_text = f"📊  <code>{_fmt.esc(a_info)}</code>"
-        if not final_text:
-            final_text = _fmt._DIV
-
-        has_media    = bool(result.figures)
-        has_reports  = bool(getattr(result, "reports", None))
-        artifacts    = list(getattr(result, "artifacts", []) or [])
-        has_artifacts = bool(artifacts)
-
-        # OpenClaw lane delivery:
-        #   Draft = intermediate streaming state only.
-        #   Any complex reply (media / reports / artifacts / long text) is routed
-        #   through _dispatch_final_blocks — the unified block dispatcher:
-        #     reports → figures (sendPhoto) → artifacts (sendDocument) → summary+keyboard
-        is_complex = has_media or has_reports or has_artifacts or long_summary
-        if is_complex:
-            if has_media:
-                status = "正在发送图片…"
-            elif has_reports:
-                status = "正在发送报告…"
-            else:
-                status = "结果如下"
-            await _edit_draft(f"✅  {status}", force=True)
-
-            # Prefer agent summary; fall back to stripped LLM stream buffer.
-            explain = summary if has_summary else _strip_local_paths(llm_buf.strip())
-            await _dispatch_final_blocks(
-                bot, chat_id,
-                reports=list(result.reports) if has_reports else [],
-                figures=list(result.figures) if has_media else [],
-                artifacts=artifacts,
-                explain=explain,
-                final_text=final_text,
-                keyboard=keyboard,
-            )
-            # OpenClaw: all final blocks delivered — clean up draft → tombstone.
-            await _edit_draft("✅  分析完成", force=True)
-            return
-
-        # Text-only, no complex blocks: draft IS the streaming result.
-        # Update draft to final LLM text; keyboard goes to a separate fresh message.
-        if llm_buf.strip():
-            final_html = _fmt.md_to_html(llm_buf.strip())
-            if len(final_html) > 3200 or "<pre>" in final_html:
-                # Avoid oversized editMessageText failures; send full prose as new blocks.
-                await _edit_draft("✅  分析完成，正文如下。", force=True)
-                await _send_prose_locked(bot, chat_id, llm_buf.strip(), always_expand=False)
-            else:
-                await _edit_draft(final_html, force=True)
-        elif stream_msg_id is not None:
-            await _edit_draft("✅  分析完成", force=True)
-        async with _chat_lock(chat_id):
-            await _safe_send_message(
-                bot, chat_id, final_text, parse_mode="HTML", reply_markup=keyboard
-            )
 
     # ------------------------------------------------------------------
     # Text analysis handler  — launches background task immediately
@@ -1481,112 +1691,23 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         if not user_text:
             return
 
-        user_id = update.effective_user.id
-        session = await _get_session(update)
-        if session is None:
+        bot_username = getattr(context.bot, "username", None)
+        envelope = telegram_runtime_envelope(update, bot_username)
+        if envelope is None:
             return
-
-        # OpenClaw Collect mode: if analysis is running, queue message + respond conversationally
-        existing = _tasks.get(user_id)
-        if existing and not existing.done():
-            _pending.setdefault(user_id, []).append(user_text)
-            running_req = _task_requests.get(user_id, "")
-            asyncio.create_task(
-                _quick_chat(
-                    session, user_text, update.effective_chat.id, context.bot,
-                    running_request=running_req, queued=True,
-                )
-            )
-            return
-
-        chat_id = update.effective_chat.id
-        bot = context.bot
-
-        # Acknowledge immediately
-        if session.adata is not None:
-            a = session.adata
+        try:
+            await runtime.handle_message(envelope)
+        except Exception as exc:
+            logger.exception("Failed to handle Telegram analysis message")
             await update.message.reply_text(
-                _fmt.ack_message(user_text, adata_info=f"{a.n_obs:,} cells × {a.n_vars:,} genes"),
+                _fmt.error_message(
+                    f"Agent 初始化失败：{exc}\n"
+                    "请检查 --model 参数，或运行 "
+                    "<code>import omicverse as ov; print(ov.list_supported_models())</code> "
+                    "查看可用模型。"
+                ),
                 parse_mode="HTML",
             )
-        else:
-            h5ad_files = session.list_h5ad_files()
-            if h5ad_files:
-                names = "\n".join(
-                    f"  • <code>{_fmt.esc(f.name)}</code>" for f in h5ad_files[:5]
-                )
-                hint = (
-                    f"💡  workspace 中检测到 {len(h5ad_files)} 个文件：\n"
-                    f"{names}\n使用 <code>/load &lt;文件名&gt;</code> 加载"
-                )
-            else:
-                hint = "💡  未检测到已加载数据，Agent 将自行加载数据"
-            await update.message.reply_text(
-                _fmt.ack_message(user_text, workspace_hint=hint),
-                parse_mode="HTML",
-            )
-
-        await _spawn_analysis(session, user_text, chat_id, bot, user_id)
-
-    async def _spawn_analysis(
-        session: Any,
-        user_text: str,
-        chat_id: int,
-        bot: Any,
-        user_id: int,
-    ) -> None:
-        """Build context, spawn background analysis task, and drain pending queue when done."""
-        # Build context: AGENTS.md + memory + request
-        ctx_parts  = []
-        agents_md  = session.get_agents_md()
-        memory_ctx = session.get_memory_context()
-        if agents_md:
-            ctx_parts.append(f"[User instructions]\n{agents_md}")
-        if memory_ctx:
-            ctx_parts.append(f"[Analysis history]\n{memory_ctx}")
-        full_request = (
-            "\n\n".join(ctx_parts) + f"\n\n[Current request]\n{user_text}"
-            if ctx_parts else user_text
-        )
-
-        async def _wrapper() -> None:
-            try:
-                await _run_analysis_bg(session, user_text, chat_id, full_request, bot)
-            except asyncio.CancelledError:
-                pass
-            except Exception as exc:
-                logger.exception("Analysis task failed")
-                try:
-                    await bot.send_message(
-                        chat_id=chat_id,
-                        text=_fmt.error_message(str(exc)),
-                        parse_mode="HTML",
-                    )
-                except Exception:
-                    pass
-            finally:
-                _tasks.pop(user_id, None)
-                _task_requests.pop(user_id, None)
-                # OpenClaw Collect: drain queued messages into a single followup run
-                queued = _pending.pop(user_id, [])
-                if queued:
-                    coalesced = "\n\n".join(queued)
-                    n = len(queued)
-                    try:
-                        await _safe_send_message(
-                            bot, chat_id,
-                            f"⏭  开始执行队列中的 {n} 条请求…",
-                            parse_mode="HTML",
-                        )
-                    except Exception:
-                        pass
-                    asyncio.create_task(
-                        _spawn_analysis(session, coalesced, chat_id, bot, user_id)
-                    )
-
-        task = asyncio.create_task(_wrapper())
-        _tasks[user_id] = task
-        _task_requests[user_id] = user_text
 
     # ------------------------------------------------------------------
     # Register all handlers

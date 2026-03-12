@@ -94,7 +94,7 @@ def weighted_knn_trainer(train_adata:anndata.AnnData,
         "query_adata.obs['transferred_celltype'] = labels.loc[query_adata.obs.index, 'celltype']",
         "query_adata.obs['transfer_uncertainty'] = uncert.loc[query_adata.obs.index, 'celltype']",
         "# Visualize transfer results",
-        "ov.utils.embedding(query_adata, color=['transferred_celltype', 'transfer_uncertainty'])"
+        "ov.pl.embedding(query_adata, color=['transferred_celltype', 'transfer_uncertainty'])"
     ],
     related=["utils.weighted_knn_trainer", "single.pySCSA", "utils.embedding"]
 )

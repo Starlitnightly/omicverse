@@ -18,7 +18,7 @@ from .._registry import register_function
         "# Apply results to AnnData",
         "adata.obs['local_gpt_celltype'] = adata.obs['leiden'].map(result)",
         "# Compare with online GPT results",
-        "ov.utils.embedding(adata, color=['local_gpt_celltype', 'gpt_celltype'])"
+        "ov.pl.embedding(adata, color=['local_gpt_celltype', 'gpt_celltype'])"
     ],
     related=["single.gptcelltype", "single.get_celltype_marker", "single.pySCSA"]
 )
