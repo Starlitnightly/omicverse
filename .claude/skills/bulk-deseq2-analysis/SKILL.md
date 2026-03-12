@@ -11,8 +11,8 @@ Use this skill when a user wants to reproduce the DESeq2 workflow showcased in [
 
 ## Instructions
 1. **Import and format the expression matrix**
-   - Call `import omicverse as ov` and `ov.utils.ov_plot_set()` to standardise visuals.
-   - Read tab-separated count data from featureCounts using `ov.utils.read(..., index_col=0, header=1)`.
+   - Call `import omicverse as ov` and `ov.style()` to standardise visuals.
+   - Read tab-separated count data from featureCounts using `ov.io.read(..., index_col=0, header=1)`.
    - Strip trailing `.bam` from column names with `[c.split('/')[-1].replace('.bam', '') for c in data.columns]`.
 2. **Map gene identifiers**
    - Ensure the appropriate mapping pair exists by running `ov.utils.download_geneid_annotation_pair()`.
