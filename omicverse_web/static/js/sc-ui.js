@@ -325,6 +325,11 @@ Object.assign(SingleCellAnalysis.prototype, {
                          document.body.classList.contains('app-skin-dark');
             this._cmEditor.setOption('theme', dark ? 'dracula' : 'default');
         }
+        if (this._mdEditor) {
+            const dark = document.documentElement.classList.contains('app-skin-dark') ||
+                         document.body.classList.contains('app-skin-dark');
+            this._mdEditor.setOption('theme', dark ? 'dracula' : 'default');
+        }
     },
 
     updateUI(data) {
@@ -757,10 +762,12 @@ Object.assign(SingleCellAnalysis.prototype, {
         const vizView      = document.getElementById('visualization-view');
         const codeView     = document.getElementById('code-editor-view');
         const agentView    = document.getElementById('agent-view');
+        const skillsView   = document.getElementById('skills-view');
         const termView     = document.getElementById('terminal-view');
         const vizBtn       = document.getElementById('view-viz-btn');
         const codeBtn      = document.getElementById('view-code-btn');
         const agentBtn     = document.getElementById('view-agent-btn');
+        const skillsBtn    = document.getElementById('view-skills-btn');
         const termBtn      = document.getElementById('view-terminal-btn');
         const vizToolbar   = document.getElementById('viz-toolbar');
         const codeToolbarRow = document.getElementById('code-editor-toolbar-row');
@@ -774,7 +781,7 @@ Object.assign(SingleCellAnalysis.prototype, {
 
         // ── helper: reset all tab buttons to outline ──────────────────────
         const _deactivateAll = () => {
-            [vizBtn, codeBtn, agentBtn, termBtn].forEach(b => {
+            [vizBtn, codeBtn, agentBtn, skillsBtn, termBtn].forEach(b => {
                 if (!b) return;
                 b.classList.remove('btn-primary');
                 b.classList.add('btn-outline-primary');
@@ -782,10 +789,10 @@ Object.assign(SingleCellAnalysis.prototype, {
         };
 
         // Hide all views first
-        [vizView, codeView, agentView, termView].forEach(v => { if (v) v.style.display = 'none'; });
+        [vizView, codeView, agentView, skillsView, termView].forEach(v => { if (v) v.style.display = 'none'; });
         _deactivateAll();
         if (vizToolbar)    vizToolbar.style.display    = 'none';
-            if (codeToolbarRow) codeToolbarRow.style.display = 'none';
+        if (codeToolbarRow) codeToolbarRow.style.display = 'none';
         if (analysisNav)   analysisNav.style.display   = 'none';
         if (agentConfigNav) agentConfigNav.style.display = 'none';
         if (fileManager)   fileManager.style.display   = 'none';
@@ -854,7 +861,318 @@ Object.assign(SingleCellAnalysis.prototype, {
 
             if (pageTitle) pageTitle.innerHTML = `<i class="feather-message-circle me-2"></i>${this.t('view.agentTitle')}`;
             if (breadcrumbTitle) breadcrumbTitle.textContent = this.t('breadcrumb.agent');
+        } else if (view === 'skills') {
+            if (skillsView) skillsView.style.display = 'block';
+            if (skillsBtn)  { skillsBtn.classList.remove('btn-outline-primary'); skillsBtn.classList.add('btn-primary'); }
+
+            if (pageTitle) pageTitle.innerHTML = `<i class="feather-grid me-2"></i>${this.t('view.skillsTitle')}`;
+            if (breadcrumbTitle) breadcrumbTitle.textContent = this.t('view.skillsTitle');
+            this.loadSkills();
         }
+    },
+
+    loadSkills(force = false) {
+        if (this.skillsLoaded && !force) {
+            this.renderSkills();
+            return;
+        }
+        fetch('/api/skills/list')
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                this.skills = Array.isArray(data.skills) ? data.skills : [];
+                this.filteredSkills = [...this.skills];
+                this.skillsLoaded = true;
+                this.renderSkills();
+            })
+            .catch(error => {
+                const grid = document.getElementById('skills-store-grid');
+                if (grid) {
+                    grid.innerHTML = `
+                        <div class="skills-empty-state">
+                            <div class="skills-empty-icon"><i class="feather-alert-circle"></i></div>
+                            <h3>${this.t('skills.loadFailed')}</h3>
+                            <p>${error.message || this.t('common.noData')}</p>
+                        </div>
+                    `;
+                }
+            });
+    },
+
+    refreshSkills() {
+        this.skillsLoaded = false;
+        this.loadSkills(true);
+    },
+
+    getSkillsLayout() {
+        if (!this.skillsLayout) {
+            this.skillsLayout = localStorage.getItem('omicverse.skillsLayout') || 'card';
+        }
+        return this.skillsLayout;
+    },
+
+    setSkillsLayout(layout) {
+        const next = layout === 'list' ? 'list' : 'card';
+        this.skillsLayout = next;
+        localStorage.setItem('omicverse.skillsLayout', next);
+        this.renderSkills();
+    },
+
+    filterSkills(query = '') {
+        const term = String(query || '').trim().toLowerCase();
+        if (!term) {
+            this.filteredSkills = [...this.skills];
+        } else {
+            this.filteredSkills = this.skills.filter(skill => {
+                const haystack = [
+                    skill.name,
+                    skill.slug,
+                    skill.description,
+                    skill.root_label,
+                    skill.relative_path,
+                    skill.reference_excerpt,
+                    skill.reference_relative_path,
+                ].join(' ').toLowerCase();
+                return haystack.includes(term);
+            });
+        }
+        this.renderSkills();
+    },
+
+    renderSkills() {
+        const grid = document.getElementById('skills-store-grid');
+        const meta = document.getElementById('skills-store-meta');
+        const cardBtn = document.getElementById('skills-layout-card-btn');
+        const listBtn = document.getElementById('skills-layout-list-btn');
+        if (!grid) return;
+        const layout = this.getSkillsLayout();
+
+        grid.classList.toggle('list', layout === 'list');
+        if (cardBtn) cardBtn.classList.toggle('active', layout === 'card');
+        if (listBtn) listBtn.classList.toggle('active', layout === 'list');
+
+        const skills = Array.isArray(this.filteredSkills) ? this.filteredSkills : [];
+        if (meta) {
+            meta.textContent = `${skills.length} / ${this.skills.length} skills`;
+        }
+        if (!skills.length) {
+            grid.innerHTML = `
+                <div class="skills-empty-state">
+                    <div class="skills-empty-icon"><i class="feather-grid"></i></div>
+                    <h3>${this.t('skills.emptyTitle')}</h3>
+                    <p>${this.t('skills.emptyBody')}</p>
+                </div>
+            `;
+            if (window.feather) feather.replace({ 'stroke-width': 2 });
+            return;
+        }
+
+        const esc = (value) => String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+
+        const skillButtonLabel = (skill) => skill && skill.editable === false
+            ? this.t('skills.viewSkill')
+            : this.t('skills.modifySkill');
+        const referenceButtonLabel = (skill) => skill && skill.editable === false
+            ? this.t('skills.viewReference')
+            : this.t('skills.modifyReference');
+        const buildReferenceBlock = (skill) => {
+            if (layout === 'list') {
+                return '';
+            }
+            if (skill.reference_excerpt) {
+                return `
+                    <div class="skill-card-reference">
+                        <div class="skill-card-reference-title">${this.t('skills.reference')}</div>
+                        <p class="skill-card-reference-body">${esc(skill.reference_excerpt)}</p>
+                    </div>
+                `;
+            }
+            return `
+                <div class="skill-card-reference empty">
+                    <div class="skill-card-reference-title">${this.t('skills.reference')}</div>
+                    <p class="skill-card-reference-body">${this.t('skills.referenceEmpty')}</p>
+                </div>
+            `;
+        };
+
+        grid.innerHTML = skills.map(skill => `
+            <article class="skill-card ${layout === 'list' ? 'skill-row' : ''}">
+                <div class="${layout === 'list' ? 'skill-row-main' : ''}">
+                    <div class="skill-card-head">
+                        <div>
+                            <h3 class="skill-card-title">${esc(skill.name)}</h3>
+                            <div class="skill-card-slug">${esc(skill.slug)}</div>
+                        </div>
+                        <span class="skill-chip primary">${esc(skill.root_label || this.t('skills.location'))}</span>
+                    </div>
+                    <p class="skill-card-desc">${esc(skill.description || 'No description provided.')}</p>
+                    <div class="skill-card-meta">
+                        <span class="skill-chip">${this.t('skills.path')}: ${esc(skill.relative_path || 'SKILL.md')}</span>
+                        ${layout !== 'list' && skill.reference_relative_path ? `<span class="skill-chip">${this.t('skills.reference')}: ${esc(skill.reference_relative_path)}</span>` : ''}
+                        ${skill.version ? `<span class="skill-chip">${this.t('skills.version')}: ${esc(skill.version)}</span>` : ''}
+                        ${skill.editable === false ? `<span class="skill-chip muted">${this.t('skills.readOnly')}</span>` : ''}
+                    </div>
+                    ${buildReferenceBlock(skill)}
+                    <div class="skill-card-path">${esc(skill.path)}</div>
+                </div>
+                <div class="skill-card-footer ${layout === 'list' ? 'skill-row-actions' : ''}">
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-primary"
+                        onclick="singleCellApp.editSkill(decodeURIComponent('${encodeURIComponent(String(skill.path || ''))}'))">
+                        <i class="feather-edit-3 me-1"></i>${skillButtonLabel(skill)}
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-primary"
+                        onclick="singleCellApp.editSkillReference(decodeURIComponent('${encodeURIComponent(String(skill.path || ''))}'))">
+                        <i class="feather-file-text me-1"></i>${referenceButtonLabel(skill)}
+                    </button>
+                </div>
+            </article>
+        `).join('');
+
+        if (window.feather) feather.replace({ 'stroke-width': 2 });
+    },
+
+    createSkill() {
+        const name = prompt(this.t('skills.createPrompt'));
+        if (!name) return;
+        const description = prompt(this.t('skills.descriptionPrompt')) || '';
+        fetch('/api/skills/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, description }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            this.refreshSkills();
+            if (data.skill && data.skill.path) {
+                this.editSkill(data.skill.path);
+            }
+        })
+        .catch(error => {
+            alert(`${this.t('skills.createFailed')}: ${error.message}`);
+        });
+    },
+
+    triggerSkillImport() {
+        const input = document.getElementById('skill-import-input');
+        if (!input) return;
+        input.value = '';
+        input.click();
+    },
+
+    handleSkillImportFile(event) {
+        const input = event && event.target;
+        const file = input && input.files ? input.files[0] : null;
+        if (!file) return;
+
+        const defaultName = file.name.replace(/\.[^.]+$/, '') || 'imported-skill';
+        const name = prompt(this.t('skills.createPrompt'), defaultName);
+        if (!name) {
+            input.value = '';
+            return;
+        }
+        const description = prompt(this.t('skills.descriptionPrompt')) || '';
+        const reader = new FileReader();
+        reader.onload = () => {
+            fetch('/api/skills/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name,
+                    description,
+                    content: String(reader.result || ''),
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                this.refreshSkills();
+                if (data.skill && data.skill.path) {
+                    this.editSkill(data.skill.path);
+                }
+            })
+            .catch(error => {
+                alert(`${this.t('skills.createFailed')}: ${error.message}`);
+            })
+            .finally(() => {
+                input.value = '';
+            });
+        };
+        reader.onerror = () => {
+            alert(`${this.t('skills.createFailed')}: ${file.name}`);
+            input.value = '';
+        };
+        reader.readAsText(file, 'utf-8');
+    },
+
+    editSkill(path) {
+        if (!path) return;
+        fetch('/api/skills/open', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            if (this.openSkillTab) {
+                this.openSkillTab({
+                    name: data.filename || 'SKILL.md',
+                    path: data.path,
+                    content: data.content || '',
+                    referenceContent: data.reference_content || '',
+                    referencePath: data.reference_path || '',
+                    editable: data.editable !== false,
+                });
+            }
+            this.switchView('code');
+        })
+        .catch(error => {
+            alert(`${this.t('status.openFailed')}: ${error.message}`);
+        });
+    },
+
+    editSkillReference(path) {
+        if (!path) return;
+        fetch('/api/skills/open_reference', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            if (this.openSkillTab) {
+                this.openSkillTab({
+                    name: data.filename || 'reference.md',
+                    path: data.path,
+                    content: data.content || '',
+                    editable: data.editable !== false,
+                });
+            }
+            this.switchView('code');
+        })
+        .catch(error => {
+            alert(`${this.t('status.openFailed')}: ${error.message}`);
+        });
     },
 
     applyCodeFontSize() {

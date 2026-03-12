@@ -33,9 +33,9 @@ Invoke this skill when users need to bridge gaps in single-cell developmental tr
    - Plot clusters vs. discovered communities using `sc.pl.embedding(..., color=['clusters','nocd_n'], palette=ov.utils.pyomic_palette())` and filtered subsets excluding synthetic labels with hyphens.
 8. **Interpolate missing states**
    - Run `bulktb.interpolation('OPC')` (replace with target lineage) to synthesise continuity, then preprocess the interpolated AnnData (HVG selection, scaling, PCA).
-   - Compute embeddings with `mde`, visualise with `ov.utils.embedding`, and compare to the original atlas.
+   - Compute embeddings with `mde`, visualise with `ov.pl.embedding`, and compare to the original atlas.
 9. **Analyse trajectories**
-   - Initialise `ov.single.pyVIA` on both original and interpolated data to derive pseudotime, followed by `get_pseudotime`, `sc.pp.neighbors`, `ov.utils.cal_paga`, and `ov.utils.plot_paga` for topology validation.
+   - Initialise `ov.single.pyVIA` on both original and interpolated data to derive pseudotime, followed by `get_pseudotime`, `ov.pp.neighbors`, `ov.utils.cal_paga`, and `ov.utils.plot_paga` for topology validation.
 10. **Defensive validation**
     ```python
     # Before BulkTrajBlend: verify bulk_group columns exist

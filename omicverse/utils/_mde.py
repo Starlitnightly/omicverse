@@ -37,7 +37,7 @@ from .._registry import register_function
         "# Custom embedding dimension",
         "X_mde = ov.utils.mde(adata.obsm['X_pca'], embedding_dim=3)",
         "# Use with visualization",
-        "ov.utils.embedding(adata, basis='X_mde', color='leiden')"
+        "ov.pl.embedding(adata, basis='X_mde', color='leiden')"
     ],
     related=["pp.pca", "utils.embedding", "pl.umap", "pl.tsne"]
 )

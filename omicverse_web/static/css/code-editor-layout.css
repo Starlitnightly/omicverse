@@ -1109,6 +1109,16 @@
     resize: vertical;
 }
 
+.md-editor .CodeMirror {
+    min-height: 520px;
+    height: 100%;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace;
+    line-height: 1.6;
+}
+
 .md-preview {
     flex: 1;
     min-width: 0;
@@ -1127,6 +1137,14 @@
 
 .md-preview ul {
     padding-left: 20px;
+}
+
+.md-preview ol {
+    padding-left: 22px;
+}
+
+.md-preview li + li {
+    margin-top: 0.25rem;
 }
 
 .md-preview blockquote {
@@ -1153,6 +1171,43 @@
     padding: 10px;
     border-radius: 6px;
     overflow: auto;
+}
+
+.md-preview table {
+    width: 100%;
+    margin: 1rem 0;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+}
+
+.md-preview th,
+.md-preview td {
+    padding: 0.65rem 0.8rem;
+    border: 1px solid #e5e7eb;
+    vertical-align: top;
+    text-align: left;
+}
+
+.md-preview th {
+    background: #f8fafc;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.md-preview tbody tr:nth-child(even) {
+    background: #f8fafc;
+}
+
+.md-preview hr {
+    border: 0;
+    border-top: 1px solid #e5e7eb;
+    margin: 1.25rem 0;
+}
+
+.md-preview img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
 }
 
 .image-file-view {

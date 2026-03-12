@@ -125,13 +125,25 @@ class ToolRuntime:
                 current_adata, args.get("aspect", "full")
             )
         elif name == "execute_code":
+            code = args.get("code", "")
+            if not code or not code.strip():
+                return json.dumps(
+                    {"error": "execute_code requires a non-empty 'code' argument."},
+                    ensure_ascii=False,
+                )
             return self._tool_execute_code(
-                args.get("code", ""),
+                code,
                 args.get("description", ""),
                 current_adata,
             )
         elif name == "run_snippet":
-            return self._tool_run_snippet(args.get("code", ""), current_adata)
+            snippet = args.get("code", "")
+            if not snippet or not snippet.strip():
+                return json.dumps(
+                    {"error": "run_snippet requires a non-empty 'code' argument."},
+                    ensure_ascii=False,
+                )
+            return self._tool_run_snippet(snippet, current_adata)
         elif name == "search_functions":
             return self._tool_search_functions(args.get("query", ""))
         elif name == "search_skills":
@@ -158,8 +170,14 @@ class ToolRuntime:
                 }
             return sub_result["result"]
         elif name == "AskUserQuestion":
+            question = args.get("question", "") or args.get("prompt", "")
+            if not question:
+                return json.dumps(
+                    {"error": "AskUserQuestion requires a non-empty 'question' argument."},
+                    ensure_ascii=False,
+                )
             return self._tool_ask_user_question(
-                args.get("question", ""),
+                question,
                 header=args.get("header", ""),
                 options=args.get("options", []),
             )
@@ -336,14 +354,21 @@ class ToolRuntime:
 
         prereq_warnings = self._executor.check_code_prerequisites(code, adata)
 
+        self._executor._notebook_fallback_error = None
         try:
             result = self._executor.execute_generated_code(
                 code, adata, capture_stdout=True
             )
-            stdout = result.get("stdout", "")
-            result_adata = result.get("adata", adata)
+            stdout = result.get("stdout", "") if isinstance(result, dict) else ""
+            result_adata = result.get("adata", adata) if isinstance(result, dict) else (result if result is not None else adata)
 
             output_parts: List[str] = []
+            notebook_err = getattr(self._executor, "_notebook_fallback_error", None)
+            if notebook_err:
+                output_parts.append(
+                    f"WARNING: notebook session execution failed with error:\n{notebook_err}\n"
+                    f"Fell back to in-process execution. Please fix the code to avoid this error."
+                )
             if prereq_warnings:
                 output_parts.append(
                     f"PREREQUISITE WARNINGS: {prereq_warnings}"
@@ -423,37 +448,57 @@ class ToolRuntime:
             return f"ERROR: {e}"
 
     def _tool_search_functions(self, query: str) -> str:
-        query_lower = query.lower()
-        matches = []
-        for entry in _global_registry._registry.values():
-            searchable = (
-                entry.get("short_name", "").lower()
-                + " "
-                + entry.get("full_name", "").lower()
-                + " "
-                + entry.get("description", "").lower()
-                + " "
-                + entry.get("category", "").lower()
-                + " "
-                + " ".join(entry.get("aliases", [])).lower()
-            )
-            if any(word in searchable for word in query_lower.split()):
+        query = (query or "").strip()
+        if not query:
+            return "Please provide a non-empty function search query."
+
+        matches: List[Dict[str, Any]] = []
+        seen_full_names: set[str] = set()
+
+        def _extend(entries: List[Dict[str, Any]]) -> None:
+            for entry in entries or []:
+                full_name = str(
+                    entry.get("full_name")
+                    or entry.get("short_name")
+                    or entry.get("name")
+                    or ""
+                )
+                if not full_name or full_name in seen_full_names:
+                    continue
+                seen_full_names.add(full_name)
                 matches.append(entry)
+
+        try:
+            runtime_matches = list(_global_registry.find(query))
+        except Exception:
+            runtime_matches = []
+        _extend(runtime_matches)
+
+        static_search = getattr(self._ctx, "_collect_static_registry_entries", None)
+        if callable(static_search):
+            try:
+                static_matches = list(static_search(query, max_entries=20))
+            except TypeError:
+                static_matches = list(static_search(query))
+            except Exception:
+                static_matches = []
+            _extend(static_matches)
 
         if not matches:
             return f"No functions found matching '{query}'. Try broader keywords."
 
         results: List[str] = []
-        seen: set[str] = set()
         for m in matches[:20]:
             fname = m.get("full_name", m.get("short_name", ""))
-            if fname in seen:
-                continue
-            seen.add(fname)
             sig = m.get("signature", "")
             desc = m.get("description", "")[:300]
 
             entry_text = f"  {fname}({sig})\n    {desc}"
+
+            branch_parameter = m.get("branch_parameter")
+            branch_value = m.get("branch_value")
+            if branch_parameter and branch_value:
+                entry_text += f"\n    Branch: {branch_parameter}='{branch_value}'"
 
             prereqs = m.get("prerequisites", {})
             req_funcs = prereqs.get("functions", [])

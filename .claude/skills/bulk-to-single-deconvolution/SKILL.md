@@ -33,7 +33,7 @@ Use this skill when a user wants to reconstruct single-cell profiles from bulk R
 7. **Benchmark against the reference atlas**
    - Plot cell-type compositions with `ov.bulk2single.bulk2single_plot_cellprop(...)` for both generated and reference data.
    - Assess correlation using `ov.bulk2single.bulk2single_plot_correlation(single_data, generate_adata, celltype_key='clusters')`.
-   - Embed with `generate_adata.obsm['X_mde'] = ov.utils.mde(generate_adata.obsm['X_pca'])` and visualise via `ov.utils.embedding(..., color=['clusters'], palette=ov.utils.pyomic_palette())`.
+   - Embed with `generate_adata.obsm['X_mde'] = ov.pl.mde(generate_adata.obsm['X_pca'])` and visualise via `ov.pl.embedding(..., color=['clusters'], palette=ov.pl.sc_color())`.
 8. **Defensive validation**
    ```python
    # Before Bulk2Single: verify gene name overlap between bulk and reference

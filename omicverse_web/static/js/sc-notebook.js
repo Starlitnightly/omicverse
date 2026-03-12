@@ -668,109 +668,44 @@ Object.assign(SingleCellAnalysis.prototype, {
     },
 
     renderMarkdown(input) {
-        const escapeHtml = (text) => text
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
+        const source = String(input || '');
+        const markedLib = window.marked;
+        const purifier = window.DOMPurify;
 
-        const formatInline = (text) => {
-            let out = escapeHtml(text);
-            out = out.replace(/`([^`]+)`/g, '<code>$1</code>');
-            out = out.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-            out = out.replace(/\*(.+?)\*/g, '<em>$1</em>');
-            return out;
-        };
-
-        const lines = input.split('\n');
-        let html = '';
-        let para = [];
-        let list = [];
-        let inCode = false;
-        let codeLines = [];
-
-        const flushPara = () => {
-            if (!para.length) return;
-            const text = para.join(' ').trim();
-            if (text) {
-                html += `<p>${formatInline(text)}</p>`;
-            }
-            para = [];
-        };
-
-        const flushList = () => {
-            if (!list.length) return;
-            html += '<ul>' + list.map(item => `<li>${formatInline(item)}</li>`).join('') + '</ul>';
-            list = [];
-        };
-
-        lines.forEach(line => {
-            if (line.startsWith('```')) {
-                if (inCode) {
-                    html += `<pre><code>${escapeHtml(codeLines.join('\n'))}</code></pre>`;
-                    codeLines = [];
-                    inCode = false;
-                } else {
-                    flushPara();
-                    flushList();
-                    inCode = true;
-                }
-                return;
-            }
-
-            if (inCode) {
-                codeLines.push(line);
-                return;
-            }
-
-            if (!line.trim()) {
-                flushPara();
-                flushList();
-                return;
-            }
-
-            if (line.startsWith('# ')) {
-                flushPara();
-                flushList();
-                html += `<h1>${formatInline(line.slice(2))}</h1>`;
-                return;
-            }
-            if (line.startsWith('## ')) {
-                flushPara();
-                flushList();
-                html += `<h2>${formatInline(line.slice(3))}</h2>`;
-                return;
-            }
-            if (line.startsWith('### ')) {
-                flushPara();
-                flushList();
-                html += `<h3>${formatInline(line.slice(4))}</h3>`;
-                return;
-            }
-            if (line.startsWith('> ')) {
-                flushPara();
-                flushList();
-                html += `<blockquote>${formatInline(line.slice(2))}</blockquote>`;
-                return;
-            }
-            if (line.startsWith('- ')) {
-                list.push(line.slice(2));
-                return;
-            }
-
-            para.push(line);
-        });
-
-        if (inCode) {
-            html += `<pre><code>${escapeHtml(codeLines.join('\n'))}</code></pre>`;
+        if (!markedLib || typeof markedLib.parse !== 'function') {
+            const escapeHtml = (text) => String(text || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            return `<pre><code>${escapeHtml(source)}</code></pre>`;
         }
-        flushPara();
-        flushList();
-        return html;
+
+        if (!this._markedConfigured) {
+            markedLib.setOptions({
+                gfm: true,
+                breaks: true,
+                headerIds: false,
+                mangle: false,
+                langPrefix: 'language-',
+            });
+            this._markedConfigured = true;
+        }
+
+        const rawHtml = markedLib.parse(source);
+        if (purifier && typeof purifier.sanitize === 'function') {
+            return purifier.sanitize(rawHtml, {
+                USE_PROFILES: { html: true },
+            });
+        }
+        return rawHtml;
     },
 
     getTextEditorContent() {
         const active = this.getActiveTab();
-        if (active && active.type === 'markdown') {
+        if (active && (active.type === 'markdown' || active.type === 'skill')) {
+            if (this._mdEditor) {
+                return this._mdEditor.getValue();
+            }
             const mdEditor = document.getElementById('md-file-editor');
             return mdEditor ? mdEditor.value : '';
         }
@@ -912,6 +847,11 @@ Object.assign(SingleCellAnalysis.prototype, {
                 type: 'text',
                 content: this.getTextEditorContent()
             };
+        } else if (activeTab.type === 'skill') {
+            payload = {
+                path: targetPath,
+                content: this.getTextEditorContent()
+            };
         }
 
         if (!payload) {
@@ -919,7 +859,11 @@ Object.assign(SingleCellAnalysis.prototype, {
             return;
         }
 
-        fetch('/api/files/save', {
+        const saveUrl = activeTab && activeTab.type === 'skill'
+            ? '/api/skills/save'
+            : '/api/files/save';
+
+        fetch(saveUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)

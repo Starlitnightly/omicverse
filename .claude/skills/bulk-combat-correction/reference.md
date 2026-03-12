@@ -34,16 +34,16 @@ adata.layers['raw'] = adata.X.copy()
 ov.pp.pca(adata, layer='raw', n_pcs=50)
 ov.pp.pca(adata, layer='batch_correction', n_pcs=50)
 
-ov.utils.embedding(adata, basis='raw|original|X_pca', color='batch', frameon='small')
-ov.utils.embedding(adata, basis='batch_correction|original|X_pca', color='batch', frameon='small')
+ov.pl.embedding(adata, basis='raw|original|X_pca', color='batch', frameon='small')
+ov.pl.embedding(adata, basis='batch_correction|original|X_pca', color='batch', frameon='small')
 ```
 
 ```python
 # boxplot comparison
 color_dict = {
-    '1': ov.utils.red_color[1],
-    '2': ov.utils.blue_color[1],
-    '3': ov.utils.green_color[1],
+    '1': ov.pl.red_color[1],
+    '2': ov.pl.blue_color[1],
+    '3': ov.pl.green_color[1],
 }
 fig, ax = plt.subplots(figsize=(20, 4))
 bp = plt.boxplot(adata.to_df().T, patch_artist=True)

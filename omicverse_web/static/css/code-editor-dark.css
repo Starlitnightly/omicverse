@@ -166,6 +166,20 @@ html.app-skin-dark .md-preview pre {
     color: #e5e7eb;
 }
 
+html.app-skin-dark .md-preview table th,
+html.app-skin-dark .md-preview table td {
+    border-color: #1f2937;
+}
+
+html.app-skin-dark .md-preview table th {
+    background: #111827;
+    color: #e5e7eb;
+}
+
+html.app-skin-dark .md-preview tbody tr:nth-child(even) {
+    background: rgba(30, 41, 59, 0.45);
+}
+
 html.app-skin-dark .md-preview blockquote {
     border-left-color: #1f2937;
     color: #94a3b8;
@@ -182,9 +196,17 @@ html.app-skin-dark .md-preview code {
     color: #e5e7eb;
 }
 
+html.app-skin-dark .md-preview hr {
+    border-top-color: #1f2937;
+}
+
 html.app-skin-dark .md-editor textarea {
     background: #0f172a;
     color: #e5e7eb;
+}
+
+html.app-skin-dark .md-editor .CodeMirror {
+    border-color: #1f2937;
 }
 
 /* ========================================

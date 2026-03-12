@@ -14,7 +14,7 @@ Use this skill when the user has a gene list and wants to explore protein-protei
 ### 1. Set up libraries
 ```python
 import omicverse as ov
-ov.utils.ov_plot_set()  # or ov.plot_set()
+ov.style()  # or ov.plot_set()
 ```
 
 ### 2. Collect and validate gene inputs

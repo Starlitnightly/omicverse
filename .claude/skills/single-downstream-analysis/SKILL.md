@@ -57,7 +57,7 @@ if hasattr(adata.X, 'max') and adata.X.max() < 20:
   - Build metacells via `ov.single.MetaCell(..., use_gpu=True)` when GPU is available for acceleration.
 - **Result checks**
   - Inspect volcano plots (`dds.plot_volcano`) and targeted boxplots (`dds.plot_boxplot`) for top DEGs.
-  - Map DEG markers back to UMAP embeddings using `ov.utils.embedding` to confirm localization.
+  - Map DEG markers back to UMAP embeddings using `ov.pl.embedding` to confirm localization.
 - **Resources**
   - Metacell construction benefits from GPU but can fall back to CPU; ensure enough memory for transposed dense matrices
     passed to `pyDEG`.

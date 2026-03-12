@@ -18,6 +18,9 @@ class SingleCellAnalysis {
         this.currentBrowsePath = '';
         this.openTabs = [];
         this.activeTabId = null;
+        this.skills = [];
+        this.filteredSkills = [];
+        this.skillsLoaded = false;
         this.codeFontSize = 13;
         this.fileTreeLoaded = false;
         this.contextTargetPath = '';
