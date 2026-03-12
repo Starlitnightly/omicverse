@@ -15,6 +15,10 @@ build:
     # rust: "1.55"
     # golang: "1.17"
 
+submodules:
+  include: all
+  recursive: true
+
 mkdocs:
   configuration: omicverse_guide/mkdocs.yml
 
