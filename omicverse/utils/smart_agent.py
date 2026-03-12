@@ -53,6 +53,14 @@ if _parent_pkg is not None and _utils_pkg is not None:
     if module_name not in utils_attrs:
         setattr(_utils_pkg, module_name, sys.modules[__name__])
 
+
+def _is_under_root(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
+
 # Internal LLM backend (Pantheon replacement)
 from .agent_backend import OmicVerseLLMBackend, Usage
 
@@ -124,6 +132,7 @@ from .skill_registry import (
     SkillRegistry,
     SkillRouter,
     build_skill_registry,
+    discover_multi_path_skill_roots,
     build_multi_path_skill_registry,
 )
 
@@ -448,19 +457,25 @@ class OmicVerseAgent:
             self.skill_registry = registry
             self._skill_overview_text = self._format_skill_overview()
 
-            package_skill_root = package_root / ".claude" / "skills"
-            cwd_skill_root = cwd / ".claude" / "skills"
-            # Count from metadata instead of full skills
-            builtin_count = len([s for s in registry.skill_metadata.values() if str(package_skill_root) in str(s.path)])
-            user_count = len([s for s in registry.skill_metadata.values() if str(cwd_skill_root) in str(s.path)])
+            roots = discover_multi_path_skill_roots(package_root, cwd)
+            counts = {}
+            for label, root in roots:
+                counts[label] = sum(
+                    1
+                    for metadata in registry.skill_metadata.values()
+                    if _is_under_root(Path(metadata.path), root)
+                )
             total = len(registry.skill_metadata)
             msg = f"   🧭 Loaded {total} skills (progressive disclosure)"
-            if builtin_count and user_count:
-                msg += f" ({builtin_count} built-in + {user_count} user-created)"
-            elif builtin_count:
-                msg += f" ({builtin_count} built-in)"
-            elif user_count:
-                msg += f" ({user_count} user-created)"
+            summary_parts = []
+            if counts.get("Bundled"):
+                summary_parts.append(f"{counts['Bundled']} bundled")
+            if counts.get("Legacy Built-in"):
+                summary_parts.append(f"{counts['Legacy Built-in']} legacy built-in")
+            if counts.get("Workspace"):
+                summary_parts.append(f"{counts['Workspace']} user-created")
+            if summary_parts:
+                msg += f" ({' + '.join(summary_parts)})"
             print(msg)
         else:
             self.skill_registry = None

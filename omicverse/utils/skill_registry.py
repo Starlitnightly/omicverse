@@ -1,6 +1,7 @@
 """Utilities for loading and routing OmicVerse project Agent Skills."""
 from __future__ import annotations
 
+from importlib import import_module
 import logging
 import re
 from dataclasses import dataclass, field
@@ -513,45 +514,84 @@ def build_skill_registry(project_root: Path) -> SkillRegistry:
     return registry
 
 
+def _optional_omicverse_skills_root() -> Optional[Path]:
+    """Resolve the standalone ``omicverse_skills`` package root when installed."""
+
+    try:
+        package = import_module("omicverse_skills")
+        root_getter = getattr(package, "skill_root", None)
+        if callable(root_getter):
+            return Path(root_getter()).resolve()
+        package_file = getattr(package, "__file__", None)
+        if package_file:
+            return (Path(package_file).resolve().parent / "skills").resolve()
+    except Exception:
+        logger.debug("Standalone omicverse_skills package is not available.", exc_info=True)
+    return None
+
+
+def discover_multi_path_skill_roots(package_root: Path, cwd: Path) -> List[Tuple[str, Path]]:
+    """Return skill roots in ascending precedence order.
+
+    Precedence is:
+    1. Legacy package-local skills under ``omicverse/.claude/skills``
+    2. Standalone ``omicverse_skills`` package when installed
+    3. User workspace overrides under ``$CWD/.claude/skills``
+    """
+
+    roots: List[Tuple[str, Path]] = []
+
+    def _append(label: str, root: Path | None) -> None:
+        if root is None:
+            return
+        resolved = root.resolve()
+        if any(existing == resolved for _, existing in roots):
+            return
+        roots.append((label, resolved))
+
+    _append("Legacy Built-in", package_root / ".claude" / "skills")
+    _append("Bundled", _optional_omicverse_skills_root())
+    _append("Workspace", cwd / ".claude" / "skills")
+    return roots
+
+
 def build_multi_path_skill_registry(package_root: Path, cwd: Path) -> SkillRegistry:
     """
     Load skills from multiple paths with priority ordering.
 
     Searches for skills in:
-    1. Package root (.claude/skills in omicverse installation directory) - built-in skills
-    2. Current working directory (.claude/skills in user's project) - user-created skills
+    1. Legacy package root (.claude/skills in omicverse installation directory)
+    2. Standalone ``omicverse_skills`` package when installed
+    3. Current working directory (.claude/skills in user's project)
 
-    User-created skills (CWD) take priority over built-in skills (package) if there are duplicates.
+    User-created skills (CWD) take priority over bundled/package skills if there are duplicates.
 
     Always returns a SkillRegistry instance, even when no skills are discovered.
     """
-    package_skill_root = package_root / ".claude" / "skills"
-    cwd_skill_root = cwd / ".claude" / "skills"
-
-    pkg = SkillRegistry(skill_root=package_skill_root)
-    pkg.load()
-    usr = SkillRegistry(skill_root=cwd_skill_root)
-    usr.load()
+    roots = discover_multi_path_skill_roots(package_root, cwd)
 
     merged: Dict[str, SkillDefinition] = {}
-    if pkg.skills:
-        merged.update(pkg.skills)
-        logger.info("Loaded %d built-in skills from %s", len(pkg.skills), package_skill_root)
-    if usr.skills:
-        for slug, defn in usr.skills.items():
+    for label, root in roots:
+        registry = SkillRegistry(skill_root=root)
+        registry.load()
+        if not registry.skills:
+            continue
+        for slug, defn in registry.skills.items():
             if slug in merged:
-                logger.info("User skill '%s' overrides built-in skill", defn.name)
+                logger.info("%s skill '%s' overrides a lower-priority definition", label, defn.name)
             merged[slug] = defn
-        logger.info("Loaded %d user skills from %s", len(usr.skills), cwd_skill_root)
+        logger.info("Loaded %d %s skills from %s", len(registry.skills), label.lower(), root)
 
     if not merged:
-        logger.warning("No skills discovered in package or CWD")
-        reg = SkillRegistry(skill_root=package_skill_root)
+        logger.warning("No skills discovered from legacy, bundled, or workspace roots")
+        default_root = roots[0][1] if roots else (package_root / ".claude" / "skills")
+        reg = SkillRegistry(skill_root=default_root)
         reg._full_skills_cache = {}
         reg._skill_metadata = {}
         return reg
 
-    reg = SkillRegistry(skill_root=package_skill_root)
+    default_root = roots[0][1] if roots else (package_root / ".claude" / "skills")
+    reg = SkillRegistry(skill_root=default_root)
     reg._full_skills_cache = merged
     # Also populate _skill_metadata so that skill_metadata property works correctly
     reg._skill_metadata = {
@@ -574,5 +614,6 @@ __all__ = [
     "SkillRegistry",
     "SkillRouter",
     "build_skill_registry",
+    "discover_multi_path_skill_roots",
     "build_multi_path_skill_registry",
 ]

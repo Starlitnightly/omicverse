@@ -46,3 +46,4 @@ omicverse_web/data/
 # omicclaw alias/release scaffolding
 .build/
 omicclaw/
+docs*
