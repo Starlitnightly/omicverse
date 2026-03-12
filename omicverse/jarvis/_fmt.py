@@ -154,6 +154,7 @@ async def send_prose(
     raw_text: str,
     header: str = "",
     always_expand: bool = False,
+    message_thread_id: Optional[int] = None,
 ) -> None:
     """Send markdown prose as Telegram HTML.
 
@@ -176,7 +177,10 @@ async def send_prose(
     if len(body) <= 600 and not always_expand:
         # Short — send directly, prepend header if any
         msg = f"{prefix}{body}" if prefix else body
-        await bot.send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
+        kwargs = {"chat_id": chat_id, "text": msg, "parse_mode": "HTML"}
+        if message_thread_id is not None:
+            kwargs["message_thread_id"] = message_thread_id
+        await bot.send_message(**kwargs)
         return
 
     if has_code:
@@ -184,7 +188,10 @@ async def send_prose(
         first = True
         for chunk in _html_code_safe_chunks(body, _MAX_MSG - len(prefix)):
             msg = f"{prefix}{chunk}" if first and prefix else chunk
-            await bot.send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
+            kwargs = {"chat_id": chat_id, "text": msg, "parse_mode": "HTML"}
+            if message_thread_id is not None:
+                kwargs["message_thread_id"] = message_thread_id
+            await bot.send_message(**kwargs)
             first = False
         return
 
@@ -194,7 +201,10 @@ async def send_prose(
             msg = f"{prefix}{bq_o}{chunk}{bq_c}"
         else:
             msg = f"{bq_o}{chunk}{bq_c}"
-        await bot.send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
+        kwargs = {"chat_id": chat_id, "text": msg, "parse_mode": "HTML"}
+        if message_thread_id is not None:
+            kwargs["message_thread_id"] = message_thread_id
+        await bot.send_message(**kwargs)
         first = False
 
 
