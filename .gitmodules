@@ -1,0 +1,3 @@
+[submodule "omicverse_web"]
+	path = omicverse_web
+	url = https://github.com/Starlitnightly/omicverse-web.git
