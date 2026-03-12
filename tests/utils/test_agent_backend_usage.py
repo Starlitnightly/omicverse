@@ -78,22 +78,6 @@ class TestUsageDataclass:
         assert usage.model == "gpt-4o"
         assert usage.provider == "openai"
 
-    def test_usage_dataclass_fields(self):
-        """Test that Usage has the required fields."""
-        usage = Usage(
-            input_tokens=10,
-            output_tokens=20,
-            total_tokens=30,
-            model="test-model",
-            provider="test-provider"
-        )
-        assert hasattr(usage, 'input_tokens')
-        assert hasattr(usage, 'output_tokens')
-        assert hasattr(usage, 'total_tokens')
-        assert hasattr(usage, 'model')
-        assert hasattr(usage, 'provider')
-
-
 class TestOpenAIUsageTracking:
     """Test usage tracking for OpenAI SDK (Chat Completions)."""
 

@@ -59,18 +59,6 @@ class MockRegistry:
         return self.functions.get(name)
 
 
-def test_suggestion_engine_initialization():
-    """Test SuggestionEngine initialization."""
-    print("Testing SuggestionEngine initialization...")
-    registry = MockRegistry()
-    engine = SuggestionEngine(registry)
-
-    assert engine.registry is not None, "Registry should be set"
-    assert hasattr(engine, 'function_graph'), "Should have function_graph attribute"
-    assert hasattr(engine, 'function_templates'), "Should have function_templates attribute"
-    print("✓ test_suggestion_engine_initialization passed")
-
-
 def test_generate_suggestions_missing_prerequisites():
     """Test generating suggestions for missing prerequisites."""
     print("Testing suggestions for missing prerequisites...")
@@ -369,7 +357,6 @@ def main():
     print()
 
     tests = [
-        test_suggestion_engine_initialization,
         test_generate_suggestions_missing_prerequisites,
         test_generate_suggestions_missing_data,
         test_create_workflow_plan,

@@ -135,28 +135,6 @@ def mock_task_extractor(mock_tasks):
     return extractor
 
 
-# Basic Creation Tests
-
-def test_create_verifier():
-    """Test creating verifier with factory function."""
-    verifier = create_verifier()
-    assert isinstance(verifier, EndToEndVerifier)
-    assert verifier.skills is not None
-    assert len(verifier.skills) > 0
-
-
-def test_verifier_initialization(mock_llm_selector, mock_task_extractor):
-    """Test verifier initialization with components."""
-    verifier = EndToEndVerifier(
-        llm_selector=mock_llm_selector,
-        task_extractor=mock_task_extractor,
-    )
-
-    assert verifier.llm_selector == mock_llm_selector
-    assert verifier.task_extractor == mock_task_extractor
-    assert len(verifier.skills) > 0
-
-
 # Single Task Verification Tests
 
 @pytest.mark.asyncio

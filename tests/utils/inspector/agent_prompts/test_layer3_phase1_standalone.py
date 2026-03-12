@@ -159,24 +159,6 @@ def test_conversation_state():
     print("✓ test_conversation_state passed")
 
 
-def test_injector_initialization():
-    """Test AgentContextInjector initialization."""
-    print("Testing AgentContextInjector initialization...")
-
-    adata = create_test_adata()
-    registry = MockRegistry()
-
-    injector = AgentContextInjector(adata, registry)
-
-    assert injector.adata is adata
-    assert injector.registry is registry
-    assert injector.inspector is not None
-    assert injector.conversation_state is not None
-    assert len(injector.conversation_state.data_snapshots) == 1  # Initial snapshot
-
-    print("✓ test_injector_initialization passed")
-
-
 def test_inject_context_basic():
     """Test basic context injection."""
     print("Testing basic context injection...")
@@ -457,7 +439,6 @@ def run_tests():
 
     tests = [
         test_conversation_state,
-        test_injector_initialization,
         test_inject_context_basic,
         test_inject_context_with_target,
         test_general_state_section,

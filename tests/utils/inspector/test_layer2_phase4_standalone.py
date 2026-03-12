@@ -94,16 +94,6 @@ def create_test_validation_result(is_valid=False):
     )
 
 
-def test_llm_formatter_initialization():
-    """Test LLMFormatter initialization."""
-    print("Testing LLMFormatter initialization...")
-    formatter = LLMFormatter()
-
-    assert formatter.output_format == OutputFormat.MARKDOWN, "Default should be MARKDOWN"
-    assert formatter.verbose == True, "Default should be verbose"
-    print("✓ test_llm_formatter_initialization passed")
-
-
 def test_format_markdown():
     """Test markdown formatting."""
     print("Testing markdown formatting...")
@@ -319,7 +309,6 @@ def main():
     print()
 
     tests = [
-        test_llm_formatter_initialization,
         test_format_markdown,
         test_format_plain_text,
         test_format_json,

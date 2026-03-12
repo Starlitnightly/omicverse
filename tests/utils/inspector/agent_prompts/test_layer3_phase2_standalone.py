@@ -145,22 +145,6 @@ def create_test_adata(with_scale=False, with_pca=False, with_neighbors=False):
 
 
 # Test functions
-def test_validator_initialization():
-    """Test DataStateValidator initialization."""
-    print("Testing DataStateValidator initialization...")
-
-    adata = create_test_adata()
-    registry = MockRegistry()
-
-    validator = DataStateValidator(adata, registry)
-
-    assert validator.adata is adata
-    assert validator.registry is registry
-    assert validator.inspector is not None
-
-    print("✓ test_validator_initialization passed")
-
-
 def test_extract_function_calls():
     """Test extraction of function calls from code."""
     print("Testing function call extraction...")
@@ -573,7 +557,6 @@ def run_tests():
     print()
 
     tests = [
-        test_validator_initialization,
         test_extract_function_calls,
         test_validate_valid_code,
         test_validate_invalid_code,

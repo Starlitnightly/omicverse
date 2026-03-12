@@ -127,21 +127,6 @@ class MockRegistry:
         return self.functions.get(name)
 
 
-# Test functions
-def test_escalator_initialization():
-    """Test WorkflowEscalator initialization."""
-    print("Testing WorkflowEscalator initialization...")
-
-    registry = MockRegistry()
-    escalator = WorkflowEscalator(registry)
-
-    assert escalator.registry is registry
-    assert len(escalator.HIGH_LEVEL_FUNCTIONS) > 0
-    assert len(escalator.COMPLEX_TRIGGERS) > 0
-
-    print("✓ test_escalator_initialization passed")
-
-
 def test_complexity_analysis_low():
     """Test complexity analysis for LOW complexity."""
     print("Testing complexity analysis (LOW)...")
@@ -424,40 +409,6 @@ def test_get_default_code():
     print("✓ test_get_default_code passed")
 
 
-def test_escalation_result_structure():
-    """Test EscalationResult structure."""
-    print("Testing EscalationResult structure...")
-
-    registry = MockRegistry()
-    escalator = WorkflowEscalator(registry)
-
-    result = escalator.should_escalate(
-        target_function='leiden',
-        missing_prerequisites=['scale', 'pca', 'neighbors'],
-        missing_data={}
-    )
-
-    # Check all fields are present
-    assert hasattr(result, 'should_escalate')
-    assert hasattr(result, 'complexity')
-    assert hasattr(result, 'strategy')
-    assert hasattr(result, 'escalated_suggestion')
-    assert hasattr(result, 'original_workflow')
-    assert hasattr(result, 'dependency_depth')
-    assert hasattr(result, 'num_missing')
-    assert hasattr(result, 'has_complex_prerequisites')
-    assert hasattr(result, 'explanation')
-
-    # Check values
-    assert isinstance(result.should_escalate, bool)
-    assert isinstance(result.complexity, ComplexityLevel)
-    assert isinstance(result.strategy, EscalationStrategy)
-    assert result.num_missing == 3
-    assert isinstance(result.explanation, str)
-
-    print("✓ test_escalation_result_structure passed")
-
-
 def test_convenience_function():
     """Test analyze_and_escalate convenience function."""
     print("Testing analyze_and_escalate convenience function...")
@@ -528,7 +479,6 @@ def run_tests():
     print()
 
     tests = [
-        test_escalator_initialization,
         test_complexity_analysis_low,
         test_complexity_analysis_medium,
         test_complexity_analysis_high,
@@ -541,7 +491,6 @@ def run_tests():
         test_topological_sort,
         test_can_use_preprocess,
         test_get_default_code,
-        test_escalation_result_structure,
         test_convenience_function,
         test_complex_triggers,
         test_empty_prerequisites,

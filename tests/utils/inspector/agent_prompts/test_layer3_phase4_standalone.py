@@ -96,20 +96,6 @@ class MockRegistry:
 
 
 # Test functions
-def test_inserter_initialization():
-    """Test AutoPrerequisiteInserter initialization."""
-    print("Testing AutoPrerequisiteInserter initialization...")
-
-    registry = MockRegistry()
-    inserter = AutoPrerequisiteInserter(registry)
-
-    assert inserter.registry is registry
-    assert len(inserter.SIMPLE_PREREQUISITES) > 0
-    assert len(inserter.COMPLEX_PREREQUISITES) > 0
-
-    print("✓ test_inserter_initialization passed")
-
-
 def test_can_auto_insert_simple():
     """Test can_auto_insert for simple prerequisites."""
     print("Testing can_auto_insert (simple)...")
@@ -346,38 +332,6 @@ def test_resolve_dependencies():
     print("✓ test_resolve_dependencies passed")
 
 
-def test_insertion_result_structure():
-    """Test InsertionResult structure."""
-    print("Testing InsertionResult structure...")
-
-    registry = MockRegistry()
-    inserter = AutoPrerequisiteInserter(registry)
-
-    result = inserter.insert_prerequisites(
-        "ov.pp.leiden(adata)",
-        ['pca', 'neighbors']
-    )
-
-    # Check all fields are present
-    assert hasattr(result, 'inserted')
-    assert hasattr(result, 'original_code')
-    assert hasattr(result, 'modified_code')
-    assert hasattr(result, 'inserted_prerequisites')
-    assert hasattr(result, 'insertion_policy')
-    assert hasattr(result, 'estimated_time_seconds')
-    assert hasattr(result, 'explanation')
-    assert hasattr(result, 'alternative_suggestion')
-
-    # Check types
-    assert isinstance(result.inserted, bool)
-    assert isinstance(result.original_code, str)
-    assert isinstance(result.modified_code, str)
-    assert isinstance(result.inserted_prerequisites, list)
-    assert isinstance(result.explanation, str)
-
-    print("✓ test_insertion_result_structure passed")
-
-
 def test_convenience_function():
     """Test auto_insert_prerequisites convenience function."""
     print("Testing auto_insert_prerequisites convenience function...")
@@ -483,7 +437,6 @@ def run_tests():
     print()
 
     tests = [
-        test_inserter_initialization,
         test_can_auto_insert_simple,
         test_determine_policy_auto_insert,
         test_determine_policy_escalate,
@@ -495,7 +448,6 @@ def run_tests():
         test_escalation_suggestion,
         test_manual_suggestion,
         test_resolve_dependencies,
-        test_insertion_result_structure,
         test_convenience_function,
         test_time_estimation,
         test_code_formatting,

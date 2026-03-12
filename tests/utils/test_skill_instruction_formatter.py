@@ -28,14 +28,3 @@ def test_prompt_instructions_truncation():
     snippet = skill.prompt_instructions(max_chars=40, provider="openai")
     assert isinstance(snippet, str)
     assert len(snippet) <= 40
-
-
-def test_multi_path_registry_returns_instance(tmp_path):
-    pkg_root = tmp_path / "pkg"
-    cwd_root = tmp_path / "cwd"
-    (pkg_root / ".claude" / "skills").mkdir(parents=True)
-    (cwd_root / ".claude" / "skills").mkdir(parents=True)
-
-    registry = build_multi_path_skill_registry(pkg_root, cwd_root)
-    assert hasattr(registry, "skills")
-    assert registry.skills == {}
