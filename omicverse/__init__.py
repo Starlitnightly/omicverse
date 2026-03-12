@@ -71,16 +71,20 @@ _LAZY_MODULES = {
     'pp',
     'space',
     'pl',
+    'utils',
+    'io',
     'datasets',
     'external',
     'llm',
+    'fm',
     'agent',
+    'mcp',
 }
 
 # Lazy attribute mappings: {attribute_name: (module_path, attr_name)}
 _LAZY_ATTRS = {
-    # From utils._data - MAJOR BOTTLENECK (4.5s)!
-    'read': ('.utils._data', 'read'),
+    # From io.single
+    'read': ('.io.single', 'read'),
 
     # From utils._plot - Lightweight, but let's be lazy
     'palette': ('.utils._plot', 'palette'),
@@ -155,7 +159,6 @@ def __getattr__(name):
 
         module_path, attr_name = _LAZY_ATTRS[name]
         try:
-            import importlib
             # If no attr_name, return the module itself (for plt, np, pd)
             if attr_name is None:
                 module = importlib.import_module(module_path)
@@ -175,51 +178,44 @@ def __getattr__(name):
         if name in _lazy_modules:
             return _lazy_modules[name]
 
-        # Handle special cases
+        # Use importlib.import_module for all submodules to avoid infinite
+        # recursion: `from . import x` internally calls hasattr(omicverse, x)
+        # which re-triggers __getattr__(x) before the module is in __dict__.
+        _lazy_modules[name] = None  # re-entry guard: return None on recursion
+
         if name == 'llm':
             if os.environ.get("OMICVERSE_DISABLE_LLM") == "1":
-                _lazy_modules[name] = None
                 return None
             try:
-                from . import llm
-                _lazy_modules[name] = llm
-                return llm
+                module = importlib.import_module('.llm', package='omicverse')
+                _lazy_modules[name] = module
+                return module
             except Exception:
-                _lazy_modules[name] = None
                 return None
 
         elif name == 'datacollect':
             try:
-                from .external import datacollect
-                _lazy_modules[name] = datacollect
-                return datacollect
+                module = importlib.import_module('.external.datacollect', package='omicverse')
+                _lazy_modules[name] = module
+                return module
             except ImportError:
-                _lazy_modules[name] = None
                 return None
 
         elif name == 'agent':
             try:
-                from . import agent
-                _lazy_modules[name] = agent
-                return agent
+                module = importlib.import_module('.agent', package='omicverse')
+                _lazy_modules[name] = module
+                return module
             except Exception:
-                _lazy_modules[name] = None
                 return None
 
-        # utils needs special handling
-        elif name == 'utils':
-            from . import utils
-            _lazy_modules[name] = utils
-            return utils
-
-        # Standard module import
         else:
             try:
-                import importlib
                 module = importlib.import_module(f'.{name}', package='omicverse')
                 _lazy_modules[name] = module
                 return module
             except ImportError as e:
+                _lazy_modules.pop(name, None)
                 raise AttributeError(
                     f"Maybe some package not installed, checked the other outputss for more details."
                 ) from e
@@ -344,6 +340,7 @@ __all__ = [
     "datasets",
     "external",
     "llm",
+    "fm",
     "datacollect",
     "agent",
 

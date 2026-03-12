@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 import warnings
+from .._registry import register_function
 warnings.filterwarnings('ignore')
 from sklearn.metrics import silhouette_score
 import multiprocess as mp
@@ -22,17 +23,31 @@ from .._settings import add_reference
 
 
 import time
+@register_function(
+    aliases=['自动分辨率选择', 'autoResolution', 'optimal leiden resolution'],
+    category="single",
+    description="Search clustering resolutions and select a stable/optimal Leiden resolution for biologically coherent cluster granularity.",
+    prerequisites={'functions': ['pp.neighbors']},
+    requires={'obsp': ['connectivities'], 'uns': ['neighbors']},
+    produces={'obs': ['leiden'], 'uns': ['resolution_search']},
+    auto_fix='auto',
+    examples=['ov.single.autoResolution(adata, cpus=8)'],
+    related=['pp.leiden', 'utils.cluster']
+)
 def autoResolution(adata,cpus=4):
     r"""Automatically determine clustering resolution.
 
-    Arguments:
-        adata: The single cell data.
-        cpus: The number of cpus used for parallel computing. (4)
+    Parameters
+    ----------
+    adata:anndata.AnnData
+        Input single-cell AnnData for louvain resolution search.
+    cpus:int
+        Number of worker processes used for subsampling evaluations.
     
-    Returns:
-        adata: The single cell data with the clustering resolution.
-        res: The clustering resolution.
-        df_sil: The silhouette score of each clustering resolution.
+    Returns
+    -------
+    Tuple[anndata.AnnData,float,pd.DataFrame]
+        Updated AnnData, selected resolution, and silhouette-score table.
     """
     print("Automatically determine clustering resolution...")
     start = time.time()
@@ -105,11 +120,15 @@ def autoResolution(adata,cpus=4):
 def writeGEP(adata_GEP,path):
     r"""Write the gene expression profile to a file.
 
-    Arguments:
-        adata_GEP: The single cell data with gene expression profile.
-        path: The path to save the gene expression profile.
+    Parameters
+    ----------
+    adata_GEP:anndata.AnnData
+        AnnData containing expression matrix and ``obs['louvain']`` labels.
+    path:str
+        Output directory path for ``GEP.txt``.
     
-    Returns:
+    Returns
+    -------
         None
 
     """
@@ -124,28 +143,79 @@ def writeGEP(adata_GEP,path):
     GEP_df.dropna(axis=1, inplace=True)
     GEP_df.to_csv(os.path.join(path, 'GEP.txt'), sep='\t')
     
+@register_function(
+    aliases=['药物响应预测器', 'Drug_Response', 'single-cell drug response'],
+    category="single",
+    description="Predict drug sensitivity from single-cell transcriptomes using CaDRReS and pharmacogenomic reference resources.",
+    prerequisites={'optional_functions': ['utils.download_CaDRReS_model', 'utils.download_GDSC_data']},
+    requires={'var': ['gene symbols']},
+    produces={'obs': ['drug response scores'], 'uns': ['drug response ranking']},
+    auto_fix='escalate',
+    examples=['job = ov.single.Drug_Response(adata, scriptpath="CaDRReS-Sc")', 'res = job.main()'],
+    related=['utils.download_CaDRReS_model', 'utils.download_GDSC_data']
+)
 class Drug_Response:
-    r"""
-    Drug_Response class for drug response prediction.
-    The raw code could be found at https://github.com/ailabstw/scDrug
+    """
+    Predict drug sensitivity from single-cell transcriptomes using CaDRReS models.
+
+    Parameters
+    ----------
+    adata:AnnData
+        Query single-cell AnnData.
+    scriptpath:str
+        Path to CaDRReS-Sc scripts.
+    modelpath:str
+        Path to pretrained pharmacogenomic model/data resources.
+    output:str, optional
+        Output directory for prediction tables and plots.
+    model:{'GDSC', 'PRISM'}, optional
+        Pharmacogenomic reference model.
+    clusters:str, optional
+        Cluster subset to analyze (``'All'`` uses all cells).
+    cell:str, optional
+        Cell-line context used by the model.
+    cpus:int, optional
+        CPU threads used by downstream steps.
+    n_drugs:int, optional
+        Number of top drugs to report/plot.
+
+    Returns
+    -------
+    None
+        Initializes drug-response prediction workflow state.
+    
+    Examples
+    --------
+    >>> job = ov.single.Drug_Response(adata, scriptpath="CaDRReS-Sc")
     """
     def __init__(self,adata,scriptpath,modelpath,output='./',model='GDSC',clusters='All',
                  cell='A549',cpus=4,n_drugs=10):
         
         r"""Initialize the Drug_Response class.
 
-        Arguments:
-            adata: Annotated data matrix with cells as rows and genes as columns.
-            scriptpath: Path to the directory containing the CaDRReS scripts for the analysis. You need to download the scripts according to `git clone https://github.com/CSB5/CaDRReS-Sc.git` and set the path to the directory.
-            modelpath: Path to the directory containing the pre-trained models. You need to download the models according to `Pyomic.utils.download_GDSC_data()` and `Pyomic.utils.download_CaDRReS_model()` and set the path to the directory.
-            output: Path to the directory where the output files will be saved. ('./')
-            model: The name of the pre-trained model to be used for the analysis. ('GDSC')
-            clusters: The cluster labels to be used for the analysis. Default is all cells. ('All')
-            cell: The cell line to be analyzed. ('A549')
-            cpus: The number of CPUs to be used for the analysis. (4)
-            n_drugs: The number of top drugs to be selected based on the predicted sensitivity. (10)
+        Parameters
+        ----------
+        adata:anndata.AnnData
+            Input AnnData used for single-cell drug-response prediction.
+        scriptpath:str
+            Path to cloned ``CaDRReS-Sc`` script directory.
+        modelpath:str
+            Path containing pretrained CaDRReS model/data files.
+        output:str
+            Output directory for prediction tables and figures.
+        model:str
+            Pharmacogenomic reference model, typically ``'GDSC'`` or ``'PRISM'``.
+        clusters:str
+            Comma-separated louvain cluster IDs, or ``'All'``.
+        cell:str
+            Cell-line context label used by CaDRReS.
+        cpus:int
+            Number of CPUs used by downstream routines.
+        n_drugs:int
+            Number of top drugs displayed in output figures.
 
-        Returns:
+        Returns
+        -------
             None
         """
 
@@ -178,7 +248,8 @@ class Drug_Response:
     def load_model(self):
         r"""Load the pre-trained model.
 
-        Returns:
+        Returns
+        -------
             None
 
         """
@@ -298,6 +369,22 @@ class Drug_Response:
         self.pred_kill_df = 100 - pred_cv_df
     
     def output_result(self):
+        """
+        Export predicted drug response tables to CSV files.
+
+        Returns
+        -------
+        None
+            Writes normalized prediction files to ``self.output``:
+            ``IC50_prediction.csv``/``drug_kill_prediction.csv`` for GDSC, or
+            ``PRISM_prediction.csv`` for PRISM.
+
+        Examples
+        --------
+        >>> dr.sensitivity_prediction()
+        >>> dr.cell_death_proportion()
+        >>> dr.output_result()
+        """
         if self.model == 'GDSC':
             drug_df = pd.DataFrame({'Drug ID': self.drug_list, 
                                     'Drug Name': [self.drug_info_df.loc[drug_id]['Drug Name'] for drug_id in self.drug_list]})
@@ -322,11 +409,16 @@ class Drug_Response:
         r"""
         plot heatmap of drug response prediction
 
-        Arguments:
-            df : `pandas.DataFrame` drug response prediction dataframe
-            n_drug : `int` number of drugs to be plotted
-            name : `str` name of the plot
-            figsize : `tuple` size of the plot
+        Parameters
+        ----------
+        df:pd.DataFrame
+            Drug-response matrix to visualize.
+        n_drug:int
+            Number of top drugs shown in heatmap.
+        name:str
+            Output figure filename prefix.
+        figsize:tuple
+            Figure size for heatmap.
         """
         def select_drug(df, n_drug):
             selected_drugs = []

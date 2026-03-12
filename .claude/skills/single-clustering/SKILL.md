@@ -1,7 +1,7 @@
 ---
 name: single-cell-clustering-and-batch-correction-with-omicverse
 title: Single-cell clustering and batch correction with omicverse
-description: Guide Claude through omicverse's single-cell clustering workflow, covering preprocessing, QC, multimethod clustering, topic modeling, cNMF, and cross-batch integration as demonstrated in t_cluster.ipynb and t_single_batch.ipynb.
+description: "Single-cell clustering (Leiden, Louvain, scICE, GMM), batch correction (Harmony, scVI, BBKNN, Combat), topic modeling, and cNMF in OmicVerse."
 ---
 
 # Single-cell clustering and batch correction with omicverse
@@ -47,7 +47,7 @@ This skill distills the single-cell tutorials [`t_cluster.ipynb`](../../omicvers
 7. **Evaluate clustering quality**
    - Compare predicted labels against known references with `adjusted_rand_score(adata.obs['clusters'], adata.obs['leiden'])` and report metrics for each method (Leiden, Louvain, GMM, LDA variants, cNMF models) to justify chosen parameters.
 8. **Embed with multiple layouts**
-   - Use `ov.utils.mde(...)` to create MDE projections from different latent spaces (`adata.obsm["scaled|original|X_pca"]`, harmonised embeddings, topic compositions) and plot via `ov.utils.embedding(..., color=['batch','cell_type'])` or `ov.pl.embedding` for consistent review of cluster/batch mixing.
+   - Use `ov.utils.mde(...)` to create MDE projections from different latent spaces (`adata.obsm["scaled|original|X_pca"]`, harmonised embeddings, topic compositions) and plot via `ov.pl.embedding(..., color=['batch','cell_type'])` or `ov.pl.embedding` for consistent review of cluster/batch mixing.
 9. **Perform batch correction and integration**
    - Apply `ov.single.batch_correction(adata, batch_key='batch', methods='harmony'|'combat'|'scanorama'|'scVI'|'CellANOVA', n_pcs=50, ...)` sequentially to generate harmonised embeddings stored in `adata.obsm` (`X_harmony`, `X_combat`, `X_scanorama`, `X_scVI`, `X_cellanova`). For `scVI`, mention latent size (`n_latent=30`) and `gene_likelihood="nb"`; for CellANOVA define control pools via `control_dict`.
    - After each correction, project to 2D with `ov.utils.mde` and visualise `batch` vs `cell_type` to check mixing and conservation.

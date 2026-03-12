@@ -28,13 +28,19 @@ class omicverseConfig:
     def gpu_init(self,managed_memory=True,pool_allocator=True,devices=0):
         r"""Initialize GPU mode with RAPIDS for accelerated single-cell analysis.
 
-        Arguments:
-            managed_memory: Enable NVIDIA Unified Memory for oversubscription. Default: True.
-            pool_allocator: Enable memory pool allocator for faster allocations. Default: True.
-            devices: GPU device IDs to register. Default: 0.
+        Parameters
+        ----------
+        managed_memory:bool, optional
+            Enable NVIDIA Unified Memory to support oversubscription for large datasets.
+        pool_allocator:bool, optional
+            Enable RMM memory pool allocator for faster repeated GPU allocations.
+        devices:int|list[int], optional
+            CUDA device index (or indices) to register in RMM.
 
-        Returns:
-            None: Sets the mode to 'gpu' and configures RAPIDS environment.
+        Returns
+        -------
+        None
+            Sets ``self.mode`` to ``'gpu'`` and configures RAPIDS/CuPy allocators.
 
         Examples:
             >>> import omicverse as ov
@@ -84,11 +90,14 @@ class omicverseConfig:
     def cpu_gpu_mixed_init(self):
         r"""Initialize CPU-GPU mixed mode for accelerated single-cell analysis.
 
-        Arguments:
-            None
+        Parameters
+        ----------
+        None
 
-        Returns:
-            None: Sets the mode to 'cpu-gpu-mixed' and detects available GPU accelerators.
+        Returns
+        -------
+        None
+            Sets ``self.mode`` to ``'cpu-gpu-mixed'`` and reports detected accelerators.
 
         Examples:
             >>> import omicverse as ov
@@ -170,7 +179,7 @@ def print_acceleration_status(verbose=True):
     
     Parameters
     ----------
-    verbose : bool
+    verbose:bool
         Whether to print detailed information
     """
     status = check_acceleration_packages()
@@ -246,9 +255,9 @@ def get_optimal_device(prefer_gpu=True, verbose=False):
 
     Parameters
     ----------
-    prefer_gpu : bool
+    prefer_gpu:bool
         Whether to prefer GPU over CPU when available
-    verbose : bool
+    verbose:bool
         Whether to print device selection information and acceleration status
 
     Returns
@@ -321,16 +330,16 @@ def prepare_data_for_device(X, device, verbose=False):
     
     Parameters
     ----------
-    X : array-like
+    X:array-like
         Input data (numpy array, sparse matrix, or other array-like)
-    device : torch.device
+    device:torch.device
         Target device
-    verbose : bool
+    verbose:bool
         Whether to print conversion information
         
     Returns
     -------
-    X_prepared : array-like
+    X_prepared:array-like
         Data prepared for the target device
     """
     import numpy as np
@@ -445,9 +454,31 @@ reference_dict = {
     'Banksy':'Singhal, V., Chou, N., Lee, J. et al. BANKSY unifies cell typing and tissue domain segmentation for scalable spatial omics data analysis. Nat Genet 56, 431–441 (2024). https://doi.org/10.1038/s41588-024-01664-3'
 }
 
+@register_function(
+    aliases=['生成参考表', 'generate_reference_table', 'reference table', 'annotation reference table'],
+    category="core",
+    description="Generate a standardized reference table from AnnData feature metadata for downstream annotation, mapping, and report generation workflows.",
+    prerequisites={'optional_functions': ['utils.get_gene_annotation']},
+    requires={'var': ['gene symbols or feature annotation']},
+    produces={'uns': ['reference_table']},
+    auto_fix='none',
+    examples=['ov.generate_reference_table(adata)'],
+    related=['utils.get_gene_annotation', 'datasets.download_data', 'single.generate_scRNA_report']
+)
 def generate_reference_table(adata):
     """
-    Generate a table of references for the adata object.
+    Generate a standardized reference table from ``adata.uns['REFERENCE_MANU']``.
+
+    Parameters
+    ----------
+    adata:AnnData
+        AnnData object that stores method references in ``uns['REFERENCE_MANU']``.
+
+    Returns
+    -------
+    pandas.DataFrame|None
+        A table with columns ``method``, ``content``, and ``reference``.
+        Returns ``None`` when no reference metadata is available.
     """
     import pandas as pd
     if 'REFERENCE_MANU' not in adata.uns.keys():
@@ -472,7 +503,7 @@ def print_gpu_usage_color(bar_length: int = 30):
 
     Parameters
     ----------
-    bar_length : int
+    bar_length:int
         Total characters in each usage bar (filled + empty).
     """
     # ANSI escape codes
@@ -661,6 +692,15 @@ def print_gpu_usage_color(bar_length: int = 30):
 def print_gpu_usage_simple():
     """
     Simple GPU usage display without color bars - useful for non-NVIDIA GPUs.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+        Prints available GPU backend status and memory usage when supported.
     """
     if torch is None:
         print("PyTorch not available for GPU monitoring.")

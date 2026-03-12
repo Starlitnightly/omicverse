@@ -6,22 +6,31 @@ from matplotlib.collections import LineCollection
 from matplotlib.patches import FancyArrowPatch
 
 from ._palette import palette_112
+from .._registry import register_function
 
 def curved_line(x0, y0, x1, y1, eps=0.8, pointn=30):
     r"""
     Generate points for a curved line between two coordinates using Bezier curves.
     
-    Args:
-        x0: Starting x coordinate
-        y0: Starting y coordinate
-        x1: Ending x coordinate
-        y1: Ending y coordinate
-        eps: Curve control parameter (0.8)
-        pointn: Number of points along the curve (30)
-        
-    Returns:
-        x: Array of x coordinates along the curve
-        y: Array of y coordinates along the curve
+    Parameters
+    ----------
+    x0 : float
+        Start x-coordinate.
+    y0 : float
+        Start y-coordinate.
+    x1 : float
+        End x-coordinate.
+    y1 : float
+        End y-coordinate.
+    eps : float
+        Curvature control factor.
+    pointn : int
+        Number of sampled points along the curve.
+
+    Returns
+    -------
+    Tuple[numpy.ndarray, numpy.ndarray]
+        Sampled x/y coordinate arrays.
     """
     import bezier
     x2 = (x0 + x1) / 2.0 + 0.1 ** (eps + abs(x0 - x1)) * (-1) ** (random.randint(1, 4))
@@ -42,17 +51,27 @@ def curved_graph(_graph, pos=None, eps=0.2, pointn=30,
     r"""
     Draw a network graph with curved edges and arrows.
     
-    Args:
-        _graph: NetworkX graph object
-        pos: Node position dictionary (None)
-        eps: Curve control parameter (0.2)
-        pointn: Number of points along each curve (30)
-        linewidth: Width of edge lines (2)
-        alpha: Transparency of edges (0.3)
-        color_dict: Color mapping for edges (None)
-        
-    Returns:
-        None: Draws on current matplotlib axes
+    Parameters
+    ----------
+    _graph : nx.Graph
+        Graph whose edges will be rendered as curved links.
+    pos : dict or None
+        Node-position dictionary mapping node IDs to xy coordinates.
+    eps : float
+        Curvature control factor.
+    pointn : int
+        Number of points sampled on each edge curve.
+    linewidth : float
+        Width of rendered edges.
+    alpha : float
+        Edge transparency.
+    color_dict : dict or None
+        Optional node-to-color mapping used for edge coloring.
+
+    Returns
+    -------
+    None
+        Draws curved edges on current matplotlib axes.
     """
     ax = plt.gca()
     for u, v in _graph.edges():
@@ -96,39 +115,69 @@ def plot_curve_network(G: nx.Graph, G_type_dict: dict, G_color_dict: dict, pos_t
     r"""
     Create a network plot with curved edges and customizable node styling.
     
-    Args:
-        G: NetworkX graph object
-        G_type_dict: Dictionary mapping nodes to types
-        G_color_dict: Dictionary mapping nodes to colors
-        pos_type: Layout algorithm - 'spring', 'kamada_kawai', or custom positions ('spring')
-        pos_dim: Dimensionality for layout algorithm (2)
-        figsize: Figure dimensions as (width, height) ((4, 4))
-        pos_scale: Scale factor for node positions (10)
-        pos_k: Optimal distance parameter for spring layout (None)
-        pos_alpha: Transparency for position calculation (0.4)
-        node_size: Base size for nodes (50)
-        node_alpha: Transparency for nodes (0.6)
-        node_linewidths: Width of node borders (1)
-        plot_node: Specific nodes to label (None, uses top degree nodes)
-        plot_node_num: Number of top nodes to label (20)
-        node_shape: Dictionary mapping node types to shapes (None)
-        label_verticalalignment: Vertical alignment for labels ('center_baseline')
-        label_fontsize: Font size for node labels (12)
-        label_fontfamily: Font family for labels ('Arial')
-        label_fontweight: Font weight for labels ('bold')
-        label_bbox: Bounding box properties for labels (None)
-        legend_bbox: Legend position as (x, y) ((0.7, 0.05))
-        legend_ncol: Number of legend columns (3)
-        legend_fontsize: Legend font size (12)
-        legend_fontweight: Legend font weight ('bold')
-        curve_awarg: Additional arguments for curved edges (None)
-        ylim: Y-axis limits as (min, max) ((-0.5,0.5))
-        xlim: X-axis limits as (min, max) ((-3,3))
-        ax: Existing matplotlib axes object (None)
-        
-    Returns:
-        fig: matplotlib.figure.Figure object
-        ax: matplotlib.axes.Axes object
+    Parameters
+    ----------
+    G : nx.Graph
+        Graph object to visualize.
+    G_type_dict : dict
+        Mapping from node IDs to node-type categories.
+    G_color_dict : dict
+        Mapping from node IDs to plotting colors.
+    pos_type : str or dict
+        Layout strategy (``'spring'``, ``'kamada_kawai'``) or explicit position dict.
+    pos_dim : int
+        Dimensionality used by layout algorithm.
+    figsize : tuple
+        Figure size for plotting canvas.
+    pos_scale : int or float
+        Scale parameter for layout computation.
+    pos_k : float or None
+        Optimal pairwise distance parameter in spring layout.
+    pos_alpha : float
+        Reserved layout-related alpha parameter.
+    node_size : int
+        Base node size multiplier.
+    node_alpha : float
+        Node transparency.
+    node_linewidths : int or float
+        Border width for nodes.
+    plot_node : list or None
+        Explicit list of nodes to label.
+    plot_node_num : int
+        Number of top-degree nodes labeled when ``plot_node`` is None.
+    node_shape : dict or None
+        Optional mapping from node category to marker shape.
+    label_verticalalignment : str
+        Vertical alignment of text labels.
+    label_fontsize : int
+        Label font size.
+    label_fontfamily : str
+        Label font family.
+    label_fontweight : str
+        Label font weight.
+    label_bbox : dict or None
+        Optional matplotlib bbox style for labels.
+    legend_bbox : tuple
+        Legend anchor position.
+    legend_ncol : int
+        Number of legend columns.
+    legend_fontsize : int
+        Legend font size.
+    legend_fontweight : str
+        Legend font weight.
+    curve_awarg : dict or None
+        Optional arguments for curved-edge drawing helper.
+    ylim : tuple
+        Y-axis limits.
+    xlim : tuple
+        X-axis limits.
+    ax : matplotlib.axes.Axes or None
+        Existing axes for plotting.
+
+    Returns
+    -------
+    Tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+        Figure and axes containing network visualization.
     """
     from adjustText import adjust_text
     if ax is None:
@@ -235,6 +284,17 @@ def plot_curve_network(G: nx.Graph, G_type_dict: dict, G_color_dict: dict, pos_t
     return fig, ax
 
 
+@register_function(
+    aliases=['FlowSig 网络图', 'plot_flowsig_network', 'intercellular flow network plot'],
+    category="pl",
+    description="Visualize inferred intercellular signal-flow graphs, highlighting pathway-level directional communication structure.",
+    prerequisites={'optional_functions': ['pathway_enrichment']},
+    requires={'uns': ['flow network results']},
+    produces={},
+    auto_fix='none',
+    examples=['ov.pl.plot_flowsig_network(flow_network, gem_plot=True)'],
+    related=['single.pathway_enrichment', 'pl.plot_spatial']
+)
 def plot_flowsig_network(flow_network,
                          gem_plot,
                          figsize=(8,4),
@@ -244,17 +304,25 @@ def plot_flowsig_network(flow_network,
     r"""
     Create a flowsig network visualization showing GEM modules and gene flows.
     
-    Args:
-        flow_network: NetworkX graph with flow connections
-        gem_plot: List of GEM modules to include in plot
-        figsize: Figure dimensions as (width, height) ((8,4))
-        curve_awarg: Arguments for curved edge drawing ({'eps':2})
-        node_shape: Dictionary mapping node types to shapes ({'GEM':'^','Sender':'o','Receptor':'o'})
-        **kwargs: Additional arguments passed to plot_curve_network
-        
-    Returns:
-        fig: matplotlib.figure.Figure object
-        ax: matplotlib.axes.Axes object
+    Parameters
+    ----------
+    flow_network : nx.Graph
+        FlowSig graph containing GEM, sender, and receptor nodes.
+    gem_plot : list
+        GEM module subset to include in rendered subgraph.
+    figsize : tuple
+        Figure size for network plot.
+    curve_awarg : dict
+        Optional keyword arguments for curved-edge drawing.
+    node_shape : dict
+        Mapping from node class to marker shape.
+    **kwargs
+        Additional arguments passed to ``plot_curve_network``.
+
+    Returns
+    -------
+    Tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+        Figure and axes of the FlowSig network plot.
     """
     
     gem_li=[i for i in flow_network.nodes if 'GEM' in i]
@@ -341,4 +409,3 @@ def plot_flowsig_network(flow_network,
                         
     plt.box(False)
     return fig,ax
-

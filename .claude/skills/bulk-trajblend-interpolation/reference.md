@@ -81,7 +81,7 @@ interpolated.obsm['X_mde'] = mde(interpolated.obsm['X_pca'])
 
 overlay_palette = sc.pl.palettes.default_102
 
-overlay = ov.utils.embedding(
+overlay = ov.pl.embedding(
     adata_copy,
     basis='X_mde',
     color=['clusters'],
@@ -90,7 +90,7 @@ overlay = ov.utils.embedding(
     palette=overlay_palette,
 )
 
-ov.utils.embedding(
+ov.pl.embedding(
     interpolated,
     basis='X_mde',
     color=['clusters'],

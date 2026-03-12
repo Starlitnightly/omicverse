@@ -9,6 +9,7 @@ import scipy.sparse as sp
 from sklearn.preprocessing import normalize
 from tqdm import tqdm
 from .._settings import add_reference
+from .._registry import register_function
 
 simba_install=False
 
@@ -20,7 +21,37 @@ def global_imports(modulename,shortname = None, asfunction = False):
     else:        
         globals()[shortname] = __import__(modulename)
 
+@register_function(
+    aliases=['SIMBA整合器', 'pySIMBA', 'single-cell batch integration simba'],
+    category="single",
+    description="SIMBA wrapper for batch correction and integrated manifold learning across single-cell datasets.",
+    prerequisites={'optional_functions': ['pp.preprocess']},
+    requires={'obs': ['batch labels']},
+    produces={'obsm': ['X_simba'], 'uns': ['simba graph/model']},
+    auto_fix='none',
+    examples=['simba_object = ov.single.pySIMBA(adata, workdir)', 'simba_object.preprocess(batch_key="batch")'],
+    related=['single.batch_correction', 'pp.neighbors', 'pp.umap']
+)
 class pySIMBA(object):
+    """
+    SIMBA wrapper for single-cell batch integration and graph-embedding construction.
+    
+    Parameters
+    ----------
+    adata:AnnData
+        Input AnnData with batch labels in ``obs``.
+    workdir:str, optional
+        Directory used by SIMBA to store intermediate files and outputs.
+    
+    Returns
+    -------
+    None
+        Initializes SIMBA runtime and stores input data/workspace.
+    
+    Examples
+    --------
+    >>> simba_object = ov.single.pySIMBA(adata, workdir)
+    """
 
     def check_simba(self):
         r"""Check if SIMBA package has been installed.
@@ -42,9 +73,12 @@ class pySIMBA(object):
     def __init__(self,adata,workdir="simba_result") -> None:
         r"""Initialize SIMBA object for batch correction and multimodal analysis.
 
-        Arguments:
-            adata: AnnData object containing single-cell data
-            workdir (str): Working directory for saving results (default: "simba_result")
+        Parameters
+        ----------
+        adata:anndata.AnnData
+            Input AnnData containing single-cell profiles and batch labels.
+        workdir:str
+            Working directory used by SIMBA for intermediate files.
         
         """
 
@@ -60,12 +94,18 @@ class pySIMBA(object):
                     method='lib_size',n_top_genes=3000,n_bins=5):
         r"""Preprocess the AnnData object for SIMBA analysis.
 
-        Arguments:
-            batch_key (str): Key of batch information in adata.obs (default: 'batch')
-            min_n_cells (int): Minimum number of cells for a gene to be considered (default: 3)
-            method (str): Method for normalization (default: 'lib_size')
-            n_top_genes (int): Number of top variable genes to keep (default: 3000)
-            n_bins (int): Number of bins for discretization (default: 5)
+        Parameters
+        ----------
+        batch_key:str
+            Column in ``adata.obs`` containing batch labels.
+        min_n_cells:int
+            Minimum number of cells required to keep a gene.
+        method:str
+            Normalization method used by SIMBA preprocessing.
+        n_top_genes:int
+            Number of variable genes selected per batch.
+        n_bins:int
+            Number of bins used in discretization.
 
         
         """
@@ -86,11 +126,16 @@ class pySIMBA(object):
                     copy=False,dirname='graph0'):
         r"""Generate the graph structure for batch correction.
 
-        Arguments:
-            n_components (int): Number of components for dimensionality reduction (default: 15)
-            k (int): Number of neighbors for graph construction (default: 15)
-            copy (bool): Whether to copy the adata object (default: False)
-            dirname (str): Directory name for saving graph results (default: 'graph0')
+        Parameters
+        ----------
+        n_components:int
+            Number of components used for edge inference.
+        k:int
+            Number of neighbors in inter-batch edge inference.
+        copy:bool
+            Whether SIMBA graph generation should operate on a copy.
+        dirname:str
+            Output directory name for generated graph files.
         
         """
 
@@ -114,11 +159,16 @@ class pySIMBA(object):
     def train(self,num_workers=12,auto_wd=True, save_wd=True, output='model'):
         r"""Train the SIMBA model for batch correction.
 
-        Arguments:
-            num_workers (int): Number of workers for parallel training (default: 12)
-            auto_wd (bool): Whether to use automatic weight decay (default: True)
-            save_wd (bool): Whether to save weight decay parameters (default: True)
-            output (str): Output directory for saving the trained model (default: 'model')
+        Parameters
+        ----------
+        num_workers:int
+            Number of workers used by PBG training.
+        auto_wd:bool
+            Whether to enable automatic weight-decay tuning.
+        save_wd:bool
+            Whether to persist tuned weight-decay configuration.
+        output:str
+            Output directory for trained model artifacts.
 
         """
 
@@ -133,9 +183,10 @@ class pySIMBA(object):
     def load(self,model_path=None):
         r"""Load a pre-trained SIMBA model for batch correction.
 
-        Arguments:
-            model_path (str): Path to the model directory (default: None)
-                            If None, loads from default location
+        Parameters
+        ----------
+        model_path:str or None
+            Path to saved SIMBA model directory. If ``None``, default path is used.
 
         
         """
@@ -151,11 +202,15 @@ class pySIMBA(object):
     def batch_correction(self,use_precomputed=False):
         r"""Perform batch correction using the trained SIMBA model.
 
-        Arguments:
-            use_precomputed (bool): Whether to use precomputed embeddings (default: False)
+        Parameters
+        ----------
+        use_precomputed:bool
+            Whether to reuse precomputed embeddings during SIMBA embedding merge.
 
-        Returns:
-            AnnData: Batch-corrected AnnData object with X_simba embedding
+        Returns
+        -------
+        anndata.AnnData
+            Batch-corrected AnnData with integrated embedding in ``obsm['X_simba']``.
         """
         dict_adata = si.read_embedding()
         adata_dict={}

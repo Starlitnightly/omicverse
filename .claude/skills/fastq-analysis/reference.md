@@ -146,8 +146,8 @@ count_result = ov.alignment.count(
 )
 
 # Load result into AnnData
-import scanpy as sc
-adata = sc.read_h5ad('kb_out/adata.h5ad')
+import omicverse as ov
+adata = ov.read('kb_out/adata.h5ad')
 ```
 
 ## Single-cell one-click analysis

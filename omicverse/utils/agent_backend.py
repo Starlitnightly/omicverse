@@ -21,12 +21,15 @@ introduce any runtime dependency on Pantheon.
 from __future__ import annotations
 
 import asyncio
+import base64
 import contextlib
 import io
 import json
 import logging
 import os
+import platform
 import random
+import re
 import ssl
 import textwrap
 import traceback
@@ -45,6 +48,22 @@ T = TypeVar('T')
 
 # Logger for retry operations
 logger = logging.getLogger(__name__)
+
+_OPENAI_CODEX_BASE_URL = "https://chatgpt.com/backend-api"
+_OPENAI_CODEX_JWT_CLAIM_PATH = "https://api.openai.com/auth"
+
+
+def _request_timeout_seconds() -> float:
+    """Request timeout used for blocking SDK calls in agentic tool loops."""
+    raw = os.environ.get("OV_AGENT_CHAT_TIMEOUT_SECONDS", "").strip()
+    if raw:
+        try:
+            value = float(raw)
+            if value > 0:
+                return value
+        except ValueError:
+            pass
+    return 120.0
 
 
 # ---------------------------------------------------------------------------
@@ -352,7 +371,11 @@ class OmicVerseLLMBackend:
         retry_backoff_factor: float = 2.0,
         retry_jitter: float = 0.5
     ) -> None:
-        provider = ModelConfig.get_provider_from_model(model)
+        try:
+            provider = ModelConfig.get_provider_from_model(model, endpoint)
+        except TypeError:
+            # Some tests monkeypatch the older single-argument signature.
+            provider = ModelConfig.get_provider_from_model(model)
         self.config = BackendConfig(
             model=model,
             api_key=api_key,
@@ -500,6 +523,158 @@ class OmicVerseLLMBackend:
         )
         return result
 
+    def _wire_model_name(self) -> str:
+        """Return the model name suitable for the wire API.
+
+        Strips provider prefixes (``anthropic/``, ``gemini/``, etc.) that are
+        used internally for routing but not accepted by the upstream APIs.
+        """
+        model = self.config.model
+        try:
+            model = ModelConfig.normalize_model_id(model)
+        except Exception:
+            # Fall back to the raw configured model if normalization fails.
+            pass
+
+        for prefix in (
+            "openai/",
+            "google/",
+            "anthropic/",
+            "gemini/",
+            "deepseek/",
+            "minimax/",
+            "moonshot/",
+            "qianfan/",
+            "synthetic/",
+            "together/",
+            "xai/",
+            "xiaomi/",
+            "grok/",
+            "zhipu/",
+            "qwen/",
+        ):
+            if model.startswith(prefix):
+                return model[len(prefix):]
+        return model
+
+    def _effective_wire_api(self, provider_info: Any) -> WireAPI:
+        """Resolve the effective wire API for the configured provider."""
+        wire = provider_info.wire_api if provider_info is not None else WireAPI.CHAT_COMPLETIONS
+        if self.config.endpoint and wire == WireAPI.CHAT_COMPLETIONS:
+            if "claude" in self.config.model.lower():
+                return WireAPI.ANTHROPIC_MESSAGES
+        return wire
+
+    def _missing_api_key_error(self, provider_info: Any, fallback_display_name: str) -> RuntimeError:
+        display_name = fallback_display_name
+        env_key = ""
+        if provider_info is not None:
+            display_name = str(getattr(provider_info, "display_name", "") or display_name)
+            env_key = str(getattr(provider_info, "env_key", "") or "")
+        if env_key:
+            return RuntimeError(f"Missing {env_key} for {display_name} provider")
+        return RuntimeError(f"Missing API key for {display_name} provider")
+
+    def _apply_openai_chat_param_policy(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply known provider/model-specific chat-completions parameter overrides.
+
+        This mirrors OpenClaw's model-aware approach: treat provider/model
+        capabilities as distinct from the generic OpenAI-compatible wire format.
+        """
+        adapted = dict(kwargs)
+        wire_model = str(adapted.get("model") or self._wire_model_name()).strip()
+        wire_model_lower = wire_model.lower()
+
+        # Moonshot Kimi K2.5 currently only accepts temperature=1.
+        if self.config.provider == "moonshot" and wire_model_lower.startswith("kimi-k2.5"):
+            current_temperature = adapted.get("temperature")
+            if current_temperature != 1:
+                logger.info(
+                    "openai_chat_param_override model=%s provider=%s param=temperature from=%s to=1",
+                    self.config.model,
+                    self.config.provider,
+                    current_temperature,
+                )
+                adapted["temperature"] = 1
+
+        return adapted
+
+    def _extract_openai_error_text(self, exc: Exception) -> str:
+        if isinstance(exc, HTTPError):
+            try:
+                body = exc.read().decode("utf-8", errors="ignore").strip()
+                if body:
+                    return body
+            except Exception:
+                pass
+        text = str(exc or "").strip()
+        if text:
+            return text
+        response = getattr(exc, "response", None)
+        if response is not None:
+            body = getattr(response, "text", None)
+            if isinstance(body, str) and body.strip():
+                return body.strip()
+        return repr(exc)
+
+    def _adapt_openai_chat_kwargs_from_error(
+        self,
+        kwargs: Dict[str, Any],
+        exc: Exception,
+    ) -> Optional[tuple[Dict[str, Any], str]]:
+        """Best-effort one-shot adaptation for provider/model parameter mismatches."""
+        text = self._extract_openai_error_text(exc)
+        adapted = dict(kwargs)
+        changes: List[str] = []
+
+        for raw_param in re.findall(r"unsupported parameter:?\s*([a-zA-Z0-9_]+)", text, flags=re.IGNORECASE):
+            target_key = next((key for key in adapted.keys() if key.lower() == raw_param.lower()), None)
+            if target_key and target_key in adapted:
+                adapted.pop(target_key, None)
+                changes.append(f"removed {target_key}")
+
+        if re.search(r"invalid temperature:.*only\s+1\s+is allowed", text, flags=re.IGNORECASE):
+            if adapted.get("temperature") != 1:
+                adapted["temperature"] = 1
+                changes.append("set temperature=1")
+
+        if re.search(
+            r"tool_choice\s*['\"]?required['\"]?\s+is incompatible with thinking enabled",
+            text,
+            flags=re.IGNORECASE,
+        ):
+            if adapted.get("tool_choice") == "required":
+                adapted["tool_choice"] = "auto"
+                changes.append("downgraded tool_choice=auto")
+
+        if not changes or adapted == kwargs:
+            return None
+        return adapted, ", ".join(changes)
+
+    def _call_openai_chat_with_adaptation(
+        self,
+        request_fn: Callable[[Dict[str, Any]], Any],
+        kwargs: Dict[str, Any],
+        *,
+        base_url: str,
+    ) -> Any:
+        """Execute an OpenAI-compatible chat request with one adaptive retry."""
+        try:
+            return request_fn(kwargs)
+        except Exception as exc:
+            adapted = self._adapt_openai_chat_kwargs_from_error(kwargs, exc)
+            if adapted is None:
+                raise
+            retried_kwargs, change_summary = adapted
+            logger.info(
+                "openai_chat_retry_adapted model=%s provider=%s endpoint=%s changes=%s",
+                self.config.model,
+                self.config.provider,
+                base_url,
+                change_summary,
+            )
+            return request_fn(retried_kwargs)
+
     def _chat_sync(
         self,
         messages: List[Dict[str, Any]],
@@ -513,7 +688,7 @@ class OmicVerseLLMBackend:
                 f"Provider '{self.config.provider}' is not registered."
             )
 
-        wire = provider_info.wire_api
+        wire = self._effective_wire_api(provider_info)
         if wire == WireAPI.CHAT_COMPLETIONS:
             return self._chat_tools_openai(messages, tools, tool_choice)
         elif wire == WireAPI.ANTHROPIC_MESSAGES:
@@ -531,6 +706,19 @@ class OmicVerseLLMBackend:
         """Convert provider-agnostic tool defs to OpenAI format."""
         return [{"type": "function", "function": t} for t in tools]
 
+    def _convert_tools_openai_responses(self, tools: List[Dict]) -> List[Dict]:
+        """Convert provider-agnostic tool defs to OpenAI Responses format."""
+        return [
+            {
+                "type": "function",
+                "name": t["name"],
+                "description": t["description"],
+                "parameters": t["parameters"],
+                "strict": False,
+            }
+            for t in tools
+        ]
+
     def _convert_tools_anthropic(self, tools: List[Dict]) -> List[Dict]:
         """Convert provider-agnostic tool defs to Anthropic format."""
         return [{
@@ -546,6 +734,9 @@ class OmicVerseLLMBackend:
         tool_choice: Optional[str],
     ) -> ChatResponse:
         """Multi-turn chat via OpenAI-compatible API with tool support."""
+        if self.config.provider == "openai" and ModelConfig.requires_responses_api(self.config.model):
+            return self._chat_tools_openai_responses(messages, tools, tool_choice)
+
         info = get_provider(self.config.provider)
         base_url = self.config.endpoint or (info.base_url if info else "https://api.openai.com/v1")
         api_key = self._resolve_api_key()
@@ -556,93 +747,629 @@ class OmicVerseLLMBackend:
 
         try:
             from openai import OpenAI  # type: ignore
-            client = OpenAI(base_url=base_url, api_key=api_key)
+            timeout_s = _request_timeout_seconds()
+            client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout_s)
 
             def _make_call():
-                # GPT-5 series requires max_completion_tokens instead of max_tokens
-                if ModelConfig.requires_responses_api(self.config.model):
-                    token_param = {"max_completion_tokens": self.config.max_tokens}
-                else:
-                    token_param = {"max_tokens": self.config.max_tokens}
+                try:
+                    # GPT-5 series requires max_completion_tokens instead of max_tokens
+                    if ModelConfig.requires_responses_api(self.config.model):
+                        token_param = {"max_completion_tokens": self.config.max_tokens}
+                    else:
+                        token_param = {"max_tokens": self.config.max_tokens}
 
-                kwargs = {
-                    "model": self.config.model,
-                    "messages": messages,
-                    "temperature": self.config.temperature,
-                    **token_param,
-                }
-                if tools:
-                    kwargs["tools"] = self._convert_tools_openai(tools)
-                    kwargs["tool_choice"] = tool_choice or "auto"
+                    kwargs = self._apply_openai_chat_param_policy({
+                        "model": self._wire_model_name(),
+                        "messages": messages,
+                        "temperature": self.config.temperature,
+                        **token_param,
+                    })
+                    if tools:
+                        kwargs["tools"] = self._convert_tools_openai(tools)
+                        kwargs["tool_choice"] = tool_choice or "auto"
 
-                resp = client.chat.completions.create(**kwargs)
-                choice = (resp.choices or [None])[0]
-                if not choice or not getattr(choice, "message", None):
-                    raise RuntimeError("No choices returned from the model")
+                    logger.info(
+                        "openai_tool_chat_start model=%s provider=%s endpoint=%s tool_choice=%s messages=%d tools=%d timeout_s=%.1f",
+                        self.config.model,
+                        self.config.provider,
+                        base_url,
+                        kwargs.get("tool_choice", "none"),
+                        len(messages),
+                        len(tools or []),
+                        timeout_s,
+                    )
+                    resp = self._call_openai_chat_with_adaptation(
+                        lambda payload: client.chat.completions.create(**payload),
+                        kwargs,
+                        base_url=base_url,
+                    )
+                    logger.info(
+                        "openai_tool_chat_done model=%s finish_reason=%s choices=%d",
+                        self.config.model,
+                        getattr((resp.choices or [None])[0], "finish_reason", None),
+                        len(resp.choices or []),
+                    )
+                    choice = (resp.choices or [None])[0]
+                    if not choice or not getattr(choice, "message", None):
+                        raise RuntimeError("No choices returned from the model")
 
-                # Capture usage
-                usage_obj = None
-                if hasattr(resp, 'usage') and resp.usage is not None:
-                    usage = resp.usage
-                    pt = _coerce_int(getattr(usage, 'prompt_tokens', None))
-                    ct = _coerce_int(getattr(usage, 'completion_tokens', None))
-                    tt = _compute_total(pt, ct, _coerce_int(getattr(usage, 'total_tokens', None)))
-                    if tt is not None:
-                        usage_obj = Usage(
-                            input_tokens=pt or 0,
-                            output_tokens=ct or 0,
-                            total_tokens=tt,
-                            model=self.config.model,
-                            provider=self.config.provider
-                        )
-                        self.last_usage = usage_obj
+                    # Capture usage
+                    usage_obj = None
+                    if hasattr(resp, 'usage') and resp.usage is not None:
+                        usage = resp.usage
+                        pt = _coerce_int(getattr(usage, 'prompt_tokens', None))
+                        ct = _coerce_int(getattr(usage, 'completion_tokens', None))
+                        tt = _compute_total(pt, ct, _coerce_int(getattr(usage, 'total_tokens', None)))
+                        if tt is not None:
+                            usage_obj = Usage(
+                                input_tokens=pt or 0,
+                                output_tokens=ct or 0,
+                                total_tokens=tt,
+                                model=self.config.model,
+                                provider=self.config.provider
+                            )
+                            self.last_usage = usage_obj
 
-                # Extract content and tool calls
-                msg = choice.message
-                content = msg.content or None
-                tc_list = []
-                if msg.tool_calls:
-                    for tc in msg.tool_calls:
-                        args_str = tc.function.arguments
-                        try:
-                            args = json.loads(args_str)
-                        except (json.JSONDecodeError, TypeError):
-                            args = {"raw": args_str}
-                        tc_list.append(ToolCall(
-                            id=tc.id,
-                            name=tc.function.name,
-                            arguments=args,
-                        ))
+                    # Extract content and tool calls
+                    msg = choice.message
+                    content = msg.content or None
+                    tc_list = []
+                    if msg.tool_calls:
+                        for tc in msg.tool_calls:
+                            args_str = tc.function.arguments
+                            try:
+                                args = json.loads(args_str)
+                            except (json.JSONDecodeError, TypeError):
+                                args = {"raw": args_str}
+                            tc_list.append(ToolCall(
+                                id=tc.id,
+                                name=tc.function.name,
+                                arguments=args,
+                            ))
 
-                stop = "tool_use" if tc_list else "end_turn"
-                if choice.finish_reason == "length":
-                    stop = "max_tokens"
+                    stop = "tool_use" if tc_list else "end_turn"
+                    if choice.finish_reason == "length":
+                        stop = "max_tokens"
 
-                # Build raw message dict for re-injection into messages list
-                raw_msg = {"role": "assistant", "content": content}
-                if tc_list:
-                    raw_msg["tool_calls"] = [
-                        {
-                            "id": tc.id,
-                            "type": "function",
-                            "function": {"name": tc.name, "arguments": json.dumps(tc.arguments)},
-                        }
-                        for tc in tc_list
-                    ]
+                    # Build raw message dict for re-injection into messages list
+                    raw_msg = {"role": "assistant", "content": content}
+                    if tc_list:
+                        raw_msg["tool_calls"] = [
+                            {
+                                "id": tc.id,
+                                "type": "function",
+                                "function": {"name": tc.name, "arguments": json.dumps(tc.arguments)},
+                            }
+                            for tc in tc_list
+                        ]
 
-                return ChatResponse(
-                    content=content,
-                    tool_calls=tc_list,
-                    stop_reason=stop,
-                    usage=usage_obj,
-                    raw_message=raw_msg,
-                )
+                    return ChatResponse(
+                        content=content,
+                        tool_calls=tc_list,
+                        stop_reason=stop,
+                        usage=usage_obj,
+                        raw_message=raw_msg,
+                    )
+                except Exception as exc:
+                    raise self._wrap_openai_connection_error(exc, base_url) from exc
 
             return self._retry(_make_call)
 
         except ImportError:
             raise RuntimeError(
                 "openai package not installed. Install openai>=1.0 for tool-calling support."
+            )
+
+    @staticmethod
+    def _is_openai_codex_base_url(base_url: str) -> bool:
+        normalized = str(base_url or "").strip().rstrip("/")
+        return normalized.startswith(_OPENAI_CODEX_BASE_URL)
+
+    @staticmethod
+    def _resolve_openai_codex_url(base_url: str) -> str:
+        normalized = str(base_url or _OPENAI_CODEX_BASE_URL).strip().rstrip("/")
+        if normalized.endswith("/codex/responses"):
+            return normalized
+        if normalized.endswith("/codex"):
+            return f"{normalized}/responses"
+        return f"{normalized}/codex/responses"
+
+    @staticmethod
+    def _decode_openai_codex_jwt(token: str) -> Dict[str, Any]:
+        parts = str(token or "").split(".")
+        if len(parts) != 3 or not parts[1]:
+            return {}
+        payload = parts[1] + "=" * (-len(parts[1]) % 4)
+        try:
+            raw = base64.urlsafe_b64decode(payload.encode("ascii"))
+            data = json.loads(raw.decode("utf-8"))
+        except Exception:
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    @classmethod
+    def _extract_openai_codex_account_id(cls, token: str) -> str:
+        payload = cls._decode_openai_codex_jwt(token)
+        auth = payload.get(_OPENAI_CODEX_JWT_CLAIM_PATH)
+        if not isinstance(auth, dict):
+            return ""
+        account_id = str(auth.get("chatgpt_account_id") or "").strip()
+        return account_id
+
+    @staticmethod
+    def _openai_codex_user_agent() -> str:
+        try:
+            system = platform.system().lower() or "unknown"
+            release = platform.release() or "unknown"
+            machine = platform.machine() or "unknown"
+            return f"pi ({system} {release}; {machine})"
+        except Exception:
+            return "pi (python)"
+
+    @staticmethod
+    def _is_ollama_endpoint(base_url: str) -> bool:
+        normalized = str(base_url or "").strip().lower().rstrip("/")
+        return (
+            "127.0.0.1:11434" in normalized
+            or "localhost:11434" in normalized
+            or normalized.endswith(":11434/v1")
+            or normalized.endswith(":11434")
+        )
+
+    def _wrap_openai_connection_error(self, exc: Exception, base_url: str) -> RuntimeError:
+        exc_name = type(exc).__name__.lower()
+        exc_text = str(exc).lower()
+        if "connection" not in exc_name and "connection" not in exc_text and "refused" not in exc_text:
+            return RuntimeError(str(exc))
+        if self._is_ollama_endpoint(base_url):
+            return RuntimeError(
+                f"Could not connect to Ollama at {base_url}. Start the Ollama server and verify the model is installed."
+            )
+        return RuntimeError(f"OpenAI-compatible connection failed for {base_url}: {exc}")
+
+    def _build_openai_responses_request(
+        self,
+        *,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict]],
+        tool_choice: Optional[str],
+        include_system_messages: bool,
+    ) -> Dict[str, Any]:
+        input_items = self._convert_messages_openai_responses(messages)
+        if not include_system_messages:
+            input_items = [
+                item for item in input_items
+                if not (isinstance(item, dict) and item.get("role") == "system")
+            ]
+
+        kwargs: Dict[str, Any] = {
+            "model": self._wire_model_name(),
+            "input": input_items,
+            "max_output_tokens": self.config.max_tokens,
+            "reasoning": {"effort": "medium"},
+        }
+        if self.config.system_prompt:
+            kwargs["instructions"] = self.config.system_prompt
+        if tools:
+            kwargs["tools"] = self._convert_tools_openai_responses(tools)
+            kwargs["tool_choice"] = tool_choice or "auto"
+        return kwargs
+
+    @staticmethod
+    def _iter_openai_codex_sse_events(raw_bytes: bytes) -> List[Dict[str, Any]]:
+        text = raw_bytes.decode("utf-8", errors="replace").replace("\r\n", "\n")
+        events: List[Dict[str, Any]] = []
+        for chunk in text.split("\n\n"):
+            data_lines = [
+                line[5:].strip()
+                for line in chunk.split("\n")
+                if line.startswith("data:")
+            ]
+            if not data_lines:
+                continue
+            data = "\n".join(data_lines).strip()
+            if not data or data == "[DONE]":
+                continue
+            try:
+                parsed = json.loads(data)
+            except json.JSONDecodeError:
+                logger.debug("Ignoring non-JSON Codex SSE chunk: %s", data[:200])
+                continue
+            if isinstance(parsed, dict):
+                events.append(parsed)
+        return events
+
+    def _extract_openai_codex_final_response(self, events: List[Dict[str, Any]]) -> Dict[str, Any]:
+        final_payload: Optional[Dict[str, Any]] = None
+        for event in events:
+            event_type = str(event.get("type") or "").strip()
+            if event_type == "error":
+                message = (
+                    str(event.get("message") or "").strip()
+                    or str(event.get("code") or "").strip()
+                    or json.dumps(event)
+                )
+                raise RuntimeError(f"Codex error: {message}")
+            if event_type == "response.failed":
+                response = event.get("response") or {}
+                error = response.get("error") if isinstance(response, dict) else {}
+                message = (
+                    str(error.get("message") or "").strip()
+                    if isinstance(error, dict)
+                    else ""
+                )
+                raise RuntimeError(message or "Codex response failed")
+            if event_type in {"response.completed", "response.done"}:
+                response = event.get("response")
+                if isinstance(response, dict):
+                    final_payload = self._responses_jsonable(response)
+
+        if not final_payload:
+            raise RuntimeError("Codex response stream completed without a final response payload")
+        return final_payload
+
+    def _call_openai_codex_responses(
+        self,
+        *,
+        base_url: str,
+        api_key: str,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict]],
+        tool_choice: Optional[str],
+    ) -> Dict[str, Any]:
+        account_id = self._extract_openai_codex_account_id(api_key)
+        if not account_id:
+            raise RuntimeError(
+                "OpenAI OAuth access token is missing chatgpt_account_id; please rerun `omicverse jarvis --setup`."
+            )
+
+        payload = self._build_openai_responses_request(
+            messages=messages,
+            tools=tools,
+            tool_choice=tool_choice,
+            include_system_messages=False,
+        )
+        payload.pop("max_output_tokens", None)
+        payload.pop("reasoning", None)
+        payload.update(
+            {
+                "store": False,
+                "stream": True,
+                "text": {"verbosity": "medium"},
+                "include": ["reasoning.encrypted_content"],
+                "tool_choice": "auto",
+                "parallel_tool_calls": True,
+            }
+        )
+
+        url = self._resolve_openai_codex_url(base_url)
+        timeout_s = _request_timeout_seconds()
+        request = urllib_request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "chatgpt-account-id": account_id,
+                "OpenAI-Beta": "responses=experimental",
+                "originator": "pi",
+                "User-Agent": self._openai_codex_user_agent(),
+                "accept": "text/event-stream",
+                "content-type": "application/json",
+            },
+            method="POST",
+        )
+
+        logger.info(
+            "openai_codex_responses_start model=%s endpoint=%s tool_choice=%s messages=%d tools=%d timeout_s=%.1f",
+            self.config.model,
+            url,
+            tool_choice or "none",
+            len(messages),
+            len(tools or []),
+            timeout_s,
+        )
+
+        try:
+            with urllib_request.urlopen(
+                request,
+                timeout=timeout_s,
+                context=ssl.create_default_context(),
+            ) as response:
+                raw_bytes = response.read()
+        except HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(
+                f"OpenAI Codex Responses API failed: HTTP {exc.code} {detail[:400]}"
+            ) from exc
+        except URLError as exc:
+            raise RuntimeError(f"OpenAI Codex Responses API failed: {exc}") from exc
+
+        events = self._iter_openai_codex_sse_events(raw_bytes)
+        final_payload = self._extract_openai_codex_final_response(events)
+        logger.info(
+            "openai_codex_responses_done model=%s output_items=%d tool_calls=%d",
+            self.config.model,
+            len(self._extract_responses_output_items(final_payload)),
+            len(self._extract_responses_tool_calls_from_items(self._extract_responses_output_items(final_payload))),
+        )
+        return final_payload
+
+    @staticmethod
+    def _responses_jsonable(value: Any) -> Any:
+        """Convert SDK response objects into JSON-serializable structures."""
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+        if isinstance(value, dict):
+            return {
+                k: OmicVerseLLMBackend._responses_jsonable(v)
+                for k, v in value.items()
+            }
+        if isinstance(value, (list, tuple)):
+            return [
+                OmicVerseLLMBackend._responses_jsonable(v)
+                for v in value
+            ]
+        model_dump = getattr(value, "model_dump", None)
+        if callable(model_dump):
+            try:
+                return OmicVerseLLMBackend._responses_jsonable(
+                    model_dump(exclude_none=True)
+                )
+            except TypeError:
+                return OmicVerseLLMBackend._responses_jsonable(model_dump())
+        to_dict = getattr(value, "to_dict", None)
+        if callable(to_dict):
+            return OmicVerseLLMBackend._responses_jsonable(to_dict())
+        if hasattr(value, "__dict__"):
+            return {
+                k: OmicVerseLLMBackend._responses_jsonable(v)
+                for k, v in value.__dict__.items()
+                if not k.startswith("_")
+            }
+        return str(value)
+
+    @staticmethod
+    def _extract_responses_output_items(payload: Any) -> List[Dict[str, Any]]:
+        """Return canonical output items from a Responses SDK object or dict."""
+        if payload is None:
+            return []
+        if not isinstance(payload, dict):
+            payload = OmicVerseLLMBackend._responses_jsonable(payload)
+        output = payload.get("output")
+        if output is None:
+            return []
+        if isinstance(output, list):
+            return [
+                item for item in (
+                    OmicVerseLLMBackend._responses_jsonable(item)
+                    for item in output
+                )
+                if isinstance(item, dict)
+            ]
+        if isinstance(output, dict):
+            return [output]
+        return []
+
+    @staticmethod
+    def _extract_responses_text_from_items(items: List[Dict[str, Any]]) -> str:
+        """Extract assistant-visible text from Responses output items."""
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            if isinstance(item.get("text"), str) and item.get("text"):
+                return item["text"]
+            if item.get("type") == "message":
+                for part in item.get("content") or []:
+                    if not isinstance(part, dict):
+                        continue
+                    text = part.get("text")
+                    if isinstance(text, dict):
+                        text = text.get("value") or text.get("text")
+                    if isinstance(text, str) and text:
+                        return text
+                    if isinstance(part.get("output_text"), str) and part.get("output_text"):
+                        return part["output_text"]
+                    if isinstance(part.get("content"), str) and part.get("content"):
+                        return part["content"]
+        return ""
+
+    @staticmethod
+    def _extract_responses_tool_calls_from_items(items: List[Dict[str, Any]]) -> List[ToolCall]:
+        """Extract function/tool calls from Responses output items."""
+        tool_calls: List[ToolCall] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") not in {"function_call", "tool_call"}:
+                continue
+            args_raw = item.get("arguments", {})
+            if isinstance(args_raw, str):
+                try:
+                    args = json.loads(args_raw)
+                except (json.JSONDecodeError, TypeError):
+                    args = {"raw": args_raw}
+            elif isinstance(args_raw, dict):
+                args = args_raw
+            else:
+                args = {"raw": str(args_raw)}
+            call_id = item.get("call_id") or item.get("id") or f"call_{len(tool_calls) + 1}"
+            tool_calls.append(
+                ToolCall(
+                    id=str(call_id),
+                    name=item.get("name", "unknown"),
+                    arguments=args,
+                )
+            )
+        return tool_calls
+
+    def _convert_messages_openai_responses(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Normalize mixed conversation state into Responses API input items."""
+        converted: List[Dict[str, Any]] = []
+        for message in messages:
+            if not isinstance(message, dict):
+                continue
+
+            item_type = message.get("type")
+            if item_type in {"function_call", "function_call_output", "message", "reasoning"}:
+                normalized = self._responses_jsonable(message)
+                if isinstance(normalized, dict):
+                    converted.append(normalized)
+                continue
+
+            role = message.get("role")
+            if role == "tool":
+                converted.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": message.get("tool_call_id", ""),
+                        "output": message.get("content", ""),
+                    }
+                )
+                continue
+
+            if role not in {"system", "user", "assistant"}:
+                continue
+
+            content = message.get("content", "")
+            if isinstance(content, list):
+                parts: List[Dict[str, Any]] = []
+                for block in content:
+                    if not isinstance(block, dict):
+                        parts.append({"type": "input_text", "text": str(block)})
+                        continue
+                    block_type = block.get("type")
+                    if block_type in {"input_text", "output_text"}:
+                        parts.append(
+                            {
+                                "type": "input_text",
+                                "text": block.get("text", ""),
+                            }
+                        )
+                    elif block_type == "text":
+                        parts.append(
+                            {
+                                "type": "input_text",
+                                "text": block.get("text", ""),
+                            }
+                        )
+                    else:
+                        normalized = self._responses_jsonable(block)
+                        if isinstance(normalized, dict):
+                            parts.append(normalized)
+                converted.append({"role": role, "content": parts})
+            else:
+                if isinstance(content, dict):
+                    content = json.dumps(content, ensure_ascii=False)
+                converted.append({"role": role, "content": content})
+        return converted
+
+    def _build_chat_response_from_responses_payload(self, payload: Dict[str, Any]) -> ChatResponse:
+        """Build the generic ChatResponse contract from a Responses payload."""
+        output_items = self._extract_responses_output_items(payload)
+        tool_calls = self._extract_responses_tool_calls_from_items(output_items)
+        content = ""
+        try:
+            content = self._extract_responses_text_from_dict(payload)
+        except Exception:
+            content = self._extract_responses_text_from_items(output_items)
+
+        usage_obj = None
+        usage = payload.get("usage") or {}
+        if usage:
+            pt = _coerce_int(usage.get("input_tokens"))
+            if pt is None:
+                pt = _coerce_int(usage.get("prompt_tokens"))
+            ct = _coerce_int(usage.get("output_tokens"))
+            if ct is None:
+                ct = _coerce_int(usage.get("completion_tokens"))
+            tt = _compute_total(pt, ct, _coerce_int(usage.get("total_tokens")))
+            if tt is not None:
+                usage_obj = Usage(
+                    input_tokens=pt or 0,
+                    output_tokens=ct or 0,
+                    total_tokens=tt,
+                    model=self.config.model,
+                    provider=self.config.provider,
+                )
+                self.last_usage = usage_obj
+
+        raw_message: Optional[Any] = output_items if tool_calls else None
+        stop_reason = "tool_use" if tool_calls else "end_turn"
+        return ChatResponse(
+            content=content or None,
+            tool_calls=tool_calls,
+            stop_reason=stop_reason,
+            usage=usage_obj,
+            raw_message=raw_message,
+        )
+
+    def _chat_tools_openai_responses(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict]],
+        tool_choice: Optional[str],
+    ) -> ChatResponse:
+        """Multi-turn tool chat via the OpenAI Responses API."""
+        info = get_provider(self.config.provider)
+        base_url = self.config.endpoint or (info.base_url if info else "https://api.openai.com/v1")
+        api_key = self._resolve_api_key()
+        if not api_key:
+            raise RuntimeError(
+                f"Missing API key for provider '{self.config.provider}'."
+            )
+
+        if self._is_openai_codex_base_url(base_url):
+            def _make_codex_call():
+                payload = self._call_openai_codex_responses(
+                    base_url=base_url,
+                    api_key=api_key,
+                    messages=messages,
+                    tools=tools,
+                    tool_choice=tool_choice,
+                )
+                return self._build_chat_response_from_responses_payload(payload)
+
+            return self._retry(_make_codex_call)
+
+        try:
+            from openai import OpenAI  # type: ignore
+
+            timeout_s = _request_timeout_seconds()
+            client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout_s)
+
+            def _make_call():
+                kwargs = self._build_openai_responses_request(
+                    messages=messages,
+                    tools=tools,
+                    tool_choice=tool_choice,
+                    include_system_messages=True,
+                )
+
+                logger.info(
+                    "openai_responses_tool_chat_start model=%s provider=%s endpoint=%s tool_choice=%s messages=%d tools=%d timeout_s=%.1f",
+                    self.config.model,
+                    self.config.provider,
+                    base_url,
+                    kwargs.get("tool_choice", "none"),
+                    len(messages),
+                    len(tools or []),
+                    timeout_s,
+                )
+                resp = client.responses.create(**kwargs)
+                payload = self._responses_jsonable(resp)
+                logger.info(
+                    "openai_responses_tool_chat_done model=%s output_items=%d tool_calls=%d",
+                    self.config.model,
+                    len(self._extract_responses_output_items(payload)),
+                    len(self._extract_responses_tool_calls_from_items(self._extract_responses_output_items(payload))),
+                )
+                return self._build_chat_response_from_responses_payload(payload)
+
+            return self._retry(_make_call)
+
+        except ImportError:
+            raise RuntimeError(
+                "openai package not installed. Install openai>=1.0 for Responses API tool support."
             )
 
     def _chat_tools_anthropic(
@@ -654,11 +1381,27 @@ class OmicVerseLLMBackend:
         """Multi-turn chat via Anthropic Messages API with tool support."""
         api_key = self._resolve_api_key()
         if not api_key:
-            raise RuntimeError("Missing ANTHROPIC_API_KEY for Anthropic provider")
+            raise self._missing_api_key_error(get_provider(self.config.provider), "Anthropic")
 
         try:
             import anthropic  # type: ignore
-            client = anthropic.Anthropic(api_key=api_key)
+            client_kwargs = {"api_key": api_key}
+            if self.config.endpoint:
+                # Proxy endpoints often use /v1 suffix for OpenAI compat.
+                # The Anthropic SDK prepends /v1/messages itself, so strip
+                # trailing /v1 to avoid /v1/v1/messages.
+                base = self.config.endpoint.rstrip("/")
+                if base.endswith("/v1"):
+                    base = base[:-3]
+                client_kwargs["base_url"] = base
+            import httpx
+            timeout_s = _request_timeout_seconds()
+            client_kwargs["timeout"] = httpx.Timeout(timeout_s, connect=10.0)
+            client = anthropic.Anthropic(**client_kwargs)
+            logger.info(
+                "anthropic_tool_chat_start model=%s timeout_s=%.1f messages=%d tools=%d",
+                self.config.model, timeout_s, len(messages), len(tools or []),
+            )
 
             # Separate system message from conversation messages
             system_text = self.config.system_prompt
@@ -669,9 +1412,11 @@ class OmicVerseLLMBackend:
                 else:
                     conv_messages.append(m)
 
+            wire_model = self._wire_model_name()
+
             def _make_call():
                 kwargs = {
-                    "model": self.config.model,
+                    "model": wire_model,
                     "max_tokens": self.config.max_tokens,
                     "system": system_text,
                     "messages": conv_messages,
@@ -688,6 +1433,10 @@ class OmicVerseLLMBackend:
                             pass  # Don't set tool_choice
 
                 resp = client.messages.create(**kwargs)
+                logger.info(
+                    "anthropic_tool_chat_done model=%s stop_reason=%s",
+                    self.config.model, getattr(resp, "stop_reason", None),
+                )
 
                 # Capture usage
                 usage_obj = None
@@ -949,8 +1698,15 @@ class OmicVerseLLMBackend:
 
         Returns a message dict in the correct format for the current provider.
         """
+        if self.config.provider == "openai" and ModelConfig.requires_responses_api(self.config.model):
+            return {
+                "type": "function_call_output",
+                "call_id": tool_call_id,
+                "output": result,
+            }
+
         provider_info = get_provider(self.config.provider)
-        wire = provider_info.wire_api if provider_info else WireAPI.CHAT_COMPLETIONS
+        wire = self._effective_wire_api(provider_info)
 
         if wire == WireAPI.ANTHROPIC_MESSAGES:
             return {
@@ -982,7 +1738,7 @@ class OmicVerseLLMBackend:
                 "Please choose a supported model or register the provider first."
             )
 
-        method_name = _SYNC_DISPATCH.get(provider_info.wire_api)
+        method_name = _SYNC_DISPATCH.get(self._effective_wire_api(provider_info))
         if method_name is None:
             raise RuntimeError(
                 f"Provider '{self.config.provider}' (wire={provider_info.wire_api.value}) "
@@ -1036,30 +1792,37 @@ class OmicVerseLLMBackend:
         Consolidates the duplicated extraction logic used in both SDK and
         HTTP paths for the OpenAI Responses API.
         """
-        if payload.get("output_text"):
-            return payload["output_text"]
+        output_text = payload.get("output_text")
+        if isinstance(output_text, str) and output_text:
+            return output_text
 
         output = payload.get("output")
         if output is not None:
             if isinstance(output, str):
                 return output
             if isinstance(output, dict):
-                if output.get("text"):
+                if isinstance(output.get("text"), str) and output.get("text"):
                     return output["text"]
                 content = output.get("content")
                 if isinstance(content, list):
                     for p in content:
-                        if isinstance(p, dict) and p.get("text"):
-                            return p["text"]
+                        if not isinstance(p, dict):
+                            continue
+                        text_value = p.get("text")
+                        if isinstance(text_value, dict):
+                            text_value = text_value.get("value") or text_value.get("text")
+                        if isinstance(text_value, str) and text_value:
+                            return text_value
             if isinstance(output, list) and len(output) > 0:
-                first = output[0]
-                if isinstance(first, str):
-                    return first
-                if isinstance(first, dict) and first.get("text"):
-                    return first["text"]
+                text = OmicVerseLLMBackend._extract_responses_text_from_items(
+                    OmicVerseLLMBackend._extract_responses_output_items(payload)
+                )
+                if text:
+                    return text
 
-        if payload.get("text"):
-            return payload["text"]
+        text_field = payload.get("text")
+        if isinstance(text_field, str) and text_field:
+            return text_field
 
         raise RuntimeError(
             f"Unexpected Responses API response format. "
@@ -1086,17 +1849,23 @@ class OmicVerseLLMBackend:
             from openai import OpenAI  # type: ignore
 
             client = OpenAI(base_url=base_url, api_key=api_key)
+            wire_model = self._wire_model_name()
 
             # Wrap SDK call with retry logic
             def _make_sdk_call():
-                resp = client.chat.completions.create(
-                    model=self.config.model,
-                    messages=[
+                kwargs = self._apply_openai_chat_param_policy({
+                    "model": wire_model,
+                    "messages": [
                         {"role": "system", "content": self.config.system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
-                    temperature=self.config.temperature,
-                    max_tokens=self.config.max_tokens,
+                    "temperature": self.config.temperature,
+                    "max_tokens": self.config.max_tokens,
+                })
+                resp = self._call_openai_chat_with_adaptation(
+                    lambda payload: client.chat.completions.create(**payload),
+                    kwargs,
+                    base_url=base_url,
                 )
                 choice = (resp.choices or [None])[0]
                 if not choice or not getattr(choice, "message", None):
@@ -1142,16 +1911,15 @@ class OmicVerseLLMBackend:
 
     def _chat_via_openai_http(self, base_url: str, api_key: str, user_prompt: str) -> str:
         url = base_url.rstrip("/") + "/chat/completions"
-        body = {
-            "model": self.config.model,
+        body = self._apply_openai_chat_param_policy({
+            "model": self._wire_model_name(),
             "messages": [
                 {"role": "system", "content": self.config.system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": self.config.temperature,
             "max_tokens": self.config.max_tokens,
-        }
-        data = json.dumps(body).encode("utf-8")
+        })
 
         headers = {
             "Content-Type": "application/json",
@@ -1160,20 +1928,19 @@ class OmicVerseLLMBackend:
 
         # Wrap HTTP call with retry logic
         def _make_http_call():
-            req = urllib_request.Request(url, data=data, headers=headers, method="POST")
-            # SSL certificate verification is enabled by default for security
-            ctx = ssl.create_default_context()
-            try:
+            def _request_with_kwargs(payload: Dict[str, Any]) -> str:
+                data = json.dumps(payload).encode("utf-8")
+                req = urllib_request.Request(url, data=data, headers=headers, method="POST")
+                ctx = ssl.create_default_context()
                 with urllib_request.urlopen(req, context=ctx, timeout=90) as resp:
                     content = resp.read().decode("utf-8")
-                    payload = json.loads(content)
-                    choices = payload.get("choices", [])
+                    parsed = json.loads(content)
+                    choices = parsed.get("choices", [])
                     if not choices:
-                        raise RuntimeError(f"No choices in response: {payload}")
+                        raise RuntimeError(f"No choices in response: {parsed}")
                     msg = choices[0].get("message", {})
 
-                    # Capture usage information
-                    usage_data = payload.get("usage", {})
+                    usage_data = parsed.get("usage", {})
                     if usage_data:
                         self.last_usage = Usage(
                             input_tokens=usage_data.get('prompt_tokens', 0),
@@ -1184,6 +1951,13 @@ class OmicVerseLLMBackend:
                         )
 
                     return msg.get("content", "")
+
+            try:
+                return self._call_openai_chat_with_adaptation(
+                    _request_with_kwargs,
+                    body,
+                    base_url=base_url,
+                )
             except Exception as exc:
                 raise RuntimeError(
                     f"OpenAI-compatible HTTP call failed: {type(exc).__name__}: {exc}"
@@ -1204,6 +1978,41 @@ class OmicVerseLLMBackend:
           encourage plain-text responses suitable for code extraction.
         - Response: prefer output_text; otherwise inspect output.{text|content[*].text} or text
         """
+        if self._is_openai_codex_base_url(base_url):
+            def _make_codex_call():
+                payload = self._call_openai_codex_responses(
+                    base_url=base_url,
+                    api_key=api_key,
+                    messages=[{"role": "user", "content": user_prompt}],
+                    tools=None,
+                    tool_choice=None,
+                )
+                text = self._extract_responses_text_from_dict(payload)
+                if not text:
+                    text = self._extract_responses_text_from_items(
+                        self._extract_responses_output_items(payload)
+                    )
+                usage = payload.get("usage") or {}
+                if usage:
+                    pt = _coerce_int(usage.get("input_tokens"))
+                    if pt is None:
+                        pt = _coerce_int(usage.get("prompt_tokens"))
+                    ct = _coerce_int(usage.get("output_tokens"))
+                    if ct is None:
+                        ct = _coerce_int(usage.get("completion_tokens"))
+                    tt = _compute_total(pt, ct, _coerce_int(usage.get("total_tokens")))
+                    if tt is not None:
+                        self.last_usage = Usage(
+                            input_tokens=pt or 0,
+                            output_tokens=ct or 0,
+                            total_tokens=tt,
+                            model=self.config.model,
+                            provider=self.config.provider,
+                        )
+                return text
+
+            return self._retry(_make_codex_call)
+
         # Try OpenAI SDK first
         try:
             from openai import OpenAI  # type: ignore
@@ -1218,31 +2027,18 @@ class OmicVerseLLMBackend:
                 logger.debug(f"GPT-5 Responses API call: model={self.config.model}, max_tokens={self.config.max_tokens}")
                 logger.debug(f"User prompt length: {len(user_prompt)} chars")
 
-                input_payload = [
-                    {
-                        "role": "system",
-                        "content": [
-                            {"type": "input_text", "text": self.config.system_prompt}
-                        ],
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "input_text", "text": user_prompt}
-                        ],
-                    },
-                ]
+                kwargs = self._build_openai_responses_request(
+                    messages=[{"role": "user", "content": user_prompt}],
+                    tools=None,
+                    tool_choice=None,
+                    include_system_messages=False,
+                )
 
                 # GPT-5 models use reasoning tokens - control effort for response quality
                 # Set reasoning effort to 'high' for maximum reasoning capability and best quality responses
                 logger.debug("Creating GPT-5 Responses API request with high reasoning effort...")
-                resp = client.responses.create(
-                    model=self.config.model,
-                    input=input_payload,
-                    instructions=self.config.system_prompt,
-                    max_output_tokens=self.config.max_tokens,
-                    reasoning={"effort": "high"}  # Use high reasoning effort for better quality responses
-                )
+                kwargs["reasoning"] = {"effort": "high"}
+                resp = client.responses.create(**kwargs)
 
                 logger.debug(f"GPT-5 response received. Type: {type(resp).__name__}")
                 logger.debug(f"Response attributes: {[attr for attr in dir(resp) if not attr.startswith('_')]}")
@@ -1660,16 +2456,27 @@ class OmicVerseLLMBackend:
     def _chat_via_anthropic(self, user_prompt: str) -> str:
         api_key = self._resolve_api_key()
         if not api_key:
-            raise RuntimeError("Missing ANTHROPIC_API_KEY for Anthropic provider")
+            raise self._missing_api_key_error(get_provider(self.config.provider), "Anthropic")
         try:
             import anthropic  # type: ignore
 
-            client = anthropic.Anthropic(api_key=api_key)
+            client_kwargs = {"api_key": api_key}
+            if self.config.endpoint:
+                base = self.config.endpoint.rstrip("/")
+                if base.endswith("/v1"):
+                    base = base[:-3]
+                client_kwargs["base_url"] = base
+            import httpx
+            timeout_s = _request_timeout_seconds()
+            client_kwargs["timeout"] = httpx.Timeout(timeout_s, connect=10.0)
+            client = anthropic.Anthropic(**client_kwargs)
+
+            wire_model = self._wire_model_name()
 
             # Wrap Anthropic SDK call with retry logic
             def _make_anthropic_call():
                 resp = client.messages.create(
-                    model=self.config.model,
+                    model=wire_model,
                     max_tokens=self.config.max_tokens,
                     system=self.config.system_prompt,
                     messages=[
@@ -1905,19 +2712,25 @@ class OmicVerseLLMBackend:
             from openai import OpenAI  # type: ignore
 
             client = OpenAI(base_url=base_url, api_key=api_key)
+            wire_model = self._wire_model_name()
 
             # Generator function for streaming with retry on session creation
             def _stream_sdk():
                 def _create_stream():
-                    return client.chat.completions.create(
-                        model=self.config.model,
-                        messages=[
+                    kwargs = self._apply_openai_chat_param_policy({
+                        "model": wire_model,
+                        "messages": [
                             {"role": "system", "content": self.config.system_prompt},
                             {"role": "user", "content": user_prompt},
                         ],
-                        temperature=self.config.temperature,
-                        max_tokens=self.config.max_tokens,
-                        stream=True,
+                        "temperature": self.config.temperature,
+                        "max_tokens": self.config.max_tokens,
+                        "stream": True,
+                    })
+                    return self._call_openai_chat_with_adaptation(
+                        lambda payload: client.chat.completions.create(**payload),
+                        kwargs,
+                        base_url=base_url,
                     )
 
                 # Retry stream creation on transient failures
@@ -1972,6 +2785,16 @@ class OmicVerseLLMBackend:
 
     async def _stream_openai_responses(self, base_url: str, api_key: str, user_prompt: str):
         """Stream responses from OpenAI Responses API (gpt-5 series) with proper streaming support."""
+        if self._is_openai_codex_base_url(base_url):
+            result = await asyncio.to_thread(
+                self._chat_via_openai_responses,
+                base_url,
+                api_key,
+                user_prompt,
+            )
+            yield result
+            return
+
         try:
             from openai import OpenAI  # type: ignore
 
@@ -1982,29 +2805,15 @@ class OmicVerseLLMBackend:
                 def _create_stream():
                     logger.debug(f"Creating GPT-5 Responses API stream: model={self.config.model}")
 
-                    input_payload = [
-                        {
-                            "role": "system",
-                            "content": [
-                                {"type": "input_text", "text": self.config.system_prompt}
-                            ],
-                        },
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "input_text", "text": user_prompt}
-                            ],
-                        },
-                    ]
-
-                    return client.responses.create(
-                        model=self.config.model,
-                        input=input_payload,
-                        instructions=self.config.system_prompt,
-                        max_output_tokens=self.config.max_tokens,
-                        reasoning={"effort": "high"},
-                        stream=True  # Enable streaming for GPT-5 Responses API
+                    kwargs = self._build_openai_responses_request(
+                        messages=[{"role": "user", "content": user_prompt}],
+                        tools=None,
+                        tool_choice=None,
+                        include_system_messages=False,
                     )
+                    kwargs["reasoning"] = {"effort": "high"}
+                    kwargs["stream"] = True
+                    return client.responses.create(**kwargs)
 
                 # Retry stream creation on transient failures
                 stream = self._retry(_create_stream)
@@ -2104,18 +2913,25 @@ class OmicVerseLLMBackend:
         """Stream responses from Anthropic Claude models with retry on session creation."""
         api_key = self._resolve_api_key()
         if not api_key:
-            raise RuntimeError("Missing ANTHROPIC_API_KEY for Anthropic provider")
+            raise self._missing_api_key_error(get_provider(self.config.provider), "Anthropic")
 
         try:
             import anthropic  # type: ignore
 
-            client = anthropic.Anthropic(api_key=api_key)
+            client_kwargs = {"api_key": api_key}
+            if self.config.endpoint:
+                client_kwargs["base_url"] = self.config.endpoint
+            import httpx
+            timeout_s = _request_timeout_seconds()
+            client_kwargs["timeout"] = httpx.Timeout(timeout_s * 3, connect=10.0)  # streaming gets more time
+            client = anthropic.Anthropic(**client_kwargs)
+            wire_model = self._wire_model_name()
 
             # Generator function for streaming with retry on session creation
             def _stream_sdk():
                 def _create_stream():
                     return client.messages.stream(
-                        model=self.config.model,
+                        model=wire_model,
                         max_tokens=self.config.max_tokens,
                         system=self.config.system_prompt,
                         messages=[

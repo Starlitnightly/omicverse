@@ -1,13 +1,13 @@
 ---
 name: single-cell-preprocessing-with-omicverse
 title: Single-cell preprocessing with omicverse
-description: Walk through omicverse's single-cell preprocessing tutorials to QC PBMC3k data, normalise counts, detect HVGs, and run PCA/embedding pipelines on CPU, CPU–GPU mixed, or GPU stacks.
+description: "Single-cell QC, normalization, HVG detection, PCA, neighbor graph, UMAP/tSNE embedding pipelines in OmicVerse (CPU/GPU)."
 ---
 
 # Single-cell preprocessing with omicverse
 
 ## Overview
-Follow this skill when a user needs to reproduce the preprocessing workflow from the omicverse notebooks [`t_preprocess.ipynb`](../../omicverse_guide/docs/Tutorials-single/t_preprocess.ipynb), [`t_preprocess_cpu.ipynb`](../../omicverse_guide/docs/Tutorials-single/t_preprocess_cpu.ipynb), and [`t_preprocess_gpu.ipynb`](../../omicverse_guide/docs/Tutorials-single/t_preprocess_gpu.ipynb). The tutorials operate on the 10x PBMC3k dataset and cover QC filtering, normalisation, highly variable gene (HVG) detection, dimensionality reduction, and downstream embeddings.
+Follow this skill when a user needs to reproduce the preprocessing workflow from the omicverse notebooks [`t_preprocess.ipynb`](../../../omicverse_guide/docs/Tutorials-single/t_preprocess.ipynb), [`t_preprocess_cpu.ipynb`](../../../omicverse_guide/docs/Tutorials-single/t_preprocess_cpu.ipynb), and [`t_preprocess_gpu.ipynb`](../../../omicverse_guide/docs/Tutorials-single/t_preprocess_gpu.ipynb). The tutorials operate on the 10x PBMC3k dataset and cover QC filtering, normalisation, highly variable gene (HVG) detection, dimensionality reduction, and downstream embeddings.
 
 ## Instructions
 1. **Set up the environment**
@@ -15,7 +15,7 @@ Follow this skill when a user needs to reproduce the preprocessing workflow from
    - Encourage `%load_ext autoreload` and `%autoreload 2` when iterating inside notebooks so code edits propagate without restarting the kernel.
 2. **Prepare input data**
    - Download the PBMC3k filtered matrix from 10x Genomics (`pbmc3k_filtered_gene_bc_matrices.tar.gz`) and extract it under `data/filtered_gene_bc_matrices/hg19/`.
-   - Load the matrix via `sc.read_10x_mtx(..., var_names='gene_symbols', cache=True)` and keep a writable folder like `write/` for exports.
+   - Load the matrix via `ov.io.read_10x_mtx(..., var_names='gene_symbols')` and keep a writable folder like `write/` for exports.
 3. **Perform quality control (QC)**
    - Run `ov.pp.qc(adata, tresh={'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250}, doublets_method='scrublet')` for the CPU/CPU–GPU pipelines; omit `doublets_method` on pure GPU where Scrublet is not yet supported.
    - Review the returned AnnData summary to confirm doublet rates and QC thresholds; advise adjusting cut-offs for different species or sequencing depths.
@@ -43,7 +43,7 @@ Follow this skill when a user needs to reproduce the preprocessing workflow from
              ov.pp.neighbors(adata, n_neighbors=15, use_rep='X_pca')
          ov.single.leiden(adata, resolution=1.0)
      ```
-   - Plot embeddings with `ov.pl.embedding(...)` or `ov.utils.embedding(...)`, colouring by `leiden` clusters and marker genes. Always verify that the column specified in `color=` parameter exists in `adata.obs` before plotting.
+   - Plot embeddings with `ov.pl.embedding(...)` or `ov.pl.umap(...)`, colouring by `leiden` clusters and marker genes. Always verify that the column specified in `color=` parameter exists in `adata.obs` before plotting.
 9. **Document outputs**
    - Encourage saving intermediate AnnData objects (`adata.write('write/pbmc3k_preprocessed.h5ad')`) and figure exports using Matplotlib’s `plt.savefig(...)` to preserve QC summaries and embeddings.
 10. **Notebook-specific notes**
@@ -51,7 +51,7 @@ Follow this skill when a user needs to reproduce the preprocessing workflow from
     - *CPU–GPU mixed (`t_preprocess_cpu.ipynb`)*: Highlights Omicverse ≥1.7.0 mixed acceleration. Include timing magics (%%time) to showcase speedups and call out `doublets_method='scrublet'` support.
     - *GPU (`t_preprocess_gpu.ipynb`)*: Requires a CUDA-capable GPU, RAPIDS 24.04 stack, and `rapids-singlecell`. Mention the `ov.pp.anndata_to_GPU`/`ov.pp.anndata_to_CPU` transfers and `method='cagra'` neighbours. Note the current warning that pure-GPU pipelines depend on RAPIDS updates.
 11. **Troubleshooting tips**
-    - If `sc.read_10x_mtx` fails, verify the extracted folder structure and ensure gene symbols are available via `var_names='gene_symbols'`.
+    - If `ov.io.read_10x_mtx` fails, verify the extracted folder structure and ensure gene symbols are available via `var_names='gene_symbols'`.
     - Address GPU import errors by confirming the conda environment matches the RAPIDS version for the installed CUDA driver (`nvidia-smi`).
     - For `ov.pp.preprocess` dimension mismatches, ensure QC filtered out empty barcodes so HVG selection does not encounter zero-variance features.
     - When embeddings lack expected fields (e.g., `scaled|original|X_pca` missing), re-run `ov.pp.scale` and `ov.pp.pca` to rebuild the cached layers.
@@ -180,5 +180,5 @@ def safe_highly_variable_genes(adata, batch_key='batch', n_top_genes=2000):
 - "Provision a RAPIDS environment, transfer AnnData to GPU, run `method='cagra'` neighbours, and return embeddings to CPU for plotting."
 
 ## References
-- Detailed walkthrough notebooks: [`t_preprocess.ipynb`](../../omicverse_guide/docs/Tutorials-single/t_preprocess.ipynb), [`t_preprocess_cpu.ipynb`](../../omicverse_guide/docs/Tutorials-single/t_preprocess_cpu.ipynb), [`t_preprocess_gpu.ipynb`](../../omicverse_guide/docs/Tutorials-single/t_preprocess_gpu.ipynb)
+- Detailed walkthrough notebooks: [`t_preprocess.ipynb`](../../../omicverse_guide/docs/Tutorials-single/t_preprocess.ipynb), [`t_preprocess_cpu.ipynb`](../../../omicverse_guide/docs/Tutorials-single/t_preprocess_cpu.ipynb), [`t_preprocess_gpu.ipynb`](../../../omicverse_guide/docs/Tutorials-single/t_preprocess_gpu.ipynb)
 - Quick copy/paste commands: [`reference.md`](reference.md)

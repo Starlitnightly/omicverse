@@ -71,13 +71,13 @@ def _get_vector_friendly():
     description="Scatter plot visualization of single-cell embeddings with flexible coloring options",
     examples=[
         "# Basic UMAP visualization",
-        "ov.utils.embedding(adata, basis='X_umap', color='leiden')",
+        "ov.pl.embedding(adata, basis='X_umap', color='leiden')",
         "# Multiple color variables",
-        "ov.utils.embedding(adata, basis='X_pca', color=['n_genes', 'leiden', 'CD14'])",
+        "ov.pl.embedding(adata, basis='X_pca', color=['n_genes', 'leiden', 'CD14'])",
         "# Gene expression visualization",
-        "ov.utils.embedding(adata, basis='X_tsne', color=['CD3D', 'CD79A'])",
+        "ov.pl.embedding(adata, basis='X_tsne', color=['CD3D', 'CD79A'])",
         "# Custom visualization settings",
-        "ov.utils.embedding(adata, basis='X_umap', color='celltype',",
+        "ov.pl.embedding(adata, basis='X_umap', color='celltype',",
         "                   frameon=False, legend_loc='right margin')"
     ],
     related=["pp.pca", "utils.mde", "pl.umap", "pl.tsne"]
@@ -142,7 +142,8 @@ def embedding(
 ) -> Union[Figure, Axes, None]:
     r"""Scatter plot for user specified embedding basis (e.g. umap, pca, etc).
 
-    Arguments:
+    Parameters
+    ----------
         adata: Annotated data matrix
         basis: Name of the obsm basis to use
         color: Keys for annotations of observations/cells or variables/genes (None)
@@ -191,7 +192,8 @@ def embedding(
         marker: Marker style ('.') 
         **kwargs: Additional arguments passed to scatter
         
-    Returns:
+    Returns
+    -------
         Matplotlib axes or figure object if show=False
     """
     #####################
@@ -778,11 +780,13 @@ def _wraps_plot_scatter(wrapper):
 def umap(adata, **kwargs) -> Union[Axes, List[Axes], None]:
     r"""Scatter plot in UMAP basis.
 
-    Arguments:
+    Parameters
+    ----------
         adata: Annotated data matrix
         **kwargs: Additional arguments passed to embedding function
 
-    Returns:
+    Returns
+    -------
         Matplotlib axes or list of axes if show=False
     """
     return embedding(adata, 'umap', **kwargs)
@@ -798,11 +802,13 @@ def umap(adata, **kwargs) -> Union[Axes, List[Axes], None]:
 def tsne(adata, **kwargs) -> Union[Axes, List[Axes], None]:
     r"""Scatter plot in tSNE basis.
 
-    Arguments:
+    Parameters
+    ----------
         adata: Annotated data matrix
         **kwargs: Additional arguments passed to embedding function
 
-    Returns:
+    Returns
+    -------
         Matplotlib axes or list of axes if show=False
     """
     return embedding(adata, 'tsne', **kwargs)
@@ -920,7 +926,8 @@ def pca(
 ) -> Union[Axes, List[Axes], None]:
     r"""Scatter plot in PCA coordinates.
 
-    Arguments:
+    Parameters
+    ----------
         adata: Annotated data matrix
         annotate_var_explained: Annotate explained variance (False)
         show: Show the plot (None)
@@ -928,7 +935,8 @@ def pca(
         save: Save the plot (None)
         **kwargs: Additional arguments passed to embedding function
 
-    Returns:
+    Returns
+    -------
         Matplotlib axes or list of axes if show=False
     """
     if not annotate_var_explained:
@@ -1562,7 +1570,12 @@ def _color_vector(
             color_vector = color_vector.fillna(to_hex(na_color))
         return color_vector, True
     elif not isinstance(values.dtype, pd.CategoricalDtype):
-        return values, False
+        # 将数值列强制转为 float array，避免 object dtype 传入 matplotlib 时报错
+        # （例如 obs 列存为 Python int / object，circles() 无法识别）
+        try:
+            return np.asarray(pd.to_numeric(values, errors="raise"), dtype=float), False
+        except (ValueError, TypeError):
+            return values, False
 
 
 def _basis2name(basis):
@@ -1754,11 +1767,13 @@ def _embedding(
     """\
     Scatter plot for user specified embedding basis (e.g. umap, pca, etc)
 
-    Arguments:
+    Parameters
+    ----------
         adata: Annotated data matrix.
         basis: Name of the `obsm` basis to use.
-        
-    Returns:
+
+    Returns
+    -------
         If `show==False` a :class:`~matplotlib.axes.Axes` or a list of it.
     """
 

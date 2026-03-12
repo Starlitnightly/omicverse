@@ -1,7 +1,7 @@
 ---
 name: single-cell-downstream-analysis
 title: Single-cell downstream analysis
-description: Checklist-style reference for OmicVerse downstream tutorials covering AUCell scoring, metacell DEG, and related exports.
+description: "AUCell pathway scoring, metacell DEG, scDrug response, SCENIC regulons, cNMF programs, and NOCD community detection in OmicVerse."
 ---
 
 # Single-cell downstream analysis quick-reference
@@ -9,6 +9,26 @@ description: Checklist-style reference for OmicVerse downstream tutorials coveri
 This skill sheet distills the OmicVerse single-cell downstream tutorials into an executable checklist. Each module
 highlights **prerequisites**, the **core API entry points**, **interpretation checkpoints**, **resource planning notes**, and
 any **optional validation or export steps** surfaced in the notebooks.
+
+## Defensive Validation Patterns
+
+Before running any downstream module, verify prerequisites:
+
+```python
+# Before AUCell: verify embeddings exist
+assert 'X_umap' in adata.obsm or 'X_pca' in adata.obsm, \
+    "Embedding required. Run ov.pp.umap(adata) or ov.pp.pca(adata) first."
+
+# Before metacell DEG: verify raw counts are preserved
+assert adata.raw is not None, "adata.raw required. Set adata.raw = adata.copy() before HVG filtering."
+
+# Before SCENIC: verify raw counts (not log-transformed) are available
+if hasattr(adata.X, 'max') and adata.X.max() < 20:
+    print("WARNING: SCENIC expects raw counts. Data may be log-transformed.")
+
+# Before scDrug: verify tumor annotations
+# assert 'cell_type' in adata.obs.columns, "Cell type annotation required for scDrug"
+```
 
 ## AUCell pathway scoring (`t_aucell.ipynb`)
 - **Prerequisites**
@@ -37,7 +57,7 @@ any **optional validation or export steps** surfaced in the notebooks.
   - Build metacells via `ov.single.MetaCell(..., use_gpu=True)` when GPU is available for acceleration.
 - **Result checks**
   - Inspect volcano plots (`dds.plot_volcano`) and targeted boxplots (`dds.plot_boxplot`) for top DEGs.
-  - Map DEG markers back to UMAP embeddings using `ov.utils.embedding` to confirm localization.
+  - Map DEG markers back to UMAP embeddings using `ov.pl.embedding` to confirm localization.
 - **Resources**
   - Metacell construction benefits from GPU but can fall back to CPU; ensure enough memory for transposed dense matrices
     passed to `pyDEG`.
@@ -81,6 +101,9 @@ any **optional validation or export steps** surfaced in the notebooks.
   - Persist intermediate `AnnData` (`adata.write('scanpyobj.h5ad')`) to reuse for downstream analyses or re-runs.
 
 ## SCENIC regulon discovery (`t_scenic.ipynb`)
+
+**For comprehensive SCENIC guidance** (database downloads, RegDiffusion tuning, RSS interpretation, GRN visualization), use `search_skills('SCENIC regulon GRN')` to load the dedicated SCENIC skill.
+
 - **Prerequisites**
   - Mouse hematopoiesis dataset loaded via `ov.single.mouse_hsc_nestorowa16()` (or provide preprocessed data with raw counts).
   - Download cisTarget ranking databases (`*.feather`) and motif annotations (`motifs-*.tbl`) for the species; allocate

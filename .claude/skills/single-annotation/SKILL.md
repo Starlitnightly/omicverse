@@ -1,7 +1,7 @@
 ---
 name: single-cell-annotation-skills-with-omicverse
 title: Single-cell annotation skills with omicverse
-description: Guide Claude through SCSA, MetaTiME, CellVote, CellMatch, GPTAnno, and weighted KNN transfer workflows for annotating single-cell modalities.
+description: "Cell type annotation: SCSA, MetaTiME, CellVote consensus, CellMatch, GPTAnno, weighted KNN label transfer in OmicVerse."
 ---
 
 # Single-cell annotation skills with omicverse
@@ -12,8 +12,8 @@ Use this skill to reproduce and adapt the single-cell annotation playbook captur
 ## Instructions
 1. **SCSA automated cluster annotation**
    - *Data requirements*: PBMC3k raw counts from 10x Genomics (`pbmc3k_filtered_gene_bc_matrices.tar.gz`) or the processed `sample/rna.h5ad`. Download instructions are embedded in the notebook; unpack to `data/filtered_gene_bc_matrices/hg19/`. Ensure an SCSA SQLite database is available (e.g. `pySCSA_2024_v1_plus.db` from the Figshare/Drive links listed in the tutorial) and point `model_path` to its location.
-   - *Preprocessing & model fit*: Load with `sc.read_10x_mtx`, run QC (`ov.pp.qc`), normalization and HVG selection (`ov.pp.preprocess`), scaling (`ov.pp.scale`), PCA (`ov.pp.pca`), neighbors, Leiden clustering, and compute rank markers (`sc.tl.rank_genes_groups`). Instantiate `scsa = ov.single.pySCSA(...)` choosing `target='cellmarker'` or `'panglaodb'`, tissue scope, and thresholds (`foldchange`, `pvalue`).
-   - *Inference & interpretation*: Call `scsa.cell_anno(clustertype='leiden', result_key='scsa_celltype_cellmarker')` or `scsa.cell_auto_anno` to append predictions to `adata.obs`. Compare to manual marker-based labels via `ov.utils.embedding` or `sc.pl.dotplot`, inspect marker dictionaries (`ov.single.get_celltype_marker`), and query supported tissues with `scsa.get_model_tissue()`. Use the ROI/ROE helpers (`ov.utils.roe`, `ov.utils.plot_cellproportion`) to validate abundance trends.
+   - *Preprocessing & model fit*: Load with `ov.io.read_10x_mtx`, run QC (`ov.pp.qc`), normalization and HVG selection (`ov.pp.preprocess`), scaling (`ov.pp.scale`), PCA (`ov.pp.pca`), neighbors, Leiden clustering, and compute rank markers (`sc.tl.rank_genes_groups`). Instantiate `scsa = ov.single.pySCSA(...)` choosing `target='cellmarker'` or `'panglaodb'`, tissue scope, and thresholds (`foldchange`, `pvalue`).
+   - *Inference & interpretation*: Call `scsa.cell_anno(clustertype='leiden', result_key='scsa_celltype_cellmarker')` or `scsa.cell_auto_anno` to append predictions to `adata.obs`. Compare to manual marker-based labels via `ov.pl.embedding` or `sc.pl.dotplot`, inspect marker dictionaries (`ov.single.get_celltype_marker`), and query supported tissues with `scsa.get_model_tissue()`. Use the ROI/ROE helpers (`ov.utils.roe`, `ov.utils.plot_cellproportion`) to validate abundance trends.
 
 2. **MetaTiME tumour microenvironment states**
    - *Data requirements*: Batched TME AnnData with an scVI latent embedding. The tutorial uses `TiME_adata_scvi.h5ad` from Figshare (`https://figshare.com/ndownloader/files/41440050`). If starting from counts, run scVI (`scvi.model.SCVI`) first to populate `adata.obsm['X_scVI']`.
@@ -38,7 +38,24 @@ Use this skill to reproduce and adapt the single-cell annotation playbook captur
 6. **Weighted KNN annotation transfer**
    - *Data requirements*: Cross-modal GLUE outputs with aligned embeddings, e.g. `data/analysis_lymph/rna-emb.h5ad` (annotated RNA) and `data/analysis_lymph/atac-emb.h5ad` (query ATAC) where both contain `obsm['X_glue']`.
    - *Preprocessing & model fit*: Load both modalities, optionally concatenate for QC plots, and compute a shared low-dimensional embedding with `ov.utils.mde`. Train a neighbour model using `ov.utils.weighted_knn_trainer(train_adata=rna, train_adata_emb='X_glue', n_neighbors=15)`.
-   - *Inference & interpretation*: Transfer labels via `labels, uncert = ov.utils.weighted_knn_transfer(query_adata=atac, query_adata_emb='X_glue', label_keys='major_celltype', knn_model=knn_transformer, ref_adata_obs=rna.obs)`. Store predictions in `atac.obs['transf_celltype']` and uncertainties in `atac.obs['transf_celltype_unc']`; copy to `major_celltype` if you want consistent naming. Visualise (`ov.utils.embedding`) and inspect uncertainty to flag ambiguous cells.
+   - *Inference & interpretation*: Transfer labels via `labels, uncert = ov.utils.weighted_knn_transfer(query_adata=atac, query_adata_emb='X_glue', label_keys='major_celltype', knn_model=knn_transformer, ref_adata_obs=rna.obs)`. Store predictions in `atac.obs['transf_celltype']` and uncertainties in `atac.obs['transf_celltype_unc']`; copy to `major_celltype` if you want consistent naming. Visualise (`ov.pl.embedding`) and inspect uncertainty to flag ambiguous cells.
+
+## Defensive Validation Patterns
+
+```python
+# Before SCSA: verify rank_genes_groups has been computed
+assert 'rank_genes_groups' in adata.uns, \
+    "Marker genes required. Run sc.tl.rank_genes_groups(adata, groupby='leiden') first."
+
+# Before any annotation: verify clustering exists
+assert 'leiden' in adata.obs.columns or 'louvain' in adata.obs.columns, \
+    "Clustering required. Run ov.pp.leiden(adata) or sc.tl.leiden(adata) first."
+
+# Before CellVote: verify multiple annotation columns exist
+annotation_keys = ['scsa_annotation', 'gpt_celltype']  # adjust to actual keys
+for key in annotation_keys:
+    assert key in adata.obs.columns, f"Annotation column '{key}' not found — run annotators first"
+```
 
 ## Critical API Reference - EXACT Function Signatures
 

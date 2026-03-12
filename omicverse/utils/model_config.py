@@ -76,10 +76,12 @@ register_provider(ProviderInfo(
     base_url="https://api.openai.com/v1",
     env_key="OPENAI_API_KEY",
     wire_api=WireAPI.CHAT_COMPLETIONS,
-    model_prefixes=("gpt-", "o1", "o3"),
+    model_prefixes=("gpt-", "o1", "o3", "o4"),
     models={
         "gpt-5": "OpenAI GPT-5 (Latest)",
         "gpt-5.2": "OpenAI GPT-5.2",
+        "gpt-5.4": "OpenAI GPT-5.4",
+        "gpt-5.4-pro": "OpenAI GPT-5.4 Pro",
         "gpt-5-mini": "OpenAI GPT-5 Mini",
         "gpt-5-nano": "OpenAI GPT-5 Nano",
         "gpt-5-chat-latest": "OpenAI GPT-5 Chat Latest",
@@ -95,6 +97,7 @@ register_provider(ProviderInfo(
         "o3": "OpenAI o3 (Reasoning)",
         "o3-mini": "OpenAI o3 Mini (Reasoning)",
         "o1-mini": "OpenAI o1 Mini (Reasoning)",
+        "o4-mini": "OpenAI o4 Mini",
     },
 ))
 
@@ -104,13 +107,21 @@ register_provider(ProviderInfo(
     base_url="https://api.anthropic.com",
     env_key="ANTHROPIC_API_KEY",
     wire_api=WireAPI.ANTHROPIC_MESSAGES,
-    model_prefixes=("anthropic/",),
+    model_prefixes=("anthropic/", "claude-"),
     models={
-        "anthropic/claude-opus-4-1-20250805": "Claude Opus 4.1 (Latest)",
+        # Claude 4.6
+        "anthropic/claude-opus-4-6-20260201": "Claude Opus 4.6",
+        "anthropic/claude-sonnet-4-6-20260201": "Claude Sonnet 4.6",
+        "anthropic/claude-haiku-4-5-20251001": "Claude Haiku 4.5",
+        # Claude 4.1
+        "anthropic/claude-opus-4-1-20250805": "Claude Opus 4.1",
+        # Claude 4
         "anthropic/claude-opus-4-20250514": "Claude Opus 4",
         "anthropic/claude-sonnet-4-20250514": "Claude Sonnet 4",
+        # Claude 3.7 / 3.5
         "anthropic/claude-3-7-sonnet-20250219": "Claude Sonnet 3.7",
         "anthropic/claude-3-5-haiku-20241022": "Claude Haiku 3.5",
+        # Legacy
         "anthropic/claude-3-opus-20240229": "Claude 3 Opus (Legacy)",
         "anthropic/claude-3-sonnet-20240229": "Claude 3 Sonnet (Legacy)",
         "anthropic/claude-3-haiku-20240307": "Claude 3 Haiku (Legacy)",
@@ -123,8 +134,9 @@ register_provider(ProviderInfo(
     base_url="https://generativelanguage.googleapis.com/v1beta",
     env_key="GOOGLE_API_KEY",
     wire_api=WireAPI.GEMINI_GENERATE,
-    model_prefixes=("gemini/",),
+    model_prefixes=("gemini/", "gemini-"),
     models={
+        "gemini/gemini-3-pro-preview": "Gemini 3 Pro (Preview)",
         "gemini/gemini-3-flash-preview": "Gemini 3 Flash (Preview)",
         "gemini/gemini-2.5-pro": "Gemini 2.5 Pro",
         "gemini/gemini-2.5-flash": "Gemini 2.5 Flash",
@@ -171,6 +183,7 @@ register_provider(ProviderInfo(
     wire_api=WireAPI.CHAT_COMPLETIONS,
     model_prefixes=("moonshot/", "kimi-", "moonshot-"),
     models={
+        "moonshot/kimi-k2.5": "Kimi K2.5",
         "moonshot/kimi-k2-0711-preview": "Kimi K2 (Preview)",
         "moonshot/kimi-k2-turbo-preview": "Kimi K2 Turbo (Preview)",
         "moonshot/kimi-latest": "Kimi Latest (Auto Context)",
@@ -181,15 +194,87 @@ register_provider(ProviderInfo(
 ))
 
 register_provider(ProviderInfo(
+    name="minimax",
+    display_name="MiniMax",
+    base_url="https://api.minimax.chat/v1",
+    env_key="MINIMAX_API_KEY",
+    wire_api=WireAPI.CHAT_COMPLETIONS,
+    model_prefixes=("minimax/",),
+    models={
+        "minimax/MiniMax-M2.1": "MiniMax M2.1",
+        "minimax/MiniMax-M2.1-lightning": "MiniMax M2.1 Lightning",
+        "minimax/MiniMax-VL-01": "MiniMax VL 01",
+    },
+))
+
+register_provider(ProviderInfo(
+    name="together",
+    display_name="Together AI",
+    base_url="https://api.together.xyz/v1",
+    env_key="TOGETHER_API_KEY",
+    wire_api=WireAPI.CHAT_COMPLETIONS,
+    model_prefixes=("together/",),
+    models={
+        "together/zai-org/GLM-4.7": "GLM 4.7 Fp8 (Together)",
+        "together/moonshotai/Kimi-K2.5": "Kimi K2.5 (Together)",
+        "together/deepseek-ai/DeepSeek-V3.1": "DeepSeek V3.1 (Together)",
+        "together/deepseek-ai/DeepSeek-R1": "DeepSeek R1 (Together)",
+    },
+))
+
+register_provider(ProviderInfo(
     name="xai",
     display_name="Grok",
     base_url="https://api.x.ai/v1",
     env_key="XAI_API_KEY",
     wire_api=WireAPI.CHAT_COMPLETIONS,
-    model_prefixes=("grok/",),
+    model_prefixes=("xai/", "grok/", "grok-"),
     models={
-        "grok/grok-beta": "Grok Beta",
-        "grok/grok-2": "Grok 2",
+        "xai/grok-beta": "Grok Beta",
+        "xai/grok-2": "Grok 2",
+        "xai/grok-4": "Grok 4",
+        "xai/grok-4-fast-non-reasoning": "Grok 4 Fast",
+        "xai/grok-4-fast-reasoning": "Grok 4 Fast Reasoning",
+    },
+))
+
+register_provider(ProviderInfo(
+    name="qianfan",
+    display_name="Qianfan",
+    base_url="https://qianfan.baidubce.com/v2",
+    env_key="QIANFAN_API_KEY",
+    wire_api=WireAPI.CHAT_COMPLETIONS,
+    model_prefixes=("qianfan/",),
+    models={
+        "qianfan/deepseek-v3.2": "DEEPSEEK V3.2 (Qianfan)",
+        "qianfan/ernie-5.0-thinking-preview": "ERNIE-5.0 Thinking Preview",
+    },
+))
+
+register_provider(ProviderInfo(
+    name="xiaomi",
+    display_name="Xiaomi MiMo",
+    base_url="https://api.xiaomimimo.com/anthropic",
+    env_key="XIAOMI_API_KEY",
+    wire_api=WireAPI.ANTHROPIC_MESSAGES,
+    model_prefixes=("xiaomi/",),
+    models={
+        "xiaomi/mimo-v2-flash": "Xiaomi MiMo V2 Flash",
+    },
+))
+
+register_provider(ProviderInfo(
+    name="synthetic",
+    display_name="Synthetic",
+    base_url="https://api.synthetic.new/anthropic",
+    env_key="SYNTHETIC_API_KEY",
+    wire_api=WireAPI.ANTHROPIC_MESSAGES,
+    model_prefixes=("synthetic/",),
+    models={
+        "synthetic/hf:MiniMaxAI/MiniMax-M2.1": "MiniMax M2.1 (Synthetic)",
+        "synthetic/hf:moonshotai/Kimi-K2.5": "Kimi K2.5 (Synthetic)",
+        "synthetic/hf:zai-org/GLM-4.5": "GLM-4.5 (Synthetic)",
+        "synthetic/hf:deepseek-ai/DeepSeek-V3.2": "DeepSeek V3.2 (Synthetic)",
     },
 ))
 
@@ -200,16 +285,37 @@ register_provider(ProviderInfo(
     env_key="ZAI_API_KEY",
     alt_env_keys=("ZHIPUAI_API_KEY",),
     wire_api=WireAPI.CHAT_COMPLETIONS,
-    model_prefixes=("zhipu/",),
+    model_prefixes=("zhipu/", "glm-"),
     models={
         "zhipu/glm-4.5": "GLM-4.5 (Zhipu AI - Latest)",
         "zhipu/glm-4.5-air": "GLM-4.5 Air (Zhipu AI - Latest)",
         "zhipu/glm-4.5-flash": "GLM-4.5 Flash (Zhipu AI - Latest)",
+        "zhipu/glm-4.5v": "GLM-4.5V (Zhipu AI)",
         "zhipu/glm-4": "GLM-4 (Zhipu AI)",
         "zhipu/glm-4-plus": "GLM-4 Plus (Zhipu AI)",
         "zhipu/glm-4-air": "GLM-4 Air (Zhipu AI)",
         "zhipu/glm-4-flash": "GLM-4 Flash (Zhipu AI - Free)",
     },
+))
+
+register_provider(ProviderInfo(
+    name="ollama",
+    display_name="Ollama",
+    base_url="http://127.0.0.1:11434/v1",
+    env_key="",
+    wire_api=WireAPI.CHAT_COMPLETIONS,
+    model_prefixes=(),
+    models={},
+))
+
+register_provider(ProviderInfo(
+    name="openai_compatible",
+    display_name="OpenAI-Compatible",
+    base_url="https://api.openai.com/v1",
+    env_key="OPENAI_API_KEY",
+    wire_api=WireAPI.CHAT_COMPLETIONS,
+    model_prefixes=(),
+    models={},
 ))
 
 
@@ -254,7 +360,23 @@ _RAW_MODEL_ALIASES = {
     "python-local": "python",
     "py-local": "python",
 
-    # Claude 4.5 variations
+    # Claude 4.6 variations
+    "claude-opus-4-6": "anthropic/claude-opus-4-6-20260201",
+    "claude-opus-4-6-thinking": "anthropic/claude-opus-4-6-20260201",
+    "claude-4-6-opus": "anthropic/claude-opus-4-6-20260201",
+    "claude-4.6-opus": "anthropic/claude-opus-4-6-20260201",
+    "claude-sonnet-4-6": "anthropic/claude-sonnet-4-6-20260201",
+    "claude-sonnet-4-6-thinking": "anthropic/claude-sonnet-4-6-20260201",
+    "claude-4-6-sonnet": "anthropic/claude-sonnet-4-6-20260201",
+    "claude-4.6-sonnet": "anthropic/claude-sonnet-4-6-20260201",
+    "claude-haiku-4-5": "anthropic/claude-haiku-4-5-20251001",
+    "claude-4-5-haiku": "anthropic/claude-haiku-4-5-20251001",
+    "claude-4.5-haiku": "anthropic/claude-haiku-4-5-20251001",
+    # Claude 4.1 variations
+    "claude-opus-4-1": "anthropic/claude-opus-4-1-20250805",
+    "claude-4-1-opus": "anthropic/claude-opus-4-1-20250805",
+    "claude-4.1-opus": "anthropic/claude-opus-4-1-20250805",
+    # Claude 4 / 4.5 Sonnet variations
     "claude-sonnet-4-5": "anthropic/claude-sonnet-4-20250514",
     "claude-4-5-sonnet": "anthropic/claude-sonnet-4-20250514",
     "claude-sonnet-4-5-20250929": "anthropic/claude-sonnet-4-20250514",
@@ -277,10 +399,16 @@ _RAW_MODEL_ALIASES = {
     # Gemini
     "gemini-3-flash-preview": "gemini/gemini-3-flash-preview",
     "gemini-3-flash": "gemini/gemini-3-flash-preview",
+    "google/gemini-3-flash-preview": "gemini/gemini-3-flash-preview",
+    "gemini-3-pro-preview": "gemini/gemini-3-pro-preview",
+    "gemini-3-pro": "gemini/gemini-3-pro-preview",
+    "google/gemini-3-pro-preview": "gemini/gemini-3-pro-preview",
     "gemini-2.5-pro": "gemini/gemini-2.5-pro",
     "gemini-2-5-pro": "gemini/gemini-2.5-pro",
+    "google/gemini-2.5-pro": "gemini/gemini-2.5-pro",
     "gemini-2.5-flash": "gemini/gemini-2.5-flash",
     "gemini-2-5-flash": "gemini/gemini-2.5-flash",
+    "google/gemini-2.5-flash": "gemini/gemini-2.5-flash",
     "gemini-2.0-pro": "gemini/gemini-2.0-pro",
     "gemini-2-0-pro": "gemini/gemini-2.0-pro",
     "gemini-2.0-flash": "gemini/gemini-2.0-flash",
@@ -289,6 +417,57 @@ _RAW_MODEL_ALIASES = {
     # Deepseek
     "deepseek-chat": "deepseek/deepseek-chat",
     "deepseek-reasoner": "deepseek/deepseek-reasoner",
+    # Moonshot / Kimi
+    "kimi-k2.5": "moonshot/kimi-k2.5",
+    "moonshot/kimi-k2.5": "moonshot/kimi-k2.5",
+    "kimi-latest": "moonshot/kimi-latest",
+    # MiniMax
+    "minimax/minimax-m2.1": "minimax/MiniMax-M2.1",
+    "minimax/minimax-m2.1-lightning": "minimax/MiniMax-M2.1-lightning",
+    "minimax/minimax-vl-01": "minimax/MiniMax-VL-01",
+    "minimax-m2.1": "minimax/MiniMax-M2.1",
+    "minimax-m2.1-lightning": "minimax/MiniMax-M2.1-lightning",
+    "minimax-vl-01": "minimax/MiniMax-VL-01",
+    "minimax m2.1": "minimax/MiniMax-M2.1",
+    "minimax m2.1 lightning": "minimax/MiniMax-M2.1-lightning",
+    "minimax vl 01": "minimax/MiniMax-VL-01",
+    "minimax/m2.1": "minimax/MiniMax-M2.1",
+    # Together
+    "together/moonshotai/kimi-k2.5": "together/moonshotai/Kimi-K2.5",
+    "together/zai-org/glm-4.7": "together/zai-org/GLM-4.7",
+    "together/deepseek-ai/deepseek-v3.1": "together/deepseek-ai/DeepSeek-V3.1",
+    "together/deepseek-ai/deepseek-r1": "together/deepseek-ai/DeepSeek-R1",
+    # xAI / Grok
+    "grok-beta": "xai/grok-beta",
+    "grok/grok-beta": "xai/grok-beta",
+    "grok-2": "xai/grok-2",
+    "grok/grok-2": "xai/grok-2",
+    "grok-4": "xai/grok-4",
+    "xai/grok-4": "xai/grok-4",
+    # Qianfan
+    "qianfan/deepseek-v3.2": "qianfan/deepseek-v3.2",
+    "deepseek-v3.2": "qianfan/deepseek-v3.2",
+    "qianfan/ernie-5.0-thinking-preview": "qianfan/ernie-5.0-thinking-preview",
+    "ernie-5.0-thinking-preview": "qianfan/ernie-5.0-thinking-preview",
+    # Xiaomi
+    "xiaomi/mimo-v2-flash": "xiaomi/mimo-v2-flash",
+    "mimo-v2-flash": "xiaomi/mimo-v2-flash",
+    # Synthetic
+    "synthetic/hf:minimaxai/minimax-m2.1": "synthetic/hf:MiniMaxAI/MiniMax-M2.1",
+    "hf:minimaxai/minimax-m2.1": "synthetic/hf:MiniMaxAI/MiniMax-M2.1",
+    "synthetic/hf:moonshotai/kimi-k2.5": "synthetic/hf:moonshotai/Kimi-K2.5",
+    "hf:moonshotai/kimi-k2.5": "synthetic/hf:moonshotai/Kimi-K2.5",
+    "synthetic/hf:zai-org/glm-4.5": "synthetic/hf:zai-org/GLM-4.5",
+    "hf:zai-org/glm-4.5": "synthetic/hf:zai-org/GLM-4.5",
+    "synthetic/hf:deepseek-ai/deepseek-v3.2": "synthetic/hf:deepseek-ai/DeepSeek-V3.2",
+    "hf:deepseek-ai/deepseek-v3.2": "synthetic/hf:deepseek-ai/DeepSeek-V3.2",
+    # Zhipu / GLM
+    "glm-4.5": "zhipu/glm-4.5",
+    "glm-4.5-air": "zhipu/glm-4.5-air",
+    "glm-4.5-flash": "zhipu/glm-4.5-flash",
+    "glm-4.5v": "zhipu/glm-4.5v",
+    # OpenAI o4
+    "openai/o4-mini": "o4-mini",
 }
 
 MODEL_ALIASES: Dict[str, str] = {key.lower(): value for key, value in _RAW_MODEL_ALIASES.items()}
@@ -317,9 +496,31 @@ def _provider_for_model(model: str) -> Optional[ProviderInfo]:
     # Prefix-based fallback for custom / unlisted models
     for info in PROVIDER_REGISTRY.values():
         for prefix in info.model_prefixes:
+            # Bare prefixes like ``kimi-`` or ``glm-`` are intended for raw
+            # model IDs, not namespaced refs such as ``kimi-coding/...``.
+            if "/" in model and "/" not in prefix:
+                continue
             if model.startswith(prefix):
                 return info
     return None
+
+
+def _is_known_model_or_provider_model(model: str) -> bool:
+    if model in AVAILABLE_MODELS:
+        return True
+    return _provider_for_model(model) is not None
+
+
+def _is_ollama_endpoint(endpoint: Optional[str]) -> bool:
+    raw = str(endpoint or "").strip().lower().rstrip("/")
+    if not raw:
+        return False
+    return (
+        "127.0.0.1:11434" in raw
+        or "localhost:11434" in raw
+        or raw.endswith(":11434/v1")
+        or raw.endswith(":11434")
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -341,17 +542,24 @@ class ModelConfig:
     def is_model_supported(model: str) -> bool:
         """Check if a model is supported"""
         normalized = ModelConfig.normalize_model_id(model)
-        return normalized in AVAILABLE_MODELS
+        return _is_known_model_or_provider_model(normalized)
 
     @staticmethod
     def get_model_description(model: str) -> str:
         """Get human-readable description for a model"""
         normalized = ModelConfig.normalize_model_id(model)
-        return AVAILABLE_MODELS.get(normalized, f"Unknown model: {model}")
+        if normalized in AVAILABLE_MODELS:
+            return AVAILABLE_MODELS[normalized]
+        info = _provider_for_model(normalized)
+        if info is not None:
+            return f"{info.display_name} model ({normalized})"
+        return f"Unknown model: {model}"
 
     @staticmethod
-    def get_provider_from_model(model: str) -> str:
+    def get_provider_from_model(model: str, endpoint: Optional[str] = None) -> str:
         """Determine provider from model name using the registry."""
+        if _is_ollama_endpoint(endpoint):
+            return "ollama"
         model = ModelConfig.normalize_model_id(model)
         info = _provider_for_model(model)
         if info is not None:

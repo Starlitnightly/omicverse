@@ -7,8 +7,6 @@ import time
 import requests
 import os
 import pandas as pd
-import scanpy as sc
-from pathlib import Path
 from ._genomics import read_gtf,Gtf
 import anndata
 import numpy as np
@@ -20,6 +18,17 @@ from scipy.stats import norm
 from .._settings import Colors, EMOJI  # Import Colors and EMOJI from settings
 from .._registry import register_function
 from ..datasets import download_data_requests
+from ..datasets import load_signatures_from_file, predefined_signatures
+from ..io.general import load, read_csv, save
+from ..io.single import (
+    convert_adata_for_rust,
+    convert_to_pandas,
+    read,
+    read_10x_h5,
+    read_10x_mtx,
+    read_h5ad,
+    wrap_dataframe,
+)
 
 
 DATA_DOWNLOAD_LINK_DICT = {
@@ -130,15 +139,22 @@ DATA_DOWNLOAD_LINK_DICT = {
 def get_utils_dataset_url(dataset_name: str, prefer_stanford: bool = True) -> str:
     """Get URL for a dataset by name, preferring Stanford over Figshare.
 
-    Args:
-        dataset_name: Name of the dataset (e.g., 'GO_bp', 'GDSC_exp').
-        prefer_stanford: Whether to prefer Stanford links over Figshare (default: True).
+    Parameters
+    ----------
+    dataset_name : str
+        Dataset key in ``DATA_DOWNLOAD_LINK_DICT``.
+    prefer_stanford : bool
+        Whether Stanford mirror is preferred over Figshare mirror.
 
-    Returns:
-        URL string for the dataset.
+    Returns
+    -------
+    str
+        Download URL for requested dataset.
 
-    Raises:
-        ValueError: If dataset name is not found.
+    Raises
+    ------
+    ValueError
+        If dataset name does not exist in ``DATA_DOWNLOAD_LINK_DICT``.
     """
     if dataset_name not in DATA_DOWNLOAD_LINK_DICT:
         raise ValueError(f"Dataset '{dataset_name}' not found in DATA_DOWNLOAD_LINK_DICT")
@@ -177,395 +193,28 @@ def _dbg(msg):
 
 
 
-@register_function(
-    aliases=["读取数据", "read", "load_data", "数据读取", "file_reader"],
-    category="utils",
-    description="Universal file reader for common bioinformatics data formats including h5ad, csv, tsv, txt, and gzipped files",
-    examples=[
-        "# Read AnnData file",
-        "adata = ov.read('data.h5ad')",
-        "# Read CSV file",
-        "df = ov.read('data.csv')",
-        "# Read TSV file",
-        "df = ov.read('data.tsv')",
-        "# Read compressed file",
-        "df = ov.read('data.csv.gz')",
-        "# Pass additional parameters",
-        "df = ov.read('data.csv', index_col=0, header=0)"
-    ],
-    related=["utils.read_csv", "utils.read_h5ad", "pp.preprocess"]
-)
-def read(path, backend='python', **kwargs):
-    r"""
-    Arguments:
-        path: The path of the file to read
-        backend: 'python' | 'rust'
-    Returns:
-        AnnData-like object
-    """
-    ext = Path(path).suffix.lower()
-
-    if ext == '.h5ad':
-        if backend == 'python':
-            adata = sc.read_h5ad(path, **kwargs)
-            # Ensure pandas obs index matches obs_names
-            
-            return adata
-
-        elif backend == 'rust':
-            try:
-                import snapatac2 as snap
-            except ImportError:
-                raise ImportError('snapatac2 is not installed. `pip install snapatac2`')
-
-            print(f'{Colors.GREEN}Using anndata-rs to read h5ad file{Colors.ENDC}')
-            print(f'{Colors.WARNING}You should run adata.close() after analysis{Colors.ENDC}')
-            print(f'{Colors.WARNING}Not all function support Rust backend{Colors.ENDC}')
-            adata = snap.read(path, **kwargs)
-            return adata
-
-        else:
-            raise ValueError("backend must be 'python' or 'rust'")
-
-    # 其它纯表格：pandas 会自动识别 gz 压缩，不必手动区分
-    if ext in {'.csv', '.tsv', '.txt', '.gz'}:
-        sep = '\t' if ext in {'.tsv', '.txt'} or path.endswith(('.tsv.gz', '.txt.gz')) else ','
-        return pd.read_csv(path, sep=sep, **kwargs)
-
-    raise ValueError('The type is not supported.')
-
-
-@register_function(
-    aliases=["转换为pandas", "convert_to_pandas", "to_pandas", "DataFrame转换", "rust_to_pandas"],
-    category="utils",
-    description="Convert PyDataFrameElem or Rust DataFrame objects to pandas DataFrame",
-    examples=[
-        "# Convert Rust backend obs to pandas",
-        "adata = ov.read('data.h5ad', backend='rust')",
-        "obs_df = ov.utils.convert_to_pandas(adata.obs)",
-        "print(obs_df)  # Displays as pandas DataFrame",
-        "# Convert Rust backend var to pandas",
-        "var_df = ov.utils.convert_to_pandas(adata.var)",
-        "# Now you can use pandas methods",
-        "filtered = obs_df[obs_df['n_genes'] > 1000]"
-    ],
-    related=["utils.read", "pp.preprocess", "utils.store_layers"]
-)
-def convert_to_pandas(df_obj):
-    """
-    Convert PyDataFrameElem or similar objects to pandas DataFrame.
-
-    This is a utility function to convert Rust-based DataFrame objects
-    (like PyDataFrameElem from anndata-rs/SnapATAC2) to pandas DataFrames.
-
-    Arguments:
-        df_obj: PyDataFrameElem or similar DataFrame-like object
-
-    Returns:
-        pandas.DataFrame: Converted DataFrame
-
-    Examples:
-        >>> import omicverse as ov
-        >>> adata = ov.read('data.h5ad', backend='rust')
-        >>> obs_df = ov.utils.convert_to_pandas(adata.obs)
-        >>> print(obs_df)  # Now displays as pandas DataFrame
-    """
-    import pandas as pd
-
-    try:
-        # 如果对象已经有 to_pandas 方法，直接使用
-        if hasattr(df_obj, 'to_pandas'):
-            return df_obj.to_pandas()
-    except Exception:
-        pass
-
-    try:
-        # 方法1: 使用切片获取整个 DataFrame（SnapATAC2 风格）
-        import polars as pl
-        df_slice = df_obj[:]
-
-        # 检查返回的是否是 polars DataFrame
-        if hasattr(df_slice, 'to_pandas'):
-            return df_slice.to_pandas()
-        elif isinstance(df_slice, pl.DataFrame):
-            return df_slice.to_pandas()
-        else:
-            # 已经是 pandas DataFrame
-            return df_slice
-    except Exception:
-        pass
-
-    try:
-        # 方法2: 通过列名构建 DataFrame
-        if hasattr(df_obj, '__getitem__'):
-            import polars as pl
-            data = {}
-            # 尝试获取列名
-            if hasattr(df_obj, 'columns'):
-                columns = df_obj.columns
-            else:
-                return pd.DataFrame()
-
-            for col in columns:
-                try:
-                    series = df_obj[col]
-                    # 检查是否是 polars Series
-                    if hasattr(series, 'to_pandas'):
-                        data[col] = series.to_pandas()
-                    elif isinstance(series, pl.Series):
-                        data[col] = series.to_pandas()
-                    else:
-                        data[col] = series
-                except:
-                    pass
-
-            if data:
-                return pd.DataFrame(data)
-    except Exception:
-        pass
-
-    # 如果都失败了，返回空 DataFrame
-    return pd.DataFrame()
-
-
-class PyDataFrameElemWrapper:
-    """
-    A wrapper class that provides pandas DataFrame-like interface for PyDataFrameElem.
-
-    This class wraps PyDataFrameElem objects and provides familiar pandas methods
-    like head(), tail(), shape, columns, index, etc.
-    """
-
-    def __init__(self, df_obj):
-        self._df_obj = df_obj
-        self._pandas_cache = None
-
-    def _get_pandas(self):
-        """Get pandas DataFrame, with caching."""
-        if self._pandas_cache is None:
-            self._pandas_cache = convert_to_pandas(self._df_obj)
-        return self._pandas_cache
-
-    def head(self, n=5):
-        """Return first n rows."""
-        return self._get_pandas().head(n)
-
-    def tail(self, n=5):
-        """Return last n rows."""
-        return self._get_pandas().tail(n)
-
-    @property
-    def shape(self):
-        """Return shape of DataFrame."""
-        return self._get_pandas().shape
-
-    @property
-    def columns(self):
-        """Return column labels."""
-        return self._get_pandas().columns
-
-    @property
-    def index(self):
-        """Return row index."""
-        return self._get_pandas().index
-
-    @property
-    def dtypes(self):
-        """Return data types."""
-        return self._get_pandas().dtypes
-
-    def info(self, *args, **kwargs):
-        """Print info about DataFrame."""
-        return self._get_pandas().info(*args, **kwargs)
-
-    def describe(self, *args, **kwargs):
-        """Generate descriptive statistics."""
-        return self._get_pandas().describe(*args, **kwargs)
-
-    def to_pandas(self):
-        """Convert to pandas DataFrame."""
-        return self._get_pandas()
-
-    def __getitem__(self, key):
-        """Support indexing like df['column'] or df[0:5]."""
-        return self._get_pandas()[key]
-
-    def __repr__(self):
-        """Display as pandas DataFrame."""
-        return repr(self._get_pandas())
-
-    def __str__(self):
-        """Display as pandas DataFrame."""
-        return str(self._get_pandas())
-
-    def __len__(self):
-        """Return number of rows."""
-        return len(self._get_pandas())
-
-    # Delegate attribute access to the original object
-    def __getattr__(self, name):
-        return getattr(self._df_obj, name)
-
-
-@register_function(
-    aliases=["包装PyDataFrame", "wrap_dataframe", "pandas_wrapper", "DataFrame包装器"],
-    category="utils",
-    description="Wrap PyDataFrameElem to provide pandas DataFrame-like interface",
-    examples=[
-        "# Wrap PyDataFrameElem for pandas-like usage",
-        "adata = ov.read('data.h5ad', backend='rust')",
-        "obs_wrapper = ov.utils.wrap_dataframe(adata.obs)",
-        "print(obs_wrapper.head())",
-        "print(obs_wrapper.shape)",
-        "print(obs_wrapper.columns)"
-    ],
-    related=["utils.convert_to_pandas", "utils.read"]
-)
-def wrap_dataframe(df_obj):
-    """
-    Wrap PyDataFrameElem to provide pandas DataFrame-like interface.
-
-    Arguments:
-        df_obj: PyDataFrameElem or similar DataFrame-like object
-
-    Returns:
-        PyDataFrameElemWrapper: Wrapped object with pandas-like methods
-
-    Examples:
-        >>> import omicverse as ov
-        >>> adata = ov.read('data.h5ad', backend='rust')
-        >>> obs = ov.utils.wrap_dataframe(adata.obs)
-        >>> print(obs.head())
-        >>> print(obs.shape)
-    """
-    return PyDataFrameElemWrapper(df_obj)
-
-
-@register_function(
-    aliases=["转换为pandas", "convert_to_pandas", "to_pandas", "DataFrame转换", "rust_to_pandas"],
-    category="utils",
-    description="Convert PyDataFrameElem or Rust DataFrame objects to pandas DataFrame",
-    examples=[
-        "# Convert Rust backend obs to pandas",
-        "adata = ov.read('data.h5ad', backend='rust')",
-        "obs_df = ov.utils.convert_to_pandas(adata.obs)",
-        "print(obs_df)  # Displays as pandas DataFrame",
-        "# Convert Rust backend var to pandas",
-        "var_df = ov.utils.convert_to_pandas(adata.var)",
-        "# Now you can use pandas methods",
-        "filtered = obs_df[obs_df['n_genes'] > 1000]"
-    ],
-    related=["utils.read", "pp.preprocess", "utils.store_layers"]
-)
-def convert_to_pandas(df_obj):
-    """
-    Convert PyDataFrameElem or similar objects to pandas DataFrame.
-
-    This is a utility function to convert Rust-based DataFrame objects
-    (like PyDataFrameElem from anndata-rs/SnapATAC2) to pandas DataFrames.
-
-    Arguments:
-        df_obj: PyDataFrameElem or similar DataFrame-like object
-
-    Returns:
-        pandas.DataFrame: Converted DataFrame
-
-    Examples:
-        >>> import omicverse as ov
-        >>> adata = ov.read('data.h5ad', backend='rust')
-        >>> obs_df = ov.utils.convert_to_pandas(adata.obs)
-        >>> print(obs_df)  # Now displays as pandas DataFrame
-    """
-    import pandas as pd
-
-    try:
-        # 如果对象已经有 to_pandas 方法，直接使用
-        if hasattr(df_obj, 'to_pandas'):
-            return df_obj.to_pandas()
-    except Exception:
-        pass
-
-    try:
-        # 方法1: 使用切片获取整个 DataFrame（SnapATAC2 风格）
-        import polars as pl
-        df_slice = df_obj[:]
-
-        # 检查返回的是否是 polars DataFrame
-        if hasattr(df_slice, 'to_pandas'):
-            return df_slice.to_pandas()
-        elif isinstance(df_slice, pl.DataFrame):
-            return df_slice.to_pandas()
-        else:
-            # 已经是 pandas DataFrame
-            return df_slice
-    except Exception:
-        pass
-
-    try:
-        # 方法2: 通过列名构建 DataFrame
-        if hasattr(df_obj, '__getitem__'):
-            import polars as pl
-            data = {}
-            # 尝试获取列名
-            if hasattr(df_obj, 'columns'):
-                columns = df_obj.columns
-            else:
-                return pd.DataFrame()
-
-            for col in columns:
-                try:
-                    series = df_obj[col]
-                    # 检查是否是 polars Series
-                    if hasattr(series, 'to_pandas'):
-                        data[col] = series.to_pandas()
-                    elif isinstance(series, pl.Series):
-                        data[col] = series.to_pandas()
-                    else:
-                        data[col] = series
-                except:
-                    pass
-
-            if data:
-                return pd.DataFrame(data)
-    except Exception:
-        pass
-
-    # 如果都失败了，返回空 DataFrame
-    return pd.DataFrame()
-
-
-# 替换 get_vector 内 in_col 分支那一行：
-# 旧：return _series_to_np(col_series)
-# 新：
-
-
-
-    
-def read_csv(**kwargs):
-    return pd.read_csv(**kwargs)
-
-def read_10x_mtx(**kwargs):
-    return sc.read_10x_mtx(**kwargs)
-
-def read_h5ad(**kwargs):
-    return sc.read_h5ad(**kwargs)
-
-def read_10x_h5(**kwargs):
-    return sc.read_10x_h5(**kwargs)
-
-
 # Deprecated: data_downloader has been replaced by download_data_requests from omicverse.datasets
 # All download functions now use download_data_requests for better error handling and progress display
 
+@register_function(
+    aliases=['下载 CaDRReS 模型', 'download_CaDRReS_model', 'CaDRReS model download'],
+    category="utils",
+    description="Download pretrained CaDRReS drug-response models used by single-cell drug sensitivity prediction workflows.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.utils.download_CaDRReS_model()'],
+    related=['utils.download_GDSC_data', 'single.Drug_Response']
+)
 def download_CaDRReS_model():
-    r"""load CaDRReS_model
-
-    Parameters
-    ---------
+    r"""
+    Download pretrained CaDRReS model parameter/output files.
 
     Returns
     -------
-
+    None
+        Downloads model files into local ``./models`` directory.
     """
     _datasets = [
         'cadrres-wo-sample-bias_output_dict_all_genes',
@@ -579,15 +228,25 @@ def download_CaDRReS_model():
         model_path = download_data_requests(url=url, file_path=f'{datasets_name}.pickle', dir='./models')
     print(f'{Colors.GREEN}{EMOJI["done"]} CaDRReS model download finished!{Colors.ENDC}')
 
+@register_function(
+    aliases=['下载 GDSC 数据', 'download_GDSC_data', 'GDSC data download'],
+    category="utils",
+    description="Download GDSC pharmacogenomic response matrices and annotation files for drug-response modeling.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.utils.download_GDSC_data()'],
+    related=['utils.download_CaDRReS_model', 'single.Drug_Response']
+)
 def download_GDSC_data():
-    r"""load GDSC_data
-
-    Parameters
-    ---------
+    r"""
+    Download GDSC expression and drug mask tables.
 
     Returns
     -------
-
+    None
+        Downloads data files into local ``./models`` directory.
     """
     _datasets = {
         'masked_drugs': '.csv',
@@ -618,11 +277,10 @@ def download_GDSC_data():
 def download_pathway_database():
     r"""Download pathway and gene set databases for enrichment analysis.
 
-    Arguments:
-        None
-
-    Returns:
-        None: The function downloads pathway databases to the genesets/ directory including GO_Biological_Process_2021, GO_Cellular_Component_2021, GO_Molecular_Function_2021, WikiPathway_2021_Human, WikiPathways_2019_Mouse, and Reactome_2022.
+    Returns
+    -------
+    None
+        Downloads pathway resources to local ``./genesets`` directory.
     """
     _datasets = [
         'GO_Biological_Process_2021',
@@ -657,11 +315,10 @@ def download_pathway_database():
 def download_geneid_annotation_pair():
     r"""Download gene ID annotation mapping files for various organisms.
 
-    Arguments:
-        None
-
-    Returns:
-        None: The function downloads mapping files to the genesets/ directory including pair_GRCm39.tsv (Mouse), pair_GRCh38.tsv (Human), pair_GRCh37.tsv (Human legacy), and pair_danRer11.tsv (Zebrafish).
+    Returns
+    -------
+    None
+        Downloads gene ID mapping tables to local ``./genesets`` directory.
     """
     _datasets = [
         'pair_GRCm39',
@@ -713,15 +370,22 @@ def download_geneid_annotation_pair():
 def gtf_to_pair_tsv(gtf_path, output_path, gene_id_version=True):
     r"""Convert GTF file to gene ID mapping pairs TSV format.
 
-    Arguments:
-        gtf_path: Path to input GTF file.
-        output_path: Path for output TSV file.
-        gene_id_version: Whether to keep version numbers in gene IDs. Default: True.
+    Parameters
+    ----------
+    gtf_path : str
+        Path to input GTF file.
+    output_path : str
+        Path for output TSV file.
+    gene_id_version : bool
+        Whether to keep version numbers in gene IDs.
 
-    Returns:
-        gene_count: Number of genes processed and written to the output file.
+    Returns
+    -------
+    int
+        Number of unique genes written to output file.
 
-    Examples:
+    Examples
+    --------
         >>> import omicverse as ov
         >>> # Convert GTF to mapping pairs
         >>> gene_count = ov.utils.gtf_to_pair_tsv('genes.gtf', 'gene_pairs.tsv')
@@ -779,9 +443,25 @@ def gtf_to_pair_tsv(gtf_path, output_path, gene_id_version=True):
     
     return len(df)
 
+@register_function(
+    aliases=['下载 TOSICA 基因集', 'download_tosica_gmt', 'tosica gmt'],
+    category="utils",
+    description="Download curated GMT pathway/gene-set files required by TOSICA-based single-cell annotation workflows.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.utils.download_tosica_gmt()'],
+    related=['single.pyTOSICA', 'single.pathway_enrichment']
+)
 def download_tosica_gmt():
-    r"""load TOSICA gmt dataset
+    r"""
+    Download curated GMT files used by TOSICA workflows.
 
+    Returns
+    -------
+    None
+        Downloads GMT files into local ``./genesets`` directory.
     """
     _datasets = [
         'GO_bp',
@@ -817,12 +497,17 @@ def download_tosica_gmt():
 def geneset_prepare(geneset_path,organism='Human',):
     r"""Load and prepare gene sets from GMT/TXT files for enrichment analysis.
 
-    Arguments:
-        geneset_path: Path of geneset file.
-        organism: Organism of geneset file. Default: 'Human'.
+    Parameters
+    ----------
+    geneset_path : str
+        Path to geneset file.
+    organism : str
+        Organism name used for gene-symbol case normalization.
 
-    Returns:
-        go_bio_dict: A dictionary of geneset where keys are pathway names and values are lists of gene symbols.
+    Returns
+    -------
+    dict
+        Dictionary where keys are pathway names and values are gene symbol lists.
     """
     result_dict = {}
     file_path=geneset_path
@@ -871,19 +556,20 @@ def geneset_prepare(geneset_path,organism='Human',):
     return go_bio_dict
 
 def geneset_prepare_old(geneset_path,organism='Human'):
-    r"""load geneset
+    r"""
+    Legacy geneset loader for old double-tab GMT-like files.
 
     Parameters
     ----------
-    - geneset_path: `str`
-        Path of geneset file.
-    - organism: `str`
-        Organism of geneset file. Default: 'Human'
+    geneset_path : str
+        Path to geneset file.
+    organism : str
+        Organism name used for gene-symbol case normalization.
 
     Returns
     -------
-    - go_bio_dict: `dict`
-        A dictionary of geneset.
+    dict
+        Dictionary of pathway-to-genes mapping.
     """
     go_bio_geneset=pd.read_csv(geneset_path,sep='\t\t',header=None)
     go_bio_dict={}
@@ -898,23 +584,34 @@ def geneset_prepare_old(geneset_path,organism='Human'):
             go_bio_dict[go_bio_geneset.loc[i,0]]=[i for i in go_bio_geneset.loc[i,1].split('\t')]
     return go_bio_dict
 
+@register_function(
+    aliases=['基因注释映射', 'get_gene_annotation', 'gtf annotation mapping'],
+    category="utils",
+    description="Map transcript/gene identifiers to annotation fields (e.g., symbol, biotype) using GTF metadata and store into adata.var.",
+    prerequisites={},
+    requires={'var': ['gene identifiers']},
+    produces={'var': ['gene annotation columns']},
+    auto_fix='none',
+    examples=['ov.utils.get_gene_annotation(adata, var_by="gene_id", gtf="genes.gtf", gtf_by="gene_id")'],
+    related=['generate_reference_table', 'utils.read_csv']
+)
 def get_gene_annotation(
         adata: anndata.AnnData, var_by: str = None,
         gtf: os.PathLike = None, gtf_by: str = None,
         by_func: Optional[Callable] = None
 ) -> None:
     r"""
-    Get genomic annotation of genes by joining with a GTF file.
-    It was writed by scglue, and I just copy it.
+    Annotate ``adata.var`` by merging with gene-level GTF attributes.
 
-    Arguments:
-        adata: Input dataset.
-        var_by: Specify a column in ``adata.var`` used to merge with GTF attributes, 
+    Parameters
+    ----------
+        adata : Input dataset.
+        var_by : Specify a column in ``adata.var`` used to merge with GTF attributes,
             otherwise ``adata.var_names`` is used by default.
-        gtf: Path to the GTF file.
-        gtf_by: Specify a field in the GTF attributes used to merge with ``adata.var``,
+        gtf : Path to the GTF file.
+        gtf_by : Specify a field in the GTF attributes used to merge with ``adata.var``,
             e.g. "gene_id", "gene_name".
-        by_func: Specify an element-wise function used to transform merging fields,
+        by_func : Specify an element-wise function used to transform merging fields,
             e.g. removing suffix in gene IDs.
 
     Note:
@@ -940,36 +637,6 @@ def get_gene_annotation(
         pd.DataFrame(gtf).drop(columns=Gtf.COLUMNS)  # Only use the splitted attributes
     ], axis=1).set_index(gtf_by).reindex(var_by).set_index(adata.var.index)
     adata.var = adata.var.assign(**merge_df)
-    
-from importlib import resources
-
-predefined_signatures = dict(
-    cell_cycle_human=resources.files("omicverse").joinpath("data_files/cell_cycle_human.gmt").__fspath__(),
-    cell_cycle_mouse=resources.files("omicverse").joinpath("data_files/cell_cycle_mouse.gmt").__fspath__(),
-    gender_human=resources.files("omicverse").joinpath("data_files/gender_human.gmt").__fspath__(),
-    gender_mouse=resources.files("omicverse").joinpath("data_files/gender_mouse.gmt").__fspath__(),
-    mitochondrial_genes_human=resources.files("omicverse").joinpath("data_files/mitochondrial_genes_human.gmt").__fspath__(),
-    mitochondrial_genes_mouse=resources.files("omicverse").joinpath("data_files/mitochondrial_genes_mouse.gmt").__fspath__(),
-    ribosomal_genes_human=resources.files("omicverse").joinpath("data_files/ribosomal_genes_human.gmt").__fspath__(),
-    ribosomal_genes_mouse=resources.files("omicverse").joinpath("data_files/ribosomal_genes_mouse.gmt").__fspath__(),
-    apoptosis_human=resources.files("omicverse").joinpath("data_files/apoptosis_human.gmt").__fspath__(),
-    apoptosis_mouse=resources.files("omicverse").joinpath("data_files/apoptosis_mouse.gmt").__fspath__(),
-    human_lung=resources.files("omicverse").joinpath("data_files/human_lung.gmt").__fspath__(),
-    mouse_lung=resources.files("omicverse").joinpath("data_files/mouse_lung.gmt").__fspath__(),
-    mouse_brain=resources.files("omicverse").joinpath("data_files/mouse_brain.gmt").__fspath__(),
-    mouse_liver=resources.files("omicverse").joinpath("data_files/mouse_liver.gmt").__fspath__(),
-    emt_human=resources.files("omicverse").joinpath("data_files/emt_human.gmt").__fspath__(),
-)
-
-def load_signatures_from_file(input_file: str) -> Dict[str, List[str]]:
-    signatures = {}
-    with open(input_file) as fin:
-        for line in fin:
-            items = line.strip().split('\t')
-            signatures[items[0]] = list(set(items[2:]))
-    print(f"Loaded signatures from GMT file {input_file}.")
-    return signatures
-
 from typing import (
     Any,
     Dict,
@@ -1193,14 +860,17 @@ def _perm_test(
 
 def anndata_sparse(adata):
     """
-    Set adata.X to csr_matrix
+    Convert ``adata.X`` to CSR sparse matrix.
 
-    Arguments:
-        adata: AnnData
+    Parameters
+    ----------
+    adata : AnnData
+        Input AnnData object.
 
-    Returns:
-        adata: AnnData
-
+    Returns
+    -------
+    AnnData
+        AnnData with ``X`` converted to CSR format.
     """
 
     from scipy.sparse import csr_matrix
@@ -1227,14 +897,20 @@ def anndata_sparse(adata):
 def store_layers(adata,layers='counts'):
     """Store the X matrix of AnnData in adata.uns for later retrieval.
 
-    Arguments:
-        adata: AnnData object containing single-cell data.
-        layers: The layers name to store. Default: 'counts'.
+    Parameters
+    ----------
+    adata : AnnData
+        AnnData object containing single-cell data.
+    layers : str
+        Layer name used for stored snapshot.
 
-    Returns:
-        None: The function modifies adata.uns in place by storing the X matrix.
+    Returns
+    -------
+    None
+        Stores current ``adata.X`` snapshot into ``adata.uns``.
 
-    Examples:
+    Examples
+    --------
         >>> import omicverse as ov
         >>> # Store original counts before preprocessing
         >>> ov.utils.store_layers(adata, layers='raw_counts')
@@ -1278,14 +954,20 @@ def store_layers(adata,layers='counts'):
 def retrieve_layers(adata,layers='counts'):
     """Retrieve previously stored X matrix from adata.uns and restore to adata.X.
 
-    Arguments:
-        adata: AnnData object containing single-cell data.
-        layers: The layers name to retrieve. Default: 'counts'.
+    Parameters
+    ----------
+    adata : AnnData
+        AnnData object containing single-cell data.
+    layers : str
+        Layer name used for stored snapshot retrieval.
 
-    Returns:
-        None: The function modifies adata.X in place by restoring the stored matrix.
+    Returns
+    -------
+    None
+        Restores stored matrix into ``adata.X``.
 
-    Examples:
+    Examples
+    --------
         >>> import omicverse as ov
         >>> # Store original data before preprocessing
         >>> ov.utils.store_layers(adata, layers='raw_counts')
@@ -1325,577 +1007,71 @@ class easter_egg(object):
         print('尊嘟假嘟')
 
 
-def save(file, path,):
-    """Save object to file using pickle or cloudpickle."""
-    print(f"{Colors.HEADER}{Colors.BOLD}💾 Save Operation:{Colors.ENDC}")
-    print(f"   {Colors.CYAN}Target path: {Colors.BOLD}{path}{Colors.ENDC}")
-    print(f"   {Colors.BLUE}Object type: {Colors.BOLD}{type(file).__name__}{Colors.ENDC}")
-
-    # Create directory if it doesn't exist
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    
-    try:
-        import pickle
-        print(f"   {Colors.GREEN}Using: {Colors.BOLD}pickle{Colors.ENDC}")
-        with open(path, 'wb') as f:
-            pickle.dump(file, f)
-        print(f"   {Colors.GREEN}✅ Successfully saved!{Colors.ENDC}")
-    except:
-        import cloudpickle
-        print(f"   {Colors.WARNING}Pickle failed, switching to: {Colors.BOLD}cloudpickle{Colors.ENDC}")
-        with open(path, 'wb') as f:
-            cloudpickle.dump(file, f)
-        print(f"   {Colors.GREEN}✅ Successfully saved using cloudpickle!{Colors.ENDC}")
-    print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
-
-def load(path,backend=None):
-    """Load object from file using pickle or cloudpickle."""
-    print(f"{Colors.HEADER}{Colors.BOLD}📂 Load Operation:{Colors.ENDC}")
-    print(f"   {Colors.CYAN}Source path: {Colors.BOLD}{path}{Colors.ENDC}")
-    if backend is None:
-        try:
-            import pickle
-            print(f"   {Colors.GREEN}Using: {Colors.BOLD}pickle{Colors.ENDC}")
-            with open(path, 'rb') as f:
-                data = pickle.load(f)
-            print(f"   {Colors.GREEN}✅ Successfully loaded!{Colors.ENDC}")
-            print(f"   {Colors.BLUE}Loaded object type: {Colors.BOLD}{type(data).__name__}{Colors.ENDC}")
-            print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
-            return data
-        except:
-            import cloudpickle
-            print(f"   {Colors.WARNING}Pickle failed, switching to: {Colors.BOLD}cloudpickle{Colors.ENDC}")
-            with open(path, 'rb') as f:
-                data = cloudpickle.load(f)
-            print(f"   {Colors.GREEN}✅ Successfully loaded using cloudpickle!{Colors.ENDC}")
-            print(f"   {Colors.BLUE}Loaded object type: {Colors.BOLD}{type(data).__name__}{Colors.ENDC}")
-            print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
-            return data
-    else:
-        if backend=='pickle':
-            import pickle
-            print(f"   {Colors.GREEN}Using: {Colors.BOLD}pickle{Colors.ENDC}")
-            with open(path, 'rb') as f:
-                data = pickle.load(f)
-            print(f"   {Colors.GREEN}✅ Successfully loaded!{Colors.ENDC}")
-            print(f"   {Colors.BLUE}Loaded object type: {Colors.BOLD}{type(data).__name__}{Colors.ENDC}")
-            print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
-            return data
-        elif backend=='cloudpickle':
-            import cloudpickle
-            print(f"   {Colors.GREEN}Using: {Colors.BOLD}cloudpickle{Colors.ENDC}")
-            with open(path, 'rb') as f:
-                data = cloudpickle.load(f)
-            print(f"   {Colors.GREEN}✅ Successfully loaded!{Colors.ENDC}")
-            print(f"   {Colors.BLUE}Loaded object type: {Colors.BOLD}{type(data).__name__}{Colors.ENDC}")
-            print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
-            return data
-        else:
-            raise ValueError(f"Invalid backend: {backend}")
+# Note: save/load/read-conversion routines were moved to `omicverse.io`.
 
 
-# Note: download_data function has been removed.
-# Please use download_data_requests from omicverse.datasets instead.
+from pathlib import Path
+import re
 
-
-@register_function(
-    aliases=["AnnData兼容转换", "convert_adata_for_rust", "fix_adata_compatibility", "修复兼容性", "rust_compatibility"],
-    category="utils", 
-    description="Convert old Python-backend h5ad AnnData to be compatible with Rust backend requirements using snapatac2.AnnData",
-    examples=[
-        "# Convert for Rust backend using snapatac2",
-        "adata_rust = ov.utils.convert_adata_for_rust(adata, output_file='fixed_data.h5ad')",
-        "# Now you can safely read with Rust backend",
-        "adata = ov.read('fixed_data.h5ad', backend='rust')",
-        "# Access obs without errors",
-        "print(adata.obs['cell_type'])"
-    ],
-    related=["utils.read", "utils.convert_to_pandas", "pp.preprocess"]
-)
-def convert_adata_for_rust(adata, output_file=None, verbose=True, close_file=True):
-    """Convert AnnData object to be compatible with Rust backend using snapatac2.AnnData.
-    
-    This function creates a new backed AnnData object using snapatac2.AnnData constructor,
-    ensuring full compatibility with Rust backend requirements. It handles:
-    - Proper sparse matrix formatting
-    - DataFrame compatibility
-    - Data type consistency
-    - Automatic unique name generation
-    
-    Arguments:
-        adata: AnnData object to be converted (from Python backend)
-        output_file: Output h5ad file path. If None, uses temp file. Default: None
-        verbose: Whether to print conversion progress. Default: True
-        close_file: Whether to close the snapatac2 AnnData after creation. Default: True
-        
-    Returns:
-        output_file: Path to the converted h5ad file compatible with Rust backend
-        
-    Examples:
-        >>> import omicverse as ov
-        >>> # Load old h5ad file with Python backend
-        >>> adata = ov.read('old_data.h5ad', backend='python') 
-        >>> # Convert for Rust compatibility
-        >>> output_path = ov.utils.convert_adata_for_rust(adata, 'fixed_data.h5ad')
-        >>> # Now read with Rust backend
-        >>> adata_rust = ov.read(output_path, backend='rust')
+def split_pattern(name: str):
     """
-    import numpy as np
-    import pandas as pd
-    import scipy.sparse as sp
-    from scipy.sparse import csr_matrix, issparse
-    import tempfile
-    import os
-    
-    # Import snapatac2 for creating backed AnnData
-    try:
-        import snapatac2 as snap
-    except ImportError:
-        raise ImportError("snapatac2 is required for Rust backend conversion. Install with: pip install snapatac2")
-    
-    if output_file is None:
-        # Create a temporary file if no output specified
-        fd, output_file = tempfile.mkstemp(suffix='.h5ad')
-        os.close(fd)  # Close the file descriptor
-    
-    if verbose:
-        print(f"{Colors.HEADER}{Colors.BOLD}🔧 Converting AnnData for Rust Backend using anndata-rs{Colors.ENDC}")
-        print(f"   {Colors.CYAN}Original shape: {adata.shape}{Colors.ENDC}")
-        print(f"   {Colors.CYAN}Output file: {output_file}{Colors.ENDC}")
-    
-    # Make sure names are unique
-    if verbose:
-        print(f"   {Colors.BLUE}📝 Ensuring unique names...{Colors.ENDC}")
-    
-    adata_copy = adata.copy()
-    adata_copy.var_names_make_unique()
-    adata_copy.obs_names_make_unique()
-    
-    # Prepare clean data for snapatac2
-    def _clean_matrix(X):
-        """Clean matrix for snapatac2 compatibility."""
-        if X is None:
-            return None
-        if issparse(X):
-            X = X.tocsr(copy=True)
-            X.sum_duplicates()
-            X.sort_indices()
-            # Clean NaN/Inf values
-            if np.isnan(X.data).any() or np.isinf(X.data).any():
-                X.data = np.nan_to_num(X.data, nan=0.0, posinf=0.0, neginf=0.0)
-                X.eliminate_zeros()
-            return X
+    把文件名拆成:
+    prefix + number + suffix
+    例如:
+    CellOverlay_F001.jpg -> ('CellOverlay_F', 1, '.jpg')
+    """
+    m = re.match(r"^(.*?)(\d+)(\.[^.]+)$", name)
+    if m:
+        prefix, num, suffix = m.groups()
+        return prefix, int(num), suffix
+    return None
+
+def compress_files(files):
+    """
+    将同类文件压缩成:
+    [首个文件, '...', 末个文件]
+    """
+    groups = {}
+    others = []
+
+    for f in files:
+        pat = split_pattern(f.name)
+        if pat is None:
+            others.append(f)
         else:
-            # Clean dense matrices and ensure compatible dtype
-            X_clean = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
-            
-            # Ensure the matrix has a SnapATAC2-compatible dtype
-            if X_clean.dtype.kind == 'V':  # structured/void arrays not supported
-                if verbose:
-                    print(f"   {Colors.WARNING}⚠️  Converting void array to float32{Colors.ENDC}")
-                X_clean = X_clean.astype(np.float32)
-            elif X_clean.dtype == np.float64:
-                # Convert float64 to float32 for efficiency
-                X_clean = X_clean.astype(np.float32)
-            elif X_clean.dtype.kind in ['U', 'S']:  # string arrays
-                if verbose:
-                    print(f"   {Colors.WARNING}⚠️  Converting string array to float32{Colors.ENDC}")
-                # Try to convert strings to numbers, fallback to zeros
-                try:
-                    X_clean = pd.to_numeric(X_clean.flatten(), errors='coerce').values.reshape(X_clean.shape).astype(np.float32)
-                    X_clean = np.nan_to_num(X_clean, nan=0.0)
-                except:
-                    X_clean = np.zeros(X_clean.shape, dtype=np.float32)
-            
-            return X_clean
-    
-    def _clean_dataframe(df):
-        """Clean DataFrame for snapatac2 compatibility."""
-        if df is None or df.empty:
-            return df
-        
-        df_clean = df.copy()
-        
-        # Reset index to RangeIndex to avoid issues with SnapATAC2
-        # The actual obs_names/var_names will be set separately
-        df_clean = df_clean.reset_index(drop=True)
-        
-        # Remove any columns that are completely empty or problematic
-        cols_to_drop = []
-        for col in df_clean.columns:
-            # Check for completely empty columns
-            if df_clean[col].isna().all():
-                cols_to_drop.append(col)
-                continue
-                
-            # Handle categorical columns
-            if pd.api.types.is_categorical_dtype(df_clean[col]):
-                try:
-                    # Ensure categories are sorted and handle empty categories
-                    cat_data = df_clean[col]
-                    if len(cat_data.cat.categories) == 0:
-                        # Convert empty categorical to string
-                        df_clean[col] = df_clean[col].astype(str)
-                    elif not cat_data.cat.ordered:
-                        try:
-                            from natsort import natsorted
-                            new_categories = natsorted(cat_data.cat.categories.astype(str))
-                        except ImportError:
-                            new_categories = sorted(cat_data.cat.categories.astype(str))
-                        df_clean[col] = cat_data.cat.reorder_categories(new_categories)
-                except Exception:
-                    # If categorical handling fails, convert to string
-                    df_clean[col] = df_clean[col].astype(str)
-            
-            # Handle object columns
-            elif df_clean[col].dtype == 'object':
-                try:
-                    # Fill NaN values with empty string first
-                    df_clean[col] = df_clean[col].fillna('')
-                    # Convert all to string to ensure consistency
-                    df_clean[col] = df_clean[col].astype(str)
-                except Exception:
-                    # If conversion fails, drop the column
-                    cols_to_drop.append(col)
-                    continue
-            
-            # Handle numeric columns with NaN/Inf
-            elif pd.api.types.is_numeric_dtype(df_clean[col]):
-                try:
-                    if df_clean[col].dtype.kind == 'f':  # float columns
-                        col_data = df_clean[col].values
-                        if np.isnan(col_data).any() or np.isinf(col_data).any():
-                            col_clean = np.nan_to_num(col_data, nan=0.0, 
-                                                    posinf=np.finfo(col_data.dtype).max,
-                                                    neginf=np.finfo(col_data.dtype).min)
-                            df_clean[col] = col_clean
-                    elif df_clean[col].dtype.kind in ['i', 'u']:  # integer columns
-                        # Fill NaN in integer columns with 0
-                        if df_clean[col].isna().any():
-                            df_clean[col] = df_clean[col].fillna(0).astype(df_clean[col].dtype)
-                except Exception:
-                    # If numeric processing fails, try to convert to float
-                    try:
-                        df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce').fillna(0.0)
-                    except Exception:
-                        cols_to_drop.append(col)
-                        continue
-            
-            # Handle boolean columns
-            elif df_clean[col].dtype == 'bool':
-                # Fill NaN boolean values with False
-                df_clean[col] = df_clean[col].fillna(False)
-        
-        # Drop problematic columns
-        if cols_to_drop:
-            if verbose:
-                print(f"   {Colors.WARNING}⚠️  Dropping problematic columns: {cols_to_drop}{Colors.ENDC}")
-            df_clean = df_clean.drop(columns=cols_to_drop)
-        
-        # Ensure the DataFrame is not empty after cleaning
-        if df_clean.empty:
-            # Create a minimal DataFrame with at least one column
-            df_clean = pd.DataFrame({'placeholder': [''] * len(df)})
-        
-        return df_clean
-    
-    # Clean main data
-    if verbose:
-        print(f"   {Colors.BLUE}📊 Cleaning data matrices...{Colors.ENDC}")
-    
-    X_clean = _clean_matrix(adata_copy.X)
-    obs_clean = _clean_dataframe(adata_copy.obs)
-    var_clean = _clean_dataframe(adata_copy.var)
-    
-    # Clean obsm
-    obsm_clean = {}
-    if hasattr(adata_copy, 'obsm') and adata_copy.obsm:
-        for key, value in adata_copy.obsm.items():
-            obsm_clean[key] = _clean_matrix(value)
-    
-    # Clean varm  
-    varm_clean = {}
-    if hasattr(adata_copy, 'varm') and adata_copy.varm:
-        for key, value in adata_copy.varm.items():
-            varm_clean[key] = _clean_matrix(value)
-    
-    # Clean uns
-    def _clean_uns(uns_dict):
-        """Recursively clean uns dictionary."""
-        if not isinstance(uns_dict, dict):
-            return uns_dict
-        
-        cleaned = {}
-        for key, value in uns_dict.items():
-            if value is None:
-                cleaned[key] = value
-            elif isinstance(value, np.ndarray):
-                if value.dtype.kind == 'f':
-                    cleaned[key] = np.nan_to_num(value, nan=0.0, posinf=0.0, neginf=0.0)
-                else:
-                    cleaned[key] = value
-            elif isinstance(value, (np.bool_, np.integer, np.floating)):
-                # Convert numpy scalars to Python native types
-                cleaned[key] = value.item()
-            elif isinstance(value, np.ndarray) and value.ndim == 0:
-                # Convert 0-dimensional numpy arrays to scalars
-                cleaned[key] = value.item()
-            elif issparse(value):
-                cleaned[key] = _clean_matrix(value)
-            elif isinstance(value, pd.DataFrame):
-                cleaned[key] = _clean_dataframe(value)
-            elif isinstance(value, dict):
-                cleaned[key] = _clean_uns(value)
-            elif isinstance(value, list):
-                try:
-                    # Convert numpy types in lists to Python native types
-                    converted_list = []
-                    for item in value:
-                        if isinstance(item, (np.bool_, np.integer, np.floating)):
-                            converted_list.append(item.item())
-                        elif isinstance(item, np.ndarray) and item.ndim == 0:
-                            converted_list.append(item.item())
-                        else:
-                            converted_list.append(item)
-                    
-                    # Check if all items are numeric for array conversion
-                    if all(isinstance(x, (int, float)) for x in converted_list):
-                        arr = np.array(converted_list)
-                        if arr.dtype.kind == 'f':
-                            arr = np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
-                        cleaned[key] = arr
-                    else:
-                        cleaned[key] = converted_list
-                except Exception:
-                    cleaned[key] = value
-            else:
-                cleaned[key] = value
-        return cleaned
-    
-    uns_clean = _clean_uns(adata_copy.uns) if hasattr(adata_copy, 'uns') else {}
-    
-    # Create snapatac2 AnnData object
-    if verbose:
-        print(f"   {Colors.BLUE}🔧 Creating anndata-rs AnnData object...{Colors.ENDC}")
-    
-    try:
-        # Log the cleaned data types for debugging
-        if verbose:
-            print(f"   {Colors.BLUE}📋 Data summary before anndata-rs creation:{Colors.ENDC}")
-            print(f"      X: {type(X_clean)} {X_clean.shape if X_clean is not None else 'None'}")
-            print(f"      obs: {type(obs_clean)} {obs_clean.shape if obs_clean is not None else 'None'}")
-            print(f"      var: {type(var_clean)} {var_clean.shape if var_clean is not None else 'None'}")
-            if obs_clean is not None and not obs_clean.empty:
-                print(f"      obs columns: {list(obs_clean.columns)}")
-                print(f"      obs dtypes: {dict(obs_clean.dtypes)}")
-            if var_clean is not None and not var_clean.empty:
-                print(f"      var columns: {list(var_clean.columns)}")
-                print(f"      var dtypes: {dict(var_clean.dtypes)}")
-        
-        # Create SnapATAC2 AnnData step by step to isolate issues
-        # First create with minimal data, then add others
-        if verbose:
-            print(f"   {Colors.BLUE}🔧 Creating anndata-rs with basic data first...{Colors.ENDC}")
-        
-        # Create with minimal required data first
-        adata_snap = snap.AnnData(
-            filename=output_file,
-            X=X_clean,
-        )
-        
-        # Add obs and var separately if they exist
-        if obs_clean is not None and not obs_clean.empty:
-            if verbose:
-                print(f"   {Colors.BLUE}📊 Adding obs data...{Colors.ENDC}")
-            # Make sure obs data is completely clean
-            for col in obs_clean.columns:
-                if obs_clean[col].dtype == 'object':
-                    obs_clean[col] = obs_clean[col].astype(str)
-                elif pd.api.types.is_categorical_dtype(obs_clean[col]):
-                    # Convert categorical to string to avoid issues
-                    obs_clean[col] = obs_clean[col].astype(str)
-            # Create new anndata-rs with obs data
-            adata_snap.close()
-            adata_snap = snap.AnnData(
-                filename=output_file,
-                X=X_clean,
-                obs=obs_clean,
-            )
-        
-        if var_clean is not None and not var_clean.empty:
-            if verbose:
-                print(f"   {Colors.BLUE}📊 Adding var data...{Colors.ENDC}")
-            # Make sure var data is completely clean
-            for col in var_clean.columns:
-                if var_clean[col].dtype == 'object':
-                    var_clean[col] = var_clean[col].astype(str)
-                elif pd.api.types.is_categorical_dtype(var_clean[col]):
-                    var_clean[col] = var_clean[col].astype(str)
-            # Recreate with both obs and var
-            adata_snap.close()
-            adata_snap = snap.AnnData(
-                filename=output_file,
-                X=X_clean,
-                obs=obs_clean,
-                var=var_clean,
-            )
-        
-        # Set obs_names and var_names explicitly
-        if verbose:
-            print(f"   {Colors.BLUE}📝 Setting obs_names and var_names...{Colors.ENDC}")
-        
-        # Convert names to list of strings
-        obs_names_list = [str(name) for name in adata_copy.obs_names]
-        var_names_list = [str(name) for name in adata_copy.var_names]
-        
-        adata_snap.obs_names = obs_names_list
-        adata_snap.var_names = var_names_list
-        
-        # Add obsp if exists (has to be done after creation)
-        if hasattr(adata_copy, 'obsp') and adata_copy.obsp:
-            if verbose:
-                print(f"   {Colors.BLUE}📊 Adding obsp matrices...{Colors.ENDC}")
-            for key, value in adata_copy.obsp.items():
-                if value is not None:
-                    adata_snap.obsp[key] = _clean_matrix(value)
-        
-        # Add varp if exists
-        if hasattr(adata_copy, 'varp') and adata_copy.varp:
-            if verbose:
-                print(f"   {Colors.BLUE}📊 Adding varp matrices...{Colors.ENDC}")
-            for key, value in adata_copy.varp.items():
-                if value is not None:
-                    adata_snap.varp[key] = _clean_matrix(value)
-        
-        # Add layers if exists
-        if hasattr(adata_copy, 'layers') and adata_copy.layers:
-            if verbose:
-                print(f"   {Colors.BLUE}📊 Adding layers...{Colors.ENDC}")
-            for key, value in adata_copy.layers.items():
-                if value is not None:
-                    adata_snap.layers[key] = _clean_matrix(value)
-        
-        if close_file:
-            adata_snap.close()
-            
-        if verbose:
-            print(f"   {Colors.GREEN}🎉 Conversion completed successfully!{Colors.ENDC}")
-            print(f"   {Colors.GREEN}✅ Rust-compatible file saved: {output_file}{Colors.ENDC}")
-            print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
-        
-        return output_file
-        
-    except Exception as e:
-        if verbose:
-            print(f"   {Colors.WARNING}❌ Error during conversion: {e}{Colors.ENDC}")
-        # Clean up the file if creation failed
-        if os.path.exists(output_file):
-            try:
-                os.remove(output_file)
-            except:
-                pass
-        raise
+            key = (pat[0], pat[2])  # prefix, suffix
+            groups.setdefault(key, []).append((pat[1], f))
 
+    result = []
 
-def _fix_dataframe_for_rust(df, df_type="dataframe"):
-    """Fix DataFrame for Rust backend compatibility."""
-    if df is None or df.empty:
-        return df
-        
-    import pandas as pd
-    import numpy as np
-    
-    # Create a copy to avoid modifying original
-    df_fixed = df.copy()
-    
-    # 1. Ensure index is consistent
-    if not isinstance(df_fixed.index, pd.RangeIndex):
-        # Keep the current index but ensure it's proper pandas Index
-        df_fixed.index = pd.Index(df_fixed.index, name=df_fixed.index.name)
-    
-    # 2. Fix categorical columns
-    for col in df_fixed.columns:
-        if pd.api.types.is_categorical_dtype(df_fixed[col]):
-            cat_data = df_fixed[col]
-            # Ensure categories are properly ordered
-            if not cat_data.cat.ordered:
-                # Sort categories naturally if possible
-                try:
-                    from natsort import natsorted
-                    new_categories = natsorted(cat_data.cat.categories.astype(str))
-                except ImportError:
-                    new_categories = sorted(cat_data.cat.categories.astype(str))
-                
-                df_fixed[col] = cat_data.cat.reorder_categories(new_categories)
-        
-        # 3. Handle object columns that might contain mixed types
-        elif df_fixed[col].dtype == 'object':
-            # Try to convert to string if they're not already
-            try:
-                # Check if all non-null values are strings
-                non_null_values = df_fixed[col].dropna()
-                if len(non_null_values) > 0:
-                    if not all(isinstance(x, str) for x in non_null_values):
-                        df_fixed[col] = df_fixed[col].astype(str)
-            except Exception:
-                pass
-        
-        # 4. Handle numeric columns with NaN/Inf
-        elif pd.api.types.is_numeric_dtype(df_fixed[col]):
-            if df_fixed[col].dtype.kind == 'f':  # float columns
-                col_data = df_fixed[col].values
-                if np.isnan(col_data).any() or np.isinf(col_data).any():
-                    # Replace NaN with 0, Inf with finite values
-                    col_clean = np.nan_to_num(col_data, nan=0.0, posinf=np.finfo(col_data.dtype).max, neginf=np.finfo(col_data.dtype).min)
-                    df_fixed[col] = col_clean
-    
-    return df_fixed
-
-
-def _fix_uns_for_rust(uns_dict):
-    """Fix uns dictionary for Rust backend compatibility."""
-    if not isinstance(uns_dict, dict):
-        return uns_dict
-    
-    import numpy as np
-    import pandas as pd
-    from scipy.sparse import issparse
-    
-    uns_fixed = {}
-    
-    for key, value in uns_dict.items():
-        if value is None:
-            uns_fixed[key] = value
-        elif isinstance(value, np.ndarray):
-            # Clean numpy arrays
-            if value.dtype.kind == 'f':  # float arrays
-                value_clean = np.nan_to_num(value, nan=0.0, posinf=0.0, neginf=0.0)
-                uns_fixed[key] = value_clean
-            else:
-                uns_fixed[key] = value
-        elif issparse(value):
-            # Fix sparse matrices in uns
-            uns_fixed[key] = _to_sorted_csr(value)
-        elif isinstance(value, pd.DataFrame):
-            # Fix DataFrames in uns
-            uns_fixed[key] = _fix_dataframe_for_rust(value, f"uns[{key}]")
-        elif isinstance(value, dict):
-            # Recursively fix nested dictionaries
-            uns_fixed[key] = _fix_uns_for_rust(value)
-        elif isinstance(value, list):
-            # Handle lists
-            try:
-                # Convert to numpy array if all elements are numeric
-                if all(isinstance(x, (int, float, np.integer, np.floating)) for x in value):
-                    arr = np.array(value)
-                    if arr.dtype.kind == 'f':
-                        arr = np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
-                    uns_fixed[key] = arr
-                else:
-                    uns_fixed[key] = value
-            except Exception:
-                uns_fixed[key] = value
+    for key in sorted(groups):
+        items = sorted(groups[key], key=lambda x: x[0])
+        only_files = [f for _, f in items]
+        if len(only_files) <= 2:
+            result.extend(only_files)
         else:
-            uns_fixed[key] = value
-    
-    return uns_fixed
+            result.extend([only_files[0], "...", only_files[-1]])
+
+    result.extend(sorted(others, key=lambda x: x.name.lower()))
+    return result
+
+def print_tree(path: Path, prefix: str = ""):
+    print(prefix + path.name + "/")
+
+    dirs = sorted([p for p in path.iterdir() if p.is_dir()], key=lambda x: x.name.lower())
+    files = sorted([p for p in path.iterdir() if p.is_file()], key=lambda x: x.name.lower())
+    files = compress_files(files)
+
+    children = dirs + files
+
+    for i, child in enumerate(children):
+        is_last = i == len(children) - 1
+        branch = "└── " if is_last else "├── "
+        next_prefix = prefix + ("    " if is_last else "│   ")
+
+        if child == "...":
+            print(prefix + branch + "...")
+        elif isinstance(child, Path) and child.is_dir():
+            print_tree(child, next_prefix)
+        else:
+            print(prefix + branch + child.name)

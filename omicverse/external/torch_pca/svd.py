@@ -33,11 +33,11 @@ def choose_svd_solver(
     Returns
     -------
     str
-        Selected solver name ('full', 'covariance_eigh', 'randomized', or 'arpack')
+        Selected solver name ('full', 'covariance_eigh', 'randomized', or 'lobpcg')
     """
-    # For sparse matrices, prefer ARPACK
+    # For sparse matrices, prefer pure-PyTorch LOBPCG.
     if is_sparse:
-        return "arpack"
+        return "lobpcg"
 
     # Original logic for dense tensors
     if inputs.shape[-1] <= 1_000 and inputs.shape[-2] >= 10 * inputs.shape[-1]:

@@ -95,7 +95,11 @@ __all__ = [
     'sude_py',
     'harmony',
     'datacollect',
-    'spaco'
+    'spaco',
+    'nocd',
+    'SpatialDE',
+    'NaiveDE',
+    'somde'
 ]
 
 

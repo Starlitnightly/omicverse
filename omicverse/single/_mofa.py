@@ -15,6 +15,7 @@ import scanpy as sc
 from typing import Union,Tuple,Optional
 import matplotlib
 from .._settings import add_reference
+from .._registry import register_function
 
 
 mofax_install=False
@@ -30,8 +31,10 @@ def global_imports(modulename,shortname = None, asfunction = False):
 def check_mofax():
     r"""Check if mofax is installed and import it.
     
-    Returns:
-        None: Raises ImportError if mofax is not installed
+    Returns
+    -------
+    None
+        Raises ``ImportError`` if ``mofax`` is unavailable.
     """
     global mofax_install
     try:
@@ -43,18 +46,52 @@ def check_mofax():
             'Please install the mofax: `pip install mofax`.'
         )
 
+@register_function(
+    aliases=['GLUE配对器', 'GLUE_pair', 'RNA-ATAC cell pairing'],
+    category="single",
+    description="Pair cells across RNA and ATAC modalities using GLUE embeddings and correlation-based nearest-neighbor matching.",
+    prerequisites={'optional_functions': ['alignment integration with GLUE']},
+    requires={'obsm': ['X_glue in RNA and ATAC objects']},
+    produces={'obs': ['paired-cell labels'], 'uns': ['pairing diagnostics']},
+    auto_fix='none',
+    examples=['pair_obj = ov.single.GLUE_pair(rna, atac)', 'pair_obj.correlation(); pair_df = pair_obj.find_neighbor_cell()'],
+    related=['single.pyMOFA', 'single.factor_exact']
+)
 class GLUE_pair(object):
+    """
+    Pair RNA and ATAC cells using GLUE latent embeddings and neighbor matching.
+    
+    Parameters
+    ----------
+    rna:anndata.AnnData
+        RNA AnnData with ``obsm['X_glue']``.
+    atac:anndata.AnnData
+        ATAC AnnData with ``obsm['X_glue']``.
+    
+    Returns
+    -------
+    None
+        Initializes paired-modality matching workflow.
+    
+    Examples
+    --------
+    >>> pair_obj = ov.single.GLUE_pair(rna, atac)
+    """
 
     def __init__(self,rna:anndata.AnnData,
               atac:anndata.AnnData) -> None:
         r"""Pair the cells between RNA and ATAC using result of GLUE.
 
-        Arguments:
-            rna: The AnnData of RNA-seq.
-            atac: The AnnData of ATAC-seq.
+        Parameters
+        ----------
+        rna:anndata.AnnData
+            RNA AnnData containing ``obsm['X_glue']``.
+        atac:anndata.AnnData
+            ATAC AnnData containing ``obsm['X_glue']``.
         
-        Returns:
-            None
+        Returns
+        -------
+        None
         """
         
         print('......Extract GLUE layer from obs')
@@ -64,8 +101,10 @@ class GLUE_pair(object):
     def correlation(self):
         r"""Perform Pearson Correlation analysis in the layer of GLUE.
         
-        Returns:
-            None: Updates self.rna_pd and self.atac_pd attributes
+        Returns
+        -------
+        None
+            Updates ``self.rna_pd`` and ``self.atac_pd`` pair-ranking tables.
         """
         
         print('......Prepare for pair')
@@ -107,12 +146,17 @@ class GLUE_pair(object):
     def find_neighbor_cell(self,depth:int=10,cor:float=0.9)->pd.DataFrame:
         r"""Find the neighbor cells between two omics using pearson correlation.
         
-        Arguments:
-            depth: The depth of the search for the nearest neighbor. (10)
-            cor: Correlation threshold for pairing. (0.9)
+        Parameters
+        ----------
+        depth:int
+            Maximum rank depth used when searching reciprocal neighbors.
+        cor:float
+            Minimum Pearson-correlation threshold for keeping pairs.
 
-        Returns:
-            result: The pair result as DataFrame
+        Returns
+        -------
+        pd.DataFrame
+            Pairing table with matched cell IDs across modalities.
 
         """
 
@@ -148,13 +192,17 @@ class GLUE_pair(object):
     def pair_omic(self,omic1:anndata.AnnData,omic2:anndata.AnnData)->Tuple[anndata.AnnData,anndata.AnnData]:
         r"""Pair the omics using the result of find_neighbor_cell.
 
-        Arguments:
-            omic1: The AnnData of first omic.
-            omic2: The AnnData of second omic.
+        Parameters
+        ----------
+        omic1:anndata.AnnData
+            First modality AnnData.
+        omic2:anndata.AnnData
+            Second modality AnnData.
 
-        Returns:
-            rna1: The paired AnnData of first omic.
-            atac1: The paired AnnData of second omic.
+        Returns
+        -------
+        Tuple[anndata.AnnData,anndata.AnnData]
+            Paired AnnData objects with aligned observation indices.
 
         """
         rna1=omic1[self.res_pair['omic_1']].copy()
@@ -169,10 +217,19 @@ def glue_pair(rna:anndata.AnnData,
     r"""
     Pair the cells between RNA and ATAC using result of GLUE.
 
-    Arguments:
-        rna: the AnnData of RNA-seq.
-        atac: the AnnData of ATAC-seq.
-        depth: the depth of the search for the nearest neighbor.
+    Parameters
+    ----------
+    rna:anndata.AnnData
+        RNA AnnData containing ``obsm['X_glue']``.
+    atac:anndata.AnnData
+        ATAC AnnData containing ``obsm['X_glue']``.
+    depth:int
+        Maximum rank depth used when searching reciprocal neighbors.
+
+    Returns
+    -------
+    pd.DataFrame
+        Pairing table with matched cell IDs across modalities.
     
     """
 
@@ -249,31 +306,52 @@ def glue_pair(rna:anndata.AnnData,
 
 def normalization(data):
     r"""
-    Normalization for data.
+    Scale an array by its maximum absolute value.
 
-    Arguments:
-        data: the data to be normalized.
+    Parameters
+    ----------
+    data : np.ndarray
+        Input numeric array.
 
-    Returns:
-        data: the normalized data.
+    Returns
+    -------
+    np.ndarray
+        Rescaled array in approximately ``[-1, 1]``.
     """
     _range = np.max(abs(data))
     return data / _range
 
+@register_function(
+    aliases=['提取 MOFA 权重', 'get_weights', 'mofa weights'],
+    category="single",
+    description="Extract feature loadings of selected MOFA factors for one omics view to interpret latent biological programs.",
+    prerequisites={'functions': ['pyMOFA']},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.single.get_weights("mofa.hdf5", view="rna", factor=1, scale=True)'],
+    related=['single.factor_exact', 'single.factor_correlation', 'single.pyMOFA']
+)
 def get_weights(hdf5_path:str,view:str,
                 factor:int,scale:bool=True)->pd.DataFrame:
     r"""
-    Get the weights of each feature in a specific factor.
+    Extract feature loadings for one factor from a MOFA model.
 
-    Arguments:
-        hdf5_path: the path of hdf5 file.
-        view: the name of view.
-        factor: the number of factor.
-        scale: whether to scale the weights.
+    Parameters
+    ----------
+    hdf5_path : str
+        Path to MOFA ``.hdf5`` model file.
+    view : str
+        View/modality name to query.
+    factor : int
+        1-based factor index.
+    scale : bool
+        If ``True``, rescale weights by maximum absolute value.
 
-    Returns:
-        res: the weights of each feature in a specific factor.
-
+    Returns
+    -------
+    pd.DataFrame
+        Feature table containing raw/absolute weights and sign label.
     """
     f = h5py.File(hdf5_path,'r')  
     view_names=f['views']['views'][:]
@@ -293,17 +371,33 @@ def get_weights(hdf5_path:str,view:str,
 
     return res
 
+@register_function(
+    aliases=['MOFA 因子提取', 'factor_exact', 'extract mofa factors'],
+    category="single",
+    description="Project MOFA latent factors to cells and store them in AnnData for downstream trajectory, clustering, and phenotype association analyses.",
+    prerequisites={'functions': ['pyMOFA']},
+    requires={'obs': ['cell metadata (optional)']},
+    produces={'obsm': ['X_mofa'], 'obs': ['factor scores']},
+    auto_fix='none',
+    examples=['ov.single.factor_exact(adata, hdf5_path="mofa.hdf5")'],
+    related=['single.get_weights', 'single.factor_correlation']
+)
 def factor_exact(adata:anndata.AnnData,hdf5_path:str)->anndata.AnnData:
     r"""
-    Extract the factor information from hdf5 file.
+    Add MOFA latent factors from model file into ``adata.obs``.
 
-    Arguments:
-        adata: The AnnData object.
-        hdf5_path: The path of hdf5 file.
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        AnnData object to annotate.
+    hdf5_path : str
+        Path to MOFA ``.hdf5`` model file.
 
-    Returns:
-        adata: The AnnData object with factor information.
-
+    Returns
+    -------
+    anndata.AnnData
+        Input AnnData with added columns ``factor1``, ``factor2``, ... in
+        ``adata.obs``.
     """
     f_pos = h5py.File(hdf5_path,'r')  
     g_name=f_pos['groups']['groups'][:][0]
@@ -311,20 +405,40 @@ def factor_exact(adata:anndata.AnnData,hdf5_path:str)->anndata.AnnData:
         adata.obs['factor{0}'.format(i+1)]=f_pos['expectations']['Z'][g_name][i] 
     return adata
 
+@register_function(
+    aliases=['MOFA 因子相关性', 'factor_correlation', 'factor phenotype correlation'],
+    category="single",
+    description="Compute correlations between MOFA factors and cell annotations to prioritize biologically interpretable latent axes.",
+    prerequisites={'functions': ['factor_exact']},
+    requires={'obs': ['cluster or phenotype labels']},
+    produces={'uns': ['mofa_factor_correlation']},
+    auto_fix='none',
+    examples=['ov.single.factor_correlation(adata, cluster="celltype", factor_list=[1,2,3], p_threshold=0.05)'],
+    related=['single.factor_exact', 'single.get_weights']
+)
 def factor_correlation(adata:anndata.AnnData,cluster:str,
                        factor_list:list,p_threshold:int=500)->pd.DataFrame:
     r"""
-    Calculate the correlation between factors and cluster.
+    Score MOFA-factor enrichment across annotated groups.
 
-    Arguments:
-        adata: The AnnData object.
-        cluster: The name of cluster.
-        factor_list: The list of factors.
-        p_threshold: The threshold of p-value.
+    For each factor and each group in ``cluster``, a two-sample t-test compares
+    factor values in-group vs out-group, and stores ``-log(p)``.
 
-    Returns:
-        cell_pd: The correlation between factors and cluster.
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        AnnData containing ``factor*`` columns in ``obs``.
+    cluster : str
+        Group label column in ``adata.obs``.
+    factor_list : list
+        Factor indices to evaluate.
+    p_threshold : int
+        Upper cap applied to ``-log(p)`` values to avoid extreme outliers.
 
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame indexed by group labels with factor association scores.
     """
     plot_data=adata.obs
     cell_t=list(set(plot_data[cluster]))
@@ -342,17 +456,49 @@ def factor_correlation(adata:anndata.AnnData,cluster:str,
         cell_pd['factor'+str(i)]=test
     return cell_pd
 
+@register_function(
+    aliases=['MOFA训练器', 'pyMOFA', 'multi-omics factor model'],
+    category="single",
+    description="Train MOFA models for multi-omics factor decomposition and latent biology discovery across modalities.",
+    prerequisites={'optional_functions': ['pp.preprocess']},
+    requires={},
+    produces={'obsm': ['X_mofa'], 'uns': ['mofa model']},
+    auto_fix='none',
+    examples=['test_mofa = ov.single.pyMOFA(omics=[rna, atac], omics_name=["rna","atac"])', 'test_mofa.mofa_run()'],
+    related=['single.get_weights', 'single.factor_exact', 'single.pyMOFAART']
+)
 class pyMOFA(object):
-    r"""
-    MOFA class.
+    """
+    Train MOFA models for latent factor discovery across multiple omics layers.
+    
+    Parameters
+    ----------
+    omics:list
+        List of omics data matrices (for example RNA/ATAC/proteomics).
+    omics_name:list
+        Names corresponding to each entry in ``omics``.
+    
+    Returns
+    -------
+    None
+        Initializes MOFA training inputs and metadata.
+    
+    Examples
+    --------
+    >>> test_mofa = ov.single.pyMOFA(omics=[rna, atac], omics_name=["rna","atac"])
     """
     def __init__(self,omics:list,omics_name:list):
         r"""
-        Initialize the MOFA class.
-        
-        Arguments:
-            omics: The list of omics data.
-            omics_name: The list of omics name.
+        Initialize a multi-view MOFA training container.
+
+        Parameters
+        ----------
+        omics : list
+            List of input omics objects, typically ``AnnData`` matrices for each
+            modality (for example RNA, ATAC, protein).
+        omics_name : list
+            View names aligned with ``omics`` order. These names are used in the
+            exported MOFA model and downstream interpretation.
         """
         self.omics=omics 
         self.omics_name=omics_name
@@ -360,7 +506,10 @@ class pyMOFA(object):
 
     def mofa_preprocess(self):
         r"""
-        Preprocess the data.
+        Convert input omics objects into MOFA-ready dense matrices.
+
+        The method creates ``self.data_mat`` and ``self.feature_name`` in the
+        format expected by ``mofapy2.entry_point.set_data_matrix``.
         """
         self.data_mat=[[None for g in range(1)] for m in range(len(self.omics))]
         self.feature_name=[]
@@ -376,24 +525,47 @@ class pyMOFA(object):
                 gpu_device: Optional[int] = None, verbose:bool = False, seed:int = 112,scale_groups:bool = False, 
                 scale_views:bool = False,center_groups:bool=True,)->None:
         r"""
-        Train the MOFA model.
+        Train and save a MOFA model using current multi-omics inputs.
 
-        Arguments:
-            outfile: The path of output file.
-            factors: The number of factors.
-            iter: The number of iterations.
-            convergence_mode: The mode of convergence.
-            spikeslab_weights: Whether to use spikeslab weights.
-            startELBO: The start of ELBO.
-            freqELBO: The frequency of ELBO.
-            dropR2: The drop of R2.
-            gpu_mode: Whether to use gpu mode.
-            verbose: Whether to print the information.
-            seed: The seed of random number.
-            scale_groups: Whether to scale groups.
-            scale_views: Whether to scale views.
-            center_groups: Whether to center groups.
+        Parameters
+        ----------
+        outfile : str
+            Output path for the trained MOFA ``.hdf5`` model.
+        factors : int
+            Number of latent factors to learn.
+        iter : int
+            Maximum number of training iterations.
+        convergence_mode : str
+            Optimization regime in MOFA (for example ``'fast'`` or ``'medium'``).
+        spikeslab_weights : bool
+            Whether to use spike-and-slab prior on feature weights, encouraging
+            sparse factor loadings.
+        startELBO : int
+            Iteration at which ELBO evaluation starts.
+        freqELBO : int
+            Frequency (in iterations) for ELBO monitoring.
+        dropR2 : float
+            Early-stop criterion based on minimal variance-explained improvement.
+        gpu_mode : bool
+            Whether to enable GPU acceleration when supported by backend.
+        gpu_device : int or None
+            GPU device index used when ``gpu_mode=True``.
+        verbose : bool
+            Whether to print detailed training logs.
+        seed : int
+            Random seed for reproducible model initialization/training.
+        scale_groups : bool
+            Whether to scale each sample group before factorization.
+        scale_views : bool
+            Whether to scale each view (modality) before factorization.
+        center_groups : bool
+            Whether to center each sample group before factorization.
 
+        Returns
+        -------
+        None
+            Writes trained model to ``outfile`` and records MOFA reference in
+            each input omics object.
         """
         ent1 = entry_point()
         ent1.set_data_options(
@@ -432,14 +604,44 @@ class pyMOFA(object):
 
     
 
+@register_function(
+    aliases=['MOFA模型读取器', 'pyMOFAART', 'mofa model loader'],
+    category="single",
+    description="Load and analyze pretrained MOFA models for downstream factor interpretation without retraining.",
+    prerequisites={'optional_functions': ['pyMOFA']},
+    requires={},
+    produces={'obsm': ['X_mofa'], 'uns': ['mofa factor summaries']},
+    auto_fix='none',
+    examples=['pymofa_obj = ov.single.pyMOFAART(model_path="data/sample/MOFA_POS.hdf5")', 'pymofa_obj.get_factors()'],
+    related=['single.pyMOFA', 'single.factor_correlation']
+)
 class pyMOFAART(object):
+    """
+    Load pretrained MOFA models for downstream factor interpretation.
+    
+    Parameters
+    ----------
+    model_path:str
+        Path to a trained MOFA model file.
+    
+    Returns
+    -------
+    None
+        Initializes MOFA model reader and analysis utilities.
+    
+    Examples
+    --------
+    >>> pymofa_obj = ov.single.pyMOFAART(model_path="data/sample/MOFA_POS.hdf5")
+    """
     
     def __init__(self,model_path:str):
         """
-        Initialize the MOFAART class.
+        Load a pretrained MOFA model for downstream interpretation.
 
-        Arguments:
-            model_path: The path of MOFA model.
+        Parameters
+        ----------
+        model_path : str
+            Path to a trained MOFA ``.hdf5`` model file.
         """
         check_mofax()
         global mofax_install
@@ -458,11 +660,19 @@ class pyMOFAART(object):
        
     def get_factors(self,adata:anndata.AnnData):
         """
-        Get the factors of MOFA to anndata object.
+        Attach MOFA latent factors to ``adata.obsm['X_mofa']``.
 
-        Arguments:
-            adata: The anndata object.
-        
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            AnnData whose observations correspond to the samples/cells used in
+            the MOFA model.
+
+        Returns
+        -------
+        None
+            Updates ``adata.obsm['X_mofa']`` and annotates factor columns in
+            ``adata.obs`` via :func:`factor_exact`.
         """
         print('......Add factors to adata and store to adata.obsm["X_mofa"]')
         adata.obsm['X_mofa']=self.factors
@@ -470,10 +680,12 @@ class pyMOFAART(object):
 
     def get_r2(self,)->pd.DataFrame:
         """
-        Get the varience of each factor
+        Return factor-wise explained variance table.
 
-        Returns:
-            r2: the varience of each factor
+        Returns
+        -------
+        pd.DataFrame
+            Variance explained (R2) per factor and view.
         """
 
         return self.r2
@@ -482,19 +694,25 @@ class pyMOFAART(object):
                 ticks_fontsize:int=10,labels_fontsize:int=12,
                 save:bool=False)->Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
         """
-        plot the varience of each factor.
+        Plot a heatmap of variance explained by each MOFA factor.
 
-        Arguments:
-            figsize: The size of figure.
-            cmap: The color map.
-            ticks_fontsize: The size of ticks.
-            labels_fontsize: The size of labels.
-            save: Whether to save the figure.
+        Parameters
+        ----------
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+        cmap : str
+            Colormap for heatmap intensity.
+        ticks_fontsize : int
+            Font size for axis tick labels.
+        labels_fontsize : int
+            Font size for axis titles and plot title.
+        save : bool
+            If ``True``, save figure as ``mofa_varience.png``.
 
-        Returns:
-            fig: The figure of varience.
-            ax: The axes of varience.
-        
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]
+            Matplotlib figure and axes of the R2 heatmap.
         """
         fig, ax = plt.subplots(figsize=figsize)
         sns.heatmap(self.r2,cmap=cmap,ax=ax,xticklabels=True,yticklabels=True,
@@ -510,16 +728,23 @@ class pyMOFAART(object):
     
     def get_cor(self,adata:anndata.AnnData,cluster:str,factor_list=None)->pd.DataFrame:
         """
-        get the correlation of each factor with cluster type in anndata object.
+        Compute factor-group association scores from MOFA factors.
 
-        Arguments:
-            adata: The anndata object.
-            cluster: The cluster type.
-            factor_list: The list of factors.
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            AnnData containing ``obs[cluster]`` and MOFA factor columns in
+            ``obs``.
+        cluster : str
+            Column in ``adata.obs`` used as biological groups (for example cell
+            type, condition, or batch).
+        factor_list : list or None
+            Factors to evaluate. If ``None``, all factors are used.
 
-        Returns:
-            plot_data1: The correlation of each factor with cluster type.
-        
+        Returns
+        -------
+        pd.DataFrame
+            Matrix of group-wise factor association scores.
         """
 
         if factor_list==None:
@@ -531,23 +756,33 @@ class pyMOFAART(object):
                  cmap:str='Purples',ticks_fontsize:int=10,labels_fontsize:int=12,title:str='Correlation',
                  save:bool=False)->Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
         """
-        Plot the correlation of each factor with cluster type in anndata object.
+        Visualize factor-group association scores as a heatmap.
 
-        Arguments:
-            adata: The anndata object in MOFA pre trained.
-            cluster: The cluster type in adata.obs.
-            factor_list: The list of factors.
-            figsize: The size of figure.
-            cmap: The color map.
-            ticks_fontsize: The font size of ticks.
-            labels_fontsize: The font size of labels.
-            title: The title of figure.
-            save: Whether to save the figure.
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            AnnData containing ``obs[cluster]`` and extracted MOFA factors.
+        cluster : str
+            Grouping column in ``adata.obs``.
+        factor_list : list or None
+            Factors to include. If ``None``, all factors are plotted.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+        cmap : str
+            Colormap for heatmap values.
+        ticks_fontsize : int
+            Font size for tick labels.
+        labels_fontsize : int
+            Font size for axis labels and title.
+        title : str
+            Plot title.
+        save : bool
+            If ``True``, save figure as ``mofa_cor.png``.
 
-        Returns:
-            fig: The figure of correlation.
-            ax: The axes of correlation.
-        
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]
+            Matplotlib figure and axes of the correlation heatmap.
         """
 
         if factor_list==None:
@@ -569,22 +804,32 @@ class pyMOFAART(object):
                     factor1:int=1,factor2:int=2,palette:list=None,
                     save:bool=False)->Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
         """
-        Plot the factor of MOFA in anndata object.
+        Plot cells in MOFA factor space colored by group annotation.
         
-        Arguments:
-            adata: The anndata object.
-            cluster: The cluster type in adata.obs.
-            title: The title of figure.
-            figsize: The size of figure.
-            factor1: The first factor.
-            factor2: The second factor.
-            palette: The color map.
-            save: Whether to save the figure.
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            AnnData object to visualize.
+        cluster : str
+            Categorical column in ``adata.obs`` used for coloring.
+        title : str
+            Title shown above the embedding plot.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+        factor1 : int
+            First MOFA factor index used as x-axis.
+        factor2 : int
+            Second MOFA factor index used as y-axis.
+        palette : list or None
+            Color palette for cluster categories. If ``None``, uses
+            :func:`pyomic_palette`.
+        save : bool
+            If ``True``, save figure to ``figures/mofa_factor_{factor1}_{factor2}.png``.
         
-        Returns:
-            fig: The figure of factor.
-            ax: The axes of factor.
-
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]
+            Matplotlib figure and axes for the factor embedding.
         """
 
         if 'X_mofa' not in adata.obsm.keys():
@@ -614,26 +859,41 @@ class pyMOFAART(object):
                             weith_threshold:float=0.5,figsize:tuple=(3,3),
                             save:bool=False)->Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
         """
-        Plot the weight of gene in each factor of MOFA in anndata object in dimension 1.
+        Plot gene weights for two factors with 1D threshold-based highlighting.
 
-        Arguments:
-            view: The view of MOFA.
-            factor1: The first factor.
-            factor2: The second factor.
-            colors_dict: The color dict of up, down and normal. default is {'normal':'#c2c2c2','up':'#a51616','down':'#0d6a3b'}
-            plot_gene_num: The number of genes to plot.
-            title: The title of figure.
-            title_fontsize: The font size of title.
-            ticks_fontsize: The font size of ticks.
-            labels_fontsize: The font size of labels.
-            weith_threshold: The threshold of weight.
-            figsize: The size of figure.
-            save: Whether to save the figure.
+        Parameters
+        ----------
+        view : str
+            View/modality name in the MOFA model.
+        factor1 : int
+            Factor index used for thresholding and x-axis.
+        factor2 : int
+            Factor index used for y-axis.
+        colors_dict : dict or None
+            Colors for ``normal``, ``up`` and ``down`` classes. If ``None``,
+            defaults to a red/green scheme.
+        plot_gene_num : int
+            Number of top genes per direction (up/down) to annotate.
+        title : str
+            Figure title.
+        title_fontsize : int
+            Font size for title.
+        ticks_fontsize : int
+            Font size for axis ticks.
+        labels_fontsize : int
+            Font size for axis labels.
+        weith_threshold : float
+            Absolute weight threshold on ``factor1`` to call genes ``up`` or
+            ``down``.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+        save : bool
+            If ``True``, save figure as ``factor_gene_{title}.png``.
 
-        Returns:
-            fig: The figure of weight.
-            ax: The axes of weight.
-        
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]
+            Matplotlib figure and axes for gene-weight scatter plot.
         """
         factor_w=pd.DataFrame()
         for i in range(self.factors.shape[1]):
@@ -711,26 +971,40 @@ class pyMOFAART(object):
                             weith_threshold:float=0.5,figsize:tuple=(3,3),
                             save:bool=False)->Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
         """
-        Plot the weight of gene in each factor of MOFA in anndata object in dimension 2.
+        Plot gene weights for two factors with quadrant-based labeling.
 
-        Arguments:
-            view: The view of MOFA.
-            factor1: The first factor.
-            factor2: The second factor.
-            colors_dict: The color dict. default is {'up-up':'#a51616','up-down':'#e25d5d','down-up':'#1a6e1a','down-down':'#5de25d','normal':'#c2c2c2'}
-            plot_gene_num: The number of genes to plot.
-            title: The title of figure.
-            title_fontsize: The font size of title.
-            ticks_fontsize: The font size of ticks.
-            labels_fontsize: The font size of labels.
-            weith_threshold: The threshold of weight.
-            figsize: The size of figure.
-            save: Whether to save the figure.
+        Parameters
+        ----------
+        view : str
+            View/modality name in the MOFA model.
+        factor1 : int
+            Factor index used for x-axis.
+        factor2 : int
+            Factor index used for y-axis.
+        colors_dict : dict or None
+            Colors for ``up-up``, ``up-down``, ``down-up``, ``down-down`` and
+            ``normal`` categories. If ``None``, a default palette is used.
+        plot_gene_num : int
+            Number of labeled genes per quadrant category.
+        title : str
+            Figure title.
+        title_fontsize : int
+            Font size for title.
+        ticks_fontsize : int
+            Font size for axis ticks.
+        labels_fontsize : int
+            Font size for axis labels.
+        weith_threshold : float
+            Absolute cutoff applied to both factors to define quadrants.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+        save : bool
+            If ``True``, save figure as ``factor_gene_{title}.png``.
 
-        Returns:
-            fig: The figure of weight.
-            ax: The axes of weight.
-        
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]
+            Matplotlib figure and axes for quadrant gene-weight scatter plot.
         """
         
         factor_w=pd.DataFrame()
@@ -816,24 +1090,38 @@ class pyMOFAART(object):
                     labels_fontsize:int=12,ticks_fontsize:int=12,title_fontsize:int=12,
                      title=None,save:bool=False)->Tuple[matplotlib.figure.Figure,matplotlib.axes._axes.Axes]:
         """
-        Plot the weights of each gene in the factor
+        Plot ranked gene weights for a single MOFA factor.
 
-        Arguments:
-            view: str, the view of the factor
-            factor: int, the factor number
-            color: str, the color of the plot
-            figsize: tuple, the size of the figure
-            plot_gene_num: int, the number of genes to plot
-            ascending: bool, whether to sort the genes by weights
-            labels_fontsize: int, the fontsize of the labels
-            ticks_fontsize: int, the fontsize of the ticks
-            title_fontsize: int, the fontsize of the title
-            title: str, the title of the plot
-            save: bool, whether to save the plot.
+        Parameters
+        ----------
+        view : str
+            View/modality name in the MOFA model.
+        factor : int
+            Factor index to visualize.
+        color : str
+            Line and marker color.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+        plot_gene_num : int
+            Number of extreme genes to annotate.
+        ascending : bool
+            Sorting direction for weights. ``False`` highlights largest positive
+            weights; ``True`` highlights most negative weights.
+        labels_fontsize : int
+            Font size for axis labels.
+        ticks_fontsize : int
+            Font size for axis ticks.
+        title_fontsize : int
+            Font size for title.
+        title : str or None
+            Plot title. If ``None``, use ``factor_{factor}``.
+        save : bool
+            If ``True``, save figure as ``factor{factor}_gene.png``.
 
-        Returns:
-            fig: The figure object.
-            ax: The axis object.
+        Returns
+        -------
+        Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]
+            Matplotlib figure and axes for ranked weight plot.
         """
         factor_w=pd.DataFrame()
         for i in range(self.factors.shape[1]):
@@ -883,16 +1171,23 @@ class pyMOFAART(object):
 
     def plot_top_feature_dotplot(self,view:str,cmap:str='bwr',n_genes:int=3,n_pcs:int=50)->list:
         """
-        Plot the top features of each factor in dotplot
+        Plot top marker features per factor as a Scanpy dotplot.
         
-        Arguments:
-            view: str, the view of the factor
-            cmap: str, the color map of the plot
-            n_genes: int, the number of genes to plot
+        Parameters
+        ----------
+        view : str
+            View/modality name in the MOFA model.
+        cmap : str
+            Colormap passed to Scanpy dotplot.
+        n_genes : int
+            Number of top-ranked features per factor.
+        n_pcs : int
+            Number of principal components used for factor dendrogram ordering.
 
-        Returns:
-            axes: the list of the figure
-
+        Returns
+        -------
+        list
+            Plot handles returned by ``scanpy.pl.rank_genes_groups_dotplot``.
         """
 
         factor_w=pd.DataFrame()
@@ -913,16 +1208,23 @@ class pyMOFAART(object):
     
     def plot_top_feature_heatmap(self,view:str,cmap:str='bwr',n_genes:int=3,n_pcs:int=50)->list:
         """
-        Plot the top features of each factor in dotplot
+        Plot top marker features per factor as a Scanpy matrix heatmap.
         
-        Arguments:
-            view: str, the view of the factor
-            cmap: str, the color map of the plot
-            n_genes: int, the number of genes to plot
+        Parameters
+        ----------
+        view : str
+            View/modality name in the MOFA model.
+        cmap : str
+            Colormap passed to Scanpy matrixplot.
+        n_genes : int
+            Number of top-ranked features per factor.
+        n_pcs : int
+            Number of principal components used for factor dendrogram ordering.
 
-        Returns:
-            axes: the list of the figure
-
+        Returns
+        -------
+        list
+            Plot handles returned by ``scanpy.pl.rank_genes_groups_matrixplot``.
         """
 
         factor_w=pd.DataFrame()
@@ -943,16 +1245,21 @@ class pyMOFAART(object):
     
     def get_top_feature(self,view:str,log2fc_min:int=3,pval_cutoff:float=0.1)->dict:
         """
-        Get the top features of each factor
+        Identify top features for each factor using differential marker ranking.
 
-        Arguments:
-            view: str, the view of the factor
-            log2fc_min: float, the minimum log2fc of the feature
-            pval_cutoff: float, the maximum pval of the feature
+        Parameters
+        ----------
+        view : str
+            View/modality name in the MOFA model.
+        log2fc_min : int
+            Minimum log2 fold-change threshold for retained features.
+        pval_cutoff : float
+            Maximum adjusted p-value threshold for retained features.
 
-        Returns:
-            top_feature: dict, the top features of each factor
-
+        Returns
+        -------
+        dict
+            Dictionary of marker features keyed by factor label.
         """
 
 
@@ -972,15 +1279,21 @@ class pyMOFAART(object):
 
 def calculate_r2(Z, W, Y):
     r"""
-    Calculate R2 (variance explained) given factor matrix Z, weight matrix W, and data matrix Y.
+    Compute variance explained (R2) for a reconstructed data matrix.
     
-    Arguments:
-        Z: Factor matrix (n_factors x n_samples)
-        W: Weight matrix (n_factors x n_features)  
-        Y: Data matrix (n_samples x n_features)
+    Parameters
+    ----------
+    Z : np.ndarray
+        Factor matrix with shape ``(n_factors, n_samples)``.
+    W : np.ndarray
+        Weight matrix with shape ``(n_factors, n_features)``.
+    Y : np.ndarray
+        Observed data matrix with shape ``(n_samples, n_features)``.
     
-    Returns:
-        r2: R2 value
+    Returns
+    -------
+    float
+        Fraction of variance explained by ``Z.T @ W``.
     """
     # Calculate predicted values
     Y_pred = Z.T @ W
@@ -1001,17 +1314,23 @@ def get_r2_from_hdf5_complete(hdf5_path: str,
                               views: list = None,
                               groups: list = None) -> pd.DataFrame:
     r"""
-    Get the variance explained (R2) for each factor from hdf5 file, with calculation if needed.
+    Compute/collect factor-wise variance explained from MOFA ``.hdf5``.
 
-    Arguments:
-        hdf5_path: the path of hdf5 file.
-        factors: list of factor indices to include (all by default).
-        views: list of view names to include (all by default).
-        groups: list of group names to include (all by default).
+    Parameters
+    ----------
+    hdf5_path : str
+        Path to MOFA model file.
+    factors : list or None
+        1-based factor indices to include. If ``None``, include all factors.
+    views : list or None
+        View names to include. If ``None``, include all views.
+    groups : list or None
+        Group names to include. If ``None``, include all groups.
 
-    Returns:
-        r2_df: DataFrame with R2 values for each factor and view.
-
+    Returns
+    -------
+    pd.DataFrame
+        Long-format table with columns ``Factor``, ``View``, ``Group`` and ``R2``.
     """
     f = h5py.File(hdf5_path, 'r')
     
@@ -1095,14 +1414,17 @@ def get_r2_from_hdf5_complete(hdf5_path: str,
 
 def get_r2_from_hdf5(hdf5_path: str) -> pd.DataFrame:
     r"""
-    Get the variance explained (R2) for each factor from hdf5 file directly.
-    Simplified version that only works with pre-computed R2 values.
+    Load factor-wise explained variance from a MOFA ``.hdf5`` model.
 
-    Arguments:
-        hdf5_path: the path of hdf5 file.
+    Parameters
+    ----------
+    hdf5_path : str
+        Path to MOFA model file.
 
-    Returns:
-        r2_df: DataFrame with R2 values for each factor and view.
+    Returns
+    -------
+    pd.DataFrame
+        Long-format table with columns ``Factor``, ``View``, ``Group`` and ``R2``.
 
     """
     f = h5py.File(hdf5_path, 'r')
@@ -1140,14 +1462,20 @@ def get_r2_from_hdf5(hdf5_path: str) -> pd.DataFrame:
 
 def convert_r2_to_matrix(r2_df: pd.DataFrame, group: str = None) -> pd.DataFrame:
     r"""
-    Convert R2 DataFrame to a matrix format with factors as rows and views as columns.
+    Convert long-format R2 table into factor-by-view matrix form.
 
-    Arguments:
-        r2_df: DataFrame with columns ['Factor', 'View', 'Group', 'R2'].
-        group: specific group to show (if None and multiple groups exist, will average across groups).
+    Parameters
+    ----------
+    r2_df : pd.DataFrame
+        DataFrame containing at least ``Factor``, ``View``, ``Group`` and ``R2``.
+    group : str or None
+        Group name to keep. If ``None`` and multiple groups are present, values
+        are averaged across groups.
 
-    Returns:
-        matrix_df: DataFrame with factors as rows and views as columns.
+    Returns
+    -------
+    pd.DataFrame
+        Matrix with factors as rows and views as columns.
     """
     if group is not None:
         # Filter for specific group
@@ -1185,33 +1513,55 @@ def plot_factors_violin(mdata,
                       figsize: tuple = (6,4),
                       **kwargs) -> Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]:
     r"""
-    Plot factor values as violin plots or strip plots for MuData object.
+    Plot MOFA factor distributions across groups as violin/strip plots.
 
-    Arguments:
-        mdata: MuData object with MOFA factors in obsm['X_mofa'].
-        factors: List of factor indices to plot (all factors by default).
-        group: Column name in adata.obs for grouping (default is 'Group').
-        view: Specific view to analyze ('metab', 'micro', etc.). If None, use all samples.
-        violins: Whether to show violin plots.
-        dots: Whether to show individual dots.
-        zero_line: Whether to show horizontal line at y=0.
-        linewidth: Line width for dots.
-        zero_linewidth: Line width for zero line.
-        size: Size of dots.
-        legend: Whether to show legend.
-        legend_prop: Properties for legend.
-        palette: Color palette.
-        alpha: Opacity of dots.
-        violins_alpha: Opacity of violins.
-        ncols: Number of columns in the plot.
-        sharex: Whether to share x-axis across subplots.
-        sharey: Whether to share y-axis across subplots.
-        figsize: Figure size.
-        **kwargs: Additional arguments passed to seaborn plotting functions.
+    Parameters
+    ----------
+    mdata : MuData
+        MuData containing MOFA scores in ``mdata.obsm['X_mofa']``.
+    factors : list or None
+        Factor IDs to plot. If ``None``, plot all available factors.
+    group : str
+        Grouping column name searched in ``obs`` of selected view(s).
+    view : str or None
+        Specific modality to use. If ``None``, combine samples from all views.
+    violins : bool
+        Whether to draw violin distributions.
+    dots : bool
+        Whether to overlay per-sample strip dots.
+    zero_line : bool
+        Whether to draw a horizontal zero reference line.
+    linewidth : float
+        Dot edge line width for strip plot.
+    zero_linewidth : float
+        Line width of zero reference line.
+    size : float
+        Dot size for strip plot.
+    legend : bool
+        Whether to display legend.
+    legend_prop : dict or None
+        Matplotlib legend style arguments.
+    palette : str or None
+        Seaborn palette for group colors.
+    alpha : float or None
+        Dot transparency.
+    violins_alpha : float or None
+        Violin transparency.
+    ncols : int
+        Reserved for compatibility; current implementation draws one panel.
+    sharex : bool
+        Reserved for compatibility.
+    sharey : bool
+        Reserved for compatibility.
+    figsize : tuple
+        Figure size in inches as ``(width, height)``.
+    **kwargs
+        Additional keyword arguments forwarded to seaborn plotting calls.
 
-    Returns:
-        fig: The figure object.
-        ax: The axis object.
+    Returns
+    -------
+    Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]
+        Matplotlib figure and axes containing factor distribution plot.
     """
     # Get factors data
     if 'X_mofa' not in mdata.obsm:
@@ -1381,29 +1731,50 @@ def plot_factors(mdata,
                 figsize: tuple = (6,4),
                 **kwargs) -> Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]:
     r"""
-    Plot scatter plot of two MOFA factors for MuData object.
+    Plot pairwise factor embedding colored by biological groups.
 
-    Arguments:
-        mdata: MuData object with MOFA factors in obsm['X_mofa'].
-        x: Factor index or name for x-axis (default is 1).
-        y: Factor index or name for y-axis (default is 2).
-        group: Column name in adata.obs for grouping (default is 'Group').
-        dist: Whether to show marginal distributions.
-        zero_line_x: Whether to show vertical line at x=0.
-        zero_line_y: Whether to show horizontal line at y=0.
-        linewidth: Line width for dots.
-        zero_linewidth: Line width for zero lines.
-        size: Size of dots.
-        legend: Whether to show legend.
-        legend_prop: Properties for legend.
-        palette: Color palette.
-        alpha: Opacity of dots.
-        figsize: Figure size.
-        **kwargs: Additional arguments passed to seaborn plotting functions.
+    Parameters
+    ----------
+    mdata : MuData
+        MuData containing MOFA factors in ``mdata.obsm['X_mofa']``.
+    x : Union[int, str]
+        Factor index/name for x-axis (for example ``1`` or ``'Factor1'``).
+    y : Union[int, str]
+        Factor index/name for y-axis (for example ``2`` or ``'Factor2'``).
+    group : str
+        Grouping column name searched in modality ``obs`` tables.
+    dist : bool
+        If ``True``, return a seaborn jointplot with marginal distributions.
+    zero_line_x : bool
+        Whether to draw a vertical zero reference line.
+    zero_line_y : bool
+        Whether to draw a horizontal zero reference line.
+    linewidth : float
+        Point edge line width.
+    zero_linewidth : float
+        Line width for zero reference lines.
+    size : float
+        Scatter point size.
+    legend : bool
+        Whether to show legend.
+    legend_prop : dict or None
+        Matplotlib legend style arguments.
+    palette : str or None
+        Seaborn palette for group colors.
+    alpha : float or None
+        Point transparency.
+    figsize : tuple
+        Figure size in inches as ``(width, height)`` when ``dist=False``.
+    **kwargs
+        Additional keyword arguments forwarded to seaborn plotting calls.
 
-    Returns:
-        fig: The figure object.
-        ax: The axis object.
+    Returns
+    -------
+    Union[
+        Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes],
+        seaborn.axisgrid.JointGrid
+    ]
+        Scatter figure/axes when ``dist=False``; otherwise a seaborn JointGrid.
     """
     # Get factors data
     if 'X_mofa' not in mdata.obsm:
@@ -1527,11 +1898,19 @@ def plot_factors(mdata,
 
 def store_weights(mdata, hdf5_path: str):
     r"""
-    Store MOFA weights into each modality's varm.
+    Store MOFA factor loadings into each modality ``varm`` table.
 
-    Arguments:
-        mdata: MuData object.
-        hdf5_path: Path to the MOFA hdf5 file.
+    Parameters
+    ----------
+    mdata : MuData
+        MuData object whose modalities will receive ``varm['mofa_weights']``.
+    hdf5_path : str
+        Path to trained MOFA ``.hdf5`` model.
+
+    Returns
+    -------
+    None
+        Updates ``mdata.mod[view].varm['mofa_weights']`` for matching views.
     """
     f = h5py.File(hdf5_path, 'r')
     view_names = [view.decode('utf-8') if isinstance(view, bytes) else view 
@@ -1584,35 +1963,61 @@ def plot_weights(mdata,
                 figsize: tuple = (10, 6),
                 **kwargs) -> Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]:
     r"""
-    Plot weights for MOFA factors.
+    Plot factor loadings (weights) for a selected MOFA view.
 
-    Arguments:
-        mdata: MuData object with weights stored in varm['mofa_weights'].
-        view: Name of the modality/view.
-        factors: List of factors to plot (all by default).
-        n_features: Number of features with largest weights to label.
-        w_scaled: Whether to scale weights to unit variance.
-        w_abs: Whether to plot absolute weight values.
-        size: Dot size.
-        color: Color for labeled dots.
-        label_size: Font size of feature labels.
-        x_offset: Offset for feature labels from left/right side.
-        y_offset: Parameter to repel feature labels along y axis.
-        jitter: Whether to jitter dots per factors.
-        line_width: Width of lines connecting labels with dots.
-        line_color: Color of lines connecting labels with dots.
-        line_alpha: Alpha level for lines connecting labels with dots.
-        zero_line: Whether to plot dotted line at zero.
-        zero_line_width: Width of zero line.
-        ncols: Number of columns in grid of multiple plots.
-        sharex: Whether to use same X axis across panels.
-        sharey: Whether to use same Y axis across panels.
-        feature_label: Column name in var containing feature labels.
-        **kwargs: Additional arguments passed to seaborn plotting functions.
+    Parameters
+    ----------
+    mdata : MuData
+        MuData with ``mofa_weights`` stored in modality ``varm``.
+    view : str
+        Modality/view name to visualize.
+    factors : list or None
+        Factors to plot. If ``None``, plot all factors.
+    n_features : int
+        Number of top-weighted features to annotate per factor.
+    w_scaled : bool
+        Whether to z-score weight values within each factor before plotting.
+    w_abs : bool
+        Whether to plot absolute weight values.
+    size : float
+        Scatter marker size.
+    color : str
+        Marker/label color for highlighted features.
+    label_size : float
+        Font size of feature labels.
+    x_offset : float
+        Horizontal offset applied to labels.
+    y_offset : float
+        Vertical repulsion strength for label placement.
+    jitter : float
+        Jitter amplitude for x positions to reduce overplotting.
+    line_width : float
+        Width of connector lines from labels to points.
+    line_color : str
+        Color of connector lines.
+    line_alpha : float
+        Alpha of connector lines.
+    zero_line : bool
+        Whether to draw horizontal zero reference line.
+    zero_line_width : float
+        Width of zero reference line.
+    ncols : int
+        Number of subplot columns when plotting multiple factors.
+    sharex : bool
+        Whether to share x-axis across panels.
+    sharey : bool
+        Whether to share y-axis across panels.
+    feature_label : str or None
+        Optional ``var`` column used as displayed feature names.
+    figsize : tuple
+        Figure size in inches as ``(width, height)``.
+    **kwargs
+        Additional keyword arguments forwarded to seaborn plotting calls.
 
-    Returns:
-        fig: The figure object.
-        ax: The axis object.
+    Returns
+    -------
+    Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]
+        Matplotlib figure and axes for factor-loading visualization.
     """
     if view not in mdata.mod:
         raise ValueError(f"View {view} not found in MuData object")
@@ -1738,19 +2143,30 @@ def compute_cross_correlation(mdata,
                              p_threshold: float = 0.05,
                              chunk_size: int = 1000) -> pd.DataFrame:
     r"""
-    Compute cross-correlation between two modalities in paired samples using vectorized operations.
+    Compute feature-feature cross-modality correlations on paired samples.
 
-    Arguments:
-        mdata: MuData object with paired samples.
-        view1: Name of first modality (e.g., 'metab').
-        view2: Name of second modality (e.g., 'micro').
-        method: Correlation method ('pearson', 'spearman', 'kendall').
-        min_corr: Minimum correlation threshold.
-        p_threshold: P-value threshold for significance.
-        chunk_size: Size of chunks for processing (to manage memory).
+    Parameters
+    ----------
+    mdata : MuData
+        MuData object with matched sample IDs across modalities.
+    view1 : str
+        First modality name (for example ``'metab'``).
+    view2 : str
+        Second modality name (for example ``'micro'``).
+    method : str
+        Correlation metric: ``'pearson'``, ``'spearman'`` or ``'kendall'``.
+    min_corr : float
+        Minimum absolute correlation to retain.
+    p_threshold : float
+        Maximum p-value for significance filtering.
+    chunk_size : int
+        Number of features processed per chunk for memory control.
 
-    Returns:
-        corr_df: DataFrame with correlation results.
+    Returns
+    -------
+    pd.DataFrame
+        Significant feature-pair correlations with p-values and absolute
+        correlations.
     """
     from scipy.stats import pearsonr, spearmanr, kendalltau
     from scipy.stats import t as t_dist
@@ -1889,19 +2305,27 @@ def compute_cross_correlation_fast(mdata,
                                   p_threshold: float = 0.05,
                                   max_features: int = None) -> pd.DataFrame:
     r"""
-    Ultra-fast cross-correlation computation using pure numpy operations.
-    Only supports Pearson correlation but is much faster for large datasets.
+    Compute Pearson cross-modality correlations with optimized NumPy backend.
 
-    Arguments:
-        mdata: MuData object with paired samples.
-        view1: Name of first modality.
-        view2: Name of second modality.
-        min_corr: Minimum correlation threshold.
-        p_threshold: P-value threshold for significance.
-        max_features: Maximum number of features to consider (for memory management).
+    Parameters
+    ----------
+    mdata : MuData
+        MuData object with paired sample IDs.
+    view1 : str
+        First modality name.
+    view2 : str
+        Second modality name.
+    min_corr : float
+        Minimum absolute correlation to retain.
+    p_threshold : float
+        Maximum p-value for significance filtering.
+    max_features : int or None
+        Optional feature cap per modality (highest-variance features kept).
 
-    Returns:
-        corr_df: DataFrame with correlation results.
+    Returns
+    -------
+    pd.DataFrame
+        Significant Pearson correlations between features of two modalities.
     """
     # Get paired samples
     common_samples = list(set(mdata.mod[view1].obs_names) & set(mdata.mod[view2].obs_names))
@@ -2001,20 +2425,32 @@ def nmf_coexpression_modules(mdata,
                            random_state: int = 42,
                            corr_df: pd.DataFrame = None) -> dict:
     r"""
-    Find co-expression modules using Non-negative Matrix Factorization on correlation matrix.
+    Identify cross-modality co-expression modules via NMF decomposition.
 
-    Arguments:
-        mdata: MuData object with paired samples.
-        view1: Name of first modality.
-        view2: Name of second modality.
-        n_components: Number of NMF components (modules).
-        correlation_threshold: Minimum correlation threshold.
-        method: Correlation method.
-        random_state: Random state for reproducibility.
-        corr_df: Pre-computed correlation DataFrame (optional, to avoid recomputation).
+    Parameters
+    ----------
+    mdata : MuData
+        MuData containing paired samples across modalities.
+    view1 : str
+        First modality name.
+    view2 : str
+        Second modality name.
+    n_components : int
+        Number of latent NMF modules.
+    correlation_threshold : float
+        Minimum absolute correlation retained in input matrix.
+    method : str
+        Correlation method used when ``corr_df`` is not provided.
+    random_state : int
+        Random seed for NMF reproducibility.
+    corr_df : pd.DataFrame or None
+        Optional precomputed correlation table to reuse.
 
-    Returns:
-        results: Dictionary containing NMF results and modules.
+    Returns
+    -------
+    dict
+        Dictionary containing NMF model, W/H matrices, correlation matrix and
+        per-module top features.
     """
     from sklearn.decomposition import NMF
     
@@ -2098,19 +2534,27 @@ def plot_nmf_modules(nmf_results: dict,
                     figsize: tuple = (12, 8),
                     cmap: str = 'viridis') -> Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]:
     r"""
-    Plot NMF co-expression modules.
+    Visualize top weighted features for each NMF module.
 
-    Arguments:
-        nmf_results: Results from nmf_coexpression_modules.
-        view1: Name of first modality.
-        view2: Name of second modality.
-        n_top_features: Number of top features to show per module.
-        figsize: Figure size.
-        cmap: Colormap.
+    Parameters
+    ----------
+    nmf_results : dict
+        Output dictionary from :func:`nmf_coexpression_modules`.
+    view1 : str
+        First modality name.
+    view2 : str
+        Second modality name.
+    n_top_features : int
+        Number of top features to display for each module and modality.
+    figsize : tuple
+        Figure size in inches as ``(width, height)``.
+    cmap : str
+        Colormap used for bar colors.
 
-    Returns:
-        fig: Figure object.
-        axes: Axes objects.
+    Returns
+    -------
+    Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]
+        Matplotlib figure and axes grid with module barplots.
     """
     modules = nmf_results['modules']
     n_modules = len(modules)
@@ -2150,19 +2594,27 @@ def plot_correlation_heatmap(corr_df: pd.DataFrame,
                            figsize: tuple = (10, 8),
                            cmap: str = 'RdBu_r') -> Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]:
     r"""
-    Plot correlation heatmap between top correlated features.
+    Plot a heatmap of top cross-modality feature correlations.
 
-    Arguments:
-        corr_df: Correlation DataFrame from compute_cross_correlation.
-        view1: Name of first modality.
-        view2: Name of second modality.
-        top_n: Number of top correlations to show.
-        figsize: Figure size.
-        cmap: Colormap.
+    Parameters
+    ----------
+    corr_df : pd.DataFrame
+        Correlation table from cross-modality correlation functions.
+    view1 : str
+        First modality name.
+    view2 : str
+        Second modality name.
+    top_n : int
+        Number of highest absolute-correlation pairs to visualize.
+    figsize : tuple
+        Figure size in inches as ``(width, height)``.
+    cmap : str
+        Colormap for correlation heatmap.
 
-    Returns:
-        fig: Figure object.
-        ax: Axes object.
+    Returns
+    -------
+    Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]
+        Matplotlib figure and axes for the heatmap.
     """
     # Get top correlations
     top_corr = corr_df.nlargest(top_n, 'abs_correlation')
@@ -2197,16 +2649,24 @@ def network_analysis(corr_df: pd.DataFrame,
                     view2: str,
                     correlation_threshold: float = 0.5) -> dict:
     r"""
-    Perform network analysis on correlation data.
+    Build and analyze a bipartite feature-correlation network.
 
-    Arguments:
-        corr_df: Correlation DataFrame.
-        view1: Name of first modality.
-        view2: Name of second modality.
-        correlation_threshold: Minimum correlation for network edges.
+    Parameters
+    ----------
+    corr_df : pd.DataFrame
+        Correlation table containing feature pairs and correlation values.
+    view1 : str
+        First modality name.
+    view2 : str
+        Second modality name.
+    correlation_threshold : float
+        Minimum absolute correlation to include an edge.
 
-    Returns:
-        network_results: Dictionary with network analysis results.
+    Returns
+    -------
+    dict
+        NetworkX graph and common topology metrics (density, components,
+        centrality, clustering).
     """
     try:
         import networkx as nx
@@ -2260,22 +2720,35 @@ def compute_cross_correlation_torch(mdata,
                                    batch_size2: int = 1000,
                                    dtype: str = 'float32') -> pd.DataFrame:
     r"""
-    Ultra-fast cross-correlation computation using PyTorch with GPU acceleration and 2D chunking.
+    Compute cross-modality correlations with PyTorch acceleration.
     
-    Arguments:
-        mdata: MuData object with paired samples.
-        view1: Name of first modality.
-        view2: Name of second modality.
-        min_corr: Minimum correlation threshold.
-        p_threshold: P-value threshold for significance.
-        max_features: Maximum number of features to consider.
-        device: Device to use ('auto', 'cpu', 'cuda', 'mps').
-        batch_size1: Batch size for view1 features.
-        batch_size2: Batch size for view2 features.
-        dtype: Data type ('float32' or 'float64').
+    Parameters
+    ----------
+    mdata : MuData
+        MuData object with paired samples.
+    view1 : str
+        First modality name.
+    view2 : str
+        Second modality name.
+    min_corr : float
+        Minimum absolute correlation to retain.
+    p_threshold : float
+        Maximum p-value for significance filtering.
+    max_features : int or None
+        Optional cap on selected high-variance features per modality.
+    device : str
+        Compute device: ``'auto'``, ``'cpu'``, ``'cuda'`` or ``'mps'``.
+    batch_size1 : int
+        Feature-batch size for view1 dimension.
+    batch_size2 : int
+        Feature-batch size for view2 dimension.
+    dtype : str
+        Tensor precision, ``'float32'`` or ``'float64'``.
         
-    Returns:
-        corr_df: DataFrame with correlation results.
+    Returns
+    -------
+    pd.DataFrame
+        Significant feature-pair correlations with p-values.
     """
     try:
         import torch
@@ -2424,24 +2897,38 @@ def compute_cross_correlation_torch_chunked(mdata,
                                            chunk_size2: int = 1000,
                                            dtype: str = 'float32') -> pd.DataFrame:
     r"""
-    Memory-efficient PyTorch correlation computation with 2D chunking.
-    Suitable for very large datasets that don't fit in GPU memory.
+    Compute cross-modality correlations with memory-efficient 2D chunking.
     
-    Arguments:
-        mdata: MuData object with paired samples.
-        view1: Name of first modality.
-        view2: Name of second modality.
-        min_corr: Minimum correlation threshold.
-        p_threshold: P-value threshold for significance.
-        max_features1: Maximum features for view1.
-        max_features2: Maximum features for view2.
-        device: Device to use.
-        chunk_size1: Chunk size for view1 features.
-        chunk_size2: Chunk size for view2 features.
-        dtype: Data type.
+    Parameters
+    ----------
+    mdata : MuData
+        MuData object with paired sample IDs.
+    view1 : str
+        First modality name.
+    view2 : str
+        Second modality name.
+    min_corr : float
+        Minimum absolute correlation to retain.
+    p_threshold : float
+        Maximum p-value for significance filtering.
+    max_features1 : int or None
+        Optional cap on selected high-variance features in ``view1``.
+    max_features2 : int or None
+        Optional cap on selected high-variance features in ``view2``.
+    device : str
+        Compute device: ``'auto'``, ``'cpu'``, ``'cuda'`` or ``'mps'``.
+    chunk_size1 : int
+        Feature chunk size along ``view1``.
+    chunk_size2 : int
+        Feature chunk size along ``view2``.
+    dtype : str
+        Tensor precision, ``'float32'`` or ``'float64'``.
         
-    Returns:
-        corr_df: DataFrame with correlation results.
+    Returns
+    -------
+    pd.DataFrame
+        Significant feature-pair correlations with p-values and absolute
+        correlations.
     """
     try:
         import torch
@@ -2587,26 +3074,44 @@ def nmf_coexpression_modules_fast(mdata,
                                  corr_df: pd.DataFrame = None,
                                  corr_matrix: pd.DataFrame = None) -> dict:
     r"""
-    Fast NMF co-expression module discovery with optimized correlation computation.
+    Fast NMF module discovery with optimized correlation backends.
 
-    Arguments:
-        mdata: MuData object with paired samples.
-        view1: Name of first modality.
-        view2: Name of second modality.
-        n_components: Number of NMF components (modules).
-        correlation_threshold: Minimum correlation threshold.
-        method: Correlation method.
-        random_state: Random state for reproducibility.
-        max_features: Maximum number of features to consider.
-        use_torch: Whether to use PyTorch for correlation computation.
-        device: Device for PyTorch computation.
-        nmf_solver: NMF solver ('mu', 'cd').
-        nmf_max_iter: Maximum NMF iterations.
-        corr_df: Pre-computed correlation DataFrame (optional, to avoid recomputation).
-        corr_matrix: Pre-computed correlation matrix (optional, to avoid recomputation).
+    Parameters
+    ----------
+    mdata : MuData
+        MuData object with paired samples.
+    view1 : str
+        First modality name.
+    view2 : str
+        Second modality name.
+    n_components : int
+        Number of NMF modules to infer.
+    correlation_threshold : float
+        Minimum absolute correlation retained in module input matrix.
+    method : str
+        Correlation metric used when computing correlations from raw data.
+    random_state : int
+        Random seed for NMF reproducibility.
+    max_features : int or None
+        Optional cap on selected high-variance features per modality.
+    use_torch : bool
+        Whether to prioritize PyTorch-based correlation computation.
+    device : str
+        Device setting for PyTorch backend.
+    nmf_solver : str
+        Scikit-learn NMF solver (for example ``'mu'`` or ``'cd'``).
+    nmf_max_iter : int
+        Maximum NMF optimization iterations.
+    corr_df : pd.DataFrame or None
+        Optional precomputed long-format correlation table.
+    corr_matrix : pd.DataFrame or None
+        Optional precomputed feature-by-feature correlation matrix.
 
-    Returns:
-        results: Dictionary containing NMF results and modules.
+    Returns
+    -------
+    dict
+        Dictionary containing NMF model, factor matrices, filtered correlation
+        matrix and module feature definitions.
     """
     from sklearn.decomposition import NMF
     
@@ -2813,26 +3318,44 @@ def nmf_coexpression_modules_torch(mdata,
                                   use_parallel: bool = True,
                                   n_workers: int = None) -> dict:
     r"""
-    PyTorch-based NMF for very large datasets with GPU acceleration.
+    Run PyTorch-optimized NMF module discovery for large datasets.
 
-    Arguments:
-        mdata: MuData object with paired samples.
-        view1: Name of first modality.
-        view2: Name of second modality.
-        n_components: Number of NMF components.
-        correlation_threshold: Minimum correlation threshold.
-        random_state: Random state.
-        max_features: Maximum features to consider.
-        device: PyTorch device.
-        max_iter: Maximum iterations.
-        tol: Convergence tolerance.
-        corr_df: Pre-computed correlation DataFrame (optional, to avoid recomputation).
-        corr_matrix: Pre-computed correlation matrix (optional, to avoid recomputation).
-        use_parallel: Whether to use parallel-pandas for DataFrame operations.
-        n_workers: Number of parallel workers for pandas operations.
+    Parameters
+    ----------
+    mdata : MuData
+        MuData object with paired samples.
+    view1 : str
+        First modality name.
+    view2 : str
+        Second modality name.
+    n_components : int
+        Number of NMF modules.
+    correlation_threshold : float
+        Minimum absolute correlation retained for module construction.
+    random_state : int
+        Random seed.
+    max_features : int or None
+        Optional cap on selected high-variance features.
+    device : str
+        PyTorch device selection (``'auto'``, ``'cpu'``, ``'cuda'``, ``'mps'``).
+    max_iter : int
+        Maximum NMF optimization iterations.
+    tol : float
+        Convergence tolerance for iterative updates.
+    corr_df : pd.DataFrame or None
+        Optional precomputed correlation table.
+    corr_matrix : pd.DataFrame or None
+        Optional precomputed correlation matrix.
+    use_parallel : bool
+        Whether to use ``pandarallel`` for large DataFrame operations.
+    n_workers : int or None
+        Number of workers for parallel DataFrame operations.
 
-    Returns:
-        results: Dictionary with NMF results.
+    Returns
+    -------
+    dict
+        Dictionary containing module decomposition, correlation matrix and
+        module feature summaries.
     """
     try:
         import torch
@@ -3093,28 +3616,45 @@ def plot_correlation_matrix(corr_df: pd.DataFrame,
                            save: bool = False,
                            save_path: str = 'mofa_correlation_matrix.png') -> matplotlib.axes._axes.Axes:
     r"""
-    Plot square correlation matrix with combined features from both modalities.
-    Shows within-module and between-module correlation structure.
+    Plot module-aware square correlation matrix across both modalities.
 
-    Arguments:
-        corr_df: Correlation DataFrame from compute_cross_correlation.
-        nmf_results: Results from nmf_coexpression_modules.
-        view1: Name of first modality.
-        view2: Name of second modality.
-        top_n_per_module: Number of top features to show per module (default: 10).
-        figsize: Figure size.
-        cmap: Colormap for correlation values.
-        show_module_boundaries: Whether to show module boundaries.
-        legend_ncol: Number of columns in legend.
-        legend_bbox_to_anchor: Legend position.
-        legend_fontsize: Legend font size.
-        use_parallel: Whether to use parallel-pandas for DataFrame operations.
-        n_workers: Number of parallel workers for pandas operations.
-        save: Whether to save the figure.
-        save_path: Path to save the figure.
+    Parameters
+    ----------
+    corr_df : pd.DataFrame
+        Cross-modality correlation table.
+    nmf_results : dict
+        Output from NMF module discovery containing module assignments.
+    view1 : str
+        First modality name.
+    view2 : str
+        Second modality name.
+    top_n_per_module : int
+        Number of top features retained per module and modality.
+    figsize : tuple
+        Figure size in inches as ``(width, height)``.
+    cmap : str
+        Colormap for correlation values.
+    show_module_boundaries : bool
+        Whether to draw module boundary rectangles/separators.
+    legend_ncol : int
+        Number of legend columns.
+    legend_bbox_to_anchor : tuple
+        Legend anchor position.
+    legend_fontsize : int
+        Legend font size.
+    use_parallel : bool
+        Whether to use ``pandarallel`` for large DataFrame operations.
+    n_workers : int or None
+        Number of workers for parallel mode.
+    save : bool
+        Whether to save figure to file.
+    save_path : str
+        Output file path when ``save=True``.
 
-    Returns:
-        ax: Clustermap axes object.
+    Returns
+    -------
+    seaborn.matrix.ClusterGrid
+        Seaborn clustermap object containing the module correlation matrix.
     """
     # Try to import pandarallel if parallel processing is requested
     if use_parallel:
@@ -3377,16 +3917,25 @@ def get_module_features(nmf_results: dict,
                        view: str = None,
                        top_n: int = None) -> dict:
     r"""
-    Get features from specific modules, similar to WGCNA get_sub_module.
+    Retrieve module feature lists from NMF module results.
 
-    Arguments:
-        nmf_results: Results from nmf_coexpression_modules.
-        module_name: Specific module name (e.g., 'Module_1'). If None, returns all modules.
-        view: Specific view name. If None, returns both views.
-        top_n: Number of top features to return. If None, returns all features above threshold.
+    Parameters
+    ----------
+    nmf_results : dict
+        Output dictionary from NMF module discovery.
+    module_name : str or None
+        Specific module ID (for example ``'Module_1'``). If ``None``, return all
+        modules.
+    view : str or None
+        Restrict to one modality/view. If ``None``, return all available views.
+    top_n : int or None
+        Number of top features to keep per module/view. If ``None``, keep all
+        stored features.
 
-    Returns:
-        module_features: Dictionary containing module features.
+    Returns
+    -------
+    dict
+        Nested dictionary containing selected module features and scores.
     """
     modules = nmf_results['modules']
     
@@ -3428,18 +3977,28 @@ def get_module_network(nmf_results: dict,
                       view2: str,
                       correlation_threshold: float = 0.5) -> dict:
     r"""
-    Get network representation of a specific module, similar to WGCNA get_sub_network.
+    Build a feature-correlation network for one NMF module.
 
-    Arguments:
-        nmf_results: Results from nmf_coexpression_modules.
-        corr_df: Correlation DataFrame.
-        module_name: Name of the module.
-        view1: Name of first modality.
-        view2: Name of second modality.
-        correlation_threshold: Minimum correlation for network edges.
+    Parameters
+    ----------
+    nmf_results : dict
+        Output dictionary from NMF module discovery.
+    corr_df : pd.DataFrame
+        Cross-modality correlation table.
+    module_name : str
+        Module identifier (for example ``'Module_1'``).
+    view1 : str
+        First modality name.
+    view2 : str
+        Second modality name.
+    correlation_threshold : float
+        Minimum absolute correlation retained as an edge.
 
-    Returns:
-        network_info: Dictionary containing network information.
+    Returns
+    -------
+    dict
+        Network information including graph object, centrality metrics and hub
+        features.
     """
     try:
         import networkx as nx
@@ -3516,23 +4075,35 @@ def plot_module_network(network_info: dict,
                        save: bool = False,
                        save_path: str = None) -> Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]:
     r"""
-    Plot network for a specific module.
+    Plot network topology for a selected module.
 
-    Arguments:
-        network_info: Network information from get_module_network.
-        view1: Name of first modality.
-        view2: Name of second modality.
-        figsize: Figure size.
-        node_size_factor: Factor for node sizes.
-        edge_width_factor: Factor for edge widths.
-        show_labels: Whether to show node labels.
-        label_size: Size of node labels.
-        save: Whether to save the figure.
-        save_path: Path to save the figure.
+    Parameters
+    ----------
+    network_info : dict
+        Network dictionary from :func:`get_module_network`.
+    view1 : str
+        First modality name.
+    view2 : str
+        Second modality name.
+    figsize : tuple
+        Figure size in inches as ``(width, height)``.
+    node_size_factor : float
+        Scale factor for node sizes from degree centrality.
+    edge_width_factor : float
+        Scale factor for edge widths from correlation strength.
+    show_labels : bool
+        Whether to annotate hub node labels.
+    label_size : int
+        Font size for labels.
+    save : bool
+        Whether to save the figure.
+    save_path : str or None
+        Output path when ``save=True``. If ``None``, a default filename is used.
 
-    Returns:
-        fig: Figure object.
-        ax: Axes object.
+    Returns
+    -------
+    Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes]
+        Matplotlib figure and axes for network plot.
     """
     try:
         import networkx as nx
@@ -3634,16 +4205,23 @@ def summarize_modules(nmf_results: dict,
                      view2: str,
                      top_n: int = 5) -> pd.DataFrame:
     r"""
-    Create a summary table of all modules with their top features.
+    Summarize inferred modules with top modality-specific features.
 
-    Arguments:
-        nmf_results: Results from nmf_coexpression_modules.
-        view1: Name of first modality.
-        view2: Name of second modality.
-        top_n: Number of top features to show per module.
+    Parameters
+    ----------
+    nmf_results : dict
+        Output dictionary from NMF module discovery.
+    view1 : str
+        First modality name.
+    view2 : str
+        Second modality name.
+    top_n : int
+        Number of top features listed per modality and module.
 
-    Returns:
-        summary_df: DataFrame summarizing all modules.
+    Returns
+    -------
+    pd.DataFrame
+        Module summary table with feature counts and top-feature strings.
     """
     modules = nmf_results['modules']
     
@@ -3678,7 +4256,8 @@ class MOFACorrelationAnalyzer(object):
         r"""
         Initialize the MOFA correlation analyzer.
         
-        Arguments:
+        Parameters
+        ----------
             nmf_results: Results from nmf_coexpression_modules.
             corr_df: Correlation DataFrame from compute_cross_correlation.
             view1: Name of first modality.
@@ -3702,11 +4281,13 @@ class MOFACorrelationAnalyzer(object):
         r"""
         Get top features from each module with caching.
         
-        Arguments:
+        Parameters
+        ----------
             top_n_per_module: Number of top features per module.
             use_cache: Whether to use cached results.
             
-        Returns:
+        Returns
+        -------
             Tuple of (all_features, feature_to_module, feature_to_modality)
         """
         cache_key = f"features_{top_n_per_module}"
@@ -3753,13 +4334,15 @@ class MOFACorrelationAnalyzer(object):
         r"""
         Create correlation matrix with caching and parallel processing.
         
-        Arguments:
+        Parameters
+        ----------
             top_n_per_module: Number of top features per module.
             use_parallel: Whether to use parallel processing.
             n_workers: Number of workers for parallel processing.
             use_cache: Whether to use cached results.
             
-        Returns:
+        Returns
+        -------
             Tuple of (corr_matrix, sorted_features, feature_colors, module_boundaries)
         """
         cache_key = f"corr_matrix_{top_n_per_module}_{use_parallel}"
@@ -3890,7 +4473,8 @@ class MOFACorrelationAnalyzer(object):
         r"""
         Plot correlation matrix with module annotations.
         
-        Arguments:
+        Parameters
+        ----------
             top_n_per_module: Number of top features per module.
             figsize: Figure size.
             cmap: Colormap.
@@ -3903,7 +4487,8 @@ class MOFACorrelationAnalyzer(object):
             save: Whether to save figure.
             save_path: Save path.
             
-        Returns:
+        Returns
+        -------
             ClusterGrid object or None if plotting fails.
         """
         try:
@@ -4031,7 +4616,8 @@ class MOFACorrelationAnalyzer(object):
         r"""
         Get summary information about the correlation analysis.
         
-        Returns:
+        Returns
+        -------
             Dictionary with summary statistics.
         """
         summary = {
@@ -4065,7 +4651,8 @@ class MOFACorrelationAnalyzer(object):
         r"""
         Get information about cached data.
         
-        Returns:
+        Returns
+        -------
             Dictionary with cache information.
         """
         cache_info = {
@@ -4083,16 +4670,23 @@ def create_correlation_analyzer(nmf_results: dict,
                               view1: str, 
                               view2: str) -> MOFACorrelationAnalyzer:
     r"""
-    Create a MOFACorrelationAnalyzer instance for correlation analysis and visualization.
+    Create a reusable analyzer object for module-correlation exploration.
     
-    Arguments:
-        nmf_results: Results from nmf_coexpression_modules.
-        corr_df: Correlation DataFrame from compute_cross_correlation.
-        view1: Name of first modality.
-        view2: Name of second modality.
+    Parameters
+    ----------
+    nmf_results : dict
+        Output from NMF module discovery.
+    corr_df : pd.DataFrame
+        Cross-modality correlation table.
+    view1 : str
+        First modality name.
+    view2 : str
+        Second modality name.
         
-    Returns:
-        analyzer: MOFACorrelationAnalyzer instance.
+    Returns
+    -------
+    MOFACorrelationAnalyzer
+        Initialized analyzer with internal caching.
     """
     return MOFACorrelationAnalyzer(nmf_results, corr_df, view1, view2)
 
@@ -4104,20 +4698,29 @@ def compute_cross_correlation_parallel_numpy(mdata,
                                             max_features: int = None,
                                             n_workers: int = None) -> pd.DataFrame:
     r"""
-    Ultra-fast parallel correlation computation using numpy and multiprocessing.
-    Optimized for Pearson correlation with vectorized operations.
+    Compute Pearson cross-modality correlations with multiprocessing NumPy.
     
-    Arguments:
-        mdata: MuData object with paired samples.
-        view1: Name of first modality.
-        view2: Name of second modality.
-        min_corr: Minimum correlation threshold.
-        p_threshold: P-value threshold for significance.
-        max_features: Maximum number of features to consider.
-        n_workers: Number of parallel workers (default: CPU count).
+    Parameters
+    ----------
+    mdata : MuData
+        MuData object with paired samples.
+    view1 : str
+        First modality name.
+    view2 : str
+        Second modality name.
+    min_corr : float
+        Minimum absolute correlation to retain.
+    p_threshold : float
+        Maximum p-value for significance filtering.
+    max_features : int or None
+        Optional cap on selected high-variance features per modality.
+    n_workers : int or None
+        Number of worker processes. If ``None``, inferred from CPU count.
         
-    Returns:
-        corr_df: DataFrame with correlation results.
+    Returns
+    -------
+    pd.DataFrame
+        Significant cross-modality correlations.
     """
     import multiprocessing as mp
     from functools import partial
@@ -4256,24 +4859,37 @@ def compute_kendall_tau_torch(mdata,
                              dtype: str = 'float32',
                              handle_zeros: bool = True) -> pd.DataFrame:
     r"""
-    Ultra-fast Kendall's Tau correlation computation using PyTorch with GPU acceleration.
-    Optimized for sparse data with many zeros (metabolomics, microbiome data).
+    Compute Kendall's tau correlations with optional GPU acceleration.
     
-    Arguments:
-        mdata: MuData object with paired samples.
-        view1: Name of first modality.
-        view2: Name of second modality.
-        min_corr: Minimum correlation threshold.
-        p_threshold: P-value threshold for significance.
-        max_features: Maximum number of features to consider.
-        device: Device to use ('auto', 'cpu', 'cuda', 'mps').
-        batch_size1: Batch size for view1 features.
-        batch_size2: Batch size for view2 features.
-        dtype: Data type ('float32' or 'float64').
-        handle_zeros: Whether to use zero-aware Kendall computation.
+    Parameters
+    ----------
+    mdata : MuData
+        MuData object with paired sample IDs.
+    view1 : str
+        First modality name.
+    view2 : str
+        Second modality name.
+    min_corr : float
+        Minimum absolute correlation to retain.
+    p_threshold : float
+        Maximum p-value for significance filtering.
+    max_features : int or None
+        Optional cap on selected high-variance features.
+    device : str
+        Compute device: ``'auto'``, ``'cpu'``, ``'cuda'`` or ``'mps'``.
+    batch_size1 : int
+        Batch size for view1 features.
+    batch_size2 : int
+        Batch size for view2 features.
+    dtype : str
+        Tensor precision, ``'float32'`` or ``'float64'``.
+    handle_zeros : bool
+        Whether to use zero-aware tie handling strategy.
         
-    Returns:
-        corr_df: DataFrame with correlation results.
+    Returns
+    -------
+    pd.DataFrame
+        Significant Kendall correlations between modality features.
     """
     try:
         import torch
@@ -4501,26 +5117,42 @@ def nmf_coexpression_modules_kendall(mdata,
                                    corr_df: pd.DataFrame = None,
                                    handle_zeros: bool = True) -> dict:
     r"""
-    Fast NMF co-expression module discovery using Kendall's Tau correlation.
-    Optimized for sparse data with many zeros (metabolomics, microbiome data).
+    Infer cross-modality modules using Kendall-correlation-driven NMF.
 
-    Arguments:
-        mdata: MuData object with paired samples.
-        view1: Name of first modality.
-        view2: Name of second modality.
-        n_components: Number of NMF components (modules).
-        correlation_threshold: Minimum correlation threshold.
-        random_state: Random state for reproducibility.
-        max_features: Maximum number of features to consider.
-        use_torch: Whether to use PyTorch for correlation computation.
-        device: Device for PyTorch computation.
-        nmf_solver: NMF solver ('mu', 'cd').
-        nmf_max_iter: Maximum NMF iterations.
-        corr_df: Pre-computed Kendall correlation DataFrame (optional).
-        handle_zeros: Whether to use zero-aware Kendall computation.
+    Parameters
+    ----------
+    mdata : MuData
+        MuData object with paired sample IDs across views.
+    view1 : str
+        First modality name.
+    view2 : str
+        Second modality name.
+    n_components : int
+        Number of latent NMF modules.
+    correlation_threshold : float
+        Minimum absolute Kendall tau retained in the module input matrix.
+    random_state : int
+        Random seed for NMF reproducibility.
+    max_features : int or None
+        Optional cap on selected high-variance features per modality.
+    use_torch : bool
+        Whether to use PyTorch backend for Kendall calculation.
+    device : str
+        Device selection for PyTorch backend.
+    nmf_solver : str
+        Scikit-learn NMF solver.
+    nmf_max_iter : int
+        Maximum NMF optimization iterations.
+    corr_df : pd.DataFrame or None
+        Optional precomputed Kendall correlation table.
+    handle_zeros : bool
+        Whether to use zero-aware strategy in Kendall computation.
 
-    Returns:
-        results: Dictionary containing NMF results and modules.
+    Returns
+    -------
+    dict
+        Dictionary containing correlation matrix, NMF decomposition and
+        module-specific feature sets.
     """
     from sklearn.decomposition import NMF
     
@@ -4719,18 +5351,27 @@ def validate_kendall_tau_implementation(mdata,
                                       max_features: int = 100,
                                       device: str = 'auto') -> pd.DataFrame:
     r"""
-    Validate our Kendall's Tau implementation against scipy's implementation.
+    Validate GPU/torch Kendall implementation against SciPy reference.
     
-    Arguments:
-        mdata: MuData object with paired samples.
-        view1: Name of first modality.
-        view2: Name of second modality.
-        n_test_pairs: Number of feature pairs to test.
-        max_features: Maximum features to consider for testing.
-        device: Device for PyTorch computation.
+    Parameters
+    ----------
+    mdata : MuData
+        MuData object with paired sample IDs.
+    view1 : str
+        First modality name.
+    view2 : str
+        Second modality name.
+    n_test_pairs : int
+        Number of random feature pairs used for validation.
+    max_features : int
+        Maximum features retained per modality for test runtime control.
+    device : str
+        Device setting for torch implementation.
         
-    Returns:
-        comparison_df: DataFrame comparing our results with scipy's.
+    Returns
+    -------
+    pd.DataFrame
+        Comparison table including torch vs SciPy tau/p-value differences.
     """
     try:
         import torch
@@ -4904,21 +5545,31 @@ def factor_group_correlation_mdata(mdata,
                                   log_transform: bool = True,
                                   min_group_size: int = 3) -> pd.DataFrame:
     r"""
-    Calculate the correlation/association between MOFA factors and groups in MuData.
-    Handles unpaired data by analyzing each view separately.
+    Test associations between MOFA factors and categorical groups per view.
     
-    Arguments:
-        mdata: MuData object with MOFA factors in obsm['X_mofa'].
-        group_col: Column name for group information.
-        factor_prefix: Prefix for factor names (default: 'Factor').
-        view: Specific view to analyze ('metab', 'micro', etc.). If None, analyze all views.
-        p_threshold: P-value threshold for significance.
-        method: Statistical test method ('ttest', 'anova', 'kruskal').
-        log_transform: Whether to apply log transformation to p-values.
-        min_group_size: Minimum group size for analysis.
+    Parameters
+    ----------
+    mdata : MuData
+        MuData containing factor scores in ``mdata.obsm['X_mofa']``.
+    group_col : str
+        Group label column in modality ``obs`` tables.
+    factor_prefix : str
+        Prefix used for naming factor labels in output.
+    view : str or None
+        Specific modality to analyze. If ``None``, analyze all modalities.
+    p_threshold : float
+        Significance threshold used for result flagging.
+    method : str
+        Statistical test: ``'ttest'``, ``'anova'`` or ``'kruskal'``.
+    log_transform : bool
+        Whether to transform p-values to ``-log10(p)`` in outputs.
+    min_group_size : int
+        Minimum per-group sample size to include in tests.
         
-    Returns:
-        results_df: DataFrame with factor-group associations for each view.
+    Returns
+    -------
+    pd.DataFrame
+        Long-format table of factor-group association statistics per modality.
     """
     import pandas as pd
     import numpy as np
@@ -5141,17 +5792,25 @@ def plot_factor_group_associations(results_df: pd.DataFrame,
                                   save: bool = False,
                                   save_path: str = 'factor_group_associations.png') -> tuple:
     r"""
-    Plot factor-group associations from factor_group_correlation_mdata results.
+    Visualize top factor-group associations from summary statistics table.
     
-    Arguments:
-        results_df: Results DataFrame from factor_group_correlation_mdata.
-        top_n: Number of top associations to plot.
-        figsize: Figure size.
-        save: Whether to save the plot.
-        save_path: Path to save the plot.
+    Parameters
+    ----------
+    results_df : pd.DataFrame
+        Output table from :func:`factor_group_correlation_mdata`.
+    top_n : int
+        Number of top associations displayed in plots.
+    figsize : tuple
+        Figure size in inches as ``(width, height)``.
+    save : bool
+        Whether to save figure to disk.
+    save_path : str
+        Output path when ``save=True``.
         
-    Returns:
-        fig, axes: Matplotlib figure and axes objects.
+    Returns
+    -------
+    tuple
+        ``(fig, axes)`` Matplotlib objects for the multi-panel summary plot.
     """
     try:
         import matplotlib.pyplot as plt
@@ -5256,20 +5915,31 @@ def plot_factor_boxplots(mdata,
                         save: bool = False,
                         save_path: str = 'factor_boxplots.png') -> tuple:
     r"""
-    Create boxplots for top significant factor-group associations.
+    Draw boxplots for top significant factor-group associations.
     
-    Arguments:
-        mdata: MuData object.
-        results_df: Results DataFrame from factor_group_correlation_mdata.
-        top_n: Number of top factors to plot.
-        group_col: Group column name.
-        factor_prefix: Factor name prefix.
-        figsize: Figure size.
-        save: Whether to save the plot.
-        save_path: Path to save the plot.
+    Parameters
+    ----------
+    mdata : MuData
+        MuData object containing ``obsm['X_mofa']`` and group annotations.
+    results_df : pd.DataFrame
+        Output table from :func:`factor_group_correlation_mdata`.
+    top_n : int
+        Number of top significant factor entries to visualize.
+    group_col : str
+        Grouping column name in modality ``obs``.
+    factor_prefix : str
+        Prefix used in factor labels (for example ``'Factor'``).
+    figsize : tuple
+        Figure size in inches as ``(width, height)``.
+    save : bool
+        Whether to save figure to disk.
+    save_path : str
+        Output path when ``save=True``.
         
-    Returns:
-        fig, axes: Matplotlib figure and axes objects.
+    Returns
+    -------
+    tuple
+        ``(fig, axes)`` Matplotlib objects for generated boxplots.
     """
     try:
         import matplotlib.pyplot as plt
@@ -5377,14 +6047,19 @@ def plot_factor_boxplots(mdata,
 
 def example_factor_group_analysis(mdata, group_col: str = 'Group'):
     r"""
-    Example usage of factor-group analysis functions.
+    Run an end-to-end demo of factor-group association analysis.
     
-    Arguments:
-        mdata: MuData object with MOFA factors.
-        group_col: Group column name.
+    Parameters
+    ----------
+    mdata : MuData
+        MuData object containing MOFA factors.
+    group_col : str
+        Group column used for statistical testing.
         
-    Returns:
-        results_df: Analysis results DataFrame.
+    Returns
+    -------
+    pd.DataFrame
+        Combined factor-group association results from demo workflow.
     """
     print("🔬 Example: Factor-Group Analysis")
     print("=" * 50)
@@ -5478,24 +6153,37 @@ def compute_spearman_torch_fast(mdata,
                               handle_zeros: bool = True,
                               min_nonzero_pairs: int = 10) -> pd.DataFrame:
     r"""
-    Fast Spearman correlation computation using PyTorch with proper statistical testing.
-    Optimized for sparse data with many zeros (metabolomics, microbiome data).
+    Compute cross-modality Spearman correlations with torch acceleration.
 
-    Arguments:
-        mdata: MuData object with paired samples.
-        view1: Name of first modality.
-        view2: Name of second modality.
-        min_corr: Minimum correlation threshold.
-        p_threshold: P-value threshold for significance.
-        max_features: Maximum number of features to consider per view.
-        device: Device for PyTorch computation ('auto', 'cpu', 'cuda', 'mps').
-        batch_size: Batch size for processing feature pairs.
-        dtype: Data type for PyTorch tensors.
-        handle_zeros: Whether to use zero-aware Spearman computation.
-        min_nonzero_pairs: Minimum number of non-zero pairs required.
+    Parameters
+    ----------
+    mdata : MuData
+        MuData object with paired sample IDs.
+    view1 : str
+        First modality name.
+    view2 : str
+        Second modality name.
+    min_corr : float
+        Minimum absolute Spearman correlation retained.
+    p_threshold : float
+        Maximum p-value for significance filtering.
+    max_features : int
+        Maximum selected high-variance features per modality.
+    device : str
+        Compute device: ``'auto'``, ``'cpu'``, ``'cuda'`` or ``'mps'``.
+    batch_size : int
+        Number of feature pairs processed per batch.
+    dtype : str
+        Tensor precision, ``'float32'`` or ``'float64'``.
+    handle_zeros : bool
+        Whether to apply zero-aware handling for sparse data.
+    min_nonzero_pairs : int
+        Minimum non-zero paired observations required to test a feature pair.
 
-    Returns:
-        corr_df: DataFrame with significant Spearman correlations.
+    Returns
+    -------
+    pd.DataFrame
+        Significant feature-pair Spearman correlations with p-values.
     """
     try:
         import torch
@@ -5703,46 +6391,46 @@ def compute_correlation(mdata,
     
     Parameters
     ----------
-    mdata : MuData
+    mdata:MuData
         Multi-omics data object
-    view1 : str
+    view1:str
         Name of first view/modality
-    view2 : str
+    view2:str
         Name of second view/modality
-    method : str, default 'pearson'
+    method:str, default 'pearson'
         Correlation method: 'pearson', 'spearman', 'kendall'
-    backend : str, default 'auto'
+    backend:str, default 'auto'
         Computation backend: 'auto', 'numpy', 'torch', 'scipy'
         - 'auto': automatically choose best backend
         - 'numpy': use numpy/scipy with optional parallelization
         - 'torch': use PyTorch for GPU acceleration
         - 'scipy': use scipy.stats functions
-    optimization : str, default 'fast'
+    optimization:str, default 'fast'
         Optimization level: 'basic', 'fast', 'chunked'
         - 'basic': simple implementation
         - 'fast': optimized with batching and filtering
         - 'chunked': memory-efficient chunked processing
-    min_corr : float, default 0.3
+    min_corr:float, default 0.3
         Minimum absolute correlation threshold
-    p_threshold : float, default 0.05
+    p_threshold:float, default 0.05
         P-value significance threshold
-    max_features : int, optional
+    max_features:int, optional
         Maximum number of features to use from each view
-    device : str, default 'auto'
+    device:str, default 'auto'
         Device for PyTorch backend: 'auto', 'cpu', 'cuda'
-    batch_size : int, default 100
+    batch_size:int, default 100
         Batch size for processing
-    chunk_size : int, default 1000
+    chunk_size:int, default 1000
         Chunk size for chunked processing
-    dtype : str, default 'float32'
+    dtype:str, default 'float32'
         Data type for computations
-    handle_zeros : bool, default True
+    handle_zeros:bool, default True
         Whether to filter zero pairs for sparse data
-    min_nonzero_pairs : int, default 10
+    min_nonzero_pairs:int, default 10
         Minimum non-zero pairs required
-    n_workers : int, optional
+    n_workers:int, optional
         Number of parallel workers
-    use_parallel : bool, default True
+    use_parallel:bool, default True
         Whether to use parallel processing when available
         
     Returns
@@ -5892,41 +6580,41 @@ def compute_coexpression_modules(mdata,
     
     Parameters
     ----------
-    mdata : MuData
+    mdata:MuData
         Multi-omics data object
-    view1 : str
+    view1:str
         Name of first view/modality
-    view2 : str
+    view2:str
         Name of second view/modality
-    n_components : int, default 10
+    n_components:int, default 10
         Number of NMF components (modules)
-    correlation_threshold : float, default 0.3
+    correlation_threshold:float, default 0.3
         Minimum correlation threshold for module inclusion
-    method : str, default 'pearson'
+    method:str, default 'pearson'
         Correlation method: 'pearson', 'spearman', 'kendall'
-    backend : str, default 'auto'
+    backend:str, default 'auto'
         Computation backend: 'auto', 'numpy', 'torch', 'scipy'
-    optimization : str, default 'fast'
+    optimization:str, default 'fast'
         Optimization level: 'basic', 'fast', 'torch'
-    random_state : int, default 42
+    random_state:int, default 42
         Random seed for reproducibility
-    max_features : int, optional
+    max_features:int, optional
         Maximum number of features to use
-    device : str, default 'auto'
+    device:str, default 'auto'
         Device for PyTorch backend
-    nmf_solver : str, default 'mu'
+    nmf_solver:str, default 'mu'
         NMF solver algorithm
-    nmf_max_iter : int, default 1000
+    nmf_max_iter:int, default 1000
         Maximum NMF iterations
-    handle_zeros : bool, default True
+    handle_zeros:bool, default True
         Whether to handle zeros in sparse data
-    use_parallel : bool, default True
+    use_parallel:bool, default True
         Whether to use parallel processing
-    n_workers : int, optional
+    n_workers:int, optional
         Number of parallel workers
-    corr_df : pd.DataFrame, optional
+    corr_df:pd.DataFrame, optional
         Pre-computed correlation DataFrame
-    corr_matrix : pd.DataFrame, optional
+    corr_matrix:pd.DataFrame, optional
         Pre-computed correlation matrix
         
     Returns
@@ -6008,6 +6696,3 @@ def compute_coexpression_modules(mdata,
         return nmf_coexpression_modules(
             mdata, view1, view2, n_components, correlation_threshold,
             method, random_state, corr_df)
-
-
-

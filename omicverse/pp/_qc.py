@@ -1354,6 +1354,24 @@ def qc_gpu(adata, mode='seurat',
     return adata
 
 @monitor
+@register_function(
+    aliases=["细胞过滤", "filter_cells", "cell_filter", "低质量细胞过滤", "细胞质控过滤"],
+    category="preprocessing",
+    description="Filter out low-quality cells by gene/UMI count thresholds",
+    prerequisites={
+        "optional_functions": ["qc"]
+    },
+    requires={},
+    produces={
+        "obs": ["n_genes_by_counts", "total_counts"]
+    },
+    auto_fix="none",
+    examples=[
+        "ov.pp.filter_cells(adata, min_genes=200)",
+        "ov.pp.filter_cells(adata, max_counts=50000)",
+    ],
+    related=["qc", "filter_genes", "preprocess"],
+)
 def filter_cells(adata: anndata.AnnData,
     min_counts: Optional[int] = None,
     min_genes: Optional[int] = None,
@@ -1372,7 +1390,7 @@ def filter_cells(adata: anndata.AnnData,
     
     Parameters
     ----------
-    data
+    adata
         The (annotated) data matrix of shape `n_obs` × `n_vars`.
         Rows correspond to cells and columns to genes.
     min_counts
@@ -1420,6 +1438,24 @@ def filter_cells(adata: anndata.AnnData,
     print(f"   {Colors.GREEN}✓ Filtered: {Colors.BOLD}{cells_filtered:,}{Colors.ENDC}{Colors.GREEN} cells removed{Colors.ENDC}")
 
 @monitor
+@register_function(
+    aliases=["基因过滤", "filter_genes", "gene_filter", "低表达基因过滤", "基因质控过滤"],
+    category="preprocessing",
+    description="Filter genes by minimum/maximum detected cells or counts",
+    prerequisites={
+        "optional_functions": ["qc"]
+    },
+    requires={},
+    produces={
+        "var": ["n_cells_by_counts", "total_counts"]
+    },
+    auto_fix="none",
+    examples=[
+        "ov.pp.filter_genes(adata, min_cells=3)",
+        "ov.pp.filter_genes(adata, min_counts=10)",
+    ],
+    related=["qc", "filter_cells", "highly_variable_genes"],
+)
 def filter_genes(adata: anndata.AnnData,
     min_counts: Optional[int] = None,
     min_cells: Optional[int] = None,
@@ -1438,7 +1474,7 @@ def filter_genes(adata: anndata.AnnData,
     
     Parameters
     ----------
-    data
+    adata
         An annotated data matrix of shape `n_obs` × `n_vars`. Rows correspond
         to cells and columns to genes.
     min_counts

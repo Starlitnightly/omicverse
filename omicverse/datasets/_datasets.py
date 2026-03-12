@@ -12,6 +12,7 @@ import pandas as pd
 import numpy as np
 from anndata import AnnData, read_h5ad, read_loom
 import warnings
+from .._registry import register_function
 
 # Import omicverse color settings
 try:
@@ -108,8 +109,34 @@ DATA_DOWNLOAD_LINK_DICT = {
     },
 }
 
+@register_function(
+    aliases=['下载数据', 'download_data', 'dataset downloader'],
+    category="datasets",
+    description="Download OmicVerse tutorial datasets or resources to local cache with progress and integrity checks.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.datasets.download_data(url, file_path="pbmc3k.h5ad", dir="data")'],
+    related=['datasets.pancreatic_endocrinogenesis', 'datasets.sc_ref_Lymph_Node']
+)
 def download_data(url: str, file_path: Optional[str] = None, dir: str = "./data") -> str:
-    """Download example data to local folder."""
+    """Download a dataset file to local storage.
+
+    Parameters
+    ----------
+    url:str
+        Source URL of the dataset file.
+    file_path:Optional[str]
+        Target filename. If ``None``, the basename of ``url`` is used.
+    dir:str
+        Output directory where file is stored.
+
+    Returns
+    -------
+    str
+        Absolute/relative local path of downloaded file.
+    """
     file_path = ntpath.basename(url) if file_path is None else file_path
     file_path = os.path.join(dir, file_path)
     print(f"{Colors.BLUE}{EMOJI['start']} Downloading data to {file_path}{Colors.ENDC}")
@@ -148,12 +175,17 @@ def download_data(url: str, file_path: Optional[str] = None, dir: str = "./data"
 def get_dataset_url(dataset_name: str, prefer_stanford: bool = True) -> str:
     """Get URL for a dataset by name, preferring Stanford over Figshare.
 
-    Args:
-        dataset_name: Name of the dataset (e.g., 'neuron_splicing').
-        prefer_stanford: Whether to prefer Stanford links over Figshare (default: True).
+    Parameters
+    ----------
+    dataset_name:str
+        Dataset key in ``DATA_DOWNLOAD_LINK_DICT``.
+    prefer_stanford:bool
+        Whether Stanford mirror is preferred over Figshare mirror.
 
-    Returns:
-        URL string for the dataset.
+    Returns
+    -------
+    str
+        Download URL for the requested dataset.
 
     Raises:
         ValueError: If dataset name is not found.
@@ -174,15 +206,31 @@ def get_dataset_url(dataset_name: str, prefer_stanford: bool = True) -> str:
         raise ValueError(f"No valid URL found for dataset '{dataset_name}'")
 
 
+@register_function(
+    aliases=['get_adata', '加载AnnData', 'download and load adata'],
+    category="datasets",
+    description="Download a dataset file and load it into AnnData with automatic format detection.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.get_adata(url, filename="dataset.h5ad")'],
+    related=['datasets.download_data_requests', 'datasets.download_data']
+)
 def get_adata(url: str, filename: Optional[str] = None) -> Optional[AnnData]:
     """Download example data to local folder.
 
-    Args:
-        url: the url of the data.
-        filename: the name of the file to be saved.
+    Parameters
+    ----------
+    url:str
+        Download URL of an ``.h5ad`` or ``.loom`` dataset file.
+    filename:Optional[str]
+        Local filename used for caching.
 
-    Returns:
-        An Annodata object.
+    Returns
+    -------
+    Optional[AnnData]
+        Loaded AnnData object; ``None`` if loading fails.
     """
 
     try:
@@ -218,8 +266,34 @@ def get_adata(url: str, filename: Optional[str] = None) -> Optional[AnnData]:
     return adata
 
 
+@register_function(
+    aliases=['download_data_requests', 'requests下载数据', 'robust downloader'],
+    category="datasets",
+    description="Download dataset files with HTTP headers and streaming to avoid mirror access failures.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['path = ov.datasets.download_data_requests(url, file_path="pbmc3k.h5ad")'],
+    related=['datasets.download_data', 'datasets.get_adata']
+)
 def download_data_requests(url: str, file_path: Optional[str] = None, dir: str = "./data") -> str:
-    """Download data with headers to bypass 403 errors."""
+    """Download data with custom headers to reduce HTTP 403 failures.
+
+    Parameters
+    ----------
+    url:str
+        Source URL of the dataset file.
+    file_path:Optional[str]
+        Target filename. If ``None``, the basename of ``url`` is used.
+    dir:str
+        Output directory where file is stored.
+
+    Returns
+    -------
+    str
+        Local path to downloaded (or cached) file.
+    """
     if not os.path.exists(dir):
         os.makedirs(dir)
 
@@ -267,31 +341,97 @@ def download_data_requests(url: str, file_path: Optional[str] = None, dir: str =
 
 
 # add our toy sample data
+@register_function(
+    aliases=['gillespie', 'gillespie_dataset', '占位数据集_gillespie'],
+    category="datasets",
+    description="Placeholder loader for Gillespie simulation dataset (currently not implemented).",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.datasets.gillespie()'],
+    related=['datasets.toggleswitch', 'datasets.krumsiek11']
+)
 def gillespie():
     """TODO: add data here"""
     pass
 
 
+@register_function(
+    aliases=['hl60', 'hl60_dataset', '占位数据集_hl60'],
+    category="datasets",
+    description="Placeholder loader for HL60 dataset (currently not implemented).",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.datasets.hl60()'],
+    related=['datasets.hematopoiesis', 'datasets.pbmc3k']
+)
 def hl60():
     """TODO: add data here"""
     pass
 
 
+@register_function(
+    aliases=['nascseq', 'nascent_seq', '占位数据集_nascseq'],
+    category="datasets",
+    description="Placeholder loader for NASC-seq dataset (currently not implemented).",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.datasets.nascseq()'],
+    related=['datasets.scslamseq', 'datasets.scifate']
+)
 def nascseq():
     """TODO: add data here"""
     pass
 
 
+@register_function(
+    aliases=['scslamseq', 'scSLAM-seq', '占位数据集_scslamseq'],
+    category="datasets",
+    description="Placeholder loader for scSLAM-seq dataset (currently not implemented).",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.datasets.scslamseq()'],
+    related=['datasets.nascseq', 'datasets.scifate']
+)
 def scslamseq():
     """TODO: add data here"""
     pass
 
 
+@register_function(
+    aliases=['scifate', 'sci-fate', '占位数据集_scifate'],
+    category="datasets",
+    description="Placeholder loader for sci-fate dataset (currently not implemented).",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.datasets.scifate()'],
+    related=['datasets.nascseq', 'datasets.scslamseq']
+)
 def scifate():
     """TODO: add data here"""
     pass
 
 
+@register_function(
+    aliases=['神经元剪接数据', 'scnt_seq_neuron_splicing', 'neuron_splicing_dataset'],
+    category="datasets",
+    description="Load scNT-seq neuron splicing dataset for RNA velocity/splicing dynamics analysis.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.scnt_seq_neuron_splicing()'],
+    related=['datasets.scnt_seq_neuron_labeling', 'datasets.get_adata']
+)
 def scnt_seq_neuron_splicing(
     filename: str = "neuron_splicing.h5ad",
 ) -> AnnData:
@@ -305,6 +445,17 @@ def scnt_seq_neuron_splicing(
     return adata
 
 
+@register_function(
+    aliases=['神经元标记数据', 'scnt_seq_neuron_labeling', 'neuron_labeling_dataset'],
+    category="datasets",
+    description="Load scNT-seq neuron labeling dataset for RNA labeling kinetics analysis.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.scnt_seq_neuron_labeling()'],
+    related=['datasets.scnt_seq_neuron_splicing', 'datasets.get_adata']
+)
 def scnt_seq_neuron_labeling(
     filename: str = "neuron_labeling.h5ad",
 ) -> AnnData:
@@ -318,10 +469,43 @@ def scnt_seq_neuron_labeling(
     return adata
 
 
+@register_function(
+    aliases=['cite_seq', 'CITE-seq', '占位数据集_cite_seq'],
+    category="datasets",
+    description="Placeholder loader for CITE-seq dataset (currently not implemented).",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['ov.datasets.cite_seq()'],
+    related=['datasets.pbmc3k', 'datasets.pbmc8k']
+)
 def cite_seq():
+    """Placeholder for CITE-seq dataset loader.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+        Function is currently not implemented and returns ``None``.
+    """
     pass
 
 
+@register_function(
+    aliases=['zebrafish', '斑马鱼数据', 'zebrafish_dataset'],
+    category="datasets",
+    description="Load zebrafish single-cell dataset for developmental trajectory studies.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.zebrafish()'],
+    related=['datasets.dentate_gyrus', 'datasets.hematopoiesis']
+)
 def zebrafish(
     filename: str = "zebrafish.h5ad",
 ) -> AnnData:
@@ -335,6 +519,17 @@ def zebrafish(
     return adata
 
 
+@register_function(
+    aliases=['dentate_gyrus', '齿状回数据', 'DG_loom_dataset'],
+    category="datasets",
+    description="Load Dentate Gyrus loom dataset commonly used in RNA velocity analyses.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.dentate_gyrus()'],
+    related=['datasets.dentate_gyrus_scvelo', 'datasets.get_adata']
+)
 def dentate_gyrus(
     url: str = "http://pklab.med.harvard.edu/velocyto/DentateGyrus/DentateGyrus.loom",
     filename: Optional[str] = None,
@@ -349,6 +544,17 @@ def dentate_gyrus(
     return adata
 
 
+@register_function(
+    aliases=['bone_marrow', '骨髓数据', 'bone_marrow_dataset'],
+    category="datasets",
+    description="Load bone marrow single-cell dataset for hematopoietic analysis.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.bone_marrow()'],
+    related=['datasets.hematopoiesis', 'datasets.bm']
+)
 def bone_marrow(
     filename: str = "bone_marrow.h5ad",
 ) -> AnnData:
@@ -362,6 +568,17 @@ def bone_marrow(
     return adata
 
 
+@register_function(
+    aliases=['haber', 'Haber_dataset', '小肠上皮数据'],
+    category="datasets",
+    description="Load Haber et al. intestinal epithelium dataset with cell-cycle gene annotations.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.haber()'],
+    related=['datasets.hg_forebrain_glutamatergic', 'datasets.get_adata']
+)
 def haber(
     url: str = "http://pklab.med.harvard.edu/velocyto/Haber_et_al/Haber_et_al.loom",
     filename: Optional[str] = None,
@@ -381,6 +598,17 @@ def haber(
     return adata
 
 
+@register_function(
+    aliases=['hg_forebrain_glutamatergic', '前脑谷氨酸能数据', 'hgForebrainGlut'],
+    category="datasets",
+    description="Load human forebrain glutamatergic loom dataset for velocity benchmark analyses.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.hg_forebrain_glutamatergic()'],
+    related=['datasets.haber', 'datasets.chromaffin']
+)
 def hg_forebrain_glutamatergic(
     url: str = "http://pklab.med.harvard.edu/velocyto/hgForebrainGlut/hgForebrainGlut.loom",
     filename: Optional[str] = None,
@@ -400,6 +628,17 @@ def hg_forebrain_glutamatergic(
     return adata
 
 
+@register_function(
+    aliases=['chromaffin', '嗜铬细胞数据', 'chromaffin_dataset'],
+    category="datasets",
+    description="Load chromaffin-cell loom dataset used in velocity and lineage studies.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.chromaffin()'],
+    related=['datasets.bm', 'datasets.get_adata']
+)
 def chromaffin(
     filename: str = "onefilepercell_A1_unique_and_others_J2CH1.loom",
 ) -> AnnData:  #
@@ -415,6 +654,17 @@ def chromaffin(
     return adata
 
 
+@register_function(
+    aliases=['bm', 'mouse_bm_dataset', '小鼠骨髓loom'],
+    category="datasets",
+    description="Load mouse bone marrow loom dataset for differentiation trajectory analysis.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.bm()'],
+    related=['datasets.bone_marrow', 'datasets.hematopoiesis']
+)
 def bm(
     url: str = "http://pklab.med.harvard.edu/velocyto/mouseBM/SCG71.loom",
     filename: Optional[str] = None,
@@ -429,6 +679,17 @@ def bm(
     return adata
 
 
+@register_function(
+    aliases=['胰腺内分泌发生数据', 'pancreatic_endocrinogenesis', 'pancreas development dataset'],
+    category="datasets",
+    description="Load or download the pancreatic endocrinogenesis reference dataset for developmental trajectory and lineage analyses.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.pancreatic_endocrinogenesis()'],
+    related=['datasets.download_data', 'utils.cal_paga', 'pp.preprocess']
+)
 def pancreatic_endocrinogenesis(
     url: str = "https://github.com/theislab/scvelo_notebooks/raw/master/data/Pancreas/endocrinogenesis_day15.h5ad",
     filename: Optional[str] = None,
@@ -443,6 +704,17 @@ def pancreatic_endocrinogenesis(
 
     return adata
 
+@register_function(
+    aliases=['pancreas_cellrank', 'cellrank_pancreas', '胰腺cellrank数据'],
+    category="datasets",
+    description="Load CellRank pancreas benchmark dataset for fate and lineage analyses.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.pancreas_cellrank()'],
+    related=['datasets.pancreatic_endocrinogenesis', 'datasets.get_adata']
+)
 def pancreas_cellrank(
     url: str = "https://figshare.com/ndownloader/files/25060877",
     filename: str = "pancreas_cellrank.h5ad",
@@ -456,6 +728,17 @@ def pancreas_cellrank(
 
 
 
+@register_function(
+    aliases=['dentate_gyrus_scvelo', 'DG_scvelo', '齿状回scvelo数据'],
+    category="datasets",
+    description="Load processed Dentate Gyrus dataset from scVelo examples.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.dentate_gyrus_scvelo()'],
+    related=['datasets.dentate_gyrus', 'datasets.scnt_seq_neuron_splicing']
+)
 def dentate_gyrus_scvelo(
     filename: str = "dentategyrus_scv.h5ad",
 ) -> AnnData:
@@ -470,6 +753,17 @@ def dentate_gyrus_scvelo(
     return adata
 
 
+@register_function(
+    aliases=['sceu_seq_rpe1', 'rpe1_dataset', 'scEU_seq_RPE1'],
+    category="datasets",
+    description="Load scEU-seq RPE1 dataset for RNA labeling kinetics analyses.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.sceu_seq_rpe1()'],
+    related=['datasets.sceu_seq_organoid', 'datasets.get_adata']
+)
 def sceu_seq_rpe1(
     filename: str = "rpe1.h5ad",
 ):
@@ -483,6 +777,17 @@ def sceu_seq_rpe1(
     return adata
 
 
+@register_function(
+    aliases=['sceu_seq_organoid', 'organoid_dataset', 'scEU_seq_organoid'],
+    category="datasets",
+    description="Load scEU-seq organoid dataset for temporal transcription dynamics studies.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.sceu_seq_organoid()'],
+    related=['datasets.sceu_seq_rpe1', 'datasets.get_adata']
+)
 def sceu_seq_organoid(
     filename: str = "organoid.h5ad",
 ):
@@ -496,6 +801,17 @@ def sceu_seq_organoid(
     return adata
 
 
+@register_function(
+    aliases=['hematopoiesis', '造血数据', 'hematopoiesis_processed'],
+    category="datasets",
+    description="Load processed hematopoiesis dataset for trajectory and lineage benchmarking.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.hematopoiesis()'],
+    related=['datasets.hematopoiesis_raw', 'datasets.bone_marrow']
+)
 def hematopoiesis(
     filename: str = "hematopoiesis.h5ad",
 ) -> AnnData:
@@ -506,6 +822,17 @@ def hematopoiesis(
     return adata
 
 
+@register_function(
+    aliases=['multi_brain_5k', '10x_multiome_brain_5k', '小鼠脑multiome'],
+    category="datasets",
+    description="Download and assemble 10x E18 mouse brain 5k multiome dataset resources.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['mdata = ov.datasets.multi_brain_5k()'],
+    related=['datasets.download_data_requests', 'multi.read_10x_multiome_h5']
+)
 def multi_brain_5k():
     """Processed dataset originally from https://pitt.box.com/v/hematopoiesis-processed."""
     print(f"{Colors.HEADER}🧠 Downloading raw Fresh Embryonic E18 Mouse Brain (5k){Colors.ENDC}")
@@ -552,6 +879,17 @@ def multi_brain_5k():
         return None
 
 
+@register_function(
+    aliases=['hematopoiesis_raw', '造血原始数据', 'hematopoiesis_unprocessed'],
+    category="datasets",
+    description="Load raw hematopoiesis dataset for custom preprocessing pipelines.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.hematopoiesis_raw()'],
+    related=['datasets.hematopoiesis', 'pp.preprocess']
+)
 def hematopoiesis_raw(
     filename: str = "hematopoiesis_raw.h5ad",
 ) -> AnnData:
@@ -562,6 +900,17 @@ def hematopoiesis_raw(
     return adata
 
 
+@register_function(
+    aliases=['human_tfs', '人类转录因子列表', 'human_transcription_factors'],
+    category="datasets",
+    description="Download curated human transcription factor table.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['tfs = ov.datasets.human_tfs()'],
+    related=['single.get_celltype_marker', 'bulk.pyDEG']
+)
 def human_tfs(
     filename: str = "human_tfs.txt",
 ) -> pd.DataFrame:
@@ -573,6 +922,17 @@ def human_tfs(
 
 
 # Scanpy-inspired datasets with dynamo pattern
+@register_function(
+    aliases=['blobs', 'gaussian_blobs', '模拟聚类数据'],
+    category="datasets",
+    description="Generate Gaussian blob synthetic AnnData for clustering benchmarks.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.blobs(n_centers=5, n_observations=1000)'],
+    related=['datasets.create_mock_dataset', 'datasets.krumsiek11']
+)
 def blobs(
     n_variables: int = 11,
     n_centers: int = 5,
@@ -584,21 +944,21 @@ def blobs(
 
     Parameters
     ----------
-    n_variables
-        Dimension of feature space.
-    n_centers
-        Number of cluster centers.
-    cluster_std
-        Standard deviation of clusters.
-    n_observations
-        Number of observations.
-    random_state
-        Determines random number generation for dataset creation.
+    n_variables:int
+        Feature dimension of generated data.
+    n_centers:int
+        Number of Gaussian cluster centers.
+    cluster_std:float
+        Standard deviation of each Gaussian cluster.
+    n_observations:int
+        Number of synthetic observations (cells).
+    random_state:int
+        Random seed passed to sklearn data generation.
 
     Returns
     -------
-    Annotated data matrix containing a observation annotation 'blobs' that
-    indicates cluster identity.
+    AnnData
+        Synthetic AnnData with ``obs['blobs']`` storing cluster labels.
     """
     print(f"{Colors.HEADER}🎯 Generating Gaussian Blobs dataset{Colors.ENDC}")
     
@@ -620,6 +980,17 @@ def blobs(
         return create_mock_dataset(n_cells=n_observations, n_genes=n_variables, n_cell_types=n_centers, with_clustering=False)
 
 
+@register_function(
+    aliases=['burczynski06', 'UC_CD_bulk', '炎症性肠病bulk数据'],
+    category="datasets",
+    description="Load Burczynski06 UC/CD PBMC bulk expression dataset.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.burczynski06()'],
+    related=['datasets.bhattacherjee', 'datasets.get_adata']
+)
 def burczynski06(
     url: str = "ftp://ftp.ncbi.nlm.nih.gov/geo/datasets/GDS1nnn/GDS1615/soft/GDS1615_full.soft.gz",
     filename: str = "GDS1615_full.soft.gz",
@@ -636,6 +1007,17 @@ def burczynski06(
     return adata
 
 
+@register_function(
+    aliases=['moignard15', 'embryo_hematopoiesis', '小鼠胚胎造血数据'],
+    category="datasets",
+    description="Load Moignard15 embryo hematopoiesis single-cell qRT-PCR dataset.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.moignard15()'],
+    related=['datasets.paul15', 'datasets.hematopoiesis']
+)
 def moignard15(
     url: str = "https://static-content.springer.com/esm/art%3A10.1038%2Fnbt.3154/MediaObjects/41587_2015_BFnbt3154_MOESM4_ESM.xlsx",
     filename: str = "nbt.3154-S3.xlsx",
@@ -676,6 +1058,17 @@ def moignard15(
         return create_mock_dataset(n_cells=3934, n_genes=42, n_cell_types=5, with_clustering=True)
 
 
+@register_function(
+    aliases=['paul15', 'myeloid_progenitors', '髓系祖细胞数据'],
+    category="datasets",
+    description="Load Paul15 myeloid progenitor dataset with curated lineage labels.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.paul15()'],
+    related=['datasets.krumsiek11', 'datasets.moignard15']
+)
 def paul15(
     url: str = "https://falexwolf.de/data/paul15.h5",
     filename: str = "paul15.h5",
@@ -724,6 +1117,17 @@ def paul15(
         return create_mock_dataset(n_cells=2730, n_genes=3451, n_cell_types=13, with_clustering=True)
 
 
+@register_function(
+    aliases=['pbmc8k', 'pbmc_8k', 'PBMC8K数据集'],
+    category="datasets",
+    description="Load 10x PBMC 8k dataset for immune-cell method benchmarking.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.pbmc8k()'],
+    related=['datasets.pbmc3k', 'datasets.seqfish']
+)
 def pbmc8k(
     url: str = "https://stacks.stanford.edu/file/cv694yk7414/pbmc8k.h5ad", 
     filename: str = "pbmc8k.h5ad"
@@ -735,6 +1139,17 @@ def pbmc8k(
     adata = get_adata(url, filename)
     return adata
 
+@register_function(
+    aliases=['seqfish', 'seqFISH数据', 'spatial_seqfish_dataset'],
+    category="datasets",
+    description="Load seqFISH spatial transcriptomics dataset for spatial algorithm demos.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.seqfish()'],
+    related=['space.svg', 'space.clusters', 'datasets.pbmc8k']
+)
 def seqfish(
     url: str = "https://stacks.stanford.edu/file/cv694yk7414/seqfish.h5ad", 
     filename: str = "seqfish.h5ad"
@@ -747,6 +1162,17 @@ def seqfish(
     return adata
 
 
+@register_function(
+    aliases=['toggleswitch', 'toggle_switch_simulation', '开关模型模拟数据'],
+    category="datasets",
+    description="Generate two-gene toggle-switch simulation data.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.toggleswitch()'],
+    related=['datasets.krumsiek11', 'datasets.blobs']
+)
 def toggleswitch(
     filename: str = "toggleswitch.txt"
 ) -> AnnData:
@@ -780,6 +1206,17 @@ def toggleswitch(
         return create_mock_dataset(n_cells=200, n_genes=2, n_cell_types=2, with_clustering=False)
 
 
+@register_function(
+    aliases=['krumsiek11', 'myeloid_simulation', '髓系分化模拟数据'],
+    category="datasets",
+    description="Generate Krumsiek11-inspired myeloid differentiation simulation dataset.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.krumsiek11()'],
+    related=['datasets.toggleswitch', 'datasets.paul15']
+)
 def krumsiek11() -> AnnData:
     """Simulated myeloid progenitors (Krumsiek et al. 2011).
 
@@ -825,6 +1262,17 @@ def krumsiek11() -> AnnData:
 
 
 # Mock datasets (following dynamo pattern)
+@register_function(
+    aliases=['create_mock_dataset', 'mock_adata', '模拟单细胞数据'],
+    category="datasets",
+    description="Create configurable mock single-cell AnnData for pipeline testing.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.create_mock_dataset(n_cells=1000, n_cell_types=5)'],
+    related=['datasets.pbmc3k', 'datasets.blobs']
+)
 def create_mock_dataset(
     n_cells: int = 2000,
     n_genes: int = 1500, 
@@ -835,15 +1283,23 @@ def create_mock_dataset(
     """
     Create a mock single-cell dataset for testing statistical functions.
     
-    Arguments:
-        n_cells: Number of cells to simulate.
-        n_genes: Number of genes to simulate.
-        n_cell_types: Number of cell types to simulate.
-        with_clustering: Whether to include clustering preprocessing.
-        random_state: Random seed for reproducibility.
-    
-    Returns:
-        AnnData object with mock single-cell data.
+    Parameters
+    ----------
+    n_cells:int
+        Number of cells simulated in mock dataset.
+    n_genes:int
+        Number of genes simulated in mock dataset.
+    n_cell_types:int
+        Number of synthetic cell types.
+    with_clustering:bool
+        Whether to run lightweight preprocessing and clustering-like fields.
+    random_state:int
+        Random seed for deterministic dataset generation.
+
+    Returns
+    -------
+    AnnData
+        Simulated AnnData with expression matrix and basic metadata fields.
     """
     
     np.random.seed(random_state)
@@ -952,6 +1408,17 @@ def create_mock_dataset(
     return adata
 
 
+@register_function(
+    aliases=['DeCOV bulk COVID', 'decov_bulk_covid_bulk', 'covid bulk dataset'],
+    category="datasets",
+    description="Load the bulk RNA-seq cohort used in DeCOV spatial deconvolution examples for cross-platform reference mapping.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['bulk_df = ov.datasets.decov_bulk_covid_bulk()'],
+    related=['datasets.decov_bulk_covid_single', 'space.Deconvolution']
+)
 def decov_bulk_covid_bulk(
     filename: str = "COVID_PBMC_bulk.h5ad"
 ) -> AnnData:
@@ -964,6 +1431,17 @@ def decov_bulk_covid_bulk(
     adata = get_adata(url, filename)
     return adata
 
+@register_function(
+    aliases=['DeCOV single-cell COVID', 'decov_bulk_covid_single', 'covid scRNA dataset'],
+    category="datasets",
+    description="Load the single-cell reference cohort paired with DeCOV bulk data for cell-type signature derivation and transfer.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata_sc = ov.datasets.decov_bulk_covid_single()'],
+    related=['datasets.decov_bulk_covid_bulk', 'space.calculate_gene_signature']
+)
 def decov_bulk_covid_single(
     filename: str = "COVID_PBMC_single.h5ad"
 ) -> AnnData:
@@ -976,6 +1454,17 @@ def decov_bulk_covid_single(
     adata = get_adata(url, filename)
     return adata
 
+@register_function(
+    aliases=['淋巴结单细胞参考', 'sc_ref_Lymph_Node', 'lymph node reference'],
+    category="datasets",
+    description="Load a lymph-node single-cell reference dataset for immune-cell annotation and spatial deconvolution benchmarking.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata_ref = ov.datasets.sc_ref_Lymph_Node()'],
+    related=['datasets.download_data', 'single.scanpy_cellanno_from_dict']
+)
 def sc_ref_Lymph_Node(
     url: str = "https://cell2location.cog.sanger.ac.uk/paper/integrated_lymphoid_organ_scrna/RegressionNBV4Torch_57covariates_73260cells_10237genes/sc.h5ad",
     filename: str = "sc_ref_Lymph_Node.h5ad"
@@ -989,6 +1478,17 @@ def sc_ref_Lymph_Node(
     return adata
 
 
+@register_function(
+    aliases=['pbmc3k', 'PBMC3K', 'pbmc_3k_dataset'],
+    category="datasets",
+    description="Load PBMC3k dataset with optional processed/raw mode and mock fallback.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.pbmc3k(processed=True)'],
+    related=['datasets.pbmc8k', 'datasets.create_mock_dataset']
+)
 def pbmc3k(processed: bool = False) -> AnnData:
     """
     Load PBMC 3k dataset from URL.
@@ -996,11 +1496,15 @@ def pbmc3k(processed: bool = False) -> AnnData:
     3k PBMCs from 10x Genomics. Downloads directly from public URLs,
     falls back to mock data generation if URLs are unavailable.
     
-    Arguments:
-        processed: Whether to load processed version with clustering (default: True)
+    Parameters
+    ----------
+    processed:bool
+        If ``True``, load processed PBMC3k file; otherwise load raw matrix.
     
-    Returns:
-        AnnData object with PBMC 3k data
+    Returns
+    -------
+    AnnData
+        PBMC3k AnnData, with mock fallback if remote download fails.
     """
     try:
         if processed:
@@ -1027,6 +1531,17 @@ def pbmc3k(processed: bool = False) -> AnnData:
         return create_mock_dataset(n_cells=2700, n_genes=32738, n_cell_types=8, with_clustering=processed)
 
 
+@register_function(
+    aliases=['bhattacherjee', 'cocaine_pfc_dataset', 'bhattacherjee_pfc'],
+    category="datasets",
+    description="Load Bhattacherjee mouse PFC cocaine-administration scRNA-seq dataset.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix='none',
+    examples=['adata = ov.datasets.bhattacherjee(processed=True)'],
+    related=['datasets.pbmc3k', 'datasets.create_mock_dataset']
+)
 def bhattacherjee(processed: bool = True) -> AnnData:
     """Processed single-cell data PFC adult mice under cocaine self-administration.
 
@@ -1034,8 +1549,10 @@ def bhattacherjee(processed: bool = True) -> AnnData:
     collected at three time points: Maintenance, 48h after cocaine withdrawal and
     15 days after cocaine withdrawal.
 
-    Args:
-        processed: If True, returns processed data. If False, returns raw data.
+    Parameters
+    ----------
+    processed:bool
+        Whether to return processed-style fallback mock data on failure.
 
     References:
         Bhattacherjee A, Djekidel MN, Chen R, Chen W, Tuesta LM, Zhang Y. Cell
@@ -1043,8 +1560,10 @@ def bhattacherjee(processed: bool = True) -> AnnData:
         adolescence and addiction. Nat Commun. 2019 Sep 13;10(1):4169.
         doi: 10.1038/s41467-019-12054-3. PMID: 31519873; PMCID: PMC6744514.
 
-    Returns:
-        :class:`~anndata.AnnData` object of a single-cell RNA seq dataset
+    Returns
+    -------
+    AnnData
+        Single-cell RNA-seq dataset from Bhattacherjee et al. or mock fallback.
 
     Examples:
         >>> import omicverse as ov
@@ -1069,6 +1588,3 @@ def bhattacherjee(processed: bool = True) -> AnnData:
         print(f"{Colors.WARNING}🔄 Generating mock data as fallback...{Colors.ENDC}")
         return create_mock_dataset(n_cells=5000, n_genes=2000, n_cell_types=10, with_clustering=processed)
 
-
-if __name__ == "__main__":
-    pass

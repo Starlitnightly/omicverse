@@ -75,13 +75,22 @@ class TrajInfer(object):
                 groupby:str='clusters',):
         r"""Initialize trajectory inference object.
         
-        Arguments:
-            adata: AnnData object containing single-cell data
-            basis (str): Embedding key in adata.obsm for visualization (default: 'X_umap')
-            use_rep (str): Representation key in adata.obsm for trajectory computation (default: 'X_pca')
-            n_comps (int): Number of components to use from representation (default: 50)
-            n_neighbors (int): Number of neighbors for graph construction (default: 15)
-            groupby (str): Key in adata.obs containing cluster annotations (default: 'clusters')
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            AnnData object containing single-cell expression and embeddings.
+        basis : str
+            Embedding key in ``adata.obsm`` used for visualization (for example
+            ``'X_umap'``).
+        use_rep : str
+            Representation key in ``adata.obsm`` used for trajectory inference.
+        n_comps : int
+            Number of components from ``use_rep`` used for graph/diffusion
+            computation.
+        n_neighbors : int
+            Number of neighbors used in graph construction.
+        groupby : str
+            Cluster/annotation key in ``adata.obs``.
         """
         self.adata=adata
         self.use_rep=use_rep
@@ -96,28 +105,48 @@ class TrajInfer(object):
     def set_terminal_cells(self,terminal:list):
         r"""Set terminal cell types for trajectory inference.
         
-        Arguments:
-            terminal (list): List of terminal cell type names
+        Parameters
+        ----------
+        terminal : list
+            List of terminal cell-state labels in ``adata.obs[groupby]``.
+
+        Returns
+        -------
+        None
         """
         self.terminal=terminal
         
     def set_origin_cells(self,origin:str):
         r"""Set origin cell type for trajectory inference.
         
-        Arguments:
-            origin (str): Name of the origin cell type
+        Parameters
+        ----------
+        origin : str
+            Origin/start cell-state label in ``adata.obs[groupby]``.
+
+        Returns
+        -------
+        None
         """
         self.origin=origin
         
     def inference(self,method:str='palantir',**kwargs):
         r"""Perform trajectory inference using specified method.
         
-        Arguments:
-            method (str): Trajectory inference method - 'palantir', 'diffusion_map', or 'slingshot' (default: 'palantir')
-            **kwargs: Additional arguments passed to the chosen method
+        Parameters
+        ----------
+        method : str
+            Trajectory inference backend. Supported values include
+            ``'palantir'``, ``'diffusion_map'``, ``'slingshot'`` and
+            ``'sctour'``.
+        **kwargs
+            Additional backend-specific keyword arguments.
             
-        Returns:
-            Depends on method: Palantir results object, None, or sets internal attributes
+        Returns
+        -------
+        object or None
+            Palantir result object for ``method='palantir'``; otherwise updates
+            ``self.adata`` in place and returns ``None``.
         """
         
         if method=='palantir':
@@ -210,16 +239,30 @@ class TrajInfer(object):
     def palantir_plot_pseudotime(self,**kwargs):
         r"""Plot Palantir pseudotime results.
         
-        Arguments:
-            **kwargs: Additional arguments passed to plot_palantir_results
+        Parameters
+        ----------
+        **kwargs
+            Additional keyword arguments forwarded to
+            ``plot_palantir_results``.
+
+        Returns
+        -------
+        None
         """
         plot_palantir_results(self.adata,**kwargs)
         
     def palantir_cal_branch(self,**kwargs):
         r"""Calculate and plot branch selection for Palantir results.
         
-        Arguments:
-            **kwargs: Additional arguments passed to select_branch_cells
+        Parameters
+        ----------
+        **kwargs
+            Additional keyword arguments forwarded to
+            ``select_branch_cells``.
+
+        Returns
+        -------
+        None
         """
         masks = select_branch_cells(self.adata, **kwargs)
         plot_branch_selection(self.adata)
@@ -227,11 +270,16 @@ class TrajInfer(object):
     def palantir_cal_gene_trends(self,layers:str="MAGIC_imputed_data"):
         r"""Calculate gene expression trends along Palantir trajectories.
         
-        Arguments:
-            layers (str): Key for expression data layer (default: "MAGIC_imputed_data")
+        Parameters
+        ----------
+        layers : str
+            Expression layer key used for trend modeling.
             
-        Returns:
-            Gene trends object containing trajectory-associated expression patterns
+        Returns
+        -------
+        object
+            Gene-trend result object containing trajectory-associated expression
+            patterns.
         """
         gene_trends = compute_gene_trends(
             self.adata,
@@ -242,11 +290,15 @@ class TrajInfer(object):
     def palantir_plot_gene_trends(self,genes):
         r"""Plot gene expression trends along Palantir trajectories.
         
-        Arguments:
-            genes (list): List of gene names to plot
+        Parameters
+        ----------
+        genes : list
+            Gene symbols to visualize along inferred trajectories.
             
-        Returns:
-            Matplotlib figure object containing gene trend plots
+        Returns
+        -------
+        object
+            Matplotlib figure/axes object returned by ``plot_gene_trends``.
         """
         #genes = ['Cdca3','Rasl10a','Mog','Aqp4']
         return plot_gene_trends(self.adata, genes)
@@ -258,7 +310,21 @@ def construct_graph_(
     W: csr_matrix, directed: bool = False, adjust_weights: bool = True
 ) -> nx.Graph:
     """
-    将稀疏邻接矩阵 W 转换为 networkx 图，并保留权重属性。
+    Convert sparse adjacency matrix into weighted NetworkX graph.
+
+    Parameters
+    ----------
+    W : csr_matrix
+        Sparse adjacency/connectivity matrix.
+    directed : bool
+        Whether to build a directed graph.
+    adjust_weights : bool
+        Whether to median-normalize and round edge weights.
+
+    Returns
+    -------
+    nx.Graph
+        Weighted NetworkX graph.
     """
     assert issparse(W), "W must be a scipy.sparse matrix"
 
@@ -285,6 +351,23 @@ def construct_graph_(
 def construct_graph(
     W, directed: bool = False, adjust_weights: bool = True
 ) -> "igraph":
+    """
+    Convert sparse adjacency matrix into weighted igraph object.
+
+    Parameters
+    ----------
+    W : scipy.sparse matrix
+        Sparse adjacency/connectivity matrix.
+    directed : bool
+        Whether to build a directed graph.
+    adjust_weights : bool
+        Whether to median-normalize and round edge weights.
+
+    Returns
+    -------
+    igraph.Graph
+        Weighted igraph graph.
+    """
 
     assert issparse(W)
 
@@ -332,7 +415,45 @@ def calc_force_directed_layout(
     compile_cython=True,  # 是否尝试编译Cython模块以加速
 ):
     """
-    Use our custom ForceAtlas2 implementation to calculate the layout
+    Compute ForceAtlas2 layout from connectivity graph.
+
+    Parameters
+    ----------
+    W : scipy.sparse matrix
+        Connectivity graph matrix.
+    file_name : str
+        Temporary file name (kept for compatibility).
+    n_jobs : int
+        Number of CPU threads.
+    target_change_per_node : float
+        Target movement change threshold per node.
+    target_steps : int
+        Maximum ForceAtlas2 iterations.
+    is3d : bool
+        Whether to output 3D coordinates.
+    memory : int
+        Reserved memory parameter for compatibility.
+    random_state : int
+        Random seed.
+    init : Any
+        Optional initial coordinates.
+    scaling_ratio : float
+        ForceAtlas2 scaling ratio.
+    gravity : float
+        Gravity strength.
+    edge_weight_influence : float
+        Influence of edge weights in force computation.
+    use_gpu : bool
+        Whether to use GPU-accelerated force computation.
+    optimized_threading : bool
+        Whether to enable optimized multi-thread execution.
+    compile_cython : bool
+        Whether to try compiling Cython helpers for acceleration.
+
+    Returns
+    -------
+    np.ndarray
+        Layout coordinates with shape ``(n_cells, 2)`` or ``(n_cells, 3)``.
     """
     G = construct_graph(W)
     try:
@@ -447,7 +568,8 @@ def fle(
     optimized_threading: bool = True,  # Enable optimized threading algorithm
     compile_cython: bool = True,  # 是否尝试编译Cython模块以加速
 ) -> None:
-    """Construct the Force-directed (FLE) graph.
+    """
+    Construct force-directed layout embedding (FLE) from graph representation.
 
     This implementation uses our custom ForceAtlas2 implementation, which is a multilthreaded version
     of the original ForceAtlas2 algorithm.
@@ -456,70 +578,68 @@ def fle(
 
     Parameters
     ----------
-    data: ``pegasusio.MultimodalData``
-        Annotated data matrix with rows for cells and columns for genes.
+    data : AnnData-like
+        Data object with graph/connectivity fields.
 
-    file_name: ``str``, optional, default: ``None``
+    file_name : str, optional
         Temporary file to store the coordinates as the input to forceatlas2. If ``None``, use ``tempfile.mkstemp`` to generate file name.
 
-    n_jobs: ``int``, optional, default: ``-1``
+    n_jobs : int, optional
         Number of threads to use. If ``-1``, use all physical CPU cores.
 
-    rep: ``str``, optional, default: ``"diffmap"``
+    rep : str, optional
         Representation of data used for the calculation. By default, use Diffusion Map coordinates. If ``None``, use the count matrix ``data.X``.
 
-    rep_ncomps: ``int``, optional (default: None)
+    rep_ncomps : int, optional
         Number of components to be used in `rep`. If rep_ncomps == None, use all components; otherwise, use the minimum of rep_ncomps and rep's dimensions.
 
-    K: ``int``, optional, default: ``50``
+    K : int, optional
         Number of nearest neighbors to be considered during the computation.
 
-    full_speed: ``bool``, optional, default: ``False``
+    full_speed : bool, optional
         * If ``True``, use multiple threads in constructing ``hnsw`` index. However, the kNN results are not reproducible.
         * Otherwise, use only one thread to make sure results are reproducible.
 
-    target_change_per_node: ``float``, optional, default: ``2.0``
+    target_change_per_node : float, optional
         Target change per node to stop ForceAtlas2.
 
-    target_steps: ``int``, optional, default: ``5000``
+    target_steps : int, optional
         Maximum number of iterations before stopping the ForceAtlas2 algorithm.
 
-    is3d: ``bool``, optional, default: ``False``
+    is3d : bool, optional
         If ``True``, calculate 3D force-directed layout.
 
-    memory: ``int``, optional, default: ``8``
+    memory : int, optional
         Memory size in GB for the Java FA2 component. By default, use 8GB memory.
 
-    random_state: ``int``, optional, default: ``0``
+    random_state : int, optional
         Random seed set for reproducing results.
 
-    out_basis: ``str``, optional, default: ``"fle"``
+    out_basis : str, optional
         Key name for calculated FLE coordinates to store.
     
-    fa2_scaling_ratio: ``float``, optional, default: ``2.0``
+    fa2_scaling_ratio : float, optional
         Scaling ratio parameter for ForceAtlas2.
         
-    fa2_gravity: ``float``, optional, default: ``1.0``
+    fa2_gravity : float, optional
         Gravity parameter for ForceAtlas2.
         
-    fa2_edge_weight_influence: ``float``, optional, default: ``1.0``
+    fa2_edge_weight_influence : float, optional
         Edge weight influence parameter for ForceAtlas2.
         
-    use_gpu: ``bool``, optional, default: ``False``
+    use_gpu : bool, optional
         Whether to use GPU acceleration for force calculations. Requires PyTorch to be installed.
         
-    optimized_threading: ``bool``, optional, default: ``True``
+    optimized_threading : bool, optional
         Whether to use optimized threading algorithm for better parallel performance.
         
-    compile_cython: ``bool``, optional, default: ``True``
+    compile_cython : bool, optional
         Whether to try compiling fa2util module with Cython for 10-100x speedup.
 
     Returns
     -------
-    ``None``
-
-    Update ``data.obsm``:
-        * ``data.obsm['X_' + out_basis]``: FLE coordinates of the data.
+    None
+        Stores layout in ``data.obsm['X_' + out_basis]``.
 
     Examples
     --------
@@ -581,65 +701,63 @@ def diffmap_fle(
     fa2_edge_weight_influence: float = 1.0,
     n_jobs: int = -1,
 ) -> None:
-    """Calculate diffusion map and then use it for Force-directed Layout Embedding (FLE).
+    """
+    Compute diffusion map first, then build ForceAtlas2-based FLE embedding.
     
     This function first computes diffusion maps using scanpy and then applies the optimized
     ForceAtlas2 algorithm on the diffusion map coordinates to create a force-directed layout.
     
     Parameters
     ----------
-    adata: ``anndata.AnnData``
+    adata : anndata.AnnData
         Annotated data matrix with rows for cells and columns for genes.
         
-    use_rep: ``str``, optional, default: ``'X_pca'``
+    use_rep : str, optional
         The dimensional reduction to use for neighbors calculation before diffmap.
         
-    n_pcs: ``int``, optional, default: ``50``
+    n_pcs : int, optional
         Number of PCs to use for neighbors calculation.
         
-    n_comps: ``int``, optional, default: ``15``
+    n_comps : int, optional
         Number of diffusion components to compute.
         
-    n_neighbors: ``int``, optional, default: ``30``
+    n_neighbors : int, optional
         Number of neighbors for building the neighborhood graph.
         
-    random_state: ``int``, optional, default: ``0``
+    random_state : int, optional
         Random seed for reproducibility.
         
-    out_basis: ``str``, optional, default: ``"fle"``
+    out_basis : str, optional
         Key name for calculated FLE coordinates to store.
         
-    target_steps: ``int``, optional, default: ``5000``
+    target_steps : int, optional
         Maximum number of iterations for the ForceAtlas2 algorithm.
         
-    use_gpu: ``bool``, optional, default: ``False``
+    use_gpu : bool, optional
         Whether to use GPU acceleration for force calculations.
         
-    optimized_threading: ``bool``, optional, default: ``True``
+    optimized_threading : bool, optional
         Whether to use optimized threading algorithm for better parallel performance.
         
-    compile_cython: ``bool``, optional, default: ``True``
+    compile_cython : bool, optional
         Whether to try compiling fa2util module with Cython for speedup.
         
-    fa2_scaling_ratio: ``float``, optional, default: ``2.0``
+    fa2_scaling_ratio : float, optional
         Scaling ratio parameter for ForceAtlas2.
         
-    fa2_gravity: ``float``, optional, default: ``1.0``
+    fa2_gravity : float, optional
         Gravity parameter for ForceAtlas2.
         
-    fa2_edge_weight_influence: ``float``, optional, default: ``1.0``
+    fa2_edge_weight_influence : float, optional
         Edge weight influence parameter for ForceAtlas2.
         
-    n_jobs: ``int``, optional, default: ``-1``
+    n_jobs : int, optional
         Number of threads to use. If ``-1``, use all physical CPU cores.
         
     Returns
     -------
-    ``None``
-    
-    Update ``adata.obsm``:
-        * ``adata.obsm['X_diffmap']``: Diffusion map coordinates
-        * ``adata.obsm['X_' + out_basis]``: FLE coordinates
+    None
+        Updates ``adata.obsm['X_diffmap']`` and ``adata.obsm['X_' + out_basis]``.
         
     Examples
     --------
@@ -686,4 +804,3 @@ def diffmap_fle(
     
     print(f"Force-directed layout calculated and stored in adata.obsm['X_{out_basis}']")
     return None
-

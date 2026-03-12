@@ -9,19 +9,44 @@ import pandas as pd
 import anndata as ad
 from tqdm import tqdm
 from itertools import combinations_with_replacement
+from .._registry import register_function
 
 # Get the optimized function
 #from omicverse.external.commot.tools._spatial_communication import summarize_cluster_gpu
 from ..external.commot.tools._spatial_communication import summarize_cluster_gpu
 
+@register_function(
+    aliases=["通信AnnData", "create_communication_anndata", "cellchat格式转换", "commot汇总", "细胞通信汇总"],
+    category="space",
+    description="Build CellChat-style AnnData from commot communication outputs",
+    prerequisites={
+        "optional_functions": []
+    },
+    requires={
+        "obsp": ["commot-*"],
+        "obs": ["clustering_column"]
+    },
+    produces={
+        "layers": ["means", "pvalues"],
+        "obs": ["sender", "receiver", "cell_type_pair"],
+        "var": ["interacting_pair", "classification"]
+    },
+    auto_fix="none",
+    examples=[
+        "comm_adata = ov.space.create_communication_anndata(adata, 'cell_type', n_permutations=100)",
+        "comm_adata.layers['means']",
+    ],
+    related=["space.update_classification_from_database"],
+)
 def create_communication_anndata(adata, clustering_column, n_permutations=100):
     """
-    Create AnnData object with communication results in CellChat format
+    Build a CellChat-style communication AnnData from commot outputs.
     
     Parameters
     ----------
-    adata : AnnData
-        Input spatial data with commot results
+    adata : anndata.AnnData
+        Input spatial AnnData containing commot communication matrices in
+        ``adata.obsp`` and optional commot database metadata in ``adata.uns``.
     clustering_column : str
         Column name for cell type clustering
     n_permutations : int
@@ -29,7 +54,7 @@ def create_communication_anndata(adata, clustering_column, n_permutations=100):
         
     Returns
     -------
-    comm_adata : AnnData
+    comm_adata : anndata.AnnData
         Communication results with structure:
         - obs: cell type pairs ('celltype1|celltype2')  
         - var: ligand-receptor pairs with metadata
@@ -311,21 +336,40 @@ def example_usage():
 
 
 import pandas as pd
+@register_function(
+    aliases=["更新通信分类", "update_classification_from_database", "commot_pathway_update", "通信数据库注释", "更新pathway分类"],
+    category="space",
+    description="Update communication interaction annotations using commot database metadata",
+    prerequisites={
+        "optional_functions": ["create_communication_anndata"]
+    },
+    requires={
+        "uns": ["commot-*-info"]
+    },
+    produces={
+        "var": ["classification", "gene_a", "gene_b", "partner_a", "partner_b"]
+    },
+    auto_fix="none",
+    examples=[
+        "comm_adata = ov.space.update_classification_from_database(comm_adata, adata)",
+    ],
+    related=["space.create_communication_anndata"],
+)
 def update_classification_from_database(comm_adata, adata_with_db):
     """
-    Update classification in comm_adata using database info from original adata
+    Update communication interaction annotations from commot database metadata.
     
     Parameters
     ----------
-    comm_adata : AnnData
-        Communication AnnData object to update
-    adata_with_db : AnnData
-        Original adata containing commot database info
+    comm_adata : anndata.AnnData
+        Communication AnnData returned by ``create_communication_anndata``.
+    adata_with_db : anndata.AnnData
+        Original spatial AnnData containing ``commot-*-info`` entries in ``uns``.
         
     Returns
     -------
-    comm_adata : AnnData
-        Updated communication AnnData with proper classifications
+    comm_adata : anndata.AnnData
+        Updated communication AnnData with refined pathway/classification fields.
     """
     
     # Find database info

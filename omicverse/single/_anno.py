@@ -33,15 +33,22 @@ DATA_DOWNLOAD_LINK_DICT = {
 def get_anno_dataset_url(dataset_name: str, prefer_stanford: bool = True) -> str:
     """Get URL for an annotation dataset by name, preferring Stanford over Figshare.
 
-    Args:
-        dataset_name: Name of the dataset (e.g., 'whole', 'pySCSA_2023_v2_plus').
-        prefer_stanford: Whether to prefer Stanford links over Figshare (default: True).
+    Parameters
+    ----------
+    dataset_name : str
+        Annotation dataset key (for example ``'whole'`` or ``'pySCSA_2023_v2_plus'``).
+    prefer_stanford : bool
+        Whether to prioritize Stanford mirror over Figshare.
 
-    Returns:
-        URL string for the dataset.
+    Returns
+    -------
+    str
+        Download URL for selected annotation dataset.
 
-    Raises:
-        ValueError: If dataset name is not found.
+    Raises
+    ------
+    ValueError
+        If ``dataset_name`` is not defined in ``DATA_DOWNLOAD_LINK_DICT``.
     """
     if dataset_name not in DATA_DOWNLOAD_LINK_DICT:
         raise ValueError(f"Dataset '{dataset_name}' not found in DATA_DOWNLOAD_LINK_DICT")
@@ -70,8 +77,10 @@ metatime_install=False
 def check_metatime():
     r"""Check if metatime is installed and import it.
     
-    Returns:
-        None: Raises ImportError if metatime is not installed
+    Returns
+    -------
+    None
+        Raises ``ImportError`` if ``metatime`` is unavailable.
     """
     global metatime_install
     try:
@@ -92,15 +101,23 @@ def data_preprocess(adata,clustertype='leiden',
                     path='temp/rna.csv',layer='scaled',rank_rep=False):
     r"""Data preprocess for SCSA.
     
-    Arguments:
-        adata: AnnData object
-        clustertype: Clustering name used in scanpy. ('leiden')
-        path: The save path of datasets. ('temp/rna.csv')
-        layer: Layer to use for processing. ('scaled')
-        rank_rep: Whether to repeat ranking. (False)
+    Parameters
+    ----------
+    adata : AnnData
+        Input AnnData containing cluster labels and expression matrix.
+    clustertype : str
+        Column in ``adata.obs`` used as cluster assignment.
+    path : str
+        Output CSV path for ranked marker table.
+    layer : str
+        Reserved layer argument for compatibility.
+    rank_rep : bool
+        Whether to recompute ``rank_genes_groups`` even if present.
 
-    Returns:
-        dat: Preprocessed data as DataFrame
+    Returns
+    -------
+    pd.DataFrame
+        Marker-ranking table exported for SCSA.
     """
     dirname, _ = os.path.split(path)
     try:
@@ -131,23 +148,39 @@ def __cell_annotate(data,
                 celltype='normal',norefdb=False,noprint=True,list_tissue=False):
     r"""Cell annotation by SCSA.
     
-    Arguments:
-        data: AnnData object
-        foldchange: Foldchange threshold. (1.5)
-        pvalue: Pvalue threshold. (0.05)
-        output: The save path of annotation result. ('temp/rna_anno.txt')
-        outfmt: The format of annotation result. ('txt')
-        Gensymbol: Whether to use gene symbol. (True)
-        species: The species of datasets. ('Human')
-        weight: The weight of datasets. (100)
-        tissue: The tissue of datasets. ('All')
-        celltype: The celltype of datasets. ('normal')
-        norefdb: Whether to use reference database. (False)
-        noprint: Whether to print the result. (True)
-        list_tissue: Whether to list the tissue of datasets. (False)
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Marker/rank table exported from AnnData for SCSA CLI input.
+    foldchange : float
+        Fold-change threshold used by SCSA for marker filtering.
+    pvalue : float
+        P-value threshold used by SCSA.
+    output : str
+        Output file path for SCSA annotation report.
+    outfmt : str
+        Output format used by SCSA CLI.
+    Gensymbol : bool
+        Whether gene symbols are used in input markers.
+    species : str
+        Species label used by SCSA database lookup.
+    weight : int
+        Weight parameter forwarded to SCSA scoring.
+    tissue : str
+        Tissue filter used by SCSA.
+    celltype : str
+        Cell-type mode argument for SCSA.
+    norefdb : bool
+        Whether to disable reference database scoring.
+    noprint : bool
+        Whether to suppress CLI printing.
+    list_tissue : bool
+        Whether to list available tissues and exit.
     
-    Returns:
-        result: The annotation result
+    Returns
+    -------
+    pd.DataFrame
+        SCSA annotation result table.
     """
     data.to_csv('temp/rna.csv')
 
@@ -189,11 +222,14 @@ def __cell_annotate(data,
 def __cell_anno_print(anno):
     r"""Print the annotation result.
 
-    Arguments:
-        anno: The annotation result
+    Parameters
+    ----------
+    anno : pd.DataFrame
+        SCSA annotation result table.
 
-    Returns:
-        None
+    Returns
+    -------
+    None
     """
     for i in set(anno['Cluster']):
         test=anno.loc[anno['Cluster']==i].iloc[:2]
@@ -218,26 +254,45 @@ def scanpy_lazy(adata:anndata.AnnData,min_genes:int=200,min_cells:int=3,drop_dou
                 )->anndata.AnnData:
     r"""Scanpy lazy analysis pipeline.
     
-    Arguments:
-        adata: AnnData object
-        min_genes: The min number of genes. (200)
-        min_cells: The min number of cells. (3)
-        drop_doublet: Whether to drop doublet. (True)
-        n_genes_by_counts: The max number of genes. (4300)
-        pct_counts_mt: The max proportion of mito-genes. (25)
-        target_sum: The max counts of total_counts. (1e4)
-        min_mean: The min mean of genes. (0.0125)
-        max_mean: The max mean of genes. (3)
-        min_disp: The min dispersion of genes. (0.5)
-        max_value: The max value of genes. (10)
-        n_comps: The number of components. (100)
-        svd_solver: The solver of svd. ('auto')
-        n_neighbors: The number of neighbors. (15)
-        random_state: The random state. (112)
-        n_pcs: The number of pcs. (50)
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Input AnnData for quick QC and clustering.
+    min_genes : int
+        Minimum genes per cell during QC filtering.
+    min_cells : int
+        Minimum cells per gene during QC filtering.
+    drop_doublet : bool
+        Whether to run scrublet and remove predicted doublets.
+    n_genes_by_counts : int
+        Upper threshold for ``obs.n_genes_by_counts``.
+    pct_counts_mt : int
+        Upper threshold for mitochondrial fraction percentage.
+    target_sum : float
+        Library-size normalization target.
+    min_mean : float
+        Minimum mean expression for HVG selection.
+    max_mean : int
+        Maximum mean expression for HVG selection.
+    min_disp : float
+        Minimum dispersion for HVG selection.
+    max_value : int
+        Clipping value used in scaling.
+    n_comps : int
+        Number of principal components.
+    svd_solver : str
+        SVD solver used in PCA.
+    n_neighbors : int
+        Number of neighbors for graph construction.
+    random_state : int
+        Random seed used in neighbors computation.
+    n_pcs : int
+        Number of PCs used in neighbor graph.
 
-    Returns:
-        adata: AnnData object
+    Returns
+    -------
+    anndata.AnnData
+        Processed AnnData with QC, HVG, PCA, neighbors, and UMAP results.
     """
     #filter cells and genes
     sc.pp.filter_cells(adata, min_genes=min_genes)
@@ -304,7 +359,7 @@ def scanpy_lazy(adata:anndata.AnnData,min_genes:int=200,min_cells:int=3,drop_dou
         "                                    clustertype='leiden',",
         "                                    key_added='manual_celltype')",
         "# Compare with automatic annotation",
-        "ov.utils.embedding(adata, color=['manual_celltype', 'scsa_celltype'])"
+        "ov.pl.embedding(adata, color=['manual_celltype', 'scsa_celltype'])"
     ],
     related=["single.pySCSA", "single.get_celltype_marker", "utils.embedding"]
 )
@@ -315,14 +370,20 @@ def scanpy_cellanno_from_dict(adata:anndata.AnnData,
                                )->None:
     r"""Add cell type annotation from dict to anndata object.
 
-    Arguments:
-        adata: AnnData object of scRNA-seq after preprocessing
-        anno_dict: Dict of cell type annotation. key is the cluster name, value is the cell type name.like `{'0':'B cell','1':'T cell'}`
-        anno_name: The name of annotation. ('major')
-        clustertype: Clustering name used in scanpy. ('leiden')
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        AnnData object to which annotation labels are added.
+    anno_dict : dict
+        Mapping from cluster label to cell-type name.
+    anno_name : str
+        Prefix used to create output ``obs`` column ``{anno_name}_celltype``.
+    clustertype : str
+        Cluster column in ``adata.obs`` used as mapping key.
 
-    Returns:
-        None
+    Returns
+    -------
+    None
     """
 
     adata.obs[anno_name+'_celltype'] = adata.obs[clustertype].map(anno_dict).astype('category')
@@ -366,59 +427,84 @@ def get_celltype_marker(adata:anndata.AnnData,
                             foldchange=None,topgenenumber=10,unique=True,
                             global_unique=False,use_raw:Optional[bool]=None,
                             layer:Optional[str]=None,**kwargs)->dict:
-        r"""Get marker genes for each clusters.
-        
-        Arguments:
-            adata: anndata object
-            clustertype: Clustering name used in scanpy. (leiden)
-            log2fc_min: Minimum log2 fold change of marker genes. (2)
-            pval_cutoff: Maximum p value of marker genes. (0.05)
-            rank: Whether to rank genes by wilcoxon test. (True)
-            scores_type: The type of scores. can be selected from `scores` and `logfoldchanges`
-            unique: Whether to remove duplicates within each cell type. (True)
-            global_unique: Whether to remove duplicates across all cell types. (False)
+    r"""Get marker genes for each cluster/cell type.
 
-        Returns:
-            cellmarker: A dictionary of marker genes for each clusters.
-        """
-        print('...get cell type marker')
-        celltypes = sorted(adata.obs[clustertype].unique())
-        cell_marker_dict={}
-        if key not in adata.uns.keys() or rank:
-            rg_kwargs = dict(method=method, key_added=key)
-            if use_raw is not None:
-                rg_kwargs['use_raw'] = use_raw
-            if layer is not None:
-                rg_kwargs['layer'] = layer
-            rg_kwargs.update(kwargs)
-            sc.tl.rank_genes_groups(adata, clustertype, **rg_kwargs)
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        AnnData containing cluster annotations and expression matrix.
+    clustertype : str
+        Column in ``adata.obs`` used to define groups.
+    log2fc_min : int
+        Minimum log2 fold-change threshold when extracting DE markers.
+    scores_type : str
+        Statistic field used for thresholding (for example ``'scores'``).
+    pval_cutoff : float
+        Maximum adjusted p-value cutoff for retained markers.
+    rank : bool
+        Whether to run ``sc.tl.rank_genes_groups`` before extraction.
+    key : str
+        Key in ``adata.uns`` storing ranked-gene results.
+    method : str
+        Differential-expression method for ``rank_genes_groups``.
+    foldchange : float or None
+        Optional manual score threshold; auto-derived when ``None``.
+    topgenenumber : int
+        Maximum number of markers retained per cluster.
+    unique : bool
+        Whether to deduplicate markers within each cluster.
+    global_unique : bool
+        Whether to enforce uniqueness across all clusters.
+    use_raw : Optional[bool]
+        Forwarded to ``rank_genes_groups`` to control raw usage.
+    layer : Optional[str]
+        Layer passed to ``rank_genes_groups``.
+    **kwargs
+        Additional keyword arguments for ``rank_genes_groups``.
+
+    Returns
+    -------
+    dict
+        Dictionary mapping cluster labels to marker gene lists.
+    """
+    print('...get cell type marker')
+    celltypes = sorted(adata.obs[clustertype].unique())
+    cell_marker_dict={}
+    if key not in adata.uns.keys() or rank:
+        rg_kwargs = dict(method=method, key_added=key)
+        if use_raw is not None:
+            rg_kwargs['use_raw'] = use_raw
+        if layer is not None:
+            rg_kwargs['layer'] = layer
+        rg_kwargs.update(kwargs)
+        sc.tl.rank_genes_groups(adata, clustertype, **rg_kwargs)
+    for celltype in celltypes:
+        degs = sc.get.rank_genes_groups_df(adata, group=celltype, key=key, log2fc_min=log2fc_min, 
+                                        pval_cutoff=pval_cutoff)
+        foldp=np.histogram(degs[scores_type])
+        if foldchange is None:
+            try:
+                foldchange=(foldp[1][np.where(foldp[1]>0)[0][-5]]+foldp[1][np.where(foldp[1]>0)[0][-6]])/2
+            except:
+                foldchange=degs[scores_type].mean()
+                
+        cellmarker=degs.loc[degs[scores_type]>foldchange]['names'].values[:topgenenumber]
+        cell_marker_dict[celltype]=cellmarker
+    if unique==True:
+        for key in cell_marker_dict.keys():
+            cell_marker_dict[key]=list(set(cell_marker_dict[key]))
+    
+    # Global uniqueness across all cell types
+    if global_unique:
+        used_genes = set()
         for celltype in celltypes:
-            degs = sc.get.rank_genes_groups_df(adata, group=celltype, key=key, log2fc_min=log2fc_min, 
-                                            pval_cutoff=pval_cutoff)
-            foldp=np.histogram(degs[scores_type])
-            if foldchange is None:
-                try:
-                    foldchange=(foldp[1][np.where(foldp[1]>0)[0][-5]]+foldp[1][np.where(foldp[1]>0)[0][-6]])/2
-                except:
-                    foldchange=degs[scores_type].mean()
-                    
-            cellmarker=degs.loc[degs[scores_type]>foldchange]['names'].values[:topgenenumber]
-            cell_marker_dict[celltype]=cellmarker
-        if unique==True:
-            for key in cell_marker_dict.keys():
-                cell_marker_dict[key]=list(set(cell_marker_dict[key]))
-        
-        # Global uniqueness across all cell types
-        if global_unique:
-            used_genes = set()
-            for celltype in celltypes:
-                if celltype in cell_marker_dict:
-                    # Filter out genes that have been used in previous cell types
-                    unique_genes = [gene for gene in cell_marker_dict[celltype] if gene not in used_genes]
-                    cell_marker_dict[celltype] = unique_genes
-                    used_genes.update(unique_genes)
-        
-        return cell_marker_dict
+            if celltype in cell_marker_dict:
+                # Filter out genes that have been used in previous cell types
+                unique_genes = [gene for gene in cell_marker_dict[celltype] if gene not in used_genes]
+                cell_marker_dict[celltype] = unique_genes
+                used_genes.update(unique_genes)
+    
+    return cell_marker_dict
 
 
 
@@ -464,6 +550,57 @@ def get_celltype_marker(adata:anndata.AnnData,
     related=["single.scanpy_cellanno_from_dict", "single.get_celltype_marker", "utils.embedding"]
 )
 class pySCSA(object):
+    """
+    Automated cell-type annotation using SCSA marker-enrichment scoring.
+
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Query AnnData for cell-type annotation.
+    foldchange : float, optional, default=1.5
+        Fold-change cutoff for marker filtering.
+    pvalue : float, optional, default=0.05
+        P-value cutoff for marker filtering.
+    output : str, optional, default='temp/rna_anno.txt'
+        Output path for SCSA annotation report.
+    model_path : str, optional, default=''
+        Path to local SCSA database/model.
+    outfmt : str, optional, default='txt'
+        Output format for intermediate annotation report.
+    Gensymbol : bool, optional, default=True
+        Whether gene symbols are used as identifiers.
+    species : str, optional, default='Human'
+        Species used for marker database matching.
+    weight : int, optional, default=100
+        Marker-weight scaling factor used by SCSA scoring.
+    tissue : str, optional, default='All'
+        Tissue filter for marker database query.
+    target : str, optional, default='cellmarker'
+        Marker database target (for example ``'cellmarker'`` or ``'panglaodb'``).
+    celltype : str, optional, default='normal'
+        Annotation context/type mode used by SCSA.
+    norefdb : bool, optional, default=False
+        If ``True``, skip reference database matching.
+    cellrange : str, optional, default=None
+        Optional range/filter for cell selection.
+    noprint : bool, optional, default=True
+        If ``True``, suppress verbose console output.
+    list_tissue : bool, optional, default=False
+        If ``True``, list available tissues and exit.
+    tissuename : str, optional, default=None
+        Compatibility alias for ``tissue``.
+    speciename : str, optional, default=None
+        Compatibility alias for ``species``.
+    
+    Returns
+    -------
+    None
+        Initializes SCSA annotation settings and database options.
+    
+    Examples
+    --------
+    >>> # CRITICAL: Use clustertype='leiden', NOT cluster='leiden'!
+    """
 
     def __init__(self,adata:anndata.AnnData,
                 foldchange:float=1.5,pvalue:float=0.05,
@@ -476,28 +613,47 @@ class pySCSA(object):
                 # Compatibility aliases used by older prompts/agents
                 tissuename:str=None,speciename:str=None) -> None:
 
-        r"""Initialize the pySCSA class.
+        r"""
+        Initialize SCSA annotation workflow configuration.
 
-        Arguments:
-            adata: AnnData object of scRNA-seq after preprocessing
-            foldchange: Fold change threshold for marker filtering. (1.5)
-            pvalue: P-value threshold for marker filtering. (0.05)
-            output: Output file for marker annotation. ('temp/rna_anno.txt')
-            model_path: Path to the Database for annotation. If not provided, the model will be downloaded from the internet. ('')
-            outfmt: Output format for marker annotation. ('txt')
-            Gensymbol: Using gene symbol ID instead of ensembl ID in input file for calculation. (True)
-            species: Species for annotation. Only used for cellmarker database. ('Human')
-            weight: Weight threshold for marker filtering from cellranger v1.0 results. (100)
-            tissue: Tissue for annotation. you can use `get_model_tissue` to see the available tissues. ('All')
-            target: Target to annotation class in Database. ('cellmarker')
-            celltype: Cell type for annotation. ('normal')
-            norefdb: Only using user-defined marker database for annotation. (False)
-            cellrange: Cell sub_type for annotation. (if you input T cell, it will only provide T helper cell, T cytotoxic cell, T regulatory cell, etc.) (None)
-            noprint: Do not print any detail results. (True)
-            list_tissue: List all available tissues in the database. (False)
-        
-        Returns:
-            None
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            Query AnnData object.
+        foldchange : float
+            Fold-change threshold used for marker filtering.
+        pvalue : float
+            P-value threshold used for marker filtering.
+        output : str
+            Output path of annotation report.
+        model_path : str
+            Local SCSA database path. If empty, downloads default database.
+        outfmt : str
+            Output format for SCSA report.
+        Gensymbol : bool
+            Whether input gene identifiers are gene symbols.
+        species : str
+            Species used for marker-database lookup.
+        weight : int
+            SCSA weighting parameter.
+        tissue : str
+            Tissue filter used for database matching.
+        target : str
+            Marker database target (for example ``cellmarker``).
+        celltype : str
+            Cell-type mode used by SCSA.
+        norefdb : bool
+            Whether to disable reference database.
+        cellrange : str or None
+            Optional lineage restriction (for example T-cell subtypes only).
+        noprint : bool
+            Whether to suppress verbose output.
+        list_tissue : bool
+            Whether to list available tissues.
+        tissuename : str or None
+            Compatibility alias for ``tissue``.
+        speciename : str or None
+            Compatibility alias for ``species``.
         """
 
         #create temp directory
@@ -538,11 +694,14 @@ class pySCSA(object):
     def get_model_tissue(self,species:str="Human")->None:
         r"""List all available tissues in the database.
         
-        Arguments:
-            species: Species for annotation. Only used for cellmarker database. ('Human')
+        Parameters
+        ----------
+        species : str
+            Species name used to query available tissues in marker database.
 
-        Returns:
-            None
+        Returns
+        -------
+        None
         """
         
         anno = Annotator(foldchange=self.foldchange,
@@ -573,13 +732,19 @@ class pySCSA(object):
                   cluster:str='all',rank_rep=False)->pd.DataFrame:
         r"""Annotate cell type for each cluster.
         
-        Arguments:
-            clustertype: Clustering name used in scanpy. ('leiden')
-            cluster: Only deal with one cluster of marker genes. ('all')
-            rank_rep: Whether to repeat ranking. (False)
+        Parameters
+        ----------
+        clustertype : str
+            Cluster column in ``adata.obs`` used to compute markers.
+        cluster : str
+            Cluster subset for SCSA annotation; ``'all'`` annotates all clusters.
+        rank_rep : bool
+            Whether to rerun differential ranking before annotation.
         
-        Returns:
-            result: Annotation result as DataFrame
+        Returns
+        -------
+        pd.DataFrame
+            SCSA annotation result table.
         """
 
         dat=data_preprocess(self.adata,clustertype=clustertype,path='temp/rna.csv',rank_rep=rank_rep)
@@ -621,8 +786,9 @@ class pySCSA(object):
     def cell_anno_print(self)->None:
         r"""Print the annotation result.
 
-        Returns:
-            None
+        Returns
+        -------
+        None
         """
         for i in set(self.result['Cluster']):
             test=self.result.loc[self.result['Cluster']==i].iloc[:2]
@@ -643,13 +809,18 @@ class pySCSA(object):
                        clustertype:str='leiden',key='scsa_celltype')->None:
         r"""Add cell type annotation to anndata.obs['scsa_celltype'].
         
-        Arguments:
-            adata: anndata object
-            clustertype: Clustering name used in scanpy. ('leiden')
-            key: Key to store cell type annotation. ('scsa_celltype')
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            AnnData object to receive annotation labels.
+        clustertype : str
+            Cluster column in ``adata.obs`` used as mapping key.
+        key : str
+            ``obs`` column name used to store predicted cell types.
         
-        Returns:
-            None
+        Returns
+        -------
+        None
         """
         # If annotation results are not present, run cell_anno first
         if not hasattr(self, "result") or self.result is None:
@@ -673,18 +844,29 @@ class pySCSA(object):
                             unique:bool=True,global_unique:bool=False)->dict:
         r"""Get marker genes for each clusters.
         
-        Arguments:
-            adata: anndata object
-            clustertype: Clustering name used in scanpy. (leiden)
-            log2fc_min: Minimum log2 fold change of marker genes. (2)
-            pval_cutoff: Maximum p value of marker genes. (0.05)
-            rank: Whether to rank genes by wilcoxon test. (True)
-            scores_type: The type of scores. can be selected from `scores` and `logfoldchanges`
-            unique: Whether to remove duplicates within each cell type. (True)
-            global_unique: Whether to remove duplicates across all cell types. (False)
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            AnnData containing clustering and expression data.
+        clustertype : str
+            Cluster column in ``adata.obs``.
+        log2fc_min : int
+            Minimum log2 fold-change for retained markers.
+        pval_cutoff : float
+            Maximum p-value threshold for retained markers.
+        rank : bool
+            Whether to rerun ``rank_genes_groups`` before extraction.
+        scores_type : str
+            Statistic used to rank markers (for example ``scores``).
+        unique : bool
+            Whether to deduplicate markers within each cluster.
+        global_unique : bool
+            Whether to enforce uniqueness across clusters.
 
-        Returns:
-            cellmarker: A dictionary of marker genes for each clusters.
+        Returns
+        -------
+        dict
+            Marker dictionary keyed by cluster label.
         """
         print('...get cell type marker')
         cell_marker_dict=get_celltype_marker(adata=adata,
@@ -697,27 +879,49 @@ class pySCSA(object):
     
 
 
+@register_function(
+    aliases=['MetaTiME注释器', 'MetaTiME', 'tumor microenvironment meta-components'],
+    category="single",
+    description="MetaTiME wrapper for tumor microenvironment cell-state annotation using pretrained meta-components.",
+    prerequisites={'optional_functions': ['pp.preprocess', 'pp.neighbors']},
+    requires={'obs': ['cluster labels'], 'obsm': ['embedding (recommended)']},
+    produces={'obs': ['MetaTiME annotations'], 'uns': ['MetaTiME scoring tables']},
+    auto_fix='none',
+    examples=['TiME_object = ov.single.MetaTiME(adata, mode="table")', 'TiME_object.predictTiME()'],
+    related=['single.generate_scRNA_report', 'utils.plot_embedding_celltype']
+)
 class MetaTiME(object):
     """
-    MetaTiME: Meta-components in Tumor immune MicroEnvironment
+    MetaTiME wrapper for tumor microenvironment cell-state annotation.
 
-    Github: https://github.com/yi-zhang/MetaTiME/
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        AnnData to annotate with MetaTiME meta-components.
+    mode : str, optional, default='table'
+        Output mapping mode for component-to-cell-state interpretation.
     
+    Returns
+    -------
+    None
+        Initializes MetaTiME resources and annotation mode.
+    
+    Examples
+    --------
+    >>> TiME_object = ov.single.MetaTiME(adata, mode="table")
     """
     
     def __init__(self,adata:anndata.AnnData,mode:str='table'):
         """
-        Initialize MetaTiME model
+        Initialize MetaTiME model resources and annotation table.
 
-        Arguments:
-            adata: anndata object
-            mode: choose from ['mecnamedict', 'table', 'meciddict']
-                    load manual assigned name for easy understanding of assigned names
-                    from file: MeC_anno_name.tsv under mecDIR.
-                    Required columns: `['MeC_id', 'Annotation', 'UseForCellStateAnno']` 
-                    Required seperator: tab
-                    Annotation column NA will be filtered.
-                    If you want to use your own annotation, please follow the format of MeC_anno_name.tsv
+        Parameters
+        ----------
+        adata : anndata.AnnData
+            AnnData object for MetaTiME annotation.
+        mode : str
+            Name-mapping mode in ``metatime.mecs.load_mecname``. Choose from
+            ``'mecnamedict'``, ``'table'`` or ``'meciddict'``.
 
         """
         check_metatime()
@@ -748,12 +952,16 @@ class MetaTiME(object):
                 random_state: int= 0, 
                 clustercol :str = 'overcluster'):
         """
-        Overcluster single cell data to get cluster level cell state annotation
+        Perform high-resolution Leiden clustering for MetaTiME input.
 
-        Arguments:
-            resolution: resolution for leiden clustering
-            random_state: random state for leiden clustering
-            clustercol: column name for cluster level cell state annotation
+        Parameters
+        ----------
+        resolution : float
+            Resolution parameter for Leiden overclustering.
+        random_state : int
+            Random seed for Leiden clustering.
+        clustercol : str
+            Output cluster column name stored in ``adata.obs``.
         
         """
 
@@ -764,10 +972,17 @@ class MetaTiME(object):
         
     def predictTiME(self,save_obs_name:str='MetaTiME'):
         """
-        Predict TiME celtype for each cell
+        Predict tumor microenvironment cell states for each cell.
 
-        Arguments:
-            save_obs_name: column name for cell type annotation in adata.obs
+        Parameters
+        ----------
+        save_obs_name : str
+            Prefix used for predicted annotation columns in ``adata.obs``.
+
+        Returns
+        -------
+        anndata.AnnData
+            AnnData with MetaTiME annotations stored in ``obs``.
         
         """
         print('...projecting MeC scores')
@@ -793,23 +1008,35 @@ class MetaTiME(object):
              min_cell:int=5, title=None,figsize:tuple=(6,6),
              dpi:int=80,frameon:bool=False,legend_loc=None,palette=None):
         """
-        Plot annotated cells with  non-overlapping fonts.
+        Plot MetaTiME annotations with optional label collision adjustment.
 
-        Arguments:
-            basis: basis for plotting
-            cluster_key: column name for cell type annotation in adata.obs
-            fontsize: fontsize for plotting
-            min_cell: minimum number of cells for plotting
-            title: title for plotting
-            figsize: figure size for plotting
-            dpi: dpi for plotting
-            frameon: frameon for plotting
-            legend_loc: legend_loc for plotting
-            palette: palette for plotting
+        Parameters
+        ----------
+        basis : str
+            Embedding key in ``adata.obsm`` used for plotting.
+        cluster_key : str
+            ``obs`` column used for coloring/labeling.
+        fontsize : int
+            Text label font size.
+        min_cell : int
+            Minimum cells per group retained for visualization.
+        title : str or None
+            Figure title; defaults to ``cluster_key``.
+        figsize : tuple
+            Figure size in inches as ``(width, height)``.
+        dpi : int
+            Figure DPI.
+        frameon : bool
+            Whether to draw plot frame.
+        legend_loc : str or None
+            Matplotlib legend placement.
+        palette : Any
+            Color palette passed to ``scanpy.pl.embedding``.
 
-        Returns:
-            fig: figure object
-            ax: axis object
+        Returns
+        -------
+        tuple
+            ``(fig, ax)`` Matplotlib figure and axis handles.
         
         """
         import matplotlib.pyplot as plt

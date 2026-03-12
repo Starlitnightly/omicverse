@@ -2,7 +2,32 @@ import numpy as np
 import anndata as ad
 import pandas as pd
 
+from .._registry import register_function
 
+
+@register_function(
+    aliases=[
+        'SCENIC',
+        'SCENIC分析器',
+        'GRN inference',
+        'gene regulatory network inference',
+        'regulon inference',
+        'RegDiffusion wrapper',
+        'regdiffusion scenic wrapper',
+    ],
+    category="single",
+    description="SCENIC-based gene regulatory network analysis workflow with RegDiffusion, GRNBoost2 and GENIE3 backends for regulon and GRN inference.",
+    prerequisites={'optional_functions': ['pp.preprocess', 'pp.qc']},
+    requires={'layers': ['counts'], 'var': ['gene names'], 'obs': ['cell metadata (optional)']},
+    produces={'uns': ['SCENIC/GRN metadata'], 'varm': ['regulon or GRN-related scores (workflow dependent)']},
+    auto_fix='escalate',
+    examples=[
+        'scenic = ov.single.SCENIC(adata, db_glob="cisTarget/*.feather", motif_path="motifs.tbl")',
+        'scenic.cal_grn(method="regdiffusion", layer="counts")',
+        'scenic.cal_grn(method="grnboost2", layer="counts")',
+    ],
+    related=['single.SCENIC', 'single.Velo', 'single.pyCEFCON']
+)
 class SCENIC:
 
     def __init__(
@@ -98,7 +123,8 @@ class SCENIC:
 
         You can access the model through `RegDiffusionTrainer.model`. 
         
-        Arguments:
+        Parameters
+        ----------
             exp_array (np.ndarray): 2D numpy array. If used on single-cell RNAseq, 
                 the rows are cells and the columns are genes. Data should be log 
                 transformed. You may also want to remove all non expressed genes.
@@ -128,6 +154,10 @@ class SCENIC:
                 neural networks. Default: 0.1.
             weight_decay_adj (float): L2 regularization coef on the adj matrix.
                 Default: 0.01.
+
+        Returns
+        -------
+        None
             sparse_loss_coef (float): L1 regularization coef on the adj matrix. 
                 Default: 0.25.
             adj_dropout (float): Probability of an edge to be zeroed. Default: 0.3.
@@ -1136,4 +1166,3 @@ def plot_grn(G, pos, tf_list,temporal_df, tf_gene_dict,
     ax.set_title(title,fontsize=fontsize+1)
     ax.axis('off')
     return ax
-
