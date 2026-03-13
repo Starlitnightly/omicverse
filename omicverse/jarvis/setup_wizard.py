@@ -203,6 +203,7 @@ _COPY: Dict[Language, Dict[str, str]] = {
         "provider_ollama": "Ollama (local)",
         "provider_openai_compatible": "OpenAI-compatible endpoint",
         "provider_python": "Local Python (no LLM)",
+        "provider_keep_current": "Keep current ({provider})",
         "auth_title": "Choose an authentication method",
         "auth_saved_api_key": "Save an API key in Jarvis",
         "auth_environment": "Use environment variables",
@@ -289,6 +290,7 @@ _COPY: Dict[Language, Dict[str, str]] = {
         "provider_ollama": "Ollama（本地）",
         "provider_openai_compatible": "OpenAI 兼容端点",
         "provider_python": "本地 Python（不使用 LLM）",
+        "provider_keep_current": "保持当前（{provider}）",
         "auth_title": "选择认证方式",
         "auth_saved_api_key": "把 API Key 保存到 Jarvis",
         "auth_environment": "使用环境变量",
@@ -527,6 +529,21 @@ def _provider_env_vars(provider_name: str) -> str:
 
 def _provider_options(language: Language) -> List[Tuple[str, str]]:
     return [(provider_name, _provider_label(provider_name, language)) for provider_name in _PROVIDER_ORDER]
+
+
+def _provider_selection_options(language: Language, current_provider: str) -> List[Tuple[str, str]]:
+    options = _provider_options(language)
+    if current_provider:
+        options = [
+            (
+                "__keep_current__",
+                _copy(language, "provider_keep_current").format(
+                    provider=_provider_label(current_provider, language)
+                ),
+            ),
+            *options,
+        ]
+    return options
 
 
 def _mask_secret(value: str) -> str:
@@ -823,6 +840,13 @@ def _discover_models_for_prompt(
     return list(discovered.keys())
 
 
+def _has_openai_oauth_session(auth_manager: OpenAIOAuthManager) -> bool:
+    try:
+        return bool(auth_manager.ensure_access_token(refresh_if_needed=True))
+    except Exception:
+        return False
+
+
 def _configure_llm(
     config: Dict[str, Any],
     auth_manager: OpenAIOAuthManager,
@@ -830,12 +854,13 @@ def _configure_llm(
 ) -> Dict[str, Any]:
     next_config = dict(config)
     previous_provider = _infer_provider(next_config)
-    provider_name = _prompt_choice(
+    provider_choice = _prompt_choice(
         _copy(language, "provider_title"),
-        _provider_options(language),
-        default=previous_provider,
+        _provider_selection_options(language, previous_provider),
+        default="__keep_current__" if previous_provider else "openai",
         language=language,
     )
+    provider_name = previous_provider if provider_choice == "__keep_current__" else provider_choice
     next_config["llm_provider"] = provider_name
 
     current_mode = str(next_config.get("auth_mode") or "environment")
@@ -868,7 +893,15 @@ def _configure_llm(
         next_config["auth_mode"] = auth_mode
 
         if auth_mode == "openai_oauth":
-            auth_manager.login(prompt_for_redirect=lambda auth_url: _prompt_oauth_manual_callback(auth_url, language))
+            should_login = not (
+                previous_provider == provider_name
+                and current_mode == "openai_oauth"
+                and _has_openai_oauth_session(auth_manager)
+            )
+            if should_login:
+                auth_manager.login(
+                    prompt_for_redirect=lambda auth_url: _prompt_oauth_manual_callback(auth_url, language)
+                )
             next_config["endpoint"] = OPENAI_CODEX_DEFAULT_ENDPOINT
             default_model = _openai_model_default(str(next_config.get("model") or ""), auth_mode)
             next_config["model"] = _prompt_model(

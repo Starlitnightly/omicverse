@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import concurrent.futures
 import hashlib
 import json
 import logging
@@ -30,9 +31,10 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 import requests
 
 from ..agent_bridge import AgentBridge
+from ..channel_language import response_language_instruction, tr
+from ..channel_shared import render_help_text, render_start_text
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from ..model_help import render_model_help
-from ..runtime import ConversationRoute
 
 logger = logging.getLogger("omicverse.jarvis.feishu")
 
@@ -77,6 +79,19 @@ class FeishuClient:
 
     def _headers(self) -> Dict[str, str]:
         return {"Authorization": f"Bearer {self._tenant_access_token()}"}
+
+    def get_bot_info(self) -> Dict[str, Any]:
+        resp = requests.get(
+            "https://open.feishu.cn/open-apis/bot/v3/info",
+            headers=self._headers(),
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("code") != 0:
+            raise RuntimeError(f"Feishu bot info failed: {data}")
+        bot = data.get("bot") or ((data.get("data") or {}).get("bot")) or {}
+        return bot if isinstance(bot, dict) else {}
 
     def send_text(self, chat_id: str, text: str) -> Optional[str]:
         payload = {
@@ -487,6 +502,57 @@ def _json_loads_safely(raw: Any) -> Dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
+def _stringify_optional(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    return str(value).strip()
+
+
+def _normalize_feishu_ws_event_payload(payload: Any) -> Dict[str, Any]:
+    if isinstance(payload, dict):
+        return payload
+
+    header = getattr(payload, "header", None)
+    event = getattr(payload, "event", None)
+    message = getattr(event, "message", None) if event is not None else None
+    sender = getattr(event, "sender", None) if event is not None else None
+    sender_id = getattr(sender, "sender_id", None) if sender is not None else None
+
+    normalized: Dict[str, Any] = {
+        "header": {
+            "event_type": _stringify_optional(getattr(header, "event_type", None)) or _FEISHU_EVENT_MESSAGE_RECEIVE,
+            "event_id": _stringify_optional(getattr(header, "event_id", None)),
+            "token": _stringify_optional(getattr(header, "token", None)),
+        },
+        "event": {
+            "chat_id": _stringify_optional(getattr(message, "chat_id", None)),
+            "root_id": _stringify_optional(getattr(message, "root_id", None)),
+            "thread_id": _stringify_optional(getattr(message, "thread_id", None)),
+            "message": {
+                "message_id": _stringify_optional(getattr(message, "message_id", None)),
+                "root_id": _stringify_optional(getattr(message, "root_id", None)),
+                "thread_id": _stringify_optional(getattr(message, "thread_id", None)),
+                "chat_id": _stringify_optional(getattr(message, "chat_id", None)),
+                "message_type": _stringify_optional(getattr(message, "message_type", None)),
+                "content": getattr(message, "content", None) or "",
+                "parent_id": _stringify_optional(getattr(message, "parent_id", None)),
+            },
+            "sender": {
+                "sender_type": _stringify_optional(getattr(sender, "sender_type", None)),
+                "tenant_key": _stringify_optional(getattr(sender, "tenant_key", None)),
+                "sender_id": {
+                    "open_id": _stringify_optional(getattr(sender_id, "open_id", None)),
+                    "union_id": _stringify_optional(getattr(sender_id, "union_id", None)),
+                    "user_id": _stringify_optional(getattr(sender_id, "user_id", None)),
+                },
+            },
+        },
+    }
+    return normalized
+
+
 def _process_feishu_event_payload(
     *,
     runtime: Any,
@@ -494,32 +560,40 @@ def _process_feishu_event_payload(
     payload: Any,
     expected_event_type: str = _FEISHU_EVENT_MESSAGE_RECEIVE,
 ) -> bool:
+    payload = _normalize_feishu_ws_event_payload(payload)
     if not isinstance(payload, dict):
         return False
     header = payload.get("header") or {}
     event = payload.get("event") or {}
     event_type = (header.get("event_type") or (event or {}).get("type") or "").strip()
     if event_type != expected_event_type:
+        logger.debug("Feishu ignored event_type=%s", event_type or "<empty>")
         return False
     event_id = (header.get("event_id") or "").strip()
     if event_id and deduper.seen_or_record(f"event:{event_id}"):
+        logger.debug("Feishu deduped event_id=%s", event_id)
         return True
     if not isinstance(event, dict):
         return True
+    sender = event.get("sender") or {}
+    sender_open_id = ""
+    if isinstance(sender, dict):
+        sender_type = (sender.get("sender_type") or "").strip().lower()
+        sender_ids = sender.get("sender_id") or {}
+        if isinstance(sender_ids, dict):
+            sender_open_id = (sender_ids.get("open_id") or "").strip()
+        if sender_type == "app":
+            logger.debug("Feishu ignored self-sent bot message event")
+            return True
     msg = event.get("message") or {}
     if not isinstance(msg, dict):
         return True
     message_id = (msg.get("message_id") or "").strip()
     if message_id and deduper.seen_or_record(f"message:{message_id}"):
+        logger.debug("Feishu deduped message_id=%s", message_id)
         return True
     message_type = (msg.get("message_type") or "").strip().lower()
     chat_id = (event.get("chat_id") or msg.get("chat_id") or "").strip()
-    chat_type = (
-        event.get("chat_type")
-        or msg.get("chat_type")
-        or event.get("conversation_type")
-        or msg.get("conversation_type")
-    )
     thread_id = (
         event.get("root_id")
         or msg.get("root_id")
@@ -527,29 +601,37 @@ def _process_feishu_event_payload(
         or msg.get("thread_id")
     )
     if not chat_id:
+        logger.warning("Feishu event missing chat_id; message_type=%s message_id=%s", message_type, message_id)
         return True
     content = _json_loads_safely(msg.get("content"))
+    logger.info(
+        "Feishu message received type=%s chat_id=%s thread_id=%s message_id=%s sender_open_id=%s",
+        message_type or "<empty>",
+        chat_id,
+        thread_id or "",
+        message_id or "",
+        sender_open_id or "",
+    )
 
     if message_type == "text":
         text = (content.get("text") or "").strip()
         if text:
-            runtime.submit(runtime.handle_text(chat_id, thread_id, text, chat_type=chat_type))
+            runtime.submit(runtime.handle_text(chat_id, thread_id, text))
     elif message_type in {"file", "media"}:
         file_key = (content.get("file_key") or "").strip()
         file_name = (content.get("file_name") or content.get("name") or "upload.bin").strip()
         if file_key:
-            runtime.submit(
-                runtime.handle_file(chat_id, thread_id, file_key, file_name, chat_type=chat_type)
-            )
+            runtime.submit(runtime.handle_file(chat_id, thread_id, file_key, file_name))
     elif message_type == "image":
         runtime.submit(
             runtime.handle_text(
                 chat_id,
                 thread_id,
-                "收到图片。若需分析请上传 .h5ad 或发送文字指令。",
-                chat_type=chat_type,
+                "Image received. Upload a .h5ad file or send a text instruction if you want analysis.",
             )
         )
+    else:
+        logger.debug("Feishu ignored unsupported message_type=%s", message_type or "<empty>")
     return True
 
 
@@ -569,47 +651,27 @@ class FeishuRuntime:
         self._loop.run_forever()
 
     def submit(self, coro: asyncio.Future) -> None:
-        asyncio.run_coroutine_threadsafe(coro, self._loop)
+        fut = asyncio.run_coroutine_threadsafe(coro, self._loop)
+
+        def _log_result(done: "concurrent.futures.Future[Any]") -> None:
+            try:
+                done.result()
+            except Exception:
+                logger.exception("Feishu runtime task failed")
+
+        fut.add_done_callback(_log_result)
 
     @staticmethod
     def _parse_command(text: str) -> List[str]:
         return (text or "").strip().split()
 
-    @staticmethod
-    def _route(
-        chat_id: str,
-        thread_id: Optional[str],
-        chat_type: Optional[str] = None,
-    ) -> ConversationRoute:
-        norm = (chat_type or "").strip().lower()
-        if norm in {"p2p", "private", "direct", "dm"}:
-            scope_type = "dm"
-        elif norm in {"group", "chat", "room"}:
-            scope_type = "group"
-        else:
-            scope_type = "chat"
-        return ConversationRoute(
+    def _session_key(self, chat_id: str, thread_id: Optional[str]) -> SessionKey:
+        return SessionKey(
             channel="feishu",
-            scope_type=scope_type,
+            scope_type="chat",
             scope_id=str(chat_id),
             thread_id=(str(thread_id) if thread_id else None),
         )
-
-    def _session_key(
-        self,
-        chat_id: str,
-        thread_id: Optional[str],
-        chat_type: Optional[str] = None,
-    ) -> SessionKey:
-        return self._route(chat_id, thread_id, chat_type).to_session_key()
-
-    def _route_key(
-        self,
-        chat_id: str,
-        thread_id: Optional[str],
-        chat_type: Optional[str] = None,
-    ) -> str:
-        return self._route(chat_id, thread_id, chat_type).route_key()
 
     # ------------------------------------------------------------------
     # Helpers mirroring Telegram feature set
@@ -630,7 +692,7 @@ class FeishuRuntime:
 
     def _build_full_request(self, session: Any, text: str) -> str:
         """Build context-injected request (AGENTS.md + memory + current request)."""
-        ctx_parts: List[str] = []
+        ctx_parts: List[str] = [f"[Response language]\n{response_language_instruction(text)}"]
         try:
             agents_md = session.get_agents_md()
             if agents_md:
@@ -655,10 +717,10 @@ class FeishuRuntime:
         full_request = self._build_full_request(session, user_text)
         try:
             draft_id = self._client.send_markdown_card(
-                chat_id, "💭 思考中…", title="OmicVerse Jarvis", color="grey"
+                chat_id, "💭 Thinking...", title="OmicVerse Jarvis", color="grey"
             )
         except Exception:
-            draft_id = self._client.send_text(chat_id, "💭 思考中…")
+            draft_id = self._client.send_text(chat_id, "💭 Thinking...")
         task = asyncio.create_task(
             self._analysis_wrapper(chat_id, route, session, user_text, draft_id, full_request)
         )
@@ -681,7 +743,7 @@ class FeishuRuntime:
         except Exception as exc:
             logger.exception("Feishu analysis wrapper error")
             try:
-                self._client.send_text(chat_id, f"❌ 分析异常: {exc}")
+                self._client.send_text(chat_id, f"❌ Analysis failed: {exc}")
             except Exception:
                 pass
         finally:
@@ -691,7 +753,7 @@ class FeishuRuntime:
                 coalesced = "\n\n".join(queued)
                 n = len(queued)
                 try:
-                    self._client.send_text(chat_id, f"⏭ 开始执行队列中的 {n} 条请求…")
+                    self._client.send_text(chat_id, f"⏭ Starting {n} queued request(s)...")
                 except Exception:
                     pass
                 asyncio.create_task(
@@ -712,7 +774,7 @@ class FeishuRuntime:
                 "You are OmicVerse Jarvis, a bioinformatics AI assistant.",
                 "The user is chatting with you while a background analysis is running.",
                 "Answer concisely and helpfully. Do NOT execute code or call tools.",
-                "Reply in the same language the user uses.",
+                response_language_instruction(user_text),
             ]
             if running_request:
                 system_lines.append(f"\nCurrently running analysis: {running_request[:300]}")
@@ -735,7 +797,11 @@ class FeishuRuntime:
                 {"role": "user", "content": user_text},
             ]
             response = await session.agent._llm.chat(messages, tools=None, tool_choice=None)
-            reply = (response.content or "").strip() or "⏳ 后台分析进行中，请等待完成。"
+            reply = (response.content or "").strip() or tr(
+                user_text,
+                en="⏳ Background analysis is still running. Please wait.",
+                zh="⏳ 后台分析进行中，请等待完成。",
+            )
             for chunk in self._text_chunks(reply):
                 await asyncio.to_thread(self._client.send_text, chat_id, chunk)
         except Exception as exc:
@@ -744,24 +810,21 @@ class FeishuRuntime:
                 await asyncio.to_thread(
                     self._client.send_text,
                     chat_id,
-                    "⏳ 后台分析进行中，请等待完成。使用 /cancel 取消。",
+                    tr(
+                        user_text,
+                        en="⏳ Background analysis is still running. Please wait or use /cancel.",
+                        zh="⏳ 后台分析进行中，请等待完成。使用 /cancel 取消。",
+                    ),
                 )
             except Exception:
                 pass
 
-    async def handle_text(
-        self,
-        chat_id: str,
-        thread_id: Optional[str],
-        text: str,
-        *,
-        chat_type: Optional[str] = None,
-    ) -> None:
+    async def handle_text(self, chat_id: str, thread_id: Optional[str], text: str) -> None:
         text = (text or "").strip()
         if not text:
             return
-        sk = self._session_key(chat_id, thread_id, chat_type)
-        route = self._route_key(chat_id, thread_id, chat_type)
+        sk = self._session_key(chat_id, thread_id)
+        route = sk.as_key()
         session = self._registry.get_or_create(sk)
 
         tokens = self._parse_command(text)
@@ -771,7 +834,10 @@ class FeishuRuntime:
         if cmd == "/cancel":
             await self._handle_cancel(chat_id, route)
             return
-        if cmd in {"/start", "/help"}:
+        if cmd == "/start":
+            await self._handle_start(chat_id)
+            return
+        if cmd == "/help":
             await self._handle_help(chat_id)
             return
         if cmd == "/status":
@@ -779,7 +845,14 @@ class FeishuRuntime:
             return
         if cmd == "/reset":
             session.reset()
-            self._client.send_text(chat_id, "✅ 会话已重置，kernel 将在下一次请求时重建。")
+            self._client.send_text(
+                chat_id,
+                tr(
+                    text,
+                    en="✅ Session reset. The kernel will be recreated on the next request.",
+                    zh="✅ 会话已重置，kernel 将在下一次请求时重建。",
+                ),
+            )
             return
         if cmd == "/kernel":
             await self._handle_kernel(chat_id, session, route, tokens[1:])
@@ -827,9 +900,16 @@ class FeishuRuntime:
         # Ack message before analysis (mirrors Telegram handle_analysis)
         if session.adata is not None:
             a = session.adata
-            ack = (
-                f"⚙️ 收到请求，开始分析…\n"
-                f"🔬 当前数据: {a.n_obs:,} cells × {a.n_vars:,} genes"
+            ack = tr(
+                text,
+                en=(
+                    "⚙️ Request received. Starting analysis...\n"
+                    f"🔬 Current data: {a.n_obs:,} cells × {a.n_vars:,} genes"
+                ),
+                zh=(
+                    f"⚙️ 收到请求，开始分析…\n"
+                    f"🔬 当前数据: {a.n_obs:,} cells × {a.n_vars:,} genes"
+                ),
             )
         else:
             try:
@@ -838,13 +918,25 @@ class FeishuRuntime:
                 h5ad_files = []
             if h5ad_files:
                 names = "  ".join(f.name for f in h5ad_files[:5])
-                ack = (
-                    f"⚙️ 收到请求，开始分析…\n"
-                    f"💡 workspace 中检测到文件: {names}\n"
-                    f"使用 /load <文件名> 加载"
+                ack = tr(
+                    text,
+                    en=(
+                        "⚙️ Request received. Starting analysis...\n"
+                        f"💡 Found files in the workspace: {names}\n"
+                        "Use /load <filename> to load one."
+                    ),
+                    zh=(
+                        f"⚙️ 收到请求，开始分析…\n"
+                        f"💡 workspace 中检测到文件: {names}\n"
+                        f"使用 /load <文件名> 加载"
+                    ),
                 )
             else:
-                ack = "⚙️ 收到请求，开始分析…\n💡 未检测到已加载数据，Agent 将自行加载数据"
+                ack = tr(
+                    text,
+                    en="⚙️ Request received. Starting analysis...\n💡 No loaded dataset detected. The agent will load data if needed.",
+                    zh="⚙️ 收到请求，开始分析…\n💡 未检测到已加载数据，Agent 将自行加载数据",
+                )
         self._client.send_text(chat_id, ack)
 
         await self._spawn_analysis(chat_id, route, session, text)
@@ -855,14 +947,15 @@ class FeishuRuntime:
         thread_id: Optional[str],
         file_key: str,
         file_name: str,
-        *,
-        chat_type: Optional[str] = None,
     ) -> None:
-        sk = self._session_key(chat_id, thread_id, chat_type)
+        sk = self._session_key(chat_id, thread_id)
         session = self._registry.get_or_create(sk)
         safe_name = Path(file_name or "uploaded.bin").name
         if not safe_name.lower().endswith(".h5ad"):
-            self._client.send_text(chat_id, f"⚠️ 仅支持 .h5ad 文件，已收到：{safe_name}")
+            self._client.send_text(
+                chat_id,
+                f"⚠️ Only .h5ad files are supported. Received: {safe_name}",
+            )
             return
         try:
             data = await asyncio.to_thread(self._client.download_file, file_key)
@@ -873,13 +966,13 @@ class FeishuRuntime:
             if loaded is not None:
                 self._client.send_text(
                     chat_id,
-                    f"✅ 已上传并加载 {safe_name}\n🔬 {loaded.n_obs:,} cells × {loaded.n_vars:,} genes",
+                    f"✅ Uploaded and loaded {safe_name}\n🔬 {loaded.n_obs:,} cells × {loaded.n_vars:,} genes",
                 )
             else:
-                self._client.send_text(chat_id, f"✅ 已上传 {safe_name}，但自动加载失败。")
+                self._client.send_text(chat_id, f"✅ Uploaded {safe_name}, but auto-loading failed.")
         except Exception as exc:
             logger.exception("Feishu file handling failed")
-            self._client.send_text(chat_id, f"❌ 文件处理失败: {exc}")
+            self._client.send_text(chat_id, f"❌ File handling failed: {exc}")
 
     async def _run_analysis(
         self,
@@ -907,7 +1000,7 @@ class FeishuRuntime:
                 if last_progress:
                     return f"🔄 {last_progress[:140]}\n\n💭 {_trim(llm_buf)}"
                 return f"💭 {_trim(llm_buf)}"
-            return "💭 思考中…"
+            return "💭 Thinking..."
 
         async def _edit(force: bool = False) -> None:
             nonlocal last_edit
@@ -918,7 +1011,7 @@ class FeishuRuntime:
                 return
             content = _draft_text()
             ok = await asyncio.to_thread(
-                self._client.edit_card, draft_id, content, "💭 分析中…", "grey"
+                self._client.edit_card, draft_id, content, "💭 Thinking...", "grey"
             )
             if not ok:
                 ok = await asyncio.to_thread(self._client.edit_text, draft_id, content)
@@ -943,17 +1036,33 @@ class FeishuRuntime:
         except asyncio.CancelledError:
             if draft_id:
                 ok = await asyncio.to_thread(
-                    self._client.edit_card, draft_id, "🚫 已取消当前分析。", "取消", "red"
+                    self._client.edit_card,
+                    draft_id,
+                    tr(user_text, en="🚫 Analysis cancelled.", zh="🚫 已取消当前分析。"),
+                    tr(user_text, en="Cancelled", zh="取消"),
+                    "red",
                 )
                 if not ok:
-                    await asyncio.to_thread(self._client.edit_text, draft_id, "🚫 已取消当前分析。")
+                    await asyncio.to_thread(
+                        self._client.edit_text,
+                        draft_id,
+                        tr(user_text, en="🚫 Analysis cancelled.", zh="🚫 已取消当前分析。"),
+                    )
             raise
         except Exception as exc:
             logger.exception("Feishu analysis failed")
-            err_msg = f"❌ 分析失败: {exc}"
+            err_msg = tr(
+                user_text,
+                en=f"❌ Analysis failed: {exc}",
+                zh=f"❌ 分析失败: {exc}",
+            )
             if draft_id:
                 ok = await asyncio.to_thread(
-                    self._client.edit_card, draft_id, err_msg, "❌ 分析失败", "red"
+                    self._client.edit_card,
+                    draft_id,
+                    err_msg,
+                    tr(user_text, en="❌ Analysis failed", zh="❌ 分析失败"),
+                    "red",
                 )
                 if not ok:
                     await asyncio.to_thread(self._client.edit_text, draft_id, err_msg)
@@ -985,12 +1094,24 @@ class FeishuRuntime:
             err_text = f"❌ {result.error}"
             if result.diagnostics:
                 hints = "\n".join(f"- {x}" for x in result.diagnostics[:4])
-                err_text += f"\n\n诊断信息:\n{hints}"
+                err_text += tr(
+                    user_text,
+                    en=f"\n\nDiagnostics:\n{hints}",
+                    zh=f"\n\n诊断信息:\n{hints}",
+                )
             if llm_buf.strip():
-                err_text += f"\n\n最后模型输出片段:\n{_trim(llm_buf, max_len=1200)}"
+                err_text += tr(
+                    user_text,
+                    en=f"\n\nLast model output:\n{_trim(llm_buf, max_len=1200)}",
+                    zh=f"\n\n最后模型输出片段:\n{_trim(llm_buf, max_len=1200)}",
+                )
             if draft_id:
                 ok = await asyncio.to_thread(
-                    self._client.edit_card, draft_id, err_text, "❌ 分析失败", "red"
+                    self._client.edit_card,
+                    draft_id,
+                    err_text,
+                    tr(user_text, en="❌ Analysis failed", zh="❌ 分析失败"),
+                    "red",
                 )
                 if not ok:
                     await asyncio.to_thread(self._client.edit_text, draft_id, err_text)
@@ -1000,15 +1121,34 @@ class FeishuRuntime:
 
         if draft_id:
             ok = await asyncio.to_thread(
-                self._client.edit_card, draft_id, "✅ 分析完成，正在发送结果…", "💭 分析中…", "grey"
+                self._client.edit_card,
+                draft_id,
+                tr(
+                    user_text,
+                    en="✅ Analysis finished. Sending results...",
+                    zh="✅ 分析完成，正在发送结果…",
+                ),
+                tr(user_text, en="💭 Thinking...", zh="💭 分析中…"),
+                "grey",
             )
             if not ok:
-                await asyncio.to_thread(self._client.edit_text, draft_id, "✅ 分析完成，正在发送结果…")
+                await asyncio.to_thread(
+                    self._client.edit_text,
+                    draft_id,
+                    tr(
+                        user_text,
+                        en="✅ Analysis finished. Sending results...",
+                        zh="✅ 分析完成，正在发送结果…",
+                    ),
+                )
 
         for rep in list(result.reports or []):
             if len(rep) <= 4800:
                 await asyncio.to_thread(
-                    self._client.send_markdown_card, chat_id, rep, "📊 分析报告"
+                    self._client.send_markdown_card,
+                    chat_id,
+                    rep,
+                    tr(user_text, en="📊 Analysis Report", zh="📊 分析报告"),
                 )
             else:
                 for chunk in self._text_chunks(rep):
@@ -1041,56 +1181,60 @@ class FeishuRuntime:
                 summary = _trim(llm_buf, max_len=3600)
             elif result.diagnostics:
                 hints = "\n".join(f"- {x}" for x in result.diagnostics[:5])
-                summary = f"⚠️ 未生成有效最终答复\n{hints}"
+                summary = tr(
+                    user_text,
+                    en=f"⚠️ No final answer was generated.\n{hints}",
+                    zh=f"⚠️ 未生成有效最终答复\n{hints}",
+                )
             elif session.adata is not None:
                 a = session.adata
-                summary = f"✅ 分析完成\n🔬 {a.n_obs:,} cells × {a.n_vars:,} genes"
+                summary = tr(
+                    user_text,
+                    en=f"✅ Analysis complete\n🔬 {a.n_obs:,} cells × {a.n_vars:,} genes",
+                    zh=f"✅ 分析完成\n🔬 {a.n_obs:,} cells × {a.n_vars:,} genes",
+                )
             else:
-                summary = "✅ 分析完成"
+                summary = tr(user_text, en="✅ Analysis complete", zh="✅ 分析完成")
         if len(summary) <= 4800:
             await asyncio.to_thread(
-                self._client.send_markdown_card, chat_id, summary, "✅ 分析完成", "green"
+                self._client.send_markdown_card,
+                chat_id,
+                summary,
+                tr(user_text, en="✅ Analysis complete", zh="✅ 分析完成"),
+                "green",
             )
         else:
             for chunk in self._text_chunks(summary):
                 await asyncio.to_thread(self._client.send_text, chat_id, chunk)
         if draft_id:
             ok = await asyncio.to_thread(
-                self._client.edit_card, draft_id, "✅ 分析完成", "✅ 分析完成", "green"
+                self._client.edit_card,
+                draft_id,
+                tr(user_text, en="✅ Analysis complete", zh="✅ 分析完成"),
+                tr(user_text, en="✅ Analysis complete", zh="✅ 分析完成"),
+                "green",
             )
             if not ok:
-                await asyncio.to_thread(self._client.edit_text, draft_id, "✅ 分析完成")
+                await asyncio.to_thread(
+                    self._client.edit_text,
+                    draft_id,
+                    tr(user_text, en="✅ Analysis complete", zh="✅ 分析完成"),
+                )
 
     async def _handle_cancel(self, chat_id: str, route: str) -> None:
         self._pending.pop(route, None)  # clear queued messages on cancel
         running = self._tasks.get(route)
         if not running or running.task.done():
-            self._client.send_text(chat_id, "ℹ️ 当前没有正在运行的分析。")
+            self._client.send_text(chat_id, "ℹ️ No analysis is currently running.")
             return
         running.task.cancel()
-        self._client.send_text(chat_id, "⏹ 已发送取消信号。")
+        self._client.send_text(chat_id, "⏹ Cancellation requested.")
+
+    async def _handle_start(self, chat_id: str) -> None:
+        self._client.send_text(chat_id, render_start_text())
 
     async def _handle_help(self, chat_id: str) -> None:
-        text = (
-            "👋 OmicVerse Jarvis\n"
-            "--------------------\n"
-            "数据命令:\n"
-            "/workspace 查看工作区\n"
-            "/ls [路径] 列出文件\n"
-            "/find <模式> 搜索文件\n"
-            "/load <文件名> 加载数据\n"
-            "/shell <命令> 执行白名单 shell\n\n"
-            "会话命令:\n"
-            "/kernel | /kernel ls | /kernel new 名称 | /kernel use 名称\n"
-            "/memory 分析历史\n"
-            "/usage token 用量\n"
-            "/model [名称] 查看/切换模型\n"
-            "/status 当前状态\n"
-            "/save 导出 current.h5ad\n"
-            "/cancel 取消分析\n"
-            "/reset 重置会话"
-        )
-        self._client.send_text(chat_id, text)
+        self._client.send_text(chat_id, render_help_text())
 
     async def _handle_status(self, chat_id: str, session: Any, route: str) -> None:
         lines: List[str] = []
@@ -1104,7 +1248,7 @@ class FeishuRuntime:
             except Exception:
                 pass
         else:
-            lines.append("📭 暂无数据")
+            lines.append("📭 No dataset loaded")
         try:
             kname = self._sm.get_active_kernel(session.user_id)
             lines.append(f"🧩 kernel: {kname}")
@@ -1117,7 +1261,7 @@ class FeishuRuntime:
                 lines.append(f"🆔 session: {kst.get('session_id')}")
         running = self._tasks.get(route)
         if running and not running.task.done():
-            lines.append("⚙️ 分析中（可 /cancel）")
+            lines.append("⚙️ Analysis running (/cancel available)")
         self._client.send_text(chat_id, "\n".join(lines))
 
     async def _handle_workspace(self, chat_id: str, session: Any) -> None:
@@ -1132,7 +1276,7 @@ class FeishuRuntime:
             "",
         ]
         if h5ad_files:
-            lines.append(f"📊 数据文件 ({len(h5ad_files)})")
+            lines.append(f"📊 Data files ({len(h5ad_files)})")
             for f in h5ad_files[:10]:
                 try:
                     mb = f.stat().st_size / 1_048_576
@@ -1140,15 +1284,15 @@ class FeishuRuntime:
                 except OSError:
                     lines.append(f"- {f.name}")
             if len(h5ad_files) > 10:
-                lines.append(f"... 还有 {len(h5ad_files) - 10} 个")
+                lines.append(f"... and {len(h5ad_files) - 10} more")
         else:
-            lines.append("📊 数据文件 (空)")
+            lines.append("📊 Data files (empty)")
         lines += [
             "",
             f"📋 AGENTS.md {'✅' if agents_md else '—'}",
-            f"🧠 今日记忆 {'✅' if today_log.exists() else '—'}",
+            f"🧠 Today's memory {'✅' if today_log.exists() else '—'}",
             "",
-            "可用: /load <文件名> | /ls | /memory",
+            "Available: /load <filename> | /ls | /memory",
         ]
         self._client.send_text(chat_id, "\n".join(lines))
 
@@ -1161,7 +1305,7 @@ class FeishuRuntime:
     async def _handle_find(self, chat_id: str, session: Any, pattern: str) -> None:
         pattern = (pattern or "").strip()
         if not pattern:
-            self._client.send_text(chat_id, "用法: /find <模式>，例如 /find *.h5ad")
+            self._client.send_text(chat_id, "Usage: /find <pattern>, for example /find *.h5ad")
             return
         cmd = f"find . -name {pattern}"
         out = session.shell.exec(cmd, cwd=session.workspace)
@@ -1171,25 +1315,25 @@ class FeishuRuntime:
     async def _handle_load(self, chat_id: str, session: Any, filename: str) -> None:
         filename = (filename or "").strip()
         if not filename:
-            self._client.send_text(chat_id, "用法: /load <文件名>，例如 /load pbmc3k.h5ad")
+            self._client.send_text(chat_id, "Usage: /load <filename>, for example /load pbmc3k.h5ad")
             return
-        self._client.send_text(chat_id, f"⏳ 正在加载 {filename} ...")
+        self._client.send_text(chat_id, f"⏳ Loading {filename} ...")
         try:
             adata = await asyncio.to_thread(session.load_from_workspace, filename)
         except Exception as exc:
             logger.exception("Feishu /load failed")
-            self._client.send_text(chat_id, f"❌ 加载失败: {exc}")
+            self._client.send_text(chat_id, f"❌ Load failed: {exc}")
             return
         if adata is None:
             files = session.list_h5ad_files()
             hint = ""
             if files:
-                hint = "\n可用文件: " + "  ".join(f.name for f in files[:5])
-            self._client.send_text(chat_id, f"❌ 未找到 {filename}{hint}")
+                hint = "\nAvailable files: " + "  ".join(f.name for f in files[:5])
+            self._client.send_text(chat_id, f"❌ File not found: {filename}{hint}")
             return
         self._client.send_text(
             chat_id,
-            f"✅ 加载成功\n🔬 {adata.n_obs:,} cells × {adata.n_vars:,} genes\n📁 {filename}",
+            f"✅ Loaded successfully\n🔬 {adata.n_obs:,} cells × {adata.n_vars:,} genes\n📁 {filename}",
         )
 
     async def _handle_shell(self, chat_id: str, session: Any, cmd: str) -> None:
@@ -1197,7 +1341,7 @@ class FeishuRuntime:
         if not cmd:
             self._client.send_text(
                 chat_id,
-                "用法: /shell <命令>\n允许: ls find cat head wc file du pwd tree",
+                "Usage: /shell <command>\nAllowed: ls find cat head wc file du pwd tree",
             )
             return
         out = session.shell.exec(cmd, cwd=session.workspace)
@@ -1206,13 +1350,13 @@ class FeishuRuntime:
 
     async def _handle_memory(self, chat_id: str, session: Any) -> None:
         text = session.get_recent_memory_text()
-        for chunk in self._text_chunks(f"🧠 分析历史（近两天）\n\n{text}", limit=3200):
+        for chunk in self._text_chunks(f"🧠 Analysis history (last two days)\n\n{text}", limit=3200):
             self._client.send_text(chat_id, chunk)
 
     async def _handle_usage(self, chat_id: str, session: Any) -> None:
         usage = session.last_usage
         if usage is None:
-            self._client.send_text(chat_id, "ℹ️ 暂无用量数据，请先进行一次分析。")
+            self._client.send_text(chat_id, "ℹ️ No usage data yet. Run an analysis first.")
             return
 
         def _attr(obj: Any, *names: str, default: str = "?") -> str:
@@ -1223,18 +1367,18 @@ class FeishuRuntime:
             return default
 
         lines = [
-            "📊 Token 用量（最近一次）",
+            "📊 Token usage (most recent run)",
             "--------------------",
-            f"输入: {_attr(usage, 'input_tokens')}",
-            f"输出: {_attr(usage, 'output_tokens')}",
-            f"合计: {_attr(usage, 'total_tokens')}",
+            f"Input: {_attr(usage, 'input_tokens')}",
+            f"Output: {_attr(usage, 'output_tokens')}",
+            f"Total: {_attr(usage, 'total_tokens')}",
         ]
         cr = _attr(usage, "cache_read_input_tokens", default="")
         cc = _attr(usage, "cache_creation_input_tokens", default="")
         if cr and cr != "?":
-            lines.append(f"缓存读取: {cr}")
+            lines.append(f"Cache read: {cr}")
         if cc and cc != "?":
-            lines.append(f"缓存写入: {cc}")
+            lines.append(f"Cache write: {cc}")
         self._client.send_text(chat_id, "\n".join(lines))
 
     async def _handle_model(self, chat_id: str, model_name: str) -> None:
@@ -1247,26 +1391,26 @@ class FeishuRuntime:
         self._sm._model = model_name
         self._client.send_text(
             chat_id,
-            f"✅ 模型已切换为 {model_name}\n请 /reset 重启 kernel 使新模型生效。",
+            f"✅ Model switched to {model_name}\nUse /reset to recreate the kernel and apply it.",
         )
 
     async def _handle_save(self, chat_id: str, session: Any) -> None:
         if session.adata is None:
-            self._client.send_text(chat_id, "❌ 没有数据，请先 /load 或完成分析。")
+            self._client.send_text(chat_id, "❌ No dataset loaded. Use /load or run an analysis first.")
             return
-        self._client.send_text(chat_id, "⏳ 正在保存 current.h5ad ...")
+        self._client.send_text(chat_id, "⏳ Saving current.h5ad ...")
         try:
             path = await asyncio.to_thread(session.save_adata)
             if not path or not Path(path).exists():
-                self._client.send_text(chat_id, "❌ 保存失败，请重试。")
+                self._client.send_text(chat_id, "❌ Save failed. Please try again.")
                 return
             data = Path(path).read_bytes()
             await asyncio.to_thread(self._client.send_file_bytes, chat_id, data, "current.h5ad")
             a = session.adata
-            self._client.send_text(chat_id, f"💾 已发送 current.h5ad\n🔬 {a.n_obs:,} cells × {a.n_vars:,} genes")
+            self._client.send_text(chat_id, f"💾 Sent current.h5ad\n🔬 {a.n_obs:,} cells × {a.n_vars:,} genes")
         except Exception as exc:
             logger.exception("Feishu /save failed")
-            self._client.send_text(chat_id, f"❌ 保存失败: {exc}")
+            self._client.send_text(chat_id, f"❌ Save failed: {exc}")
 
     async def _handle_kernel(self, chat_id: str, session: Any, route: str, args: List[str]) -> None:
         if not args:
@@ -1274,13 +1418,13 @@ class FeishuRuntime:
             kst = session.kernel_status()
             alive = "🟢" if kst.get("alive") else "🔴"
             text = (
-                "⚙️ Kernel 状态\n"
+                "⚙️ Kernel status\n"
                 "--------------------\n"
-                f"🧩 当前: {kname}\n"
-                f"{alive} {'运行中' if kst.get('alive') else '未启动/已关闭'}\n"
+                f"🧩 Current: {kname}\n"
+                f"{alive} {'Running' if kst.get('alive') else 'Stopped / Closed'}\n"
                 f"💬 Prompts: {kst.get('prompt_count', 0)} / {kst.get('max_prompts', '?')}\n"
                 f"🆔 Session: {kst.get('session_id') or '-'}\n\n"
-                "子命令: /kernel ls | /kernel new 名称 | /kernel use 名称"
+                "Subcommands: /kernel ls | /kernel new <name> | /kernel use <name>"
             )
             self._client.send_text(chat_id, text)
             return
@@ -1295,12 +1439,12 @@ class FeishuRuntime:
             return
         if sub in {"new", "use"}:
             if len(args) < 2:
-                self._client.send_text(chat_id, "用法: /kernel new 名称 或 /kernel use 名称")
+                self._client.send_text(chat_id, "Usage: /kernel new <name> or /kernel use <name>")
                 return
             target = args[1]
             running = self._tasks.get(route)
             if running and not running.task.done():
-                self._client.send_text(chat_id, "⏳ 当前有分析在运行，请先 /cancel 或等待完成。")
+                self._client.send_text(chat_id, "⏳ An analysis is currently running. Use /cancel or wait for it to finish.")
                 return
             try:
                 if sub == "new":
@@ -1308,12 +1452,12 @@ class FeishuRuntime:
                 else:
                     self._sm.switch_kernel(session.user_id, target, create=False)
                 self._client.send_text(
-                    chat_id, f"✅ 已切换到 kernel: {self._sm.get_active_kernel(session.user_id)}"
+                    chat_id, f"✅ Switched to kernel: {self._sm.get_active_kernel(session.user_id)}"
                 )
             except Exception as exc:
-                self._client.send_text(chat_id, f"❌ kernel 操作失败: {exc}")
+                self._client.send_text(chat_id, f"❌ Kernel operation failed: {exc}")
             return
-        self._client.send_text(chat_id, "用法: /kernel | /kernel ls | /kernel new 名称 | /kernel use 名称")
+        self._client.send_text(chat_id, "Usage: /kernel | /kernel ls | /kernel new <name> | /kernel use <name>")
 
     @staticmethod
     def _text_chunks(text: str, limit: int = _MAX_TEXT) -> List[str]:
@@ -1356,6 +1500,15 @@ def run_feishu_bot(
     encrypt_key: Optional[str] = None,
 ) -> None:
     client = FeishuClient(app_id, app_secret)
+    try:
+        bot_info = client.get_bot_info()
+        logger.info(
+            "Feishu bot probe succeeded bot_name=%s bot_open_id=%s",
+            (bot_info.get("bot_name") or bot_info.get("name") or "").strip() or "unknown",
+            (bot_info.get("open_id") or "").strip() or "unknown",
+        )
+    except Exception as exc:
+        logger.warning("Feishu bot probe failed: %s", exc)
     runtime = FeishuRuntime(client, session_manager)
     base_dir = getattr(session_manager, "_base", Path(os.path.expanduser("~/.ovjarvis")))
     deduper = FeishuDeduper(Path(base_dir) / "feishu" / "dedup" / "global.json")
@@ -1409,11 +1562,19 @@ def run_feishu_ws_bot(
     runtime = FeishuRuntime(client, session_manager)
     base_dir = getattr(session_manager, "_base", Path(os.path.expanduser("~/.ovjarvis")))
     deduper = FeishuDeduper(Path(base_dir) / "feishu" / "dedup" / "global.json")
+    try:
+        bot_info = client.get_bot_info()
+        logger.info(
+            "Feishu bot probe succeeded bot_name=%s bot_open_id=%s",
+            (bot_info.get("bot_name") or bot_info.get("name") or "").strip() or "unknown",
+            (bot_info.get("open_id") or "").strip() or "unknown",
+        )
+    except Exception as exc:
+        logger.warning("Feishu bot probe failed: %s", exc)
 
     def _on_message(data: Any) -> None:
         try:
-            raw = lark.JSON.marshal(data)
-            payload = json.loads(raw) if isinstance(raw, str) else {}
+            payload = _normalize_feishu_ws_event_payload(data)
             _process_feishu_event_payload(
                 runtime=runtime,
                 deduper=deduper,

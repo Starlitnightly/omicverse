@@ -4,17 +4,21 @@ iMessage channel for OmicVerse Jarvis via ``imsg rpc``.
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 import json
 import logging
 import os
 import re
 import shutil
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from ..agent_bridge import AgentBridge
+from ..channel_language import response_language_instruction, tr
+from ..channel_shared import render_help_text, render_start_text
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from ..model_help import render_model_help
 
@@ -35,6 +39,13 @@ class IMessageTarget:
     kind: str
     value: str
     service: str = "auto"
+
+
+@dataclass
+class RunningTask:
+    task: asyncio.Task
+    request: str
+    started_at: float
 
 
 def _strip_local_paths(text: str) -> str:
@@ -126,6 +137,33 @@ def _message_target(message: Dict[str, Any]) -> Optional[str]:
     return sender or None
 
 
+def _attachment_candidates(message: Dict[str, Any]) -> List[str]:
+    raw = message.get("attachments")
+    if not raw:
+        return []
+    entries = raw if isinstance(raw, list) else [raw]
+    candidates: List[str] = []
+    for entry in entries:
+        if isinstance(entry, str):
+            value = entry.strip()
+            if value:
+                candidates.append(value)
+            continue
+        if not isinstance(entry, dict):
+            continue
+        for key in ("path", "file_path", "file", "filename", "name", "transfer_name"):
+            value = str(entry.get(key) or "").strip()
+            if value:
+                candidates.append(value)
+    seen = set()
+    result: List[str] = []
+    for item in candidates:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+
 def _resolve_cli_path(cli_path: str) -> Optional[str]:
     value = str(cli_path or "imsg").strip()
     if not value:
@@ -140,7 +178,7 @@ async def _probe_rpc_support(cli_path: str, timeout: float) -> None:
     resolved_cli = _resolve_cli_path(cli_path)
     if resolved_cli is None:
         raise RuntimeError(
-            f"无法找到 imsg 可执行文件（当前路径: {cli_path}）。"
+            f"Could not find the imsg executable (current path: {cli_path})."
         )
 
     try:
@@ -153,7 +191,7 @@ async def _probe_rpc_support(cli_path: str, timeout: float) -> None:
         )
     except FileNotFoundError as exc:
         raise RuntimeError(
-            f"无法启动 imsg。请先安装它，例如：brew install steipete/tap/imsg（当前路径: {cli_path}）"
+            f"Could not start imsg. Install it first, for example with: brew install steipete/tap/imsg (current path: {cli_path})"
         ) from exc
 
     try:
@@ -161,7 +199,7 @@ async def _probe_rpc_support(cli_path: str, timeout: float) -> None:
     except asyncio.TimeoutError:
         proc.kill()
         await proc.communicate()
-        raise RuntimeError("imsg rpc --help 超时，无法确认当前 imsg 是否支持 rpc 子命令。")
+        raise RuntimeError("Timed out while running `imsg rpc --help`; could not verify whether this imsg build supports the `rpc` subcommand.")
 
     combined = "\n".join(
         part.decode("utf-8", errors="ignore").strip()
@@ -170,7 +208,7 @@ async def _probe_rpc_support(cli_path: str, timeout: float) -> None:
     ).strip()
     normalized = combined.lower()
     if "unknown command" in normalized and "rpc" in normalized:
-        raise RuntimeError('当前 imsg 不支持 "rpc" 子命令，请先升级 imsg。')
+        raise RuntimeError('The current imsg build does not support the "rpc" subcommand. Upgrade imsg first.')
     if proc.returncode not in (0, None):
         raise RuntimeError(
             combined or f"imsg rpc --help failed (code {proc.returncode})"
@@ -225,7 +263,7 @@ class IMessageRpcClient:
             )
         except FileNotFoundError as exc:
             raise RuntimeError(
-                f"无法启动 imsg。请先安装它，例如：brew install steipete/tap/imsg（当前路径: {self._cli_path}）"
+                f"Could not start imsg. Install it first, for example with: brew install steipete/tap/imsg (current path: {self._cli_path})"
             ) from exc
         self._stdout_task = asyncio.create_task(self._read_stdout())
         self._stderr_task = asyncio.create_task(self._read_stderr())
@@ -397,7 +435,8 @@ class IMessageJarvisBot:
         self._db_path = db_path
         self._include_attachments = include_attachments
         self._route_registry = GatewaySessionRegistry(session_manager)
-        self._tasks: Dict[str, asyncio.Task] = {}
+        self._tasks: Dict[str, RunningTask] = {}
+        self._pending: Dict[str, List[str]] = {}
         self._client = IMessageRpcClient(
             cli_path=self._cli_path,
             db_path=self._db_path,
@@ -442,8 +481,19 @@ class IMessageJarvisBot:
             return
 
         text = str(message.get("text") or "").strip()
-        if not text and message.get("attachments"):
-            text = "<media:attachment>"
+        attachments = _attachment_candidates(message)
+        if not text and attachments:
+            if await self._handle_attachment_import(session_key, target, attachments):
+                return
+            names = ", ".join(Path(item).name or item for item in attachments[:3])
+            suffix = "..." if len(attachments) > 3 else ""
+            await self._send_text(
+                target,
+                "Attachment received"
+                + (f": {names}{suffix}" if names else ".")
+                + "\nPlace the file in the workspace and use /load <filename> if auto-import is not available.",
+            )
+            return
         if not text:
             return
 
@@ -453,12 +503,52 @@ class IMessageJarvisBot:
 
         task_key = session_key.as_key()
         running = self._tasks.get(task_key)
-        if running is not None and not running.done():
-            await self._send_text(target, "⏳ 当前会话已有任务在运行，请等待完成或发送 /cancel。")
+        session = self._route_registry.get_or_create(session_key)
+        if running is not None and not running.task.done():
+            self._pending.setdefault(task_key, []).append(text)
+            asyncio.create_task(
+                self._quick_chat(
+                    target,
+                    session,
+                    text,
+                    running_request=running.request,
+                    queued=True,
+                )
+            )
             return
 
-        task = asyncio.create_task(self._run_analysis(task_key, session_key, target, text))
-        self._tasks[task_key] = task
+        await self._spawn_analysis(task_key, session_key, target, session, text)
+
+    async def _handle_attachment_import(
+        self,
+        session_key: SessionKey,
+        target: str,
+        attachments: List[str],
+    ) -> bool:
+        session = self._route_registry.get_or_create(session_key)
+        for raw in attachments:
+            path = Path(os.path.expanduser(str(raw or "").strip()))
+            if not path.name.lower().endswith(".h5ad"):
+                continue
+            if not path.is_absolute() or not path.exists() or not path.is_file():
+                continue
+            try:
+                dest = session.workspace / path.name
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                if path != dest:
+                    shutil.copy2(path, dest)
+                adata = await asyncio.to_thread(session.load_from_workspace, path.name)
+                if adata is not None:
+                    await self._send_text(
+                        target,
+                        f"✅ Uploaded and loaded {path.name}\n🔬 {adata.n_obs:,} cells x {adata.n_vars:,} genes",
+                    )
+                    return True
+            except Exception as exc:
+                logger.warning("iMessage attachment import failed for %s: %s", path, exc)
+                await self._send_text(target, f"Attachment import failed for {path.name}: {exc}")
+                return True
+        return False
 
     def _session_key_for_message(self, message: Dict[str, Any]) -> Optional[SessionKey]:
         is_group = bool(message.get("is_group"))
@@ -481,7 +571,7 @@ class IMessageJarvisBot:
         )
 
     def _build_full_request(self, session: Any, text: str) -> str:
-        ctx_parts: List[str] = []
+        ctx_parts: List[str] = [f"[Response language]\n{response_language_instruction(text)}"]
         try:
             agents_md = session.get_agents_md()
             if agents_md:
@@ -501,30 +591,67 @@ class IMessageJarvisBot:
         parts = text.strip().split(maxsplit=1)
         cmd = parts[0].lower()
         tail = parts[1].strip() if len(parts) > 1 else ""
+        route = session_key.as_key()
 
-        if cmd == "/help":
-            await self._send_text(
-                target,
-                "可用命令:\n"
-                "/help 查看帮助\n"
-                "/reset 重置当前会话\n"
-                "/model [名称] 查看或切换模型\n"
-                "/cancel 取消当前分析",
-            )
+        if cmd == "/start":
+            await self._send_text(target, render_start_text(text))
             return
 
-        if cmd == "/reset":
-            session.reset()
-            await self._send_text(target, "✅ 已重置当前会话。")
+        if cmd == "/help":
+            await self._send_text(target, render_help_text(text))
             return
 
         if cmd == "/cancel":
-            task = self._tasks.get(session_key.as_key())
-            if task and not task.done():
-                task.cancel()
-                await self._send_text(target, "🚫 已取消当前分析。")
-            else:
-                await self._send_text(target, "当前没有正在运行的分析任务。")
+            await self._handle_cancel(target, route)
+            return
+
+        if cmd == "/status":
+            await self._handle_status(target, session, route)
+            return
+
+        if cmd == "/reset":
+            self._pending.pop(route, None)
+            running = self._tasks.get(route)
+            if running and not running.task.done():
+                running.task.cancel()
+            session.reset()
+            await self._send_text(target, "✅ Current session reset.")
+            return
+
+        if cmd == "/kernel":
+            await self._handle_kernel(target, session, route, parts[1].split() if len(parts) > 1 else [])
+            return
+
+        if cmd == "/workspace":
+            await self._handle_workspace(target, session)
+            return
+
+        if cmd == "/ls":
+            await self._handle_ls(target, session, tail)
+            return
+
+        if cmd == "/find":
+            await self._handle_find(target, session, tail)
+            return
+
+        if cmd == "/load":
+            await self._handle_load(target, session, tail)
+            return
+
+        if cmd == "/shell":
+            await self._handle_shell(target, session, tail)
+            return
+
+        if cmd == "/memory":
+            await self._handle_memory(target, session)
+            return
+
+        if cmd == "/usage":
+            await self._handle_usage(target, session)
+            return
+
+        if cmd == "/save":
+            await self._handle_save(target, session)
             return
 
         if cmd == "/model":
@@ -535,11 +662,142 @@ class IMessageJarvisBot:
             self._sm._model = tail
             await self._send_text(
                 target,
-                f"✅ 模型已切换为 {tail}\n请 /reset 重启 kernel 使新模型生效。",
+                f"✅ Model switched to {tail}\nUse /reset to recreate the kernel and apply it.",
             )
             return
 
-        await self._send_text(target, f"未知命令: {cmd}\n发送 /help 查看帮助。")
+        await self._send_text(target, f"Unknown command: {cmd}\nSend /help for usage.")
+
+    async def _quick_chat(
+        self,
+        target: str,
+        session: Any,
+        user_text: str,
+        running_request: str = "",
+        queued: bool = False,
+    ) -> None:
+        try:
+            system_lines = [
+                "You are OmicVerse Jarvis, a bioinformatics AI assistant.",
+                "The user is chatting with you while a background analysis is running.",
+                "Answer concisely. Do NOT execute code or call tools.",
+                response_language_instruction(user_text),
+            ]
+            if running_request:
+                system_lines.append(f"\nCurrently running: {running_request[:300]}")
+            if queued:
+                system_lines.append(
+                    "The user's message has been queued and will start after the current analysis finishes. Mention this naturally."
+                )
+            if session.adata is not None:
+                a = session.adata
+                system_lines.append(f"Loaded data: {a.n_obs:,} cells x {a.n_vars:,} genes")
+            try:
+                memory_ctx = session.get_memory_context()
+                if memory_ctx:
+                    system_lines.append(f"\nRecent history:\n{memory_ctx[:600]}")
+            except Exception:
+                pass
+            response = await session.agent._llm.chat(
+                [
+                    {"role": "system", "content": "\n".join(system_lines)},
+                    {"role": "user", "content": user_text},
+                ],
+                tools=None,
+                tool_choice=None,
+            )
+            reply = (response.content or "").strip() or tr(
+                user_text,
+                en="⏳ Background analysis is still running. Please wait.",
+                zh="⏳ 后台分析进行中，请等待完成。",
+            )
+            await self._send_text(target, reply)
+        except Exception as exc:
+            logger.warning("iMessage quick_chat failed: %s", exc)
+            await self._send_text(
+                target,
+                tr(
+                    user_text,
+                    en="⏳ Background analysis is still running. Please wait or use /cancel.",
+                    zh="⏳ 后台分析进行中，请等待完成。使用 /cancel 取消。",
+                ),
+            )
+
+    async def _spawn_analysis(
+        self,
+        task_key: str,
+        session_key: SessionKey,
+        target: str,
+        session: Any,
+        user_text: str,
+    ) -> None:
+        if session.adata is not None:
+            ack = tr(
+                user_text,
+                en=(
+                    "⏳ Request received. Starting analysis.\n"
+                    f"Loaded data: {session.adata.n_obs:,} cells x {session.adata.n_vars:,} genes"
+                ),
+                zh=(
+                    f"⏳ 已收到，开始分析。\n"
+                    f"已加载数据: {session.adata.n_obs:,} cells x {session.adata.n_vars:,} genes"
+                ),
+            )
+        else:
+            try:
+                h5ad_files = session.list_h5ad_files()
+            except Exception:
+                h5ad_files = []
+            if h5ad_files:
+                names = "  ".join(file.name for file in h5ad_files[:5])
+                ack = tr(
+                    user_text,
+                    en=(
+                        "⏳ Request received. Starting analysis.\n"
+                        f"Detected files in the workspace: {names}\n"
+                        "Use /load <filename> to load one."
+                    ),
+                    zh=(
+                        f"⏳ 已收到，开始分析。\n"
+                        f"workspace 中检测到文件: {names}\n"
+                        f"使用 /load <文件名> 加载。"
+                    ),
+                )
+            else:
+                ack = tr(
+                    user_text,
+                    en="⏳ Request received. Starting analysis.\nNo dataset detected. The agent will load data if needed.",
+                    zh="⏳ 已收到，开始分析。\n未检测到已加载数据，Agent 将自行加载数据。",
+                )
+        await self._send_text(target, ack)
+        task = asyncio.create_task(self._analysis_wrapper(task_key, session_key, target, user_text))
+        self._tasks[task_key] = RunningTask(task=task, request=user_text, started_at=time.time())
+
+    async def _analysis_wrapper(
+        self,
+        task_key: str,
+        session_key: SessionKey,
+        target: str,
+        user_text: str,
+    ) -> None:
+        try:
+            await self._run_analysis(task_key, session_key, target, user_text)
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            logger.exception("iMessage analysis wrapper failed")
+            await self._send_text(
+                target,
+                tr(user_text, en=f"Analysis failed: {exc}", zh=f"分析失败: {exc}"),
+            )
+        finally:
+            self._tasks.pop(task_key, None)
+            queued = self._pending.pop(task_key, [])
+            if queued:
+                coalesced = "\n\n".join(queued)
+                await self._send_text(target, f"⏭ Starting {len(queued)} queued request(s)...")
+                session = self._route_registry.get_or_create(session_key)
+                await self._spawn_analysis(task_key, session_key, target, session, coalesced)
 
     async def _run_analysis(
         self,
@@ -566,19 +824,23 @@ class IMessageJarvisBot:
             if chunk:
                 llm_buf += chunk
 
-        await self._send_text(target, "⏳ 已收到，开始分析。")
         bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
 
         try:
             result = await bridge.run(full_request, session.adata)
         except asyncio.CancelledError:
+            await self._send_text(
+                target,
+                tr(user_text, en="🚫 Analysis cancelled.", zh="🚫 已取消当前分析。"),
+            )
             raise
         except Exception as exc:
             logger.exception("iMessage analysis failed")
-            await self._send_text(target, f"分析失败: {exc}")
+            await self._send_text(
+                target,
+                tr(user_text, en=f"Analysis failed: {exc}", zh=f"分析失败: {exc}"),
+            )
             return
-        finally:
-            self._tasks.pop(task_key, None)
 
         if result.adata is not None:
             session.adata = result.adata
@@ -601,12 +863,24 @@ class IMessageJarvisBot:
             pass
 
         if result.error:
-            err_text = f"分析出错: {result.error}"
+            err_text = tr(
+                user_text,
+                en=f"Analysis error: {result.error}",
+                zh=f"分析出错: {result.error}",
+            )
             if result.diagnostics:
                 hints = "\n".join(f"- {item}" for item in result.diagnostics[:4])
-                err_text += f"\n\n诊断:\n{hints}"
+                err_text += tr(
+                    user_text,
+                    en=f"\n\nDiagnostics:\n{hints}",
+                    zh=f"\n\n诊断:\n{hints}",
+                )
             if llm_buf.strip():
-                err_text += f"\n\n模型输出:\n{llm_buf[:1200]}"
+                err_text += tr(
+                    user_text,
+                    en=f"\n\nModel output:\n{llm_buf[:1200]}",
+                    zh=f"\n\n模型输出:\n{llm_buf[:1200]}",
+                )
             await self._send_text(target, err_text)
             return
 
@@ -619,7 +893,7 @@ class IMessageJarvisBot:
                 target,
                 figure,
                 filename=f"figure_{index}.png",
-                caption=f"图 {index}",
+                caption=f"Figure {index}",
             )
 
         for artifact in list(result.artifacts or []):
@@ -627,7 +901,7 @@ class IMessageJarvisBot:
                 target,
                 artifact.data,
                 filename=artifact.filename or "artifact.bin",
-                caption=f"附件: {artifact.filename}",
+                caption=f"Attachment: {artifact.filename}",
             )
 
         summary = _strip_local_paths((result.summary or "").strip())
@@ -636,11 +910,210 @@ class IMessageJarvisBot:
                 summary = llm_buf[:1800]
             elif session.adata is not None:
                 a = session.adata
-                summary = f"分析完成\n{a.n_obs:,} cells x {a.n_vars:,} genes"
+                summary = tr(
+                    user_text,
+                    en=f"Analysis complete\n{a.n_obs:,} cells x {a.n_vars:,} genes",
+                    zh=f"分析完成\n{a.n_obs:,} cells x {a.n_vars:,} genes",
+                )
             else:
-                summary = "分析完成"
+                summary = tr(user_text, en="Analysis complete", zh="分析完成")
         for chunk in _text_chunks(summary):
             await self._send_text(target, chunk)
+
+    async def _handle_cancel(self, target: str, route: str) -> None:
+        self._pending.pop(route, None)
+        running = self._tasks.get(route)
+        if not running or running.task.done():
+            await self._send_text(target, "No analysis is currently running.")
+            return
+        running.task.cancel()
+        await self._send_text(target, "Cancellation requested.")
+
+    async def _handle_status(self, target: str, session: Any, route: str) -> None:
+        lines: List[str] = []
+        if session.adata is not None:
+            a = session.adata
+            lines.append(f"{a.n_obs:,} cells x {a.n_vars:,} genes")
+            try:
+                cols = ", ".join(list(a.obs.columns[:8]))
+                if cols:
+                    lines.append(f"obs: {cols}")
+            except Exception:
+                pass
+        else:
+            lines.append("No dataset loaded")
+        try:
+            kname = self._sm.get_active_kernel(session.user_id)
+            lines.append(f"kernel: {kname}")
+        except Exception:
+            pass
+        kst = session.kernel_status()
+        if kst:
+            lines.append(f"prompts: {kst.get('prompt_count', 0)}/{kst.get('max_prompts', '?')}")
+        running = self._tasks.get(route)
+        if running and not running.task.done():
+            lines.append("Analysis running (/cancel available)")
+        await self._send_text(target, "\n".join(lines))
+
+    async def _handle_workspace(self, target: str, session: Any) -> None:
+        ws = session.workspace
+        h5ad_files = session.list_h5ad_files()
+        agents_md = session.get_agents_md()
+        today_log = session.memory_dir / f"{datetime.now().date()}.md"
+        lines = [f"Workspace: {ws}", ""]
+        if h5ad_files:
+            lines.append(f"Data files ({len(h5ad_files)})")
+            for file in h5ad_files[:10]:
+                try:
+                    mb = file.stat().st_size / 1_048_576
+                    lines.append(f"- {file.name} ({mb:.1f} MB)")
+                except OSError:
+                    lines.append(f"- {file.name}")
+        else:
+            lines.append("Data files (empty)")
+        lines += [
+            "",
+            f"AGENTS.md {'OK' if agents_md else '-'}",
+            f"Today's memory {'OK' if today_log.exists() else '-'}",
+        ]
+        await self._send_text(target, "\n".join(lines))
+
+    async def _handle_ls(self, target: str, session: Any, subpath: str) -> None:
+        cmd = f"ls -lh {subpath}".strip() if subpath else "ls -lh"
+        out = session.shell.exec(cmd, cwd=session.workspace)
+        await self._send_text(target, f"$ {cmd}\n{out}")
+
+    async def _handle_find(self, target: str, session: Any, pattern: str) -> None:
+        pattern = (pattern or "").strip()
+        if not pattern:
+            await self._send_text(target, "Usage: /find <pattern>")
+            return
+        cmd = f"find . -name {pattern}"
+        out = session.shell.exec(cmd, cwd=session.workspace)
+        await self._send_text(target, f"$ {cmd}\n{out}")
+
+    async def _handle_load(self, target: str, session: Any, filename: str) -> None:
+        filename = (filename or "").strip()
+        if not filename:
+            await self._send_text(target, "Usage: /load <filename>")
+            return
+        await self._send_text(target, f"Loading {filename}...")
+        try:
+            adata = await asyncio.to_thread(session.load_from_workspace, filename)
+        except Exception as exc:
+            await self._send_text(target, f"Load failed: {exc}")
+            return
+        if adata is None:
+            files = session.list_h5ad_files()
+            hint = f"\nAvailable files: {'  '.join(f.name for f in files[:5])}" if files else ""
+            await self._send_text(target, f"File not found: {filename}{hint}")
+            return
+        await self._send_text(
+            target,
+            f"Loaded successfully\n{adata.n_obs:,} cells x {adata.n_vars:,} genes\n{filename}",
+        )
+
+    async def _handle_shell(self, target: str, session: Any, cmd: str) -> None:
+        cmd = (cmd or "").strip()
+        if not cmd:
+            await self._send_text(
+                target,
+                "Usage: /shell <command>\nAllowed: ls find cat head wc file du pwd tree",
+            )
+            return
+        out = session.shell.exec(cmd, cwd=session.workspace)
+        await self._send_text(target, f"$ {cmd}\n{out}")
+
+    async def _handle_memory(self, target: str, session: Any) -> None:
+        text = session.get_recent_memory_text()
+        await self._send_text(target, f"Analysis history (last two days)\n\n{text}")
+
+    async def _handle_usage(self, target: str, session: Any) -> None:
+        usage = session.last_usage
+        if usage is None:
+            await self._send_text(target, "No usage data yet. Run an analysis first.")
+            return
+
+        def _attr(obj: Any, *names: str, default: str = "?") -> str:
+            for name in names:
+                value = getattr(obj, name, None)
+                if value is not None:
+                    return f"{value:,}" if isinstance(value, int) else str(value)
+            return default
+
+        lines = [
+            "Token usage (most recent run)",
+            f"Input: {_attr(usage, 'input_tokens')}",
+            f"Output: {_attr(usage, 'output_tokens')}",
+            f"Total: {_attr(usage, 'total_tokens')}",
+        ]
+        await self._send_text(target, "\n".join(lines))
+
+    async def _handle_save(self, target: str, session: Any) -> None:
+        if session.adata is None:
+            await self._send_text(target, "No dataset loaded. Use /load or run an analysis first.")
+            return
+        await self._send_text(target, "Saving current.h5ad...")
+        try:
+            path = await asyncio.to_thread(session.save_adata)
+            if not path or not Path(path).exists():
+                await self._send_text(target, "Save failed. Please try again.")
+                return
+            await self._send_bytes(
+                target,
+                Path(path).read_bytes(),
+                filename="current.h5ad",
+                caption="current.h5ad",
+            )
+            a = session.adata
+            await self._send_text(
+                target,
+                f"Saved current.h5ad\n{a.n_obs:,} cells x {a.n_vars:,} genes",
+            )
+        except Exception as exc:
+            await self._send_text(target, f"Save failed: {exc}")
+
+    async def _handle_kernel(self, target: str, session: Any, route: str, args: List[str]) -> None:
+        if not args:
+            kname = self._sm.get_active_kernel(session.user_id)
+            kst = session.kernel_status()
+            alive = "running" if kst.get("alive") else "stopped"
+            await self._send_text(
+                target,
+                "Kernel status\n"
+                f"Current: {kname}\n"
+                f"State: {alive}\n"
+                f"Prompts: {kst.get('prompt_count', 0)}/{kst.get('max_prompts', '?')}\n\n"
+                "Subcommands: /kernel ls | /kernel new <name> | /kernel use <name>",
+            )
+            return
+        sub = args[0].lower()
+        if sub == "ls":
+            names = self._sm.list_kernels(session.user_id)
+            active = self._sm.get_active_kernel(session.user_id)
+            await self._send_text(target, "\n".join(["kernels:"] + [f"{'*' if n == active else '-'} {n}" for n in names]))
+            return
+        if sub in {"new", "use"}:
+            if len(args) < 2:
+                await self._send_text(target, "Usage: /kernel new <name> or /kernel use <name>")
+                return
+            running = self._tasks.get(route)
+            if running and not running.task.done():
+                await self._send_text(target, "An analysis is currently running. Use /cancel or wait for it to finish.")
+                return
+            try:
+                if sub == "new":
+                    self._sm.create_kernel(session.user_id, args[1], switch=True)
+                else:
+                    self._sm.switch_kernel(session.user_id, args[1], create=False)
+                await self._send_text(
+                    target,
+                    f"Switched to kernel: {self._sm.get_active_kernel(session.user_id)}",
+                )
+            except Exception as exc:
+                await self._send_text(target, f"Kernel operation failed: {exc}")
+            return
+        await self._send_text(target, "Usage: /kernel | /kernel ls | /kernel new <name> | /kernel use <name>")
 
     async def _send_text(self, target: str, text: str) -> None:
         for chunk in _text_chunks(text):
