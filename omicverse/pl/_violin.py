@@ -49,7 +49,10 @@ DensityNorm = Literal["area", "count", "width"]
         "             custom_colors=['red', 'blue', 'green'], figsize=(8,6))",
         "# With boxplot overlay",
         "ov.pl.violin(adata, keys=['marker_gene'], groupby='cluster',",
-        "             show_boxplot=True, show_means=True)"
+        "             show_boxplot=True, show_means=True)",
+        "# With alternating background bands",
+        "ov.pl.violin(adata, keys=['CD3D'], groupby='cell_type',",
+        "             alternating_background=True)"
     ],
     related=["pl.embedding", "pl.dotplot"]
 )
@@ -81,6 +84,8 @@ def violin(
     jitter_alpha: float = 0.4,
     violin_alpha: float = 0.8,
     background_color: str = 'white',
+    alternating_background: bool = False,
+    alternating_background_colors: Sequence[str] = ("#fafafa", "#f0f0f0"),
     spine_color: str = '#b4aea9',
     grid_lines: bool = True,
     statistical_tests: Union[bool, str, List[str]] = False,
@@ -123,6 +128,8 @@ def violin(
         jitter_alpha: float. Transparency of jittered points. (0.4)
         violin_alpha: float. Transparency of violin plots. (0.8)
         background_color: str. Background color of the plot. ('white')
+        alternating_background: bool. Whether to add alternating vertical background bands by category. (False)
+        alternating_background_colors: Sequence[str]. Colors used for alternating background bands. (("#fafafa", "#f0f0f0"))
         spine_color: str. Color of plot spines. ('#b4aea9')
         grid_lines: bool. Whether to show horizontal grid lines. (True)
         statistical_tests: bool | str | List[str]. Statistical tests to perform. Options: False (no tests), True (auto-select), 'wilcox', 'ttest', 'anova', 'kruskal', 'mannwhitney', or list of methods. (False)
@@ -383,7 +390,14 @@ def violin(
         # Apply enhanced styling to each subplot
         if enhanced_style:
             _apply_enhanced_styling(current_ax, background_color, spine_color, grid_lines)
-        
+
+        if alternating_background:
+            _add_alternating_background(
+                current_ax,
+                group_categories,
+                alternating_background_colors,
+            )
+
         # Prepare data for current y variable
         plot_data = _prepare_plot_data(obs_tidy, x_col, y_col, group_categories, order)
         
@@ -434,7 +448,7 @@ def violin(
         current_ax.set_yticklabels(current_ax.get_yticklabels(), fontsize=ticks_fontsize)
         current_ax.set_xlabel(groupby, fontsize=fontsize)
         current_ax.set_ylabel(y_label, fontsize=fontsize)
-        current_ax.grid(False)
+        current_ax.yaxis.grid(grid_lines)
     
     # Apply tight layout for better spacing
     if len(y_cols) > 1:
@@ -538,23 +552,31 @@ def _setup_colors(custom_colors, group_categories, adata, groupby):
 
 def _apply_enhanced_styling(ax, background_color, spine_color, grid_lines):
     """Apply enhanced styling to the plot."""
-    # Set background
-    #ax.set_facecolor(background_color)
-    
-    # Customize spines
-    #ax.spines["right"].set_visible(False)
-    #ax.spines["top"].set_visible(False)
-    #ax.spines["left"].set_color(spine_color)
-    #ax.spines["left"].set_linewidth(2)
-    #ax.spines["bottom"].set_color(spine_color)
-    #ax.spines["bottom"].set_linewidth(2)
-    
-    # Add grid lines
-    #if grid_lines:
-    #    ax.grid(False, alpha=0.3, linestyle='--')
-    
-    # Remove tick marks
-    #ax.tick_params(length=0)
+    ax.set_facecolor(background_color)
+    ax.set_axisbelow(True)
+
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.spines["left"].set_color(spine_color)
+    ax.spines["left"].set_linewidth(1.5)
+    ax.spines["bottom"].set_color(spine_color)
+    ax.spines["bottom"].set_linewidth(1.5)
+
+    if grid_lines:
+        ax.yaxis.grid(True, alpha=0.25, linestyle='--', linewidth=0.8)
+    else:
+        ax.yaxis.grid(False)
+
+    ax.tick_params(length=0)
+
+def _add_alternating_background(ax, group_categories, alternating_background_colors):
+    """Add alternating vertical background bands for each category."""
+    if len(alternating_background_colors) < 2:
+        raise ValueError("alternating_background_colors must contain at least two colors")
+
+    for idx, _ in enumerate(group_categories):
+        color = alternating_background_colors[idx % len(alternating_background_colors)]
+        ax.axvspan(idx - 0.5, idx + 0.5, facecolor=color, edgecolor='none', zorder=0)
 
 def _prepare_plot_data(obs_tidy, x_col, y_col, group_categories, order):
     """Prepare data for plotting."""
