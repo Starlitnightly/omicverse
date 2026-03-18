@@ -600,11 +600,11 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
     else:
         # Regular pandas backend
         adata.obs['nUMIs'] = adata.X.sum(axis=1)
-        adata.obs['mito_perc'] = adata[:, adata.var["mt"] is True].X.sum(axis=1) / \
+        adata.obs['mito_perc'] = adata[:, adata.var["mt"]].X.sum(axis=1) / \
         adata.obs['nUMIs'].values
-        adata.obs['ribo_perc'] = adata[:, adata.var["ribo"] is True].X.sum(axis=1) / \
+        adata.obs['ribo_perc'] = adata[:, adata.var["ribo"]].X.sum(axis=1) / \
         adata.obs['nUMIs'].values
-        adata.obs['hb_perc'] = adata[:, adata.var["hb"] is True].X.sum(axis=1) / \
+        adata.obs['hb_perc'] = adata[:, adata.var["hb"]].X.sum(axis=1) / \
         adata.obs['nUMIs'].values
         adata.obs['detected_genes'] = np.count_nonzero(adata.X, axis=1)
     adata.obs['cell_complexity'] = adata.obs['detected_genes'] / adata.obs['nUMIs']
@@ -662,8 +662,8 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
     else:
         adata = adata[QC_test, :]
     n2 = adata.shape[0]
-    
-    print(f"   {Colors.GREEN}✓ Combined QC filters: {Colors.BOLD}{total_qc_failed:,}{Colors.ENDC}{Colors.GREEN} cells removed ({total_qc_failed/n1*100:.1f}%){Colors.ENDC}")
+
+    print(f"   {Colors.GREEN}✓ Combined QC filters: {Colors.BOLD}{total_qc_failed:,}{Colors.ENDC}{Colors.GREEN} cells kept ({total_qc_failed/n1*100:.1f}%){Colors.ENDC}")
 
     # Last gene and cell filter
     print(f"\n{Colors.HEADER}{Colors.BOLD}🎯 Step 3: Final Filtering{Colors.ENDC}")
@@ -931,11 +931,11 @@ def qc_cpu(
     else:
         # Regular pandas backend
         adata.obs['nUMIs'] = adata.X.sum(axis=1)
-        adata.obs['mito_perc'] = adata[:, adata.var["mt"] is True].X.sum(axis=1) / \
+        adata.obs['mito_perc'] = adata[:, adata.var["mt"]].X.sum(axis=1) / \
         adata.obs['nUMIs'].values
-        adata.obs['ribo_perc'] = adata[:, adata.var["ribo"] is True].X.sum(axis=1) / \
+        adata.obs['ribo_perc'] = adata[:, adata.var["ribo"]].X.sum(axis=1) / \
         adata.obs['nUMIs'].values
-        adata.obs['hb_perc'] = adata[:, adata.var["hb"] is True].X.sum(axis=1) / \
+        adata.obs['hb_perc'] = adata[:, adata.var["hb"]].X.sum(axis=1) / \
         adata.obs['nUMIs'].values
         adata.obs['detected_genes'] = np.count_nonzero(adata.X, axis=1)
     adata.obs['cell_complexity'] = adata.obs['detected_genes'] / adata.obs['nUMIs']
@@ -987,7 +987,7 @@ def qc_cpu(
     if is_rust:
         removed = list(np.array(adata.obs_names)[np.where(QC_test==False)[0]])
         removed_cells.extend(removed)
-        total_qc_failed = n1-len(removed)
+        total_qc_failed = len(removed)
         adata.subset(obs_indices=np.array(adata.obs_names)[np.where(QC_test==True)[0]])
     else:
         removed = QC_test.loc[lambda x : x == False]
