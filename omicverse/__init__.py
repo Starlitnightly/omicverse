@@ -57,6 +57,12 @@ except ModuleNotFoundError:
     from pkg_resources import get_distribution
     version = lambda name: get_distribution(name).version
 
+try:
+    from omicverse_notebook import enable_formatters
+    enable_formatters()
+except ImportError:
+    pass
+
 # Cache for lazy-loaded modules and attributes
 _lazy_modules = {}
 _lazy_attrs = {}
