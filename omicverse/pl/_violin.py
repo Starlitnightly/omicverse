@@ -80,12 +80,16 @@ def violin(
     enhanced_style: bool = True,
     show_means: bool = False,
     show_boxplot: bool = False,
+    add_box: bool = False,
+    comparisons: Optional[List] = None,
     jitter_method: str = 'uniform',  # 'uniform', 't_dist'
     jitter_alpha: float = 0.4,
     violin_alpha: float = 0.8,
     background_color: str = 'white',
-    alternating_background: bool = False,
-    alternating_background_colors: Sequence[str] = ("#fafafa", "#f0f0f0"),
+    alternating_background: bool = True,
+    alternating_background_colors: Sequence[str] = ("white", "#e8e8e8"),
+    use_group_colors_background: bool = False,
+    background_lighten_amount: float = 0.8,
     spine_color: str = '#b4aea9',
     grid_lines: bool = True,
     statistical_tests: Union[bool, str, List[str]] = False,
@@ -93,6 +97,7 @@ def violin(
     figsize: Optional[tuple] = None,
     fontsize=13,
     ticks_fontsize=None,
+    verbose: bool = False,
     **kwds
 ) -> Union[Axes, None]:
     r"""
@@ -128,8 +133,8 @@ def violin(
         jitter_alpha: float. Transparency of jittered points. (0.4)
         violin_alpha: float. Transparency of violin plots. (0.8)
         background_color: str. Background color of the plot. ('white')
-        alternating_background: bool. Whether to add alternating vertical background bands by category. (False)
-        alternating_background_colors: Sequence[str]. Colors used for alternating background bands. (("#fafafa", "#f0f0f0"))
+        alternating_background: bool. Whether to add background bands using each group's lightened color. (True)
+        background_lighten_amount: float. How much to lighten each group color for its background band (0=original, 1=white). (0.8)
         spine_color: str. Color of plot spines. ('#b4aea9')
         grid_lines: bool. Whether to show horizontal grid lines. (True)
         statistical_tests: bool | str | List[str]. Statistical tests to perform. Options: False (no tests), True (auto-select), 'wilcox', 'ttest', 'anova', 'kruskal', 'mannwhitney', or list of methods. (False)
@@ -167,173 +172,145 @@ def violin(
     # Extract data from AnnData object
     obs_df = _extract_data_from_adata(adata, keys, groupby, layer, use_raw)
     
-    # Colorful data analysis and parameter optimization suggestions
-    print(f"{Colors.HEADER}{Colors.BOLD}🎻 Violin Plot Analysis:{Colors.ENDC}")
-    print(f"   {Colors.CYAN}Total cells: {Colors.BOLD}{len(obs_df)}{Colors.ENDC}")
-    print(f"   {Colors.BLUE}Variables to plot: {Colors.BOLD}{len(keys)} {keys}{Colors.ENDC}")
-    
-    if groupby is not None:
-        group_counts = obs_df[groupby].value_counts()
-        print(f"   {Colors.GREEN}Groupby variable: '{Colors.BOLD}{groupby}{Colors.ENDC}{Colors.GREEN}' with {Colors.BOLD}{len(group_counts)}{Colors.ENDC}{Colors.GREEN} groups{Colors.ENDC}")
-        
-        # Show group distribution
-        for group, count in group_counts.head(10).items():  # Show top 10 groups
-            if count < 10:
-                color = Colors.WARNING
-            elif count < 50:
-                color = Colors.BLUE
-            else:
-                color = Colors.GREEN
-            print(f"     {color}• {group}: {Colors.BOLD}{count}{Colors.ENDC}{color} cells{Colors.ENDC}")
-        
-        if len(group_counts) > 10:
-            print(f"     {Colors.CYAN}... and {Colors.BOLD}{len(group_counts) - 10}{Colors.ENDC}{Colors.CYAN} more groups{Colors.ENDC}")
-        
-        # Check for imbalanced groups
-        min_count = group_counts.min()
-        max_count = group_counts.max()
-        if max_count / min_count > 10:
-            print(f"   {Colors.WARNING}⚠️  Imbalanced groups detected: {Colors.BOLD}{min_count}-{max_count}{Colors.ENDC}{Colors.WARNING} cells per group{Colors.ENDC}")
-    else:
-        print(f"   {Colors.BLUE}Groupby: {Colors.BOLD}None{Colors.ENDC}{Colors.BLUE} (comparing variables){Colors.ENDC}")
-    
-    # Analyze data distribution for each variable
-    print(f"\n{Colors.HEADER}{Colors.BOLD}📊 Data Distribution Analysis:{Colors.ENDC}")
-    for key in keys:
-        if key in obs_df.columns:
-            data_vals = obs_df[key].dropna()
-            if len(data_vals) > 0:
-                data_range = data_vals.max() - data_vals.min()
-                zero_fraction = (data_vals == 0).sum() / len(data_vals)
-                
-                # Determine if data might be log-transformed already
-                log_suggestion = ""
-                if data_vals.min() >= 0 and data_vals.max() > 100:
-                    log_suggestion = f" {Colors.BLUE}(consider log=True){Colors.ENDC}"
-                elif data_vals.min() < 0:
-                    log_suggestion = f" {Colors.WARNING}(negative values detected){Colors.ENDC}"
-                
-                print(f"   {Colors.BLUE}'{key}': range {Colors.BOLD}{data_vals.min():.2f}-{data_vals.max():.2f}{Colors.ENDC}{Colors.BLUE}, {Colors.BOLD}{zero_fraction*100:.1f}%{Colors.ENDC}{Colors.BLUE} zeros{log_suggestion}")
-    
-    # Display current function parameters
-    print(f"\n{Colors.HEADER}{Colors.BOLD}⚙️  Current Function Parameters:{Colors.ENDC}")
-    print(f"   {Colors.BLUE}Plot style: enhanced_style={Colors.BOLD}{enhanced_style}{Colors.ENDC}{Colors.BLUE}, stripplot={Colors.BOLD}{stripplot}{Colors.ENDC}{Colors.BLUE}, jitter={Colors.BOLD}{jitter}{Colors.ENDC}")
-    print(f"   {Colors.BLUE}Additional features: show_means={Colors.BOLD}{show_means}{Colors.ENDC}{Colors.BLUE}, show_boxplot={Colors.BOLD}{show_boxplot}{Colors.ENDC}{Colors.BLUE}, statistical_tests={Colors.BOLD}{statistical_tests}{Colors.ENDC}")
-    print(f"   {Colors.BLUE}Figure settings: figsize={Colors.BOLD}{figsize}{Colors.ENDC}{Colors.BLUE}, fontsize={Colors.BOLD}{fontsize}{Colors.ENDC}{Colors.BLUE}, violin_alpha={Colors.BOLD}{violin_alpha}{Colors.ENDC}")
-    if custom_colors is not None:
-        print(f"   {Colors.BLUE}Colors: {Colors.BOLD}{len(custom_colors)} custom colors specified{Colors.ENDC}")
-    else:
-        print(f"   {Colors.BLUE}Colors: {Colors.BOLD}Default palette{Colors.ENDC}")
-    
-    # Parameter optimization suggestions
-    print(f"\n{Colors.HEADER}{Colors.BOLD}💡 Parameter Optimization Suggestions:{Colors.ENDC}")
-    suggestions = []
-    
-    # Check for too many groups
-    if groupby is not None:
-        n_groups = len(obs_df[groupby].unique())
-        if n_groups > 8:
-            suggestions.append(f"   {Colors.WARNING}▶ Many groups detected ({n_groups}):{Colors.ENDC}")
-            suggestions.append(f"     {Colors.CYAN}Current: figsize={Colors.BOLD}{figsize}{Colors.ENDC}")
-            suggested_width = max(8, n_groups * 1.2)
-            suggestions.append(f"     {Colors.GREEN}Suggested: {Colors.BOLD}figsize=({suggested_width}, {figsize[1] if figsize else 6}){Colors.ENDC}")
-            
-            if rotation is None:
-                suggestions.append(f"     {Colors.GREEN}Consider adding: {Colors.BOLD}rotation=45{Colors.ENDC} for better label readability")
-        
-        # Check for small sample sizes
+    if verbose:
+        # Colorful data analysis and parameter optimization suggestions
+        print(f"{Colors.HEADER}{Colors.BOLD}🎻 Violin Plot Analysis:{Colors.ENDC}")
+        print(f"   {Colors.CYAN}Total cells: {Colors.BOLD}{len(obs_df)}{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Variables to plot: {Colors.BOLD}{len(keys)} {keys}{Colors.ENDC}")
+
         if groupby is not None:
+            group_counts = obs_df[groupby].value_counts()
+            print(f"   {Colors.GREEN}Groupby variable: '{Colors.BOLD}{groupby}{Colors.ENDC}{Colors.GREEN}' with {Colors.BOLD}{len(group_counts)}{Colors.ENDC}{Colors.GREEN} groups{Colors.ENDC}")
+
+            # Show group distribution
+            for group, count in group_counts.head(10).items():  # Show top 10 groups
+                if count < 10:
+                    color = Colors.WARNING
+                elif count < 50:
+                    color = Colors.BLUE
+                else:
+                    color = Colors.GREEN
+                print(f"     {color}• {group}: {Colors.BOLD}{count}{Colors.ENDC}{color} cells{Colors.ENDC}")
+
+            if len(group_counts) > 10:
+                print(f"     {Colors.CYAN}... and {Colors.BOLD}{len(group_counts) - 10}{Colors.ENDC}{Colors.CYAN} more groups{Colors.ENDC}")
+
+            # Check for imbalanced groups
+            min_count = group_counts.min()
+            max_count = group_counts.max()
+            if max_count / min_count > 10:
+                print(f"   {Colors.WARNING}⚠️  Imbalanced groups detected: {Colors.BOLD}{min_count}-{max_count}{Colors.ENDC}{Colors.WARNING} cells per group{Colors.ENDC}")
+        else:
+            print(f"   {Colors.BLUE}Groupby: {Colors.BOLD}None{Colors.ENDC}{Colors.BLUE} (comparing variables){Colors.ENDC}")
+
+        # Analyze data distribution for each variable
+        print(f"\n{Colors.HEADER}{Colors.BOLD}📊 Data Distribution Analysis:{Colors.ENDC}")
+        for key in keys:
+            if key in obs_df.columns:
+                data_vals = obs_df[key].dropna()
+                if len(data_vals) > 0:
+                    zero_fraction = (data_vals == 0).sum() / len(data_vals)
+
+                    log_suggestion = ""
+                    if data_vals.min() >= 0 and data_vals.max() > 100:
+                        log_suggestion = f" {Colors.BLUE}(consider log=True){Colors.ENDC}"
+                    elif data_vals.min() < 0:
+                        log_suggestion = f" {Colors.WARNING}(negative values detected){Colors.ENDC}"
+
+                    print(f"   {Colors.BLUE}'{key}': range {Colors.BOLD}{data_vals.min():.2f}-{data_vals.max():.2f}{Colors.ENDC}{Colors.BLUE}, {Colors.BOLD}{zero_fraction*100:.1f}%{Colors.ENDC}{Colors.BLUE} zeros{log_suggestion}")
+
+        # Display current function parameters
+        print(f"\n{Colors.HEADER}{Colors.BOLD}⚙️  Current Function Parameters:{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Plot style: enhanced_style={Colors.BOLD}{enhanced_style}{Colors.ENDC}{Colors.BLUE}, stripplot={Colors.BOLD}{stripplot}{Colors.ENDC}{Colors.BLUE}, jitter={Colors.BOLD}{jitter}{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Additional features: show_means={Colors.BOLD}{show_means}{Colors.ENDC}{Colors.BLUE}, show_boxplot={Colors.BOLD}{show_boxplot}{Colors.ENDC}{Colors.BLUE}, statistical_tests={Colors.BOLD}{statistical_tests}{Colors.ENDC}")
+        print(f"   {Colors.BLUE}Figure settings: figsize={Colors.BOLD}{figsize}{Colors.ENDC}{Colors.BLUE}, fontsize={Colors.BOLD}{fontsize}{Colors.ENDC}{Colors.BLUE}, violin_alpha={Colors.BOLD}{violin_alpha}{Colors.ENDC}")
+        if custom_colors is not None:
+            print(f"   {Colors.BLUE}Colors: {Colors.BOLD}{len(custom_colors)} custom colors specified{Colors.ENDC}")
+        else:
+            print(f"   {Colors.BLUE}Colors: {Colors.BOLD}Default palette{Colors.ENDC}")
+
+        # Parameter optimization suggestions
+        print(f"\n{Colors.HEADER}{Colors.BOLD}💡 Parameter Optimization Suggestions:{Colors.ENDC}")
+        suggestions = []
+
+        if groupby is not None:
+            n_groups = len(obs_df[groupby].unique())
+            if n_groups > 8:
+                suggestions.append(f"   {Colors.WARNING}▶ Many groups detected ({n_groups}):{Colors.ENDC}")
+                suggestions.append(f"     {Colors.CYAN}Current: figsize={Colors.BOLD}{figsize}{Colors.ENDC}")
+                suggested_width = max(8, n_groups * 1.2)
+                suggestions.append(f"     {Colors.GREEN}Suggested: {Colors.BOLD}figsize=({suggested_width}, {figsize[1] if figsize else 6}){Colors.ENDC}")
+                if rotation is None:
+                    suggestions.append(f"     {Colors.GREEN}Consider adding: {Colors.BOLD}rotation=45{Colors.ENDC} for better label readability")
+
             group_counts = obs_df[groupby].value_counts()
             if group_counts.min() < 10:
                 suggestions.append(f"   {Colors.WARNING}▶ Small sample sizes detected (min: {group_counts.min()}):{Colors.ENDC}")
                 suggestions.append(f"     {Colors.GREEN}Suggested: {Colors.BOLD}stripplot=True, jitter=0.3{Colors.ENDC} to show individual points")
-    
-    # Check data distribution and log scale
-    for key in keys:
-        if key in obs_df.columns:
-            data_vals = obs_df[key].dropna()
-            if len(data_vals) > 0 and data_vals.min() >= 0 and data_vals.max() / data_vals.min() > 100:
-                suggestions.append(f"   {Colors.WARNING}▶ Wide data range for '{key}' ({data_vals.max()/data_vals.min():.1f}x):{Colors.ENDC}")
-                suggestions.append(f"     {Colors.CYAN}Current: log={Colors.BOLD}{log}{Colors.ENDC}")
-                suggestions.append(f"     {Colors.GREEN}Suggested: {Colors.BOLD}log=True{Colors.ENDC} for better visualization")
-                break
-    
-    # Check figure size vs number of variables
-    if len(keys) > 3 and (figsize is None or figsize[0] < len(keys) * 2):
-        suggestions.append(f"   {Colors.WARNING}▶ Multiple variables with small figure:{Colors.ENDC}")
-        suggested_width = max(len(keys) * 2, 8)
-        suggestions.append(f"     {Colors.CYAN}Current: figsize={Colors.BOLD}{figsize}{Colors.ENDC}")
-        suggestions.append(f"     {Colors.GREEN}Suggested: {Colors.BOLD}figsize=({suggested_width}, 6){Colors.ENDC} or {Colors.BOLD}multi_panel=True{Colors.ENDC}")
-    
-    # Font size optimization
-    if groupby is not None:
-        n_groups = len(obs_df[groupby].unique())
-        max_label_length = max(len(str(x)) for x in obs_df[groupby].unique())
-        if max_label_length > 8 and fontsize > 12:
-            suggestions.append(f"   {Colors.WARNING}▶ Long group labels detected:{Colors.ENDC}")
-            suggestions.append(f"     {Colors.CYAN}Current: fontsize={Colors.BOLD}{fontsize}{Colors.ENDC}")
-            suggestions.append(f"     {Colors.GREEN}Suggested: {Colors.BOLD}fontsize=10, rotation=45{Colors.ENDC}")
-    
-    # Enhanced features suggestions
-    if not show_means and not show_boxplot and not statistical_tests:
-        suggestions.append(f"   {Colors.BLUE}▶ Consider enhancing your plot:{Colors.ENDC}")
-        suggestions.append(f"     {Colors.GREEN}Options: {Colors.BOLD}show_means=True{Colors.ENDC}{Colors.GREEN}, {Colors.BOLD}show_boxplot=True{Colors.ENDC}{Colors.GREEN}, or {Colors.BOLD}statistical_tests=True{Colors.ENDC}")
-    
-    if suggestions:
-        for suggestion in suggestions:
-            print(suggestion)
-        
-        print(f"\n   {Colors.BOLD}📋 Copy-paste ready function call:{Colors.ENDC}")
-        
-        # Generate optimized function call
-        optimized_params = []
-        
-        # Core parameters
-        if isinstance(keys, list) and len(keys) == 1:
-            optimized_params.append(f"adata, keys='{keys[0]}'")
-        else:
-            optimized_params.append(f"adata, keys={keys}")
-        
-        if groupby is not None:
-            optimized_params.append(f"groupby='{groupby}'")
-        
-        # Add optimized parameters based on suggestions
-        if groupby is not None:
-            n_groups = len(obs_df[groupby].unique())
-            if n_groups > 8:
-                suggested_width = max(8, n_groups * 1.2)
-                optimized_params.append(f"figsize=({suggested_width}, 6)")
-            
-            if rotation is None and n_groups > 6:
-                optimized_params.append("rotation=45")
-                
-            group_counts = obs_df[groupby].value_counts()
-            if group_counts.min() < 10:
-                optimized_params.append("stripplot=True")
-                optimized_params.append("jitter=0.3")
-        
-        # Check for log scale suggestion
+
         for key in keys:
             if key in obs_df.columns:
                 data_vals = obs_df[key].dropna()
                 if len(data_vals) > 0 and data_vals.min() >= 0 and data_vals.max() / data_vals.min() > 100:
-                    optimized_params.append("log=True")
+                    suggestions.append(f"   {Colors.WARNING}▶ Wide data range for '{key}' ({data_vals.max()/data_vals.min():.1f}x):{Colors.ENDC}")
+                    suggestions.append(f"     {Colors.CYAN}Current: log={Colors.BOLD}{log}{Colors.ENDC}")
+                    suggestions.append(f"     {Colors.GREEN}Suggested: {Colors.BOLD}log=True{Colors.ENDC} for better visualization")
                     break
-        
-        # Multi-panel suggestion
+
         if len(keys) > 3 and (figsize is None or figsize[0] < len(keys) * 2):
-            optimized_params.append("multi_panel=True")
-        
-        # Enhanced features
-        if not show_means and not show_boxplot:
-            optimized_params.append("show_means=True")
-        
-        optimized_call = f"   {Colors.GREEN}ov.pl.violin({', '.join(optimized_params)}){Colors.ENDC}"
-        print(optimized_call)
-    else:
-        print(f"   {Colors.GREEN}✅ Current parameters are optimal for your data!{Colors.ENDC}")
-    
-    print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
+            suggestions.append(f"   {Colors.WARNING}▶ Multiple variables with small figure:{Colors.ENDC}")
+            suggested_width = max(len(keys) * 2, 8)
+            suggestions.append(f"     {Colors.CYAN}Current: figsize={Colors.BOLD}{figsize}{Colors.ENDC}")
+            suggestions.append(f"     {Colors.GREEN}Suggested: {Colors.BOLD}figsize=({suggested_width}, 6){Colors.ENDC} or {Colors.BOLD}multi_panel=True{Colors.ENDC}")
+
+        if groupby is not None:
+            max_label_length = max(len(str(x)) for x in obs_df[groupby].unique())
+            if max_label_length > 8 and fontsize > 12:
+                suggestions.append(f"   {Colors.WARNING}▶ Long group labels detected:{Colors.ENDC}")
+                suggestions.append(f"     {Colors.CYAN}Current: fontsize={Colors.BOLD}{fontsize}{Colors.ENDC}")
+                suggestions.append(f"     {Colors.GREEN}Suggested: {Colors.BOLD}fontsize=10, rotation=45{Colors.ENDC}")
+
+        if not show_means and not show_boxplot and not statistical_tests:
+            suggestions.append(f"   {Colors.BLUE}▶ Consider enhancing your plot:{Colors.ENDC}")
+            suggestions.append(f"     {Colors.GREEN}Options: {Colors.BOLD}show_means=True{Colors.ENDC}{Colors.GREEN}, {Colors.BOLD}show_boxplot=True{Colors.ENDC}{Colors.GREEN}, or {Colors.BOLD}statistical_tests=True{Colors.ENDC}")
+
+        if suggestions:
+            for suggestion in suggestions:
+                print(suggestion)
+
+            print(f"\n   {Colors.BOLD}📋 Copy-paste ready function call:{Colors.ENDC}")
+            optimized_params = []
+            if isinstance(keys, list) and len(keys) == 1:
+                optimized_params.append(f"adata, keys='{keys[0]}'")
+            else:
+                optimized_params.append(f"adata, keys={keys}")
+            if groupby is not None:
+                optimized_params.append(f"groupby='{groupby}'")
+                n_groups = len(obs_df[groupby].unique())
+                if n_groups > 8:
+                    suggested_width = max(8, n_groups * 1.2)
+                    optimized_params.append(f"figsize=({suggested_width}, 6)")
+                if rotation is None and n_groups > 6:
+                    optimized_params.append("rotation=45")
+                group_counts = obs_df[groupby].value_counts()
+                if group_counts.min() < 10:
+                    optimized_params.append("stripplot=True")
+                    optimized_params.append("jitter=0.3")
+            for key in keys:
+                if key in obs_df.columns:
+                    data_vals = obs_df[key].dropna()
+                    if len(data_vals) > 0 and data_vals.min() >= 0 and data_vals.max() / data_vals.min() > 100:
+                        optimized_params.append("log=True")
+                        break
+            if len(keys) > 3 and (figsize is None or figsize[0] < len(keys) * 2):
+                optimized_params.append("multi_panel=True")
+            if not show_means and not show_boxplot:
+                optimized_params.append("show_means=True")
+            print(f"   {Colors.GREEN}ov.pl.violin({', '.join(optimized_params)}){Colors.ENDC}")
+        else:
+            print(f"   {Colors.GREEN}✅ Current parameters are optimal for your data!{Colors.ENDC}")
+
+        print(f"{Colors.CYAN}{'─' * 60}{Colors.ENDC}")
     
     # Prepare data for plotting
     if groupby is None:
@@ -361,7 +338,7 @@ def violin(
     # Create single or multiple axis plots
     if len(y_cols) > 1:
         # Multiple keys: create subplots directly
-        if ax is not None:
+        if ax is not None and verbose:
             print(f"{Colors.WARNING}Warning: ax parameter ignored when plotting multiple keys{Colors.ENDC}")
         
         # Use user-provided figsize or calculate appropriate size
@@ -395,20 +372,22 @@ def violin(
             _add_alternating_background(
                 current_ax,
                 group_categories,
+                colors if use_group_colors_background else None,
                 alternating_background_colors,
+                background_lighten_amount,
             )
 
         # Prepare data for current y variable
         plot_data = _prepare_plot_data(obs_tidy, x_col, y_col, group_categories, order)
-        
+
         # Create violin plots
         _create_violin_plots(
-            current_ax, plot_data, group_categories, colors, density_norm, 
+            current_ax, plot_data, group_categories, colors, density_norm,
             violin_alpha, enhanced_style, **kwds
         )
-        
+
         # Add box plots if requested
-        if show_boxplot:
+        if show_boxplot or add_box:
             _add_box_plots(current_ax, plot_data, group_categories)
         
         # Add strip plot (jittered points)
@@ -425,7 +404,11 @@ def violin(
         # Add statistical tests
         if statistical_tests:
             _add_statistical_tests(current_ax, plot_data, group_categories, statistical_tests)
-        
+
+        # Add pairwise comparison brackets
+        if comparisons:
+            _add_comparisons(current_ax, plot_data, group_categories, comparisons, fontsize=fontsize - 2)
+
         # Customize axis
         _customize_axis(
             current_ax, group_categories, xlabel, y_label, groupby, 
@@ -569,14 +552,102 @@ def _apply_enhanced_styling(ax, background_color, spine_color, grid_lines):
 
     ax.tick_params(length=0)
 
-def _add_alternating_background(ax, group_categories, alternating_background_colors):
-    """Add alternating vertical background bands for each category."""
-    if len(alternating_background_colors) < 2:
-        raise ValueError("alternating_background_colors must contain at least two colors")
+def _lighten_color(color, amount=0.8):
+    """Return a lightened version of *color* by blending it with white.
 
+    amount=0 → original color, amount=1 → white.
+    """
+    import matplotlib.colors as mc
+    try:
+        r, g, b, a = mc.to_rgba(color)
+        return (r + (1 - r) * amount,
+                g + (1 - g) * amount,
+                b + (1 - b) * amount,
+                a)
+    except ValueError:
+        return color
+
+
+def _add_alternating_background(ax, group_categories, group_colors=None,
+                                alternating_colors=("white", "#e8e8e8"),
+                                lighten_amount=0.8):
+    """Add background bands for each category.
+
+    If *group_colors* is provided, each band is the lightened version of that
+    group's color.  Otherwise the two *alternating_colors* are cycled.
+    """
     for idx, _ in enumerate(group_categories):
-        color = alternating_background_colors[idx % len(alternating_background_colors)]
+        if group_colors is not None:
+            color = _lighten_color(group_colors[idx % len(group_colors)], amount=lighten_amount)
+        else:
+            color = alternating_colors[idx % len(alternating_colors)]
         ax.axvspan(idx - 0.5, idx + 0.5, facecolor=color, edgecolor='none', zorder=0)
+
+
+def _add_comparisons(ax, plot_data, group_categories, comparisons, fontsize=11):
+    """Draw pairwise significance brackets above the violin plots.
+
+    Each item in *comparisons* is a 2-element sequence of group names.
+    A Mann-Whitney U test is run for each pair and the result annotated with
+    stars (*** p<0.001, ** p<0.01, * p<0.05, ns otherwise).
+    """
+    from scipy.stats import mannwhitneyu
+
+    cat_to_pos = {cat: i for i, cat in enumerate(group_categories)}
+
+    # Compute data max to anchor bracket positions
+    all_vals = np.concatenate([v for v in plot_data.values() if len(v) > 0])
+    data_max = float(np.max(all_vals)) if len(all_vals) > 0 else 1.0
+    data_range = data_max - (float(np.min(all_vals)) if len(all_vals) > 0 else 0.0)
+    if data_range == 0:
+        data_range = abs(data_max) or 1.0
+
+    tick_h = data_range * 0.04    # height of the vertical ticks
+    gap    = data_range * 0.04    # gap between data and first bracket
+    step   = data_range * 0.12   # vertical spacing between brackets
+
+    needed_top = data_max + gap
+
+    for pair_idx, pair in enumerate(comparisons):
+        if len(pair) != 2:
+            continue
+        g1, g2 = str(pair[0]), str(pair[1])
+        if g1 not in cat_to_pos or g2 not in cat_to_pos:
+            continue
+
+        x1, x2 = cat_to_pos[g1], cat_to_pos[g2]
+        d1 = plot_data.get(g1, np.array([]))
+        d2 = plot_data.get(g2, np.array([]))
+        if len(d1) < 2 or len(d2) < 2:
+            continue
+
+        _, p_val = mannwhitneyu(d1, d2, alternative='two-sided')
+        if p_val < 0.001:
+            sig = '***'
+        elif p_val < 0.01:
+            sig = '**'
+        elif p_val < 0.05:
+            sig = '*'
+        else:
+            sig = 'ns'
+
+        y_base = data_max + gap + step * pair_idx
+
+        # Bracket: two vertical ticks connected by a horizontal bar
+        ax.plot([x1, x1, x2, x2],
+                [y_base, y_base + tick_h, y_base + tick_h, y_base],
+                lw=1.2, color='black', clip_on=False)
+
+        # Significance label
+        ax.text((x1 + x2) / 2, y_base + tick_h,
+                sig, ha='center', va='bottom',
+                fontsize=fontsize, color='black')
+
+        needed_top = y_base + tick_h + step * 0.5
+
+    # Expand y-axis to show all brackets
+    cur_lo, cur_hi = ax.get_ylim()
+    ax.set_ylim(cur_lo, max(cur_hi, needed_top))
 
 def _prepare_plot_data(obs_tidy, x_col, y_col, group_categories, order):
     """Prepare data for plotting."""
@@ -626,8 +697,8 @@ def _add_box_plots(ax, plot_data, group_categories):
     data_arrays = [plot_data[cat] for cat in group_categories]
     
     # Box plot properties
-    medianprops = dict(linewidth=2, color='#747473')
-    boxprops = dict(linewidth=1.5, color='#747473')
+    medianprops = dict(linewidth=2, color='black')
+    boxprops = dict(linewidth=1.5, color='black')
     
     ax.boxplot(
         data_arrays,
@@ -792,13 +863,13 @@ def _customize_axis(ax, group_categories, xlabel, ylabel, groupby, rotation, log
     ax.set_xticklabels(group_categories, rotation=rotation)
     
     if xlabel:
-        ax.set_xlabel(xlabel, fontweight='bold')
+        ax.set_xlabel(xlabel,)
     elif groupby:
-        ax.set_xlabel(groupby.replace('_', ' '), fontweight='bold')
+        ax.set_xlabel(groupby.replace('_', ' '))
     
     # Set y-axis
     if ylabel:
-        ax.set_ylabel(ylabel, fontweight='bold')
+        ax.set_ylabel(ylabel)
     
     # Set log scale if requested
     if log:
