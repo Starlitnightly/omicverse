@@ -1,0 +1,68 @@
+name: Deploy Docs to GitHub Pages
+
+on:
+  push:
+    branches: ["master"]
+  workflow_dispatch:   # allow manual trigger from the Actions tab
+
+permissions:
+  contents: write      # needed for mkdocs gh-deploy to push to gh-pages branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout (with submodules so omicverse_guide is available) ──
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0   # full history lets mkdocs show last-updated dates
+
+      # ── 2. Python ────────────────────────────────────────────────────────
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ── 3. Cache pip to speed up repeated runs ────────────────────────
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: docs-pip-${{ hashFiles('omicverse_guide/requirements*.txt', 'requirements.txt') }}
+          restore-keys: docs-pip-
+
+      # ── 4. Install MkDocs + all plugins used in mkdocs.yml ────────────
+      - name: Install MkDocs dependencies
+        run: |
+          pip install --upgrade pip
+          pip install \
+            mkdocs-material \
+            mkdocs-jupyter \
+            mkdocs-mermaid2-plugin \
+            mkdocs-glightbox \
+            mkdocs-plotly \
+            mkapi \
+            mkdocstrings[python] \
+            jupyter \
+            nbconvert
+
+      # ── 5. Install OmicVerse (mkapi scans the package for API docs) ───
+      - name: Install OmicVerse
+        run: pip install omicverse
+
+      # ── 6. Configure git identity for gh-deploy push ──────────────────
+      - name: Configure git
+        run: |
+          git config --global user.name  "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      # ── 7. Build & deploy ─────────────────────────────────────────────
+      # Run from the repo root, pointing --config-file at the submodule.
+      # This ensures gh-deploy pushes to the main repo's gh-pages branch
+      # rather than the submodule (omicverse-tutorials) repo.
+      - name: Deploy to GitHub Pages
+        run: |
+          mkdocs gh-deploy --force \
+            --config-file omicverse_guide/mkdocs.yml \
+            --remote-branch gh-pages \
+            --message "docs: auto-deploy from {sha} [{timestamp}]"
