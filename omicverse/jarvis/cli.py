@@ -126,6 +126,80 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Enable verbose logging",
     )
+    # ── Code-generation / claw mode ──────────────────────────────────────
+    claw_group = parser.add_argument_group(
+        "code generation (claw mode)",
+        "These flags switch to one-shot code generation instead of starting the bot.",
+    )
+    claw_group.add_argument(
+        "-q", "--question",
+        nargs="*",
+        dest="question",
+        default=None,
+        metavar="WORD",
+        help=(
+            "Ask a one-shot natural-language question. "
+            "Uses the same model / api-key / endpoint resolved from Jarvis config. "
+            "When omitted the bot is started normally."
+        ),
+    )
+    claw_group.add_argument(
+        "--output",
+        default=None,
+        dest="claw_output",
+        metavar="FILE",
+        help="Write generated code to FILE instead of stdout.",
+    )
+    claw_group.add_argument(
+        "--max-functions",
+        type=int,
+        default=8,
+        dest="claw_max_functions",
+        metavar="N",
+        help="Max registry functions included in the code-gen prompt (default: 8).",
+    )
+    claw_group.add_argument(
+        "--no-reflection",
+        action="store_true",
+        dest="claw_no_reflection",
+        help="Skip the review pass and return first-pass generated code.",
+    )
+    claw_group.add_argument(
+        "--debug-registry",
+        action="store_true",
+        dest="claw_debug_registry",
+        help="Print matched registry entries to stderr before code generation.",
+    )
+    # ── Daemon control (claw daemon) ──────────────────────────────────────
+    daemon_group = parser.add_argument_group(
+        "daemon control (claw daemon)",
+        "Manage the persistent claw daemon that keeps OmicVerse pre-imported.",
+    )
+    daemon_group.add_argument(
+        "--daemon",
+        action="store_true",
+        dest="claw_daemon",
+        help="Start a persistent claw daemon process.",
+    )
+    daemon_group.add_argument(
+        "--use-daemon",
+        action="store_true",
+        dest="claw_use_daemon",
+        help="Send the -q request to a running claw daemon instead of a fresh process.",
+    )
+    daemon_group.add_argument(
+        "--stop-daemon",
+        action="store_true",
+        dest="claw_stop_daemon",
+        help="Ask the running claw daemon to stop.",
+    )
+    daemon_group.add_argument(
+        "--socket",
+        default=None,
+        dest="claw_socket",
+        metavar="PATH",
+        help="Unix socket path for claw daemon communication.",
+    )
     parser.add_argument(
         "--feishu-app-id",
         default=None,
@@ -490,18 +564,119 @@ def main(argv: Optional[List[str]] = None) -> int:
     session_dir = _resolve_value(args.session_dir, config.get("session_dir"))
     max_prompts = _resolve_value(args.max_prompts, config.get("max_prompts"), 0)
 
-    try:
-        api_key = _resolve_api_key(
-            cli_key=args.api_key,
-            model=model,
+    def _do_resolve_api_key() -> Optional[str]:
+        try:
+            key = _resolve_api_key(
+                cli_key=args.api_key,
+                model=model,
+                llm_provider=llm_provider,
+                endpoint=endpoint,
+                auth_mode=auth_mode,
+                auth_path=auth_path,
+            )
+        except RuntimeError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return None
+        # Always fall back to auth.json regardless of auth_mode —
+        # the setup wizard saves keys there even when auth_mode="environment".
+        if key is None:
+            key = _resolve_saved_api_key(llm_provider, auth_path)
+        return key
+
+    api_key = _do_resolve_api_key()
+
+    # ── Auto-setup if model or api_key is not configured ─────────────────
+    _key_not_needed = auth_mode in {"no_auth"} or llm_provider in {"python", "ollama"}
+    _model_missing = not config.get("model") and args.model is None
+    _key_missing = api_key is None and not _key_not_needed
+
+    # Only trigger for meaningful operations (not --stop-daemon which needs no key)
+    _needs_credentials = not args.claw_stop_daemon
+
+    if (_model_missing or (_key_missing and _needs_credentials)) and not args.setup:
+        if not sys.stdin.isatty():
+            if _model_missing:
+                print("ERROR: No model configured. Run with --setup to configure.", file=sys.stderr)
+            else:
+                print("ERROR: API key could not be resolved. Run with --setup to configure.", file=sys.stderr)
+            return 1
+
+        reason = "No model configured." if _model_missing else "API key could not be resolved."
+        print(f"⚠  {reason} Launching setup wizard...\n")
+        try:
+            config = _run_setup(args, config_path, auth_path)
+        except (OpenAIOAuthError, RuntimeError) as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
+
+        # Re-resolve everything with the updated config
+        auth_mode = _resolve_value(args.auth_mode, config.get("auth_mode"), "environment")
+        raw_model = str(_resolve_value(args.model, config.get("model"), "claude-sonnet-4-6") or "")
+        llm_provider = _resolve_provider(config=config, model=raw_model, cli_model=args.model)
+        model = _resolve_model(
+            cli_model=args.model,
+            config_model=config.get("model"),
             llm_provider=llm_provider,
-            endpoint=endpoint,
             auth_mode=auth_mode,
-            auth_path=auth_path,
         )
-    except RuntimeError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 1
+        endpoint = _resolve_endpoint(
+            cli_endpoint=args.endpoint,
+            config_endpoint=config.get("endpoint"),
+            llm_provider=llm_provider,
+            auth_mode=auth_mode,
+        )
+        api_key = _do_resolve_api_key()
+
+    # ── Claw mode: daemon control or one-shot question ────────────────────
+    _claw_mode = (
+        args.question is not None
+        or args.claw_daemon
+        or args.claw_use_daemon
+        or args.claw_stop_daemon
+    )
+
+    if _claw_mode:
+        from omicverse import claw as _claw_mod
+
+        claw_argv: List[str] = []
+
+        # Daemon control flags (mutually exclusive with -q in practice)
+        if args.claw_daemon:
+            claw_argv.append("--daemon")
+        if args.claw_use_daemon:
+            claw_argv.append("--use-daemon")
+        if args.claw_stop_daemon:
+            claw_argv.append("--stop-daemon")
+        if args.claw_socket:
+            claw_argv += ["--socket", args.claw_socket]
+
+        # Question (positional in claw)
+        if args.question is not None:
+            question_text = " ".join(args.question).strip()
+            if not question_text and not args.claw_daemon and not args.claw_stop_daemon:
+                print("ERROR: -q requires a non-empty question.", file=sys.stderr)
+                return 1
+            claw_argv += list(args.question)
+
+        # Model / auth (resolved from jarvis config, passed through)
+        if model:
+            claw_argv += ["--model", model]
+        if api_key:
+            claw_argv += ["--api-key", api_key]
+        if endpoint:
+            claw_argv += ["--endpoint", endpoint]
+
+        # Code-gen tuning flags
+        if args.claw_output:
+            claw_argv += ["--output", args.claw_output]
+        if args.claw_max_functions != 8:
+            claw_argv += ["--max-functions", str(args.claw_max_functions)]
+        if args.claw_no_reflection:
+            claw_argv.append("--no-reflection")
+        if args.claw_debug_registry:
+            claw_argv.append("--debug-registry")
+
+        return _claw_mod.main(claw_argv)
 
     from .session import SessionManager
 

@@ -547,7 +547,7 @@ echo "    Installs the Telegram/messaging bot integration."
 echo "    Required if you want to use the Jarvis chat interface."
 if maybe_ask_yes_no "Install Jarvis dependencies?"; then
   pip_install_pkg \
-    "python-telegram-bot>=20.0" \
+    "python-telegram-bot>=21.3" \
     "pillow>=9.0" \
     "nbformat>=5.0"
 else

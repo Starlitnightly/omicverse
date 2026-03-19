@@ -5,8 +5,8 @@ Entry point: ``omicverse`` (registered via pyproject.toml scripts).
 
 Sub-commands
 ------------
-jarvis        Launch the Telegram bot for mobile bioinformatics.
-claw          Generate OmicVerse Python code from a natural-language request.
+claw          Start the Jarvis bot and/or generate code with -q.
+jarvis        Alias for ``claw`` (legacy name).
 web           Launch the OmicVerse web interface.
 skill-seeker  OmicVerse Skill Seeker utilities (list/validate/package skills).
 """
@@ -25,11 +25,6 @@ def _run_jarvis(argv: List[str]) -> int:
 def _run_skill_seeker(argv: List[str]) -> int:
     from omicverse.ov_skill_seeker.cli import main as ss_main
     return ss_main(argv)
-
-
-def _run_claw(argv: List[str]) -> int:
-    from omicverse.claw import main as claw_main
-    return claw_main(argv)
 
 
 def _run_web(argv: List[str]) -> int:
@@ -54,16 +49,19 @@ def main(argv: Optional[List[str]] = None) -> int:
     subparsers = parser.add_subparsers(dest="command", metavar="COMMAND")
 
     subparsers.add_parser(
-        "jarvis",
-        help="Launch Telegram bot for mobile single-cell analysis.",
+        "claw",
+        help=(
+            "Start the OmicVerse Jarvis bot (all channels). "
+            "Use -q to ask a one-shot question instead of starting the bot."
+        ),
         add_help=False,
     ).set_defaults(func=_run_jarvis)
 
     subparsers.add_parser(
-        "claw",
-        help="Generate OmicVerse Python code from a natural-language request.",
+        "jarvis",
+        help="Alias for 'claw' (legacy name).",
         add_help=False,
-    ).set_defaults(func=_run_claw)
+    ).set_defaults(func=_run_jarvis)
 
     subparsers.add_parser(
         "web",
