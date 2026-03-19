@@ -10,7 +10,7 @@ set -euo pipefail
 # ── colour / formatting ──────────────────────────────────────
 if [[ -t 1 ]]; then
   BOLD='\033[1m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
-  RED='\033[0;31m'; CYAN='\033[0;36m'; RESET='\033[0m'
+  RED='\033[0;31m'; CYAN='\033[0;32m'; RESET='\033[0m'
 else
   BOLD=''; GREEN=''; YELLOW=''; RED=''; CYAN=''; RESET=''
 fi
@@ -54,14 +54,14 @@ _menu_select() {
   # Non-TTY / CI: pick the default silently
   if [[ ! -t 1 || -n "$AUTO_YES" ]]; then
     _MENU_IDX="$start"
-    printf "    \033[1;36m❯\033[0m  \033[1m%s\033[0m\n" "${opts[$start]}"
+    printf "    \033[1;32m❯\033[0m  \033[1m%s\033[0m\n" "${opts[$start]}"
     return
   fi
 
   _ms_draw() {
     for i in "${!opts[@]}"; do
       if [[ $i -eq $cur ]]; then
-        printf "    \033[1;36m❯\033[0m  \033[1m%s\033[0m\n" "${opts[$i]}"
+        printf "    \033[1;32m❯\033[0m  \033[1m%s\033[0m\n" "${opts[$i]}"
       else
         printf "       \033[2m%s\033[0m\n" "${opts[$i]}"
       fi
