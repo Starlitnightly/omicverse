@@ -50,4 +50,4 @@ jobs:
           mkdocs gh-deploy --force \
             --config-file omicverse_guide/mkdocs.yml \
             --remote-branch gh-pages \
-            --message "docs: auto-deploy from {sha} [{timestamp}]"
+            --message "docs: auto-deploy from {sha}"
