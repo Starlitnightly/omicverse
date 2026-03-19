@@ -28,35 +28,20 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: docs-pip-${{ hashFiles('omicverse_guide/requirements*.txt', 'requirements.txt') }}
+          key: docs-pip-${{ hashFiles('requirements.txt') }}
           restore-keys: docs-pip-
 
-      # ── 4. Install MkDocs + all plugins used in mkdocs.yml ────────────
-      - name: Install MkDocs dependencies
-        run: |
-          pip install --upgrade pip
-          pip install \
-            mkdocs-material \
-            mkdocs-jupyter \
-            mkdocs-mermaid2-plugin \
-            mkdocs-glightbox \
-            mkdocs-plotly \
-            mkapi \
-            mkdocstrings[python] \
-            jupyter \
-            nbconvert
+      # ── 4. Install all dependencies (mirrors what readthedocs does) ───
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
-      # ── 5. Install OmicVerse (mkapi scans the package for API docs) ───
-      - name: Install OmicVerse
-        run: pip install omicverse
-
-      # ── 6. Configure git identity for gh-deploy push ──────────────────
+      # ── 5. Configure git identity for gh-deploy push ──────────────────
       - name: Configure git
         run: |
           git config --global user.name  "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      # ── 7. Build & deploy ─────────────────────────────────────────────
+      # ── 6. Build & deploy ─────────────────────────────────────────────
       # Run from the repo root, pointing --config-file at the submodule.
       # This ensures gh-deploy pushes to the main repo's gh-pages branch
       # rather than the submodule (omicverse-tutorials) repo.
