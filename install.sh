@@ -530,30 +530,79 @@ step "Step 10 — Installing OmicVerse"
 pip_install_pkg omicverse
 
 # ────────────────────────────────────────────────────────────
-step "Step 11 — Installing optional bio packages"
+step "Step 11 — Optional: Web interface  [omicverse[web]]"
 # ────────────────────────────────────────────────────────────
-
-pip_install_pkg \
-  pydeseq2 mofax tomli lifelines ktplotspy pillow einops \
-  tensorboard metatime graphtools boltons leidenalg gdown wandb
-
-pip_install_pkg \
-  tangram-sc fa2-modified pot libpysal openai patsy combat
-
-pip_install_pkg \
-  pymde opencv-python scikit-image memento-de
-
-pip_install_pkg \
-  harmonypy intervaltree fbpca scvi-tools s-gd2
-
-pip_install_pkg \
-  mellon scvelo cellrank dynamo-release squidpy pertpy
-
-pip_install_pkg \
-  toytree arviz ete3 torchdr
+echo "    Installs the OmicVerse web UI (omicverseweb)."
+echo "    Required if you want to run the browser-based interface."
+if maybe_ask_yes_no "Install web dependencies?"; then
+  pip_install_pkg omicverseweb
+else
+  info "Skipping web dependencies"
+fi
 
 # ────────────────────────────────────────────────────────────
-step "Step 12 — Pinning version-locked packages"
+step "Step 12 — Optional: Jarvis bot  [omicverse[jarvis]]"
+# ────────────────────────────────────────────────────────────
+echo "    Installs the Telegram/messaging bot integration."
+echo "    Required if you want to use the Jarvis chat interface."
+if maybe_ask_yes_no "Install Jarvis dependencies?"; then
+  pip_install_pkg \
+    "python-telegram-bot>=20.0" \
+    "pillow>=9.0" \
+    "nbformat>=5.0"
+else
+  info "Skipping Jarvis dependencies"
+fi
+
+# ────────────────────────────────────────────────────────────
+step "Step 13 — Optional: Full bio package suite  [omicverse[full]]"
+# ────────────────────────────────────────────────────────────
+echo "    Installs the complete set of optional analysis packages."
+echo "    These are heavy dependencies (~2 GB+); skip if you only need core features."
+if maybe_ask_yes_no "Install full bio packages?"; then
+
+  echo ""
+  echo "    ── Bulk analysis (DEG / statistics) ──"
+  pip_install_pkg \
+    pydeseq2 mofax lifelines patsy combat
+
+  echo ""
+  echo "    ── Single-cell utilities ──"
+  pip_install_pkg \
+    metatime ktplotspy leidenalg harmonypy \
+    intervaltree fbpca boltons graphtools scvi-tools
+
+  echo ""
+  echo "    ── Trajectory & RNA velocity ──"
+  pip_install_pkg \
+    mellon scvelo cellrank dynamo-release
+
+  echo ""
+  echo "    ── Spatial transcriptomics ──"
+  pip_install_pkg \
+    squidpy tangram-sc pot libpysal
+
+  echo ""
+  echo "    ── Visualization & embedding ──"
+  pip_install_pkg \
+    fa2-modified pymde toytree arviz ete3 torchdr
+
+  echo ""
+  echo "    ── Perturbation & deep learning ──"
+  pip_install_pkg \
+    pertpy einops tensorboard wandb
+
+  echo ""
+  echo "    ── General utilities ──"
+  pip_install_pkg \
+    pillow gdown tomli opencv-python scikit-image memento-de
+
+else
+  info "Skipping full bio packages"
+fi
+
+# ────────────────────────────────────────────────────────────
+step "Step 14 — Pinning version-locked packages"
 # ────────────────────────────────────────────────────────────
 
 echo "    Ensuring pandas<3.0, numpy<2.0, zarr<3.0 for stability..."
@@ -561,7 +610,7 @@ uv pip install "pandas<3.0.0" "numpy<2.0.0" "zarr<3.0.0" --force-reinstall $PIP_
 info "Version constraints applied"
 
 # ────────────────────────────────────────────────────────────
-step "Step 13 — Verifying installation"
+step "Step 15 — Verifying installation"
 # ────────────────────────────────────────────────────────────
 
 python -c "import omicverse as ov; ov.plot_set()"
