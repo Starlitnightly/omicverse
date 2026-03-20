@@ -492,6 +492,87 @@ Response:
 
 ## Troubleshooting
 
+### Startup timeout / handshake stuck (especially on Windows)
+
+**Symptom**: The MCP client (Claude Code, Codex, Claude Desktop) fails to connect with a timeout error during initialization, or the handshake hangs for 10+ seconds and never completes.
+
+**Root cause**: The MCP client typically enforces a startup timeout (often 10 seconds). On first launch — especially on Windows — the server's registry hydration phase imports `scanpy`, `anndata`, and their transitive dependencies (including `numba`, `matplotlib`). These imports can trigger:
+
+1. **Numba JIT compilation** on first run (compiling LLVM IR → machine code), which can take 5–30 seconds
+2. **Matplotlib font cache** generation on first import, which scans system fonts
+3. **Temporary directory permission errors** if default paths are not writable (common in enterprise Windows environments)
+
+**Solution**: Set the following environment variables in your MCP server configuration:
+
+```json
+{
+  "mcpServers": {
+    "omicverse": {
+      "command": "C:\\Users\\<you>\\.conda\\envs\\omicverse_mcp\\python.exe",
+      "args": ["-m", "omicverse.mcp", "--phase", "P0+P0.5"],
+      "env": {
+        "NUMBA_DISABLE_JIT": "1",
+        "NUMBA_CACHE_DIR": "C:\\Users\\<you>\\AppData\\Local\\Temp\\numba_cache",
+        "MPLCONFIGDIR": "C:\\Users\\<you>\\AppData\\Local\\Temp\\mpl_config",
+        "TMP": "C:\\Users\\<you>\\AppData\\Local\\Temp",
+        "TEMP": "C:\\Users\\<you>\\AppData\\Local\\Temp"
+      }
+    }
+  }
+}
+```
+
+On macOS / Linux, the equivalent:
+
+```json
+{
+  "mcpServers": {
+    "omicverse": {
+      "command": "python",
+      "args": ["-m", "omicverse.mcp", "--phase", "P0+P0.5"],
+      "env": {
+        "NUMBA_DISABLE_JIT": "1",
+        "NUMBA_CACHE_DIR": "/tmp/numba_cache",
+        "MPLCONFIGDIR": "/tmp/mpl_config"
+      }
+    }
+  }
+}
+```
+
+| Variable | Purpose |
+|----------|---------|
+| `NUMBA_DISABLE_JIT=1` | Skips LLVM JIT compilation entirely; falls back to Python object mode. Removes the biggest source of startup delay. Safe for MCP usage — numba-accelerated hot paths are not critical for tool dispatch. |
+| `NUMBA_CACHE_DIR` | Directs numba's compilation cache to a writable directory. Without this, numba may fail to cache or error out on restricted filesystems. |
+| `MPLCONFIGDIR` | Directs matplotlib's font cache and config to a writable directory. Prevents `PermissionError` on first plot generation. |
+| `TMP` / `TEMP` | (Windows only) Ensures all temp file operations use a writable path. Some corporate environments restrict the default temp directory. |
+
+**Additional notes**:
+
+- After changing `env` in the config, you must **start a new session** for the changes to take effect. MCP server configuration is read once at process startup — there is no hot-reload mechanism.
+- If `NUMBA_DISABLE_JIT=1` is set, numba-heavy tools (e.g., those using `scanpy`'s neighbor graph internally) will be slightly slower at runtime but will still produce correct results.
+- To diagnose the exact startup bottleneck, run the server manually and observe stderr timing:
+  ```bash
+  time python -m omicverse.mcp --help
+  ```
+  If `--help` itself takes >5 seconds, the delay is in import-time JIT compilation.
+
+**Verification**: After applying the fix, verify with a manual MCP handshake:
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"0.1"}}}' | python -m omicverse.mcp 2>/dev/null
+```
+
+You should receive an `initialize` response within 1–4 seconds.
+
+### Config changes not taking effect
+
+**Symptom**: You modified the MCP server configuration (e.g., `config.toml`, `env` variables, `--phase` flag) but the running session still uses the old settings.
+
+**Root cause**: MCP server configuration is loaded once at process startup. The MCP client caches the spawned server process for the duration of the session.
+
+**Solution**: Close the current session and open a new one. There is no way to hot-reload MCP server configuration within an existing session.
+
 ### Tools not visible
 
 If `ov.list_tools` returns fewer tools than expected:
