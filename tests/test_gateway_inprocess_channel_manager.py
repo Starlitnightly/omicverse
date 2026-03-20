@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import sys
 import threading
 import time
+from pathlib import Path
 
-from omicverse_web.gateway.inprocess_channel_manager import InProcessChannelManager
+
+_GATEWAY_WEB_ROOT = Path("/Users/fernandozeng/Desktop/analysis/omicverse-project/omicverse-web")
+if str(_GATEWAY_WEB_ROOT) not in sys.path:
+    sys.path.insert(0, str(_GATEWAY_WEB_ROOT))
+
+from gateway.inprocess_channel_manager import InProcessChannelManager
 
 
 def test_inprocess_manager_supports_all_channels(monkeypatch) -> None:

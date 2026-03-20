@@ -571,6 +571,17 @@ def _web_only_loop(mode_label: str = "web-only") -> int:
     return 0
 
 
+def _resolve_gateway_web_root() -> Optional[Path]:
+    candidates = [
+        Path(__file__).resolve().parents[3] / "omicverse-project" / "omicverse-web",
+        Path.home() / "Desktop" / "analysis" / "omicverse-project" / "omicverse-web",
+    ]
+    for candidate in candidates:
+        if (candidate / "gateway" / "server.py").exists() and (candidate / "services").exists():
+            return candidate
+    return None
+
+
 def _gateway_daemon_loop(
     *,
     web_host: str,
@@ -586,9 +597,15 @@ def _gateway_daemon_loop(
 ) -> int:
     """Start the daemon-style gateway: web UI plus auto-started channels."""
     try:
-        from omicverse_web.gateway.server import GatewayServer  # type: ignore
-        from omicverse_web.services.agent_session_service import SessionManager as WebSM  # type: ignore
-        from omicverse_web.gateway.inprocess_channel_manager import InProcessChannelManager  # type: ignore
+        gateway_web_root = _resolve_gateway_web_root()
+        if gateway_web_root is None:
+            raise ImportError("Cannot locate omicverse-project/omicverse-web")
+        gateway_web_root_str = str(gateway_web_root)
+        if gateway_web_root_str not in sys.path:
+            sys.path.insert(0, gateway_web_root_str)
+        from gateway.server import GatewayServer  # type: ignore
+        from services.agent_session_service import SessionManager as WebSM  # type: ignore
+        from gateway.inprocess_channel_manager import InProcessChannelManager  # type: ignore
         from .gateway.web_bridge import WebSessionBridge
         from .memory.store import MemoryStore as _MemStore
     except ImportError as exc:
