@@ -28,8 +28,11 @@ def _run_skill_seeker(argv: List[str]) -> int:
 
 
 def _run_gateway(argv: List[str]) -> int:
-    """One-shot gateway launcher: equivalent to ``omicverse claw --with-web``."""
-    # Inject --with-web unless the user already passed it
+    """Start the gateway daemon mode."""
+    # Inject the internal gateway-daemon flag unless the user already passed it.
+    # Keep --with-web for compatibility with the existing Jarvis launcher.
+    if "--gateway-daemon" not in argv:
+        argv = ["--gateway-daemon"] + list(argv)
     if "--with-web" not in argv:
         argv = ["--with-web"] + list(argv)
     return _run_jarvis(argv)
@@ -80,8 +83,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     subparsers.add_parser(
         "gateway",
         help=(
-            "Unified gateway: start a channel bot AND the web UI together. "
-            "Equivalent to 'omicverse claw --with-web'."
+            "Start the gateway daemon and web UI. "
+            "Configured channels are auto-started in the background."
         ),
         add_help=False,
     ).set_defaults(func=_run_gateway)

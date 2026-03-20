@@ -73,6 +73,12 @@ _INTENT_LEVELS = [_INTENT_FULL, _INTENT_NO_DM, _INTENT_GUILD_ONLY]
 # WebSocket reconnect delays (seconds)
 _RECONNECT_DELAYS = [1, 2, 5, 10, 30, 60]
 
+# Inbound dedupe keeps duplicate QQ gateway deliveries from triggering a
+# second analysis run. QQ can replay the same message ID after reconnects or
+# transient delivery retries.
+_DEDUP_TTL_SECONDS = 24 * 60 * 60
+_DEDUP_MAX_ENTRIES = 10000
+
 # WS opcodes
 _OP_DISPATCH = 0
 _OP_HEARTBEAT = 1
@@ -89,6 +95,72 @@ class RunningTask:
     task: asyncio.Task
     request: str
     started_at: float
+
+
+class QQDeduper:
+    """Small memory+disk dedupe cache for inbound QQ message IDs."""
+
+    def __init__(
+        self,
+        store_path: Path,
+        *,
+        ttl_seconds: int = _DEDUP_TTL_SECONDS,
+        max_entries: int = _DEDUP_MAX_ENTRIES,
+    ) -> None:
+        self._store_path = store_path
+        self._ttl_seconds = max(0, int(ttl_seconds))
+        self._max_entries = max(100, int(max_entries))
+        self._lock = threading.Lock()
+        self._cache: Dict[str, float] = {}
+        self._load()
+
+    def _load(self) -> None:
+        try:
+            if not self._store_path.exists():
+                return
+            raw = json.loads(self._store_path.read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                now = time.time()
+                for k, v in raw.items():
+                    if isinstance(k, str) and isinstance(v, (int, float)):
+                        if self._ttl_seconds <= 0 or (now - float(v)) < self._ttl_seconds:
+                            self._cache[k] = float(v)
+                self._prune_locked(now)
+        except Exception:
+            logger.debug("Failed to load QQ dedupe cache", exc_info=True)
+
+    def _prune_locked(self, now: Optional[float] = None) -> None:
+        ts_now = now if now is not None else time.time()
+        if self._ttl_seconds > 0:
+            expired = [
+                key for key, ts in self._cache.items() if (ts_now - ts) >= float(self._ttl_seconds)
+            ]
+            for key in expired:
+                self._cache.pop(key, None)
+        if len(self._cache) > self._max_entries:
+            keep = sorted(self._cache.items(), key=lambda item: item[1], reverse=True)[: self._max_entries]
+            self._cache = dict(keep)
+
+    def _persist_locked(self) -> None:
+        try:
+            self._store_path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self._store_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(self._cache, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(self._store_path)
+        except Exception:
+            logger.debug("Failed to persist QQ dedupe cache", exc_info=True)
+
+    def seen_or_record(self, key: str) -> bool:
+        token = (key or "").strip()
+        if not token:
+            return False
+        with self._lock:
+            now = time.time()
+            self._prune_locked(now)
+            seen = token in self._cache
+            self._cache[token] = now
+            self._persist_locked()
+            return seen
 
 
 # ── QQClient ──────────────────────────────────────────────────────────────────
@@ -402,6 +474,7 @@ class QQRuntime:
         # msg_seq tracking: QQ requires a unique, incrementing seq per msg_id
         # The ack message and all follow-up messages for the same msg_id share one counter
         self._msg_seqs: Dict[str, int] = {}
+        self._deduper = QQDeduper(Path.home() / ".ovjarvis" / "qq" / "dedup" / "global.json")
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
@@ -758,6 +831,17 @@ class QQRuntime:
         channel_id: Optional[str] = None,
     ) -> None:
         """Entry point called by the WebSocket gateway for each received message."""
+        if msg_id:
+            dedup_key = f"message:{msg_id}"
+            if self._deduper.seen_or_record(dedup_key):
+                logger.info(
+                    "QQ duplicate inbound message ignored: msg_id=%s kind=%s sender=%s",
+                    msg_id,
+                    kind,
+                    sender_id,
+                )
+                return
+
         # Build target
         if kind == "group" and group_id:
             target = QQTarget(kind="group", id=group_id)

@@ -182,6 +182,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Start the OmicVerse web server in the background when the bot starts.",
     )
     gw_group.add_argument(
+        "--gateway-daemon",
+        action="store_true",
+        dest="gateway_daemon",
+        help=argparse.SUPPRESS,
+    )
+    gw_group.add_argument(
         "--web-port",
         type=int,
         default=0,
@@ -551,9 +557,9 @@ def _resolve_api_key(
     return None
 
 
-def _web_only_loop() -> int:
-    """Block until Ctrl-C when the web server is running but no channel is configured."""
-    print("Gateway running in web-only mode. Press Ctrl+C to stop.")
+def _web_only_loop(mode_label: str = "web-only") -> int:
+    """Block until Ctrl-C while the gateway/web server is running."""
+    print(f"Gateway running in {mode_label} mode. Press Ctrl+C to stop.")
     import time as _time
     try:
         while True:
@@ -561,6 +567,43 @@ def _web_only_loop() -> int:
     except KeyboardInterrupt:
         print("\nGateway stopped.")
     return 0
+
+
+def _gateway_daemon_loop(
+    *,
+    web_host: str,
+    web_port: int,
+    no_browser: bool,
+    config_path: Path,
+    session_dir: Optional[str],
+) -> int:
+    """Start the daemon-style gateway: web UI plus auto-started channels."""
+    try:
+        from omicverse_web.gateway.server import GatewayServer  # type: ignore
+        from omicverse_web.services.agent_session_service import SessionManager as WebSM  # type: ignore
+    except ImportError as exc:
+        print(
+            "WARNING: gateway daemon mode requires omicverse-web to be installed.",
+            file=sys.stderr,
+        )
+        print(f"Import error: {exc}", file=sys.stderr)
+        return 1
+
+    web_sm = WebSM(max_sessions=20)
+    gw = GatewayServer()
+    mem_db = os.path.join(os.path.expanduser(session_dir or "~/.ovjarvis"), "memory.db")
+    _gw_thread, _gw_url = gw.start(
+        host=web_host,
+        port=web_port,
+        session_manager=web_sm,
+        memory_db_path=mem_db,
+        auto_start_channels=True,
+        jarvis_config_path=str(config_path),
+    )
+    print(f"OmicVerse Gateway ready at {_gw_url}")
+    if not no_browser:
+        gw.open_browser()
+    return _web_only_loop("gateway daemon")
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -607,6 +650,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     session_dir = _resolve_value(args.session_dir, config.get("session_dir"))
     max_prompts = _resolve_value(args.max_prompts, config.get("max_prompts"), 0)
+
+    if getattr(args, "gateway_daemon", False):
+        return _gateway_daemon_loop(
+            web_host=getattr(args, "web_host", "127.0.0.1"),
+            web_port=getattr(args, "web_port", 0),
+            no_browser=getattr(args, "no_browser", False),
+            config_path=config_path,
+            session_dir=session_dir,
+        )
 
     def _do_resolve_api_key() -> Optional[str]:
         try:
