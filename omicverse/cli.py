@@ -22,6 +22,20 @@ def _run_jarvis(argv: List[str]) -> int:
     return jarvis_main(argv)
 
 
+def _run_claw(argv: List[str]) -> int:
+    """Default `omicverse claw` to gateway mode unless the user asked for claw-only actions."""
+    claw_passthrough_flags = {
+        "-q",
+        "--question",
+        "--daemon",
+        "--use-daemon",
+        "--stop-daemon",
+    }
+    if any(flag in argv for flag in claw_passthrough_flags):
+        return _run_jarvis(argv)
+    return _run_gateway(argv)
+
+
 def _run_skill_seeker(argv: List[str]) -> int:
     from omicverse.ov_skill_seeker.cli import main as ss_main
     return ss_main(argv)
@@ -62,11 +76,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     subparsers.add_parser(
         "claw",
         help=(
-            "Start the OmicVerse Jarvis bot (all channels). "
-            "Use -q to ask a one-shot question instead of starting the bot."
+            "Start OmicVerse gateway mode by default. "
+            "Use -q or daemon flags for one-shot claw actions."
         ),
         add_help=False,
-    ).set_defaults(func=_run_jarvis)
+    ).set_defaults(func=_run_claw)
 
     subparsers.add_parser(
         "jarvis",
