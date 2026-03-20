@@ -243,9 +243,21 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
     import builtins
     is_ipython = getattr(builtins, "__IPYTHON__", False)
     if is_ipython:
-        from matplotlib_inline.backend_inline import set_matplotlib_formats
-        ipython_format = [ipython_format]
-        set_matplotlib_formats(*ipython_format)
+        try:
+            from matplotlib_inline.backend_inline import set_matplotlib_formats
+            set_matplotlib_formats(*[ipython_format])
+        except AttributeError:
+            # matplotlib_inline 0.2.x calls rcParams._get() which was removed in
+            # some matplotlib versions. Fall back to IPython's InlineBackend config.
+            try:
+                from IPython import get_ipython as _get_ipython
+                _ip = _get_ipython()
+                if _ip is not None:
+                    _ip.config.InlineBackend.figure_formats = {ipython_format}
+            except Exception:
+                pass
+        except ImportError:
+            pass
     
     from matplotlib import rcParams
     if dpi is not None:
