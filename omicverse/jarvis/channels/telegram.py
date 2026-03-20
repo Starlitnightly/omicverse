@@ -19,6 +19,7 @@ import os
 import re
 import signal
 import socket
+import threading
 import time
 from dataclasses import dataclass
 from io import BytesIO
@@ -924,11 +925,25 @@ def _run_polling_with_restart(
     conflict_type: type[BaseException],
     restart_delay_seconds: float = _POLLING_RESTART_DELAY_SECONDS,
     max_attempts: int = _POLLING_MAX_ATTEMPTS,
+    stop_event: Optional[threading.Event] = None,
 ) -> None:
     last_conflict_message = ""
     attempts = max(1, int(max_attempts))
     for attempt in range(1, attempts + 1):
         app = application_factory()
+        if stop_event is not None:
+            def _stop_when_requested() -> None:
+                stop_event.wait()
+                try:
+                    app.stop_running()
+                except Exception:
+                    pass
+
+            threading.Thread(
+                target=_stop_when_requested,
+                daemon=True,
+                name="telegram-stop-watcher",
+            ).start()
         polling_state = _PollingState()
         _register_polling_error_handler(
             app,
@@ -936,7 +951,12 @@ def _run_polling_with_restart(
             conflict_type=conflict_type,
         )
         logger.info("OmicVerse Jarvis bot starting (polling)...")
-        app.run_polling(drop_pending_updates=True)
+        app.run_polling(
+            drop_pending_updates=True,
+            stop_signals=None,
+        )
+        if stop_event is not None and stop_event.is_set():
+            return
         if not polling_state.conflict_detected:
             return
         last_conflict_message = polling_state.conflict_message
@@ -952,6 +972,7 @@ def run_bot(
     session_manager: Any,
     access_control: AccessControl,
     verbose: bool = False,
+    stop_event: Optional[threading.Event] = None,
 ) -> None:
     """Build and start the Telegram application (blocking)."""
     try:
@@ -973,6 +994,7 @@ def run_bot(
     _run_polling_with_restart(
         application_factory=_build_application,
         conflict_type=Conflict,
+        stop_event=stop_event,
     )
 
 

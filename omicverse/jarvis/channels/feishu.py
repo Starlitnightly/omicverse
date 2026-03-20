@@ -1369,6 +1369,7 @@ def run_feishu_bot(
     path: str = "/feishu/events",
     verification_token: Optional[str] = None,
     encrypt_key: Optional[str] = None,
+    stop_event: Optional[threading.Event] = None,
 ) -> None:
     client = FeishuClient(app_id, app_secret)
     runtime = FeishuRuntime(client, session_manager)
@@ -1398,6 +1399,15 @@ def run_feishu_bot(
             logger.debug("feishu_http " + fmt, *args)
 
     server = ThreadingHTTPServer((host, port), FeishuHandler)
+    if stop_event is not None:
+        def _stop_server() -> None:
+            stop_event.wait()
+            try:
+                server.shutdown()
+            except Exception:
+                pass
+
+        threading.Thread(target=_stop_server, daemon=True, name="feishu-http-stop").start()
     logger.info("Feishu Jarvis webhook listening on http://%s:%s%s", host, port, path)
     try:
         server.serve_forever()
@@ -1412,6 +1422,7 @@ def run_feishu_ws_bot(
     session_manager: Any,
     verification_token: Optional[str] = None,
     encrypt_key: Optional[str] = None,
+    stop_event: Optional[threading.Event] = None,
 ) -> None:
     try:
         import lark_oapi as lark
@@ -1455,6 +1466,19 @@ def run_feishu_ws_bot(
         event_handler=event_handler,
         log_level=sdk_log_level,
     )
+    if stop_event is not None:
+        def _stop_ws() -> None:
+            stop_event.wait()
+            try:
+                ws_client._auto_reconnect = False
+            except Exception:
+                pass
+            try:
+                asyncio.run(ws_client._disconnect())
+            except Exception:
+                pass
+
+        threading.Thread(target=_stop_ws, daemon=True, name="feishu-ws-stop").start()
     try:
         ws_client.start()
     except Exception as exc:

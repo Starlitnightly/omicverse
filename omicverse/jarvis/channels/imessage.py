@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import tempfile
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional
@@ -391,6 +392,7 @@ class IMessageJarvisBot:
         cli_path: str = "imsg",
         db_path: Optional[str] = None,
         include_attachments: bool = False,
+        stop_event: Optional[threading.Event] = None,
     ) -> None:
         self._sm = session_manager
         self._cli_path = cli_path or "imsg"
@@ -398,6 +400,7 @@ class IMessageJarvisBot:
         self._include_attachments = include_attachments
         self._route_registry = GatewaySessionRegistry(session_manager)
         self._tasks: Dict[str, asyncio.Task] = {}
+        self._stop_event = stop_event
         self._client = IMessageRpcClient(
             cli_path=self._cli_path,
             db_path=self._db_path,
@@ -417,7 +420,21 @@ class IMessageJarvisBot:
             timeout=60.0,
         )
         try:
-            await self._client.wait_closed()
+            if self._stop_event is None:
+                await self._client.wait_closed()
+            else:
+                wait_closed_task = asyncio.create_task(self._client.wait_closed())
+                stop_task = asyncio.create_task(asyncio.to_thread(self._stop_event.wait))
+                done, pending = await asyncio.wait(
+                    {wait_closed_task, stop_task},
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                for task in pending:
+                    task.cancel()
+                if stop_task in done and self._stop_event.is_set():
+                    await self._client.stop()
+                elif wait_closed_task in done:
+                    await wait_closed_task
         finally:
             await self._client.stop()
 
@@ -681,11 +698,13 @@ def run_imessage_bot(
     cli_path: str = "imsg",
     db_path: Optional[str] = None,
     include_attachments: bool = False,
+    stop_event: Optional[threading.Event] = None,
 ) -> None:
     bot = IMessageJarvisBot(
         session_manager=session_manager,
         cli_path=cli_path,
         db_path=db_path,
         include_attachments=include_attachments,
+        stop_event=stop_event,
     )
     asyncio.run(bot.run())
