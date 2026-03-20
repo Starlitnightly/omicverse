@@ -9,6 +9,7 @@ import shlex
 import subprocess
 import sys
 import importlib
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -334,6 +335,8 @@ class SessionManager:
         self._sessions: Dict[int, Dict[str, JarvisSession]] = {}
         self._active_kernel: Dict[int, str] = {}
         self._kernel_name_re = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")
+        self._shared_adata: Any = None
+        self._lock = threading.Lock()
         # Optional WebSessionBridge — set when running with --with-web
         self.gateway_web_bridge: Optional[Any] = gateway_web_bridge
 
@@ -343,6 +346,19 @@ class SessionManager:
         """Return the active kernel session for *user_id* (default: ``main``)."""
         active = self.get_active_kernel(user_id)
         return self._get_or_create_kernel_session(user_id, active)
+
+    def set_shared_adata(self, adata: Any) -> None:
+        """Set the shared AnnData reference used by all Jarvis sessions."""
+        with self._lock:
+            self._shared_adata = adata
+            for user_sessions in self._sessions.values():
+                for session in user_sessions.values():
+                    session.adata = adata
+
+    def get_shared_adata(self) -> Any:
+        """Return the current shared AnnData reference, if any."""
+        with self._lock:
+            return self._shared_adata
 
     def get_active_kernel(self, user_id: int) -> str:
         if user_id not in self._active_kernel:
@@ -384,21 +400,23 @@ class SessionManager:
         return name
 
     def _get_or_create_kernel_session(self, user_id: int, kernel_name: str) -> JarvisSession:
-        user_sessions = self._sessions.setdefault(user_id, {})
-        if kernel_name in user_sessions:
-            return user_sessions[kernel_name]
+        with self._lock:
+            user_sessions = self._sessions.setdefault(user_id, {})
+            if kernel_name in user_sessions:
+                return user_sessions[kernel_name]
 
-        kernel_root = self._kernel_root(user_id, kernel_name)
-        self._ensure_kernel_dirs(kernel_root)
-        agent = self._build_agent(kernel_root)
-        session = JarvisSession(
-            user_id=user_id,
-            workspace_dir=kernel_root,
-            agent=agent,
-            max_prompts_setting=self._max_prompts_setting,
-        )
-        user_sessions[kernel_name] = session
-        return session
+            kernel_root = self._kernel_root(user_id, kernel_name)
+            self._ensure_kernel_dirs(kernel_root)
+            agent = self._build_agent(kernel_root)
+            session = JarvisSession(
+                user_id=user_id,
+                workspace_dir=kernel_root,
+                agent=agent,
+                max_prompts_setting=self._max_prompts_setting,
+                adata=self._shared_adata,
+            )
+            user_sessions[kernel_name] = session
+            return session
 
     def _kernel_root(self, user_id: int, kernel_name: str) -> Path:
         user_dir = self._base / str(user_id)

@@ -778,6 +778,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # ── Gateway mode: start web server + build bridge ─────────────────────
     _gateway_web_bridge = None
+    _web_sm = None
     if getattr(args, "with_web", False):
         try:
             from omicverse_web.gateway.server import GatewayServer  # type: ignore
@@ -828,6 +829,20 @@ def main(argv: Optional[List[str]] = None) -> int:
         verbose=args.verbose,
         gateway_web_bridge=_gateway_web_bridge,
     )
+
+    if _web_sm is not None:
+        try:
+            shared_adata = _web_sm.get_shared_adata()
+        except Exception:
+            shared_adata = None
+        if shared_adata is not None:
+            sm.set_shared_adata(shared_adata)
+        try:
+            _web_sm.set_adata_sync_handler(
+                lambda _session_id, adata: sm.set_shared_adata(adata)
+            )
+        except Exception:
+            pass
 
     # ── Gateway-only mode: --with-web without an explicit --channel ───────
     # If the user ran `omicverse gateway` (or `--with-web`) without specifying

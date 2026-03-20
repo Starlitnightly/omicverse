@@ -126,7 +126,7 @@ class WebSessionBridge:
             if llm_text:
                 web_session.add_message("assistant", llm_text)
             if adata is not None:
-                web_session.set_adata(adata)
+                self._sm.set_shared_adata(adata)
             logger.debug(
                 "WebSessionBridge: synced turn for route=%s → web_session=%s",
                 route.route_key(),
@@ -172,7 +172,7 @@ class WebSessionBridge:
             if llm_text:
                 web_session.add_message("assistant", llm_text)
             if adata is not None:
-                web_session.set_adata(adata)
+                self._sm.set_shared_adata(adata)
             logger.debug(
                 "WebSessionBridge: synced turn for channel=%s scope=%s:%s → web_session=%s",
                 channel, scope_type, scope_id, sid,
