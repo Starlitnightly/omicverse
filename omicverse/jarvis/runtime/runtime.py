@@ -83,6 +83,7 @@ class MessageRuntime:
         deliver: DeliveryFn,
         task_registry: Optional[TaskRegistry] = None,
         policy: Optional[MessagePolicy] = None,
+        web_bridge: Optional[Any] = None,
     ) -> None:
         self._router = router
         self._presenter = presenter
@@ -90,6 +91,7 @@ class MessageRuntime:
         self._deliver = deliver
         self._tasks = task_registry or TaskRegistry()
         self._policy = policy or MessagePolicy()
+        self._web_bridge = web_bridge  # Optional WebSessionBridge
 
     @property
     def task_registry(self) -> TaskRegistry:
@@ -238,6 +240,18 @@ class MessageRuntime:
             raise
 
         self._persist_result(session=session, user_text=user_text, result=result)
+
+        # Mirror the completed turn into the web session (gateway mode)
+        if self._web_bridge is not None:
+            try:
+                self._web_bridge.on_turn_complete(
+                    route=route,
+                    user_text=user_text,
+                    llm_text=llm_buf,
+                    adata=result.adata,
+                )
+            except Exception:
+                logger.warning("web_bridge.on_turn_complete failed (non-fatal)", exc_info=True)
 
         if result.error:
             await self._deliver(self._presenter.analysis_error(route, result.error))

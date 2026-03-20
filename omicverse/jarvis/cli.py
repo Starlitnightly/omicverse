@@ -170,6 +170,38 @@ def build_parser() -> argparse.ArgumentParser:
         dest="claw_debug_registry",
         help="Print matched registry entries to stderr before code generation.",
     )
+    # ── Gateway (web launcher) ────────────────────────────────────────────
+    gw_group = parser.add_argument_group(
+        "gateway (web launcher)",
+        "Launch the OmicVerse web UI alongside the channel bot (unified gateway mode).",
+    )
+    gw_group.add_argument(
+        "--with-web",
+        action="store_true",
+        dest="with_web",
+        help="Start the OmicVerse web server in the background when the bot starts.",
+    )
+    gw_group.add_argument(
+        "--web-port",
+        type=int,
+        default=0,
+        dest="web_port",
+        metavar="PORT",
+        help="Web server port (default: auto-select from 5050).",
+    )
+    gw_group.add_argument(
+        "--web-host",
+        default="127.0.0.1",
+        dest="web_host",
+        metavar="HOST",
+        help="Web server bind host (default: 127.0.0.1).",
+    )
+    gw_group.add_argument(
+        "--no-browser",
+        action="store_true",
+        dest="no_browser",
+        help="Do not automatically open the browser when the web server starts.",
+    )
     # ── Daemon control (claw daemon) ──────────────────────────────────────
     daemon_group = parser.add_argument_group(
         "daemon control (claw daemon)",
@@ -519,6 +551,18 @@ def _resolve_api_key(
     return None
 
 
+def _web_only_loop() -> int:
+    """Block until Ctrl-C when the web server is running but no channel is configured."""
+    print("Gateway running in web-only mode. Press Ctrl+C to stop.")
+    import time as _time
+    try:
+        while True:
+            _time.sleep(1)
+    except KeyboardInterrupt:
+        print("\nGateway stopped.")
+    return 0
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     effective_argv = list(sys.argv[1:] if argv is None else argv)
     parser = build_parser()
@@ -680,6 +724,49 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     from .session import SessionManager
 
+    # ── Gateway mode: start web server + build bridge ─────────────────────
+    _gateway_web_bridge = None
+    if getattr(args, "with_web", False):
+        try:
+            from omicverse_web.gateway.server import GatewayServer  # type: ignore
+            from omicverse_web.services.agent_session_service import SessionManager as WebSM  # type: ignore
+            from .gateway.web_bridge import WebSessionBridge
+
+            from omicverse_web.gateway.registry import GatewayChannelRegistry  # type: ignore
+
+            _web_sm = WebSM(max_sessions=20)
+            _web_registry = GatewayChannelRegistry()
+            _gw = GatewayServer()
+            _mem_db = os.path.join(os.path.expanduser(session_dir or "~/.ovjarvis"), "memory.db")
+            # Collect channel names configured at startup for the web status page
+            _startup_channels = []
+            _ch_arg = getattr(args, "channel", None) or config.get("channel")
+            if _ch_arg:
+                _startup_channels = [_ch_arg] if isinstance(_ch_arg, str) else list(_ch_arg)
+            _gw_thread, _gw_url = _gw.start(
+                host=getattr(args, "web_host", "127.0.0.1"),
+                port=getattr(args, "web_port", 0),
+                session_manager=_web_sm,
+                channel_registry=_web_registry,
+                memory_db_path=_mem_db,
+                channels=_startup_channels or None,
+            )
+            print(f"OmicVerse Web ready at {_gw_url}")
+            if not getattr(args, "no_browser", False):
+                _gw.open_browser()
+            try:
+                from omicverse.jarvis.memory.store import MemoryStore as _MemStore
+                _mem_store = _MemStore(_mem_db)
+            except Exception:
+                _mem_store = None
+            _gateway_web_bridge = WebSessionBridge(_web_sm, memory_store=_mem_store)
+        except ImportError as _gw_err:
+            print(
+                f"WARNING: --with-web requires omicverse-web to be installed. "
+                f"({_gw_err})",
+                file=sys.stderr,
+            )
+
     sm = SessionManager(
         session_dir=session_dir,
         model=model,
@@ -687,7 +774,23 @@ def main(argv: Optional[List[str]] = None) -> int:
         endpoint=endpoint,
         max_prompts=max_prompts,
         verbose=args.verbose,
+        gateway_web_bridge=_gateway_web_bridge,
     )
+
+    # ── Gateway-only mode: --with-web without an explicit --channel ───────
+    # If the user ran `omicverse gateway` (or `--with-web`) without specifying
+    # a channel, we don't require any bot credentials — just keep the web
+    # server running until Ctrl-C.
+    _channel_explicitly_set = bool(args.channel) or bool(config.get("channel"))
+    if getattr(args, "with_web", False) and not _channel_explicitly_set:
+        print("Gateway running — no channel bot configured. Press Ctrl+C to stop.")
+        try:
+            import time as _time
+            while True:
+                _time.sleep(1)
+        except KeyboardInterrupt:
+            print("\nGateway stopped.")
+        return 0
 
     if channel == "telegram":
         telegram_cfg = dict(config.get("telegram") or {})
@@ -698,11 +801,14 @@ def main(argv: Optional[List[str]] = None) -> int:
             else list(telegram_cfg.get("allowed_users") or [])
         )
         if not token:
-            print(
+            msg = (
                 "ERROR: Telegram bot token is required.\n"
-                "  Pass --token, run `omicverse jarvis --setup`, or set TELEGRAM_BOT_TOKEN.",
-                file=sys.stderr,
+                "  Pass --token, run `omicverse jarvis --setup`, or set TELEGRAM_BOT_TOKEN."
             )
+            if getattr(args, "with_web", False):
+                print(f"WARNING: {msg}\n  Running in web-only gateway mode.", file=sys.stderr)
+                return _web_only_loop()
+            print(msg, file=sys.stderr)
             return 1
         from .channels.telegram import AccessControl, run_bot
 
@@ -755,12 +861,15 @@ def main(argv: Optional[List[str]] = None) -> int:
             args.qq_client_secret or os.environ.get("QQ_CLIENT_SECRET") or qq_cfg.get("client_secret")
         )
         if not qq_app_id or not qq_client_secret:
-            print(
+            msg = (
                 "ERROR: QQ Bot credentials are required.\n"
                 "  Pass --qq-app-id/--qq-client-secret, run `omicverse jarvis --setup`, "
-                "or set QQ_APP_ID/QQ_CLIENT_SECRET.",
-                file=sys.stderr,
+                "or set QQ_APP_ID/QQ_CLIENT_SECRET."
             )
+            if getattr(args, "with_web", False):
+                print(f"WARNING: {msg}\n  Running in web-only gateway mode.", file=sys.stderr)
+                return _web_only_loop()
+            print(msg, file=sys.stderr)
             return 1
         qq_image_host = args.qq_image_host or os.environ.get("QQ_IMAGE_HOST") or qq_cfg.get("image_host")
         qq_image_server_port = int(
@@ -809,12 +918,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     path = _resolve_value(args.feishu_path, feishu_cfg.get("path"), "/feishu/events")
 
     if not app_id or not app_secret:
-        print(
+        msg = (
             "ERROR: Feishu app credentials are required.\n"
             "  Pass --feishu-app-id/--feishu-app-secret, run `omicverse jarvis --setup`, "
-            "or set FEISHU_APP_ID/FEISHU_APP_SECRET.",
-            file=sys.stderr,
+            "or set FEISHU_APP_ID/FEISHU_APP_SECRET."
         )
+        if getattr(args, "with_web", False):
+            print(f"WARNING: {msg}\n  Running in web-only gateway mode.", file=sys.stderr)
+            return _web_only_loop()
+        print(msg, file=sys.stderr)
         return 1
     from .channels.feishu import run_feishu_bot, run_feishu_ws_bot
 

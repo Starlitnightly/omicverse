@@ -27,6 +27,14 @@ def _run_skill_seeker(argv: List[str]) -> int:
     return ss_main(argv)
 
 
+def _run_gateway(argv: List[str]) -> int:
+    """One-shot gateway launcher: equivalent to ``omicverse claw --with-web``."""
+    # Inject --with-web unless the user already passed it
+    if "--with-web" not in argv:
+        argv = ["--with-web"] + list(argv)
+    return _run_jarvis(argv)
+
+
 def _run_web(argv: List[str]) -> int:
     try:
         from omicverse_web.start_server import main as web_main
@@ -68,6 +76,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Launch the OmicVerse web interface.",
         add_help=False,
     ).set_defaults(func=_run_web)
+
+    subparsers.add_parser(
+        "gateway",
+        help=(
+            "Unified gateway: start a channel bot AND the web UI together. "
+            "Equivalent to 'omicverse claw --with-web'."
+        ),
+        add_help=False,
+    ).set_defaults(func=_run_gateway)
 
     subparsers.add_parser(
         "skill-seeker",

@@ -320,6 +320,7 @@ class SessionManager:
         endpoint: Optional[str] = None,
         max_prompts: int = 0,
         verbose: bool = False,
+        gateway_web_bridge: Optional[Any] = None,
     ) -> None:
         self._base      = Path(session_dir or os.path.expanduser("~/.ovjarvis"))
         self._model     = model
@@ -333,6 +334,8 @@ class SessionManager:
         self._sessions: Dict[int, Dict[str, JarvisSession]] = {}
         self._active_kernel: Dict[int, str] = {}
         self._kernel_name_re = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")
+        # Optional WebSessionBridge — set when running with --with-web
+        self.gateway_web_bridge: Optional[Any] = gateway_web_bridge
 
     # ------------------------------------------------------------------
 

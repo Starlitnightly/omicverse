@@ -600,6 +600,21 @@ class IMessageJarvisBot:
         except Exception:
             pass
 
+        # Mirror the completed turn into the web session (gateway mode)
+        _web_bridge = getattr(self._sm, "gateway_web_bridge", None)
+        if _web_bridge is not None:
+            try:
+                _web_bridge.on_turn_complete_simple(
+                    channel="imessage",
+                    scope_type=session_key.scope_type,
+                    scope_id=session_key.scope_id,
+                    user_text=user_text,
+                    llm_text=llm_buf,
+                    adata=result.adata,
+                )
+            except Exception:
+                pass
+
         if result.error:
             err_text = f"分析出错: {result.error}"
             if result.diagnostics:

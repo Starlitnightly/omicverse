@@ -1051,6 +1051,7 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         presenter=TelegramRuntimePresenter(),
         execution_adapter=AgentBridgeExecutionAdapter(),
         deliver=delivery.deliver,
+        web_bridge=getattr(sm, "gateway_web_bridge", None),
     )
 
     # ------------------------------------------------------------------

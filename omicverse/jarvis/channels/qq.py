@@ -678,6 +678,22 @@ class QQRuntime:
         except Exception:
             pass
 
+        # Mirror the completed turn into the web session (gateway mode)
+        _web_bridge = getattr(self._sm, "gateway_web_bridge", None)
+        if _web_bridge is not None:
+            try:
+                scope_id = str(target.channel_id if hasattr(target, "channel_id") else target)
+                _web_bridge.on_turn_complete_simple(
+                    channel="qq",
+                    scope_type="dm",
+                    scope_id=scope_id,
+                    user_text=user_text,
+                    llm_text=llm_buf,
+                    adata=result.adata,
+                )
+            except Exception:
+                pass
+
         if result.error:
             err_text = f"分析出错: {result.error}"
             if result.diagnostics:
@@ -1275,8 +1291,9 @@ def _run_gateway(
                     if not can_resume:
                         session_id = None
                         last_seq = None
-                        # Downgrade intents on repeated failures
-                        intent_index = min(intent_index + 1, len(_INTENT_LEVELS) - 1)
+                        # NOTE: do NOT downgrade intents here — silently dropping
+                        # GROUP_AND_C2C would make the bot appear to work (connected)
+                        # while never receiving messages. Let reconnect retry same intents.
                     ws.close()
 
             def on_error(ws: Any, error: Any) -> None:
