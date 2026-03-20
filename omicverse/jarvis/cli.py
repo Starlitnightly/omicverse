@@ -4,9 +4,11 @@ CLI entry point for ``omicverse jarvis``.
 from __future__ import annotations
 
 import argparse
+import importlib
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -576,11 +578,19 @@ def _gateway_daemon_loop(
     no_browser: bool,
     config_path: Path,
     session_dir: Optional[str],
+    model: str,
+    api_key: Optional[str],
+    endpoint: Optional[str],
+    max_prompts: int,
+    verbose: bool,
 ) -> int:
     """Start the daemon-style gateway: web UI plus auto-started channels."""
     try:
         from omicverse_web.gateway.server import GatewayServer  # type: ignore
         from omicverse_web.services.agent_session_service import SessionManager as WebSM  # type: ignore
+        from omicverse_web.gateway.inprocess_channel_manager import InProcessChannelManager  # type: ignore
+        from .gateway.web_bridge import WebSessionBridge
+        from .memory.store import MemoryStore as _MemStore
     except ImportError as exc:
         print(
             "WARNING: gateway daemon mode requires omicverse-web to be installed.",
@@ -590,16 +600,57 @@ def _gateway_daemon_loop(
         return 1
 
     web_sm = WebSM(max_sessions=20)
-    gw = GatewayServer()
     mem_db = os.path.join(os.path.expanduser(session_dir or "~/.ovjarvis"), "memory.db")
+    try:
+        mem_store = _MemStore(mem_db)
+    except Exception:
+        mem_store = None
+    gateway_web_bridge = WebSessionBridge(web_sm, memory_store=mem_store)
+
+    from .session import SessionManager
+
+    jarvis_sm = SessionManager(
+        session_dir=session_dir,
+        model=model,
+        api_key=api_key,
+        endpoint=endpoint,
+        max_prompts=max_prompts,
+        verbose=verbose,
+        gateway_web_bridge=gateway_web_bridge,
+        shared_kernel=True,
+    )
+    try:
+        web_sm.set_adata_sync_handler(lambda _session_id, adata: jarvis_sm.set_shared_adata(adata))
+    except Exception:
+        pass
+    channel_manager = InProcessChannelManager(jarvis_sm)
+    gw = GatewayServer()
     _gw_thread, _gw_url = gw.start(
         host=web_host,
         port=web_port,
         session_manager=web_sm,
+        channel_manager=channel_manager,
         memory_db_path=mem_db,
         auto_start_channels=True,
         jarvis_config_path=str(config_path),
     )
+    deadline = time.time() + 10.0
+    while time.time() < deadline:
+        web_app = sys.modules.get("app")
+        if web_app is None:
+            try:
+                web_app = importlib.import_module("app")
+            except Exception:
+                web_app = None
+        web_state = getattr(web_app, "state", None) if web_app is not None else None
+        web_kernel_executor = getattr(web_state, "kernel_executor", None) if web_state is not None else None
+        if web_kernel_executor is not None:
+            jarvis_sm.attach_shared_kernel_executor(web_kernel_executor)
+            current_adata = getattr(web_state, "current_adata", None)
+            if current_adata is not None:
+                jarvis_sm.set_shared_adata(current_adata)
+            break
+        time.sleep(0.1)
     print(f"OmicVerse Gateway ready at {_gw_url}")
     if not no_browser:
         gw.open_browser()
@@ -651,15 +702,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     session_dir = _resolve_value(args.session_dir, config.get("session_dir"))
     max_prompts = _resolve_value(args.max_prompts, config.get("max_prompts"), 0)
 
-    if getattr(args, "gateway_daemon", False):
-        return _gateway_daemon_loop(
-            web_host=getattr(args, "web_host", "127.0.0.1"),
-            web_port=getattr(args, "web_port", 0),
-            no_browser=getattr(args, "no_browser", False),
-            config_path=config_path,
-            session_dir=session_dir,
-        )
-
     def _do_resolve_api_key() -> Optional[str]:
         try:
             key = _resolve_api_key(
@@ -680,6 +722,20 @@ def main(argv: Optional[List[str]] = None) -> int:
         return key
 
     api_key = _do_resolve_api_key()
+
+    if getattr(args, "gateway_daemon", False):
+        return _gateway_daemon_loop(
+            web_host=getattr(args, "web_host", "127.0.0.1"),
+            web_port=getattr(args, "web_port", 0),
+            no_browser=getattr(args, "no_browser", False),
+            config_path=config_path,
+            session_dir=session_dir,
+            model=model,
+            api_key=api_key,
+            endpoint=endpoint,
+            max_prompts=max_prompts,
+            verbose=args.verbose,
+        )
 
     # ── Auto-setup if model or api_key is not configured ─────────────────
     _key_not_needed = auth_mode in {"no_auth"} or llm_provider in {"python", "ollama"}

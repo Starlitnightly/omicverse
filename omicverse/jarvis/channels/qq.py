@@ -455,6 +455,20 @@ class _ImageServer:
         with self._lock:
             self._images.pop(name, None)
 
+    def stop(self) -> None:
+        server = self._server
+        if server is None:
+            return
+        try:
+            server.shutdown()
+        except Exception:
+            pass
+        try:
+            server.server_close()
+        except Exception:
+            pass
+        self._server = None
+
 
 # ── QQRuntime ─────────────────────────────────────────────────────────────────
 
@@ -1422,6 +1436,7 @@ def run_qq_bot(
     image_host: Optional[str] = None,
     image_server_bind: str = "0.0.0.0",
     image_server_port: int = 8081,
+    stop_event: Optional[threading.Event] = None,
 ) -> None:
     """
     Start the QQ Bot channel and block until interrupted.
@@ -1460,7 +1475,7 @@ def run_qq_bot(
 
     runtime = QQRuntime(client, session_manager, image_server=img_server)
 
-    stop_event = threading.Event()
+    runtime_stop_event = stop_event or threading.Event()
     try:
         logger.info("QQ Bot Jarvis starting (app_id=%s)", app_id)
         _run_gateway(
@@ -1468,8 +1483,11 @@ def run_qq_bot(
             client_secret=client_secret,
             runtime=runtime,
             client=client,
-            stop_event=stop_event,
+            stop_event=runtime_stop_event,
         )
     except KeyboardInterrupt:
         logger.info("QQ Bot shutting down")
-        stop_event.set()
+        runtime_stop_event.set()
+    finally:
+        if img_server is not None:
+            img_server.stop()

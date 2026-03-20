@@ -10,6 +10,7 @@ import subprocess
 import sys
 import importlib
 import threading
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -312,6 +313,44 @@ class JarvisSession:
 class SessionManager:
     """Manage per-user multi-kernel sessions with one active kernel pointer."""
 
+    class _SharedKernelNotebookExecutor:
+        """Adapter that lets Jarvis reuse the web app's in-process kernel."""
+
+        def __init__(self, kernel_executor: Any, *, timeout: int = 600) -> None:
+            self._kernel_executor = kernel_executor
+            self.timeout = timeout
+            self.max_prompts_per_session = UNLIMITED_PROMPTS_SENTINEL
+            self.session_prompt_count = 0
+            self.session_history: List[Dict[str, Any]] = []
+            self.current_session: Optional[Dict[str, Any]] = None
+
+        def _ensure_session(self) -> Dict[str, Any]:
+            if self.current_session is None:
+                self.current_session = {
+                    "session_id": f"gateway-shared-{uuid.uuid4().hex[:12]}",
+                    "session_dir": str(Path.cwd()),
+                    "notebook_path": None,
+                    "notebook": None,
+                }
+            return self.current_session
+
+        def execute(self, code: str, adata: Any) -> Any:
+            self._ensure_session()
+            result = self._kernel_executor.execute(code, adata=adata, timeout=self.timeout)
+            self.session_prompt_count += 1
+            return result.get("adata") if isinstance(result, dict) else result
+
+        def _archive_current_session(self) -> None:
+            if self.current_session is not None:
+                self.session_history.append(dict(self.current_session))
+            self.current_session = None
+            self.session_prompt_count = 0
+
+        def shutdown(self) -> None:
+            # The shared kernel belongs to the web process. Jarvis sessions must
+            # not tear it down when an individual agent is discarded.
+            return
+
     def __init__(
         self,
         *,
@@ -322,6 +361,8 @@ class SessionManager:
         max_prompts: int = 0,
         verbose: bool = False,
         gateway_web_bridge: Optional[Any] = None,
+        shared_kernel: bool = False,
+        shared_kernel_executor: Optional[Any] = None,
     ) -> None:
         self._base      = Path(session_dir or os.path.expanduser("~/.ovjarvis"))
         self._model     = model
@@ -337,15 +378,71 @@ class SessionManager:
         self._kernel_name_re = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")
         self._shared_adata: Any = None
         self._lock = threading.Lock()
+        self._shared_kernel = bool(shared_kernel)
+        self._shared_kernel_user_id = 0
+        self._shared_kernel_executor = shared_kernel_executor
         # Optional WebSessionBridge — set when running with --with-web
         self.gateway_web_bridge: Optional[Any] = gateway_web_bridge
 
     # ------------------------------------------------------------------
 
+    def _read_adata_from_shared_kernel(self) -> Any:
+        executor = self._shared_kernel_executor
+        if executor is None:
+            return None
+        try:
+            ensure_kernel = getattr(executor, "_ensure_kernel", None)
+            if callable(ensure_kernel):
+                ensure_kernel()
+            shell = getattr(executor, "shell", None)
+            user_ns = getattr(shell, "user_ns", None)
+            if not isinstance(user_ns, dict):
+                return None
+            return user_ns.get("odata") or user_ns.get("adata")
+        except Exception:
+            return None
+
+    def _resolve_shared_adata_locked(self) -> Any:
+        kernel_adata = self._read_adata_from_shared_kernel()
+        if kernel_adata is not None and kernel_adata is not self._shared_adata:
+            self._shared_adata = kernel_adata
+        return self._shared_adata
+
+    def _attach_shared_executor_to_agent(self, agent: Any) -> None:
+        if agent is None or self._shared_kernel_executor is None:
+            return
+        timeout = getattr(agent, "notebook_timeout", 600)
+        agent.use_notebook_execution = True
+        agent._notebook_executor = self._SharedKernelNotebookExecutor(
+            self._shared_kernel_executor,
+            timeout=timeout,
+        )
+
+    def attach_shared_kernel_executor(self, kernel_executor: Any) -> None:
+        with self._lock:
+            self._shared_kernel_executor = kernel_executor
+            shared = self._resolve_shared_adata_locked()
+            for user_sessions in self._sessions.values():
+                for session in user_sessions.values():
+                    self._attach_shared_executor_to_agent(session.agent)
+                    if shared is not None:
+                        session.adata = shared
+
+    def _effective_user_id(self, user_id: int) -> int:
+        if self._shared_kernel:
+            return self._shared_kernel_user_id
+        return user_id
+
     def get_or_create(self, user_id: int) -> JarvisSession:
         """Return the active kernel session for *user_id* (default: ``main``)."""
-        active = self.get_active_kernel(user_id)
-        return self._get_or_create_kernel_session(user_id, active)
+        effective_user_id = self._effective_user_id(user_id)
+        active = self.get_active_kernel(effective_user_id)
+        session = self._get_or_create_kernel_session(effective_user_id, active)
+        with self._lock:
+            shared = self._resolve_shared_adata_locked()
+            if session.adata is None and shared is not None:
+                session.adata = shared
+        return session
 
     def set_shared_adata(self, adata: Any) -> None:
         """Set the shared AnnData reference used by all Jarvis sessions."""
@@ -354,18 +451,28 @@ class SessionManager:
             for user_sessions in self._sessions.values():
                 for session in user_sessions.values():
                     session.adata = adata
+        executor = self._shared_kernel_executor
+        if executor is not None:
+            try:
+                sync_adata = getattr(executor, "sync_adata", None)
+                if callable(sync_adata):
+                    sync_adata(adata)
+            except Exception:
+                pass
 
     def get_shared_adata(self) -> Any:
         """Return the current shared AnnData reference, if any."""
         with self._lock:
-            return self._shared_adata
+            return self._resolve_shared_adata_locked()
 
     def get_active_kernel(self, user_id: int) -> str:
+        user_id = self._effective_user_id(user_id)
         if user_id not in self._active_kernel:
             self._active_kernel[user_id] = DEFAULT_KERNEL_NAME
         return self._active_kernel[user_id]
 
     def list_kernels(self, user_id: int) -> List[str]:
+        user_id = self._effective_user_id(user_id)
         names = set(self._discover_kernel_names(user_id))
         names.update(self._sessions.get(user_id, {}).keys())
         if not names:
@@ -373,6 +480,7 @@ class SessionManager:
         return sorted(names)
 
     def switch_kernel(self, user_id: int, kernel_name: str, create: bool = False) -> JarvisSession:
+        user_id = self._effective_user_id(user_id)
         name = self.normalize_kernel_name(kernel_name)
         exists_in_mem = name in self._sessions.get(user_id, {})
         exists_on_disk = (name == DEFAULT_KERNEL_NAME) or self._kernel_exists_on_disk(user_id, name)
@@ -383,6 +491,7 @@ class SessionManager:
         return session
 
     def create_kernel(self, user_id: int, kernel_name: str, switch: bool = True) -> JarvisSession:
+        user_id = self._effective_user_id(user_id)
         name = self.normalize_kernel_name(kernel_name)
         if self._kernel_exists_on_disk(user_id, name) or name in self._sessions.get(user_id, {}):
             raise ValueError(f"Kernel '{name}' 已存在")
@@ -408,12 +517,13 @@ class SessionManager:
             kernel_root = self._kernel_root(user_id, kernel_name)
             self._ensure_kernel_dirs(kernel_root)
             agent = self._build_agent(kernel_root)
+            self._attach_shared_executor_to_agent(agent)
             session = JarvisSession(
                 user_id=user_id,
                 workspace_dir=kernel_root,
                 agent=agent,
                 max_prompts_setting=self._max_prompts_setting,
-                adata=self._shared_adata,
+                adata=self._resolve_shared_adata_locked(),
             )
             user_sessions[kernel_name] = session
             return session
@@ -453,7 +563,7 @@ class SessionManager:
     def _build_agent(self, kernel_root: Path) -> Any:
         kwargs: Dict[str, Any] = dict(
             model=self._model,
-            use_notebook_execution=True,
+            use_notebook_execution=self._shared_kernel_executor is None,
             strict_kernel_validation=False,
             verbose=self._verbose,
             max_prompts_per_session=self._max_prompts,
