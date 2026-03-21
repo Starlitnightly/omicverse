@@ -1,14 +1,15 @@
 """
-WebSessionBridge — mirrors jarvis channel turns into omicverse-web AgentSessions.
+WebSessionBridge — mirrors jarvis channel turns into OmicClaw web AgentSessions.
 
-This module is the glue between the jarvis channel layer and the omicverse-web
+This module is the glue between the jarvis channel layer and the OmicClaw web
 SessionManager.  It is intentionally dependency-free at import time: the web
 SessionManager is passed in at construction, so this file can be imported even
-when omicverse-web is not installed (the bridge simply won't be created).
+when OmicClaw is not installed (the bridge simply won't be created). Legacy
+``omicverse_web`` installations remain supported.
 
 Usage (from jarvis/cli.py, after GatewayServer is started)::
 
-    from omicverse_web.services.agent_session_service import SessionManager as WebSM
+    from omicclaw.services.agent_session_service import SessionManager as WebSM
     from omicverse.jarvis.gateway.web_bridge import WebSessionBridge
 
     web_sm = WebSM(max_sessions=20)
@@ -36,7 +37,7 @@ def _route_to_web_session_id(
 ) -> str:
     """Derive a stable 16-hex-char web session_id from channel routing info.
 
-    Uses SHA-1 (same algorithm as ``GatewaySessionRegistry`` in omicverse-web)
+    Uses SHA-1 (same algorithm as ``GatewaySessionRegistry`` in OmicClaw)
     so that the web and jarvis sides always agree on session IDs.
     """
     key = f"{channel}:{scope_type}:{scope_id}"
@@ -46,12 +47,12 @@ def _route_to_web_session_id(
 
 
 class WebSessionBridge:
-    """Writes completed jarvis turns into the shared omicverse-web SessionManager.
+    """Writes completed jarvis turns into the shared OmicClaw SessionManager.
 
     Parameters
     ----------
     web_session_manager:
-        The omicverse-web ``SessionManager`` instance.
+        The OmicClaw ``SessionManager`` instance.
     memory_store:
         Optional ``MemoryStore`` — when set, each completed turn is also
         persisted as a memory document for long-term recall.

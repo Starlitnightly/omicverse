@@ -54,15 +54,19 @@ def _run_gateway(argv: List[str]) -> int:
 
 def _run_web(argv: List[str]) -> int:
     try:
-        from omicverse_web.start_server import main as web_main
-    except ImportError as exc:
-        print(
-            "OmicVerse web interface is unavailable. "
-            "Ensure `omicverse_web` is installed and on PYTHONPATH.",
-            file=sys.stderr,
-        )
-        print(f"Import error: {exc}", file=sys.stderr)
-        return 1
+        from omicclaw.start_server import main as web_main
+    except ImportError:
+        try:
+            from omicverse_web.start_server import main as web_main
+        except ImportError as exc:
+            print(
+                "OmicClaw web workspace is unavailable. "
+                "Ensure `omicclaw` is installed and on PYTHONPATH. "
+                "Legacy `omicverse_web` is still supported as a fallback.",
+                file=sys.stderr,
+            )
+            print(f"Import error: {exc}", file=sys.stderr)
+            return 1
     return web_main(argv)
 
 
@@ -90,7 +94,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     subparsers.add_parser(
         "web",
-        help="Launch the OmicVerse web interface.",
+        help="Launch the OmicClaw web workspace.",
         add_help=False,
     ).set_defaults(func=_run_web)
 

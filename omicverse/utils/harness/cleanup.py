@@ -101,8 +101,12 @@ class HarnessCleaner:
 
     def _find_duplicate_web_event_contract(self) -> list[CleanupFinding]:
         findings: list[CleanupFinding] = []
-        agent_service = self.repo_root / "omicverse_web" / "services" / "agent_service.py"
-        if not agent_service.exists():
+        candidates = [
+            self.repo_root / "omicclaw" / "services" / "agent_service.py",
+            self.repo_root / "omicverse_web" / "services" / "agent_service.py",
+        ]
+        agent_service = next((path for path in candidates if path.exists()), None)
+        if agent_service is None:
             return findings
         text = agent_service.read_text(encoding="utf-8")
         if "AGENT_EVENT_TYPES =" in text or "class AgentEvent" in text:

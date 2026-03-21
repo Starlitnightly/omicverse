@@ -580,15 +580,42 @@ def _web_only_loop(mode_label: str = "web-only") -> int:
     return 0
 
 
-def _resolve_gateway_web_root() -> Optional[Path]:
-    candidates = [
-        Path(__file__).resolve().parents[3] / "omicverse-project" / "omicverse-web",
-        Path.home() / "Desktop" / "analysis" / "omicverse-project" / "omicverse-web",
+def _web_project_candidates() -> List[Path]:
+    base_candidates = [
+        Path(__file__).resolve().parents[3] / "omicverse-project",
+        Path.home() / "Desktop" / "analysis" / "omicverse-project",
     ]
+    project_names = ["omicclaw", "omicverse-web"]
+    candidates: List[Path] = []
+    for base in base_candidates:
+        for project_name in project_names:
+            candidates.append(base / project_name)
+    return candidates
+
+
+def _resolve_gateway_web_root() -> Optional[Path]:
+    candidates = _web_project_candidates()
     for candidate in candidates:
         if (candidate / "gateway" / "server.py").exists() and (candidate / "services").exists():
             return candidate
     return None
+
+
+def _import_installed_web_runtime():
+    errors: List[str] = []
+    for package_name in ("omicclaw", "omicverse_web"):
+        try:
+            gateway_mod = importlib.import_module(f"{package_name}.gateway.server")
+            session_mod = importlib.import_module(f"{package_name}.services.agent_session_service")
+            registry_mod = importlib.import_module(f"{package_name}.gateway.registry")
+            return (
+                gateway_mod.GatewayServer,
+                session_mod.SessionManager,
+                registry_mod.GatewayChannelRegistry,
+            )
+        except ImportError as exc:
+            errors.append(f"{package_name}: {exc}")
+    raise ImportError("; ".join(errors))
 
 
 def _gateway_daemon_loop(
@@ -608,7 +635,7 @@ def _gateway_daemon_loop(
     try:
         gateway_web_root = _resolve_gateway_web_root()
         if gateway_web_root is None:
-            raise ImportError("Cannot locate omicverse-project/omicverse-web")
+            raise ImportError("Cannot locate omicverse-project/omicclaw or legacy omicverse-web")
         gateway_web_root_str = str(gateway_web_root)
         if gateway_web_root_str not in sys.path:
             sys.path.insert(0, gateway_web_root_str)
@@ -619,7 +646,8 @@ def _gateway_daemon_loop(
         from .memory.store import MemoryStore as _MemStore
     except ImportError as exc:
         print(
-            "WARNING: gateway daemon mode requires omicverse-web to be installed.",
+            "WARNING: gateway daemon mode requires OmicClaw to be installed. "
+            "Legacy omicverse-web is still supported.",
             file=sys.stderr,
         )
         print(f"Import error: {exc}", file=sys.stderr)
@@ -677,7 +705,7 @@ def _gateway_daemon_loop(
                 jarvis_sm.set_shared_adata(current_adata)
             break
         time.sleep(0.1)
-    print(f"OmicVerse Gateway ready at {_gw_url}")
+    print(f"OmicClaw Gateway ready at {_gw_url}")
     if not no_browser:
         gw.open_browser()
     return _web_only_loop("gateway daemon")
@@ -885,11 +913,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     _web_sm = None
     if getattr(args, "with_web", False):
         try:
-            from omicverse_web.gateway.server import GatewayServer  # type: ignore
-            from omicverse_web.services.agent_session_service import SessionManager as WebSM  # type: ignore
+            GatewayServer, WebSM, GatewayChannelRegistry = _import_installed_web_runtime()
             from .gateway.web_bridge import WebSessionBridge
-
-            from omicverse_web.gateway.registry import GatewayChannelRegistry  # type: ignore
 
             _web_sm = WebSM(max_sessions=20)
             _web_registry = GatewayChannelRegistry()
@@ -908,7 +933,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 memory_db_path=_mem_db,
                 channels=_startup_channels or None,
             )
-            print(f"OmicVerse Web ready at {_gw_url}")
+            print(f"OmicClaw Web ready at {_gw_url}")
             if not getattr(args, "no_browser", False):
                 _gw.open_browser()
             try:
@@ -919,7 +944,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             _gateway_web_bridge = WebSessionBridge(_web_sm, memory_store=_mem_store)
         except ImportError as _gw_err:
             print(
-                f"WARNING: --with-web requires omicverse-web to be installed. "
+                f"WARNING: --with-web requires omicclaw to be installed. "
+                f"Legacy omicverse-web is still supported. "
                 f"({_gw_err})",
                 file=sys.stderr,
             )
