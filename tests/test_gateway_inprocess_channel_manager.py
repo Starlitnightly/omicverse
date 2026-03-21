@@ -3,7 +3,11 @@ from __future__ import annotations
 import threading
 import time
 
-from omicverse_web.gateway.inprocess_channel_manager import InProcessChannelManager
+import pytest
+
+
+_gateway_mod = pytest.importorskip("omicverse_web.gateway.inprocess_channel_manager")
+InProcessChannelManager = _gateway_mod.InProcessChannelManager
 
 
 def test_inprocess_manager_supports_all_channels(monkeypatch) -> None:

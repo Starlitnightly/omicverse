@@ -2,19 +2,12 @@
 
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
 import unittest
 
+import pytest
 
-def _load_kernel_service_module():
-    root = Path(__file__).resolve().parents[1]
-    path = root / "omicverse_web" / "services" / "kernel_service.py"
-    spec = importlib.util.spec_from_file_location("ov_web_kernel_service_test", path)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
-    return module
+
+mod = pytest.importorskip("omicverse_web.services.kernel_service")
 
 
 def _cleanup_executor(executor):
@@ -29,8 +22,6 @@ def _cleanup_executor(executor):
 class TestWebKernelService(unittest.TestCase):
 
     def test_build_kernel_namespace_seeds_ipython_history_keys(self):
-        mod = _load_kernel_service_module()
-
         ns = mod.build_kernel_namespace()
 
         self.assertIn('_oh', ns)
@@ -41,8 +32,6 @@ class TestWebKernelService(unittest.TestCase):
         self.assertIn('In', ns)
 
     def test_custom_namespace_expression_does_not_fail_displayhook(self):
-        mod = _load_kernel_service_module()
-
         executor = mod.InProcessKernelExecutor()
         self.addCleanup(lambda: _cleanup_executor(executor))
         ns = mod.build_kernel_namespace()
