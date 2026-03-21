@@ -165,6 +165,7 @@ Github = 'https://github.com/Starlitnightly/omicverse'
 [project.scripts]
 ov-skill-seeker = "omicverse.ov_skill_seeker.cli:main"
 omicverse = "omicverse.cli:main"
+omicclaw = "omicverse.cli:omicclaw_main"
 omicverse-mcp = "omicverse.mcp.server:main"
 
 [tool.setuptools.packages.find]

@@ -13,6 +13,7 @@ skill-seeker  OmicVerse Skill Seeker utilities (list/validate/package skills).
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from typing import List, Optional
 
@@ -34,6 +35,14 @@ def _run_claw(argv: List[str]) -> int:
     if any(flag in argv for flag in claw_passthrough_flags):
         return _run_jarvis(argv)
     return _run_gateway(argv)
+
+
+def omicclaw_main(argv: Optional[List[str]] = None) -> int:
+    """Dedicated `omicclaw` entrypoint with forced-login web behavior."""
+    os.environ["OV_WEB_FORCE_LOGIN"] = "1"
+    os.environ["OV_LAUNCHER"] = "omicclaw"
+    effective_argv = list(sys.argv[1:] if argv is None else argv)
+    return _run_claw(effective_argv)
 
 
 def _run_skill_seeker(argv: List[str]) -> int:
