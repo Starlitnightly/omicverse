@@ -89,6 +89,75 @@ omicverse jarvis --setup
 - 选择 OpenAI、Claude、千问、Kimi、DeepSeek、智谱、Gemini、Grok、Ollama 以及其他 OpenAI 兼容端点上的默认模型
 - 为 Ollama 或其他 OpenAI 兼容网关保存自定义 endpoint
 
+### 3.3 OpenAI Codex OAuth（ChatGPT Pro/Plus 登录）
+
+Codex OAuth 允许你通过 ChatGPT Pro/Plus 订阅使用 OpenAI Codex 模型（如 `gpt-5.3-codex`），无需单独的 API Key。
+
+提供两种登录方式：
+
+#### Device Flow（无浏览器模式，推荐）
+
+适用于 SSH 远程服务器等没有本地浏览器的环境。
+
+```bash
+omicverse jarvis --setup
+# 选择 OpenAI → "OpenAI Codex OAuth（无浏览器 / SSH，推荐）"
+```
+
+向导会显示一个 URL 和一次性授权码：
+
+```
+在任意设备上打开: https://auth.openai.com/codex/device
+输入授权码:       XXXX-XXXX
+```
+
+在任意设备（手机、电脑）上打开该 URL，输入授权码并登录 ChatGPT 账号。Jarvis 会自动检测授权完成。
+
+#### 浏览器模式
+
+适用于本地有浏览器的环境。
+
+```bash
+omicverse jarvis --setup
+# 选择 OpenAI → "OpenAI Codex OAuth（ChatGPT 登录，浏览器）"
+```
+
+浏览器会自动打开 OpenAI 登录页面。授权完成后，浏览器重定向到 `localhost:1455`，Jarvis 自动获取 token。
+
+#### 通过 CLI 参数使用 Codex OAuth
+
+```bash
+# 使用已保存的 OAuth token（跳过向导）
+omicverse jarvis --auth-mode openai_oauth --model gpt-5.3-codex
+
+# 显式触发 Device Flow 登录
+omicverse jarvis --auth-mode openai_device --model gpt-5.3-codex
+```
+
+#### 在 Python 代码中使用 Codex OAuth
+
+```python
+from omicverse.jarvis import OpenAIOAuthManager, CodexAPIClient
+
+manager = OpenAIOAuthManager()
+
+# Device Flow（无浏览器）
+manager.login_device()
+
+# 或浏览器模式
+manager.login()
+
+# 发送请求到 Codex API（自动 token 刷新 + URL 重写）
+client = CodexAPIClient(manager)
+resp = client.post(
+    "https://api.openai.com/v1/responses",
+    json_body={"model": "gpt-5.3-codex", "input": "Hello"},
+)
+print(resp.json())
+```
+
+Token 存储在 `~/.ovjarvis/auth.json`（权限 `0600`），后续启动时自动刷新，无需重新登录。
+
 ## 4. 启动 Jarvis
 
 最小启动：
@@ -264,7 +333,7 @@ omicverse jarvis \
 - `--imessage-cli-path`: `imsg` 可执行文件路径
 - `--imessage-db-path`: `chat.db` 路径
 - `--imessage-include-attachments`: 启用 iMessage 入站附件元数据订阅
-- `--auth-mode`: 保存到本地配置中的认证方式（`environment`、`openai_oauth` 表示 OpenAI Codex OAuth、`openai_api_key`、`saved_api_key`、`no_auth`）
+- `--auth-mode`: 保存到本地配置中的认证方式（`environment`、`openai_oauth` 浏览器 Codex OAuth、`openai_device` 无浏览器 Device Flow、`saved_api_key`、`no_auth`）
 - `--model`: 默认模型（若已配置则优先使用配置）
 - `--api-key`: LLM API Key（或已保存的 provider 认证 / 对应 provider 的环境变量）
 - `--endpoint`: Ollama 或其他 OpenAI 兼容端点的 API Base URL

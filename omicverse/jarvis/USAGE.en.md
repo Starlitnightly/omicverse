@@ -89,6 +89,75 @@ The setup wizard can:
 - pick models across OpenAI, Claude, Qwen, Kimi, DeepSeek, Zhipu, Gemini, Grok, Ollama, and other OpenAI-compatible endpoints
 - save custom endpoint settings for Ollama or other OpenAI-compatible gateways
 
+### 3.3 OpenAI Codex OAuth (ChatGPT Pro/Plus Login)
+
+Codex OAuth lets you use OpenAI Codex models (e.g. `gpt-5.3-codex`) via your ChatGPT Pro/Plus subscription — no separate API key required.
+
+There are two login methods:
+
+#### Device Flow (headless, recommended)
+
+Best for SSH / remote servers where no local browser is available.
+
+```bash
+omicverse jarvis --setup
+# Choose OpenAI → "OpenAI Codex OAuth (headless / SSH, Recommended)"
+```
+
+The wizard will display a URL and a one-time code:
+
+```
+Open this URL: https://auth.openai.com/codex/device
+Enter code:    XXXX-XXXX
+```
+
+Open the URL on any device (phone, laptop), enter the code, and sign in with your ChatGPT account. Jarvis will detect the authorization automatically.
+
+#### Browser Flow
+
+Best when running on a local machine with a browser.
+
+```bash
+omicverse jarvis --setup
+# Choose OpenAI → "OpenAI Codex OAuth (ChatGPT sign-in, browser)"
+```
+
+A browser window opens for OpenAI sign-in. After authorization, the browser redirects to `localhost:1455` and Jarvis captures the token automatically.
+
+#### Using Codex OAuth via CLI flags
+
+```bash
+# Use existing saved OAuth tokens (skips the wizard)
+omicverse jarvis --auth-mode openai_oauth --model gpt-5.3-codex
+
+# Or trigger device flow login explicitly
+omicverse jarvis --auth-mode openai_device --model gpt-5.3-codex
+```
+
+#### Using Codex OAuth in Python code
+
+```python
+from omicverse.jarvis import OpenAIOAuthManager, CodexAPIClient
+
+manager = OpenAIOAuthManager()
+
+# Device Flow (headless)
+manager.login_device()
+
+# Or Browser Flow
+manager.login()
+
+# Send requests to Codex API (auto token refresh + URL rewriting)
+client = CodexAPIClient(manager)
+resp = client.post(
+    "https://api.openai.com/v1/responses",
+    json_body={"model": "gpt-5.3-codex", "input": "Hello"},
+)
+print(resp.json())
+```
+
+Tokens are stored in `~/.ovjarvis/auth.json` (permission `0600`) and refreshed automatically on subsequent launches.
+
 ## 4. Start Jarvis
 
 Minimal start:
@@ -183,7 +252,7 @@ Parameter reference:
 - `--imessage-cli-path`: path to `imsg`
 - `--imessage-db-path`: path to `chat.db`
 - `--imessage-include-attachments`: include attachment metadata in iMessage watch events
-- `--auth-mode`: saved auth mode (`environment`, `openai_oauth` for OpenAI Codex OAuth, `openai_api_key`, `saved_api_key`, `no_auth`)
+- `--auth-mode`: saved auth mode (`environment`, `openai_oauth` for browser Codex OAuth, `openai_device` for headless Device Flow, `saved_api_key`, `no_auth`)
 - `--model`: model name (config default if set)
 - `--api-key`: LLM API key (or saved provider auth / provider-specific environment variable)
 - `--endpoint`: custom API base URL for Ollama or another OpenAI-compatible endpoint
