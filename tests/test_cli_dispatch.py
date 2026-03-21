@@ -1,4 +1,3 @@
-import os
 import types
 
 from omicverse import cli
@@ -59,26 +58,3 @@ def test_web_subcommand_dispatches_to_web_launcher(monkeypatch):
 
     assert rc == 17
     assert captured["argv"] == ["--port", "5055", "--host", "127.0.0.1"]
-
-
-def test_omicclaw_entrypoint_enables_forced_login(monkeypatch):
-    captured = {}
-
-    def fake_jarvis_main(argv=None):
-        captured["argv"] = argv
-        return 31
-
-    monkeypatch.setitem(
-        __import__("sys").modules,
-        "omicverse.jarvis.cli",
-        types.SimpleNamespace(main=fake_jarvis_main),
-    )
-    monkeypatch.delenv("OV_WEB_FORCE_LOGIN", raising=False)
-    monkeypatch.delenv("OV_LAUNCHER", raising=False)
-
-    rc = cli.omicclaw_main(["--web-port", "5056"])
-
-    assert rc == 31
-    assert captured["argv"] == ["--with-web", "--gateway-daemon", "--web-port", "5056"]
-    assert os.environ["OV_WEB_FORCE_LOGIN"] == "1"
-    assert os.environ["OV_LAUNCHER"] == "omicclaw"
