@@ -221,6 +221,8 @@ See [CI Profiles](mcp_ci_profiles.md) for full profile documentation.
 
 ## Troubleshooting
 
+- **Startup timeout / handshake stuck**: On Windows (or first launch on any OS), the server may take >10 seconds to initialize due to numba JIT compilation and matplotlib font cache generation. Fix by setting `NUMBA_DISABLE_JIT=1` and pointing `NUMBA_CACHE_DIR` / `MPLCONFIGDIR` to writable directories in the `env` block of your MCP config. See [mcp_quickstart.md § Startup timeout](mcp_quickstart.md#startup-timeout--handshake-stuck-especially-on-windows) for the full config example.
+- **Config changes not taking effect**: MCP server config is read once at process startup. You must start a new session after modifying `env`, `args`, or other settings — there is no hot-reload.
 - **Server exits immediately**: Check stderr output for import errors. Ensure `mcp>=1.0` is installed.
 - **No tools listed**: Verify phase flag. `P0` exposes ~9 tools; `P0+P0.5` exposes ~15+.
 - **Tool returns `ok: false`**: Read the `error` field. Common causes: missing adata_id handle, wrong parameter types.
