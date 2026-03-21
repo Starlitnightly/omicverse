@@ -207,7 +207,8 @@ _COPY: Dict[Language, Dict[str, str]] = {
         "auth_saved_api_key": "Save an API key in Jarvis",
         "auth_environment": "Use environment variables",
         "auth_no_auth": "No API key",
-        "auth_openai_oauth": "OpenAI Codex OAuth (ChatGPT sign-in, Recommended)",
+        "auth_openai_oauth": "OpenAI Codex OAuth (ChatGPT sign-in, browser)",
+        "auth_openai_device": "OpenAI Codex OAuth (headless / SSH, Recommended)",
         "oauth_open_browser": "A browser page will open for OpenAI sign-in.",
         "oauth_manual_hint": (
             "If the callback does not complete automatically, finish login and paste the "
@@ -215,6 +216,7 @@ _COPY: Dict[Language, Dict[str, str]] = {
         ),
         "oauth_auth_url": "Authorization URL",
         "oauth_callback_prompt": "Callback URL (or code#state)",
+        "device_flow_hint": "Open the URL below on any device and enter the code to authorize.",
         "provider_model_title": "Choose a model for {provider}",
         "provider_model_input": "Enter model name",
         "api_key_config": "API key configuration",
@@ -293,11 +295,13 @@ _COPY: Dict[Language, Dict[str, str]] = {
         "auth_saved_api_key": "把 API Key 保存到 Jarvis",
         "auth_environment": "使用环境变量",
         "auth_no_auth": "不使用 API Key",
-        "auth_openai_oauth": "OpenAI Codex OAuth（ChatGPT 登录，推荐）",
+        "auth_openai_oauth": "OpenAI Codex OAuth（ChatGPT 登录，浏览器）",
+        "auth_openai_device": "OpenAI Codex OAuth（无浏览器 / SSH，推荐）",
         "oauth_open_browser": "浏览器中将打开 OpenAI 登录页面。",
         "oauth_manual_hint": "如果没有自动跳回，请完成登录后，把浏览器地址栏中的回调 URL 粘贴回来。",
         "oauth_auth_url": "授权地址",
         "oauth_callback_prompt": "回调 URL（或 code#state）",
+        "device_flow_hint": "在任意设备上打开下面的 URL，输入授权码完成认证。",
         "provider_model_title": "为 {provider} 选择模型",
         "provider_model_input": "输入模型名称",
         "api_key_config": "API Key 配置",
@@ -854,23 +858,27 @@ def _configure_llm(
         auth_mode = _prompt_choice(
             _copy(language, "auth_title"),
             [
+                ("openai_device", _copy(language, "auth_openai_device")),
                 ("openai_oauth", _copy(language, "auth_openai_oauth")),
                 ("saved_api_key", _copy(language, "auth_saved_api_key")),
                 ("environment", _copy(language, "env_auth_format").format(env_vars="OPENAI_API_KEY")),
             ],
             default=(
                 current_mode
-                if previous_provider == provider_name and current_mode in {"openai_oauth", "saved_api_key", "environment"}
-                else "openai_oauth"
+                if previous_provider == provider_name and current_mode in {"openai_oauth", "openai_device", "saved_api_key", "environment"}
+                else "openai_device"
             ),
             language=language,
         )
-        next_config["auth_mode"] = auth_mode
+        # Both openai_device and openai_oauth are stored as openai_oauth (same token format)
+        effective_auth_mode = "openai_oauth" if auth_mode == "openai_device" else auth_mode
+        next_config["auth_mode"] = effective_auth_mode
 
-        if auth_mode == "openai_oauth":
-            auth_manager.login(prompt_for_redirect=lambda auth_url: _prompt_oauth_manual_callback(auth_url, language))
+        if auth_mode == "openai_device":
+            print(f"\n{_copy(language, 'device_flow_hint')}")
+            auth_manager.login_device()
             next_config["endpoint"] = OPENAI_CODEX_DEFAULT_ENDPOINT
-            default_model = _openai_model_default(str(next_config.get("model") or ""), auth_mode)
+            default_model = _openai_model_default(str(next_config.get("model") or ""), effective_auth_mode)
             next_config["model"] = _prompt_model(
                 provider_name,
                 default_model,
@@ -878,7 +886,27 @@ def _configure_llm(
                 current_model=str(next_config.get("model") or ""),
                 discovered_models=_discover_models_for_prompt(
                     provider_name=provider_name,
-                    auth_mode=auth_mode,
+                    auth_mode=effective_auth_mode,
+                    endpoint=next_config["endpoint"],
+                    auth_manager=auth_manager,
+                ),
+                preferred_models=_OPENAI_CODEX_MODEL_CHOICES,
+                include_registry=False,
+            )
+            return next_config
+
+        if auth_mode == "openai_oauth":
+            auth_manager.login(prompt_for_redirect=lambda auth_url: _prompt_oauth_manual_callback(auth_url, language))
+            next_config["endpoint"] = OPENAI_CODEX_DEFAULT_ENDPOINT
+            default_model = _openai_model_default(str(next_config.get("model") or ""), effective_auth_mode)
+            next_config["model"] = _prompt_model(
+                provider_name,
+                default_model,
+                language,
+                current_model=str(next_config.get("model") or ""),
+                discovered_models=_discover_models_for_prompt(
+                    provider_name=provider_name,
+                    auth_mode=effective_auth_mode,
                     endpoint=next_config["endpoint"],
                     auth_manager=auth_manager,
                 ),

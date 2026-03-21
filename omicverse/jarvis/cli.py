@@ -79,7 +79,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--auth-mode",
         default=None,
         dest="auth_mode",
-        choices=["environment", "openai_oauth", "openai_codex", "openai_api_key", "saved_api_key", "no_auth"],
+        choices=["environment", "openai_oauth", "openai_device", "openai_codex", "openai_api_key", "saved_api_key", "no_auth"],
         help="Authentication mode for saved Jarvis config",
     )
     parser.add_argument(
@@ -379,7 +379,7 @@ def _resolve_value(cli_value: Any, config_value: Any, default: Any = None) -> An
 def _normalize_auth_mode(auth_mode: Optional[str]) -> str:
     if auth_mode == "openai_api_key":
         return "saved_api_key"
-    if auth_mode == "openai_codex":
+    if auth_mode in ("openai_codex", "openai_device"):
         return "openai_oauth"
     return str(auth_mode or "environment")
 
