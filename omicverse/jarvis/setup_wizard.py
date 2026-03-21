@@ -164,6 +164,7 @@ _COPY: Dict[Language, Dict[str, str]] = {
         "language_chinese": "简体中文",
         "channel_title": "Choose a messaging channel",
         "telegram_config": "Telegram configuration",
+        "discord_config": "Discord configuration",
         "bot_token": "Bot token",
         "allowed_users": "Allowed usernames or IDs (comma-separated, optional)",
         "feishu_config": "Feishu configuration",
@@ -250,6 +251,7 @@ _COPY: Dict[Language, Dict[str, str]] = {
         "language_chinese": "简体中文",
         "channel_title": "选择消息渠道",
         "telegram_config": "Telegram 配置",
+        "discord_config": "Discord 配置",
         "bot_token": "Bot Token",
         "allowed_users": "允许的用户名或 ID（逗号分隔，可留空）",
         "feishu_config": "Feishu 配置",
@@ -682,6 +684,13 @@ def _prompt_channel_config(channel: str, config: Dict[str, Any], language: Langu
         next_config["telegram"] = cur
         return next_config
 
+    if channel == "discord":
+        cur = dict(config.get("discord") or {})
+        print(f"\n{_copy(language, 'discord_config')}")
+        cur["token"] = _prompt_text(_copy(language, "bot_token"), str(cur.get("token") or ""), secret=True)
+        next_config["discord"] = cur
+        return next_config
+
     if channel == "feishu":
         cur = dict(config.get("feishu") or {})
         print(f"\n{_copy(language, 'feishu_config')}")
@@ -987,6 +996,7 @@ def run_setup_wizard(
         [
             ("imessage", "iMessage"),
             ("telegram", "Telegram"),
+            ("discord", "Discord"),
             ("feishu", "Feishu"),
             ("qq", "QQ"),
         ],

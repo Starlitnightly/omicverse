@@ -115,6 +115,12 @@ omicverse jarvis --setup --setup-language zh
 omicverse jarvis --channel telegram --token "$TELEGRAM_BOT_TOKEN"
 ```
 
+显式使用 Discord 渠道：
+
+```bash
+omicverse jarvis --channel discord --discord-token "$DISCORD_BOT_TOKEN"
+```
+
 Feishu Webhook 渠道：
 
 ```bash
@@ -250,11 +256,12 @@ omicverse jarvis \
 参数总览：
 
 - `--token`: Telegram Bot Token（或 `TELEGRAM_BOT_TOKEN`）
+- `--discord-token`: Discord Bot Token（或 `DISCORD_BOT_TOKEN`）
 - `--setup`: 运行交互式设置向导
 - `--setup-language`: 向导语言（`en` 或 `zh`，默认界面为英文）
 - `--config-file`: 配置文件路径（默认 `~/.ovjarvis/config.json`）
 - `--auth-file`: 本地认证状态文件（默认 `~/.ovjarvis/auth.json`）
-- `--channel`: 渠道后端（`telegram`、`feishu`、`imessage` 或 `qq`；若已配置则优先使用配置）
+- `--channel`: 渠道后端（`telegram`、`discord`、`feishu`、`imessage` 或 `qq`；若已配置则优先使用配置）
 - `--feishu-app-id`: Feishu app id（或 `FEISHU_APP_ID`）
 - `--feishu-app-secret`: Feishu app secret（或 `FEISHU_APP_SECRET`）
 - `--feishu-connection-mode`: `webhook` 或 `websocket`（默认 `websocket`）

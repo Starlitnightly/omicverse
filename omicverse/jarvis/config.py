@@ -35,6 +35,9 @@ def default_config() -> Dict[str, Any]:
             "token": None,
             "allowed_users": [],
         },
+        "discord": {
+            "token": None,
+        },
         "feishu": {
             "app_id": None,
             "app_secret": None,

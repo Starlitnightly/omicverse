@@ -115,6 +115,12 @@ Telegram channel explicitly:
 omicverse jarvis --channel telegram --token "$TELEGRAM_BOT_TOKEN"
 ```
 
+Discord channel explicitly:
+
+```bash
+omicverse jarvis --channel discord --discord-token "$DISCORD_BOT_TOKEN"
+```
+
 Feishu webhook channel:
 
 ```bash
@@ -169,11 +175,12 @@ omicverse jarvis \
 Parameter reference:
 
 - `--token`: Telegram token (or `TELEGRAM_BOT_TOKEN`)
+- `--discord-token`: Discord bot token (or `DISCORD_BOT_TOKEN`)
 - `--setup`: run the interactive setup wizard
 - `--setup-language`: wizard language (`en` or `zh`, default UI: English)
 - `--config-file`: config path (default: `~/.ovjarvis/config.json`)
 - `--auth-file`: saved auth path (default: `~/.ovjarvis/auth.json`)
-- `--channel`: backend channel (`telegram`, `feishu`, `imessage`, or `qq`; config default if set)
+- `--channel`: backend channel (`telegram`, `discord`, `feishu`, `imessage`, or `qq`; config default if set)
 - `--feishu-app-id`: Feishu app id (or `FEISHU_APP_ID`)
 - `--feishu-app-secret`: Feishu app secret (or `FEISHU_APP_SECRET`)
 - `--feishu-connection-mode`: `webhook` or `websocket` (default: `websocket`)

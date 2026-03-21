@@ -64,13 +64,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--channel",
         default=None,
-        choices=["telegram", "feishu", "imessage", "qq"],
+        choices=["telegram", "discord", "feishu", "imessage", "qq"],
         help="Channel backend to run",
     )
     parser.add_argument(
         "--token",
         default=None,
         help="Telegram bot token (or set TELEGRAM_BOT_TOKEN env var)",
+    )
+    parser.add_argument(
+        "--discord-token",
+        default=None,
+        dest="discord_token",
+        help="Discord bot token (or set DISCORD_BOT_TOKEN env var)",
     )
     parser.add_argument(
         "--model",
@@ -372,6 +378,8 @@ def _has_bootstrap_credentials(args: argparse.Namespace) -> bool:
     return bool(
         args.token
         or os.environ.get("TELEGRAM_BOT_TOKEN")
+        or args.discord_token
+        or os.environ.get("DISCORD_BOT_TOKEN")
         or (
             (args.feishu_app_id or os.environ.get("FEISHU_APP_ID"))
             and (args.feishu_app_secret or os.environ.get("FEISHU_APP_SECRET"))
@@ -1013,6 +1021,32 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"OmicVerse Jarvis starting (channel=telegram, model={model}) ...")
         try:
             run_bot(token=token, session_manager=sm, access_control=ac, verbose=args.verbose)
+        except RuntimeError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
+        return 0
+
+    if channel == "discord":
+        discord_cfg = dict(config.get("discord") or {})
+        discord_token = args.discord_token or os.environ.get("DISCORD_BOT_TOKEN") or discord_cfg.get("token")
+        if not discord_token:
+            msg = (
+                "ERROR: Discord bot token is required.\n"
+                "  Pass --discord-token, run `omicverse jarvis --setup`, or set DISCORD_BOT_TOKEN."
+            )
+            if getattr(args, "with_web", False):
+                print(f"WARNING: {msg}\n  Running in web-only gateway mode.", file=sys.stderr)
+                return _web_only_loop()
+            print(msg, file=sys.stderr)
+            return 1
+        from .channels.discord import run_discord_bot
+
+        print(f"OmicVerse Jarvis starting (channel=discord, model={model}) ...")
+        try:
+            run_discord_bot(
+                token=discord_token,
+                session_manager=sm,
+            )
         except RuntimeError as exc:
             print(f"ERROR: {exc}", file=sys.stderr)
             return 1
