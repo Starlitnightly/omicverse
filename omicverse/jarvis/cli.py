@@ -210,6 +210,15 @@ def build_parser() -> argparse.ArgumentParser:
         dest="no_browser",
         help="Do not automatically open the browser when the web server starts.",
     )
+    gw_group.add_argument(
+        "--codex-login",
+        action="store_true",
+        dest="codex_login",
+        help=(
+            "Force a fresh OpenAI Codex OAuth login before starting. "
+            "Use this to switch to a different Codex account."
+        ),
+    )
     # ── Daemon control (claw daemon) ──────────────────────────────────────
     daemon_group = parser.add_argument_group(
         "daemon control (claw daemon)",
@@ -698,6 +707,28 @@ def main(argv: Optional[List[str]] = None) -> int:
             config = _run_setup(args, config_path, auth_path)
         except (OpenAIOAuthError, RuntimeError) as exc:
             print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
+
+    if getattr(args, "codex_login", False):
+        print("Starting OpenAI Codex account login...")
+        try:
+            auth_manager = OpenAIOAuthManager(auth_path)
+            auth_manager.login(
+                prompt_for_redirect=lambda auth_url: (
+                    print(f"\nAuthorization URL:\n  {auth_url}\n"),
+                    input("Paste the callback URL (or code#state): "),
+                )[-1],
+            )
+            print("Codex login successful.")
+            config["auth_mode"] = "openai_oauth"
+            config["llm_provider"] = "openai"
+            if not config.get("model") or config["model"] not in _OPENAI_CODEX_MODELS:
+                config["model"] = OPENAI_CODEX_DEFAULT_MODEL
+            if not config.get("endpoint"):
+                config["endpoint"] = OPENAI_CODEX_BASE_URL
+            save_config(config, config_path)
+        except OpenAIOAuthError as exc:
+            print(f"ERROR: Codex login failed: {exc}", file=sys.stderr)
             return 1
 
     channel = _resolve_value(args.channel, config.get("channel"), "telegram")
