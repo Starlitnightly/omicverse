@@ -17,5 +17,18 @@ or for iMessage mode::
 from .channels.telegram import run_bot
 from .channels.feishu import run_feishu_bot, run_feishu_ws_bot
 from .channels.imessage import run_imessage_bot
+from .openai_oauth import (
+    CodexAPIClient,
+    OpenAIOAuthManager,
+    extract_account_id,
+)
 
-__all__ = ["run_bot", "run_feishu_bot", "run_feishu_ws_bot", "run_imessage_bot"]
+__all__ = [
+    "run_bot",
+    "run_feishu_bot",
+    "run_feishu_ws_bot",
+    "run_imessage_bot",
+    "OpenAIOAuthManager",
+    "CodexAPIClient",
+    "extract_account_id",
+]

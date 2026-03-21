@@ -27,6 +27,11 @@ OPENAI_ORIGINATOR = "pi"
 OPENAI_CALLBACK_PORT = 1455
 OPENAI_SCOPE = "openid profile email offline_access"
 OPENAI_CODEX_BASE_URL = "https://chatgpt.com/backend-api"
+OPENAI_CODEX_API_ENDPOINT = "https://chatgpt.com/backend-api/codex/responses"
+OPENAI_DEVICE_AUTH_URL = f"{OPENAI_AUTH_ISSUER}/api/accounts/deviceauth"
+OPENAI_DEVICE_AUTH_CALLBACK = f"{OPENAI_AUTH_ISSUER}/deviceauth/callback"
+OPENAI_DEVICE_AUTH_PAGE = f"{OPENAI_AUTH_ISSUER}/codex/device"
+OAUTH_POLLING_SAFETY_MARGIN_S = 3
 
 
 class OpenAIOAuthError(RuntimeError):
@@ -67,13 +72,57 @@ def jwt_auth_claims(token: str) -> Dict[str, Any]:
     return nested if isinstance(nested, dict) else {}
 
 
+def _extract_account_id_from_claims(payload: Dict[str, Any]) -> Optional[str]:
+    """Extract chatgpt_account_id from JWT claims, checking 3 locations."""
+    # Location 1: top-level field
+    account_id = str(payload.get("chatgpt_account_id") or "").strip()
+    if account_id:
+        return account_id
+
+    # Location 2: nested under https://api.openai.com/auth namespace
+    nested = payload.get("https://api.openai.com/auth")
+    if isinstance(nested, dict):
+        account_id = str(nested.get("chatgpt_account_id") or "").strip()
+        if account_id:
+            return account_id
+
+    # Location 3: first entry in organizations array
+    orgs = payload.get("organizations")
+    if isinstance(orgs, list) and orgs:
+        first_org = orgs[0]
+        if isinstance(first_org, dict):
+            org_id = str(first_org.get("id") or "").strip()
+            if org_id:
+                return org_id
+
+    return None
+
+
+def extract_account_id(tokens: Dict[str, str]) -> Optional[str]:
+    """Extract account ID from tokens, preferring id_token over access_token."""
+    for key in ("id_token", "access_token"):
+        token = str(tokens.get(key) or "").strip()
+        if token:
+            payload = _decode_jwt_payload(token)
+            account_id = _extract_account_id_from_claims(payload)
+            if account_id:
+                return account_id
+    return None
+
+
 def jwt_org_context(token: str) -> Dict[str, str]:
-    claims = jwt_auth_claims(token)
+    payload = _decode_jwt_payload(token)
+    nested = payload.get("https://api.openai.com/auth")
+    claims = nested if isinstance(nested, dict) else {}
     context: Dict[str, str] = {}
-    for key in ("organization_id", "project_id", "chatgpt_account_id"):
+    for key in ("organization_id", "project_id"):
         value = str(claims.get(key) or "").strip()
         if value:
             context[key] = value
+    # Use the improved 3-location extraction for account_id
+    account_id = _extract_account_id_from_claims(payload)
+    if account_id:
+        context["chatgpt_account_id"] = account_id
     return context
 
 
@@ -342,6 +391,94 @@ class OpenAIOAuthManager:
         }
         return self.save(record)
 
+    def login_device(
+        self,
+        *,
+        timeout_seconds: int = 300,
+        on_user_code: Optional[Callable[[str, str], None]] = None,
+    ) -> Dict[str, Any]:
+        """Device Flow login for headless environments (SSH, etc.).
+
+        Parameters
+        ----------
+        timeout_seconds : int
+            Maximum seconds to wait for the user to complete authorization.
+        on_user_code : callable, optional
+            Called with ``(url, user_code)`` so the caller can display them.
+            If *None*, the URL and code are printed to stdout.
+        """
+        # Step 1: Request device authorization code
+        resp = requests.post(
+            f"{OPENAI_DEVICE_AUTH_URL}/usercode",
+            json={"client_id": OPENAI_CLIENT_ID},
+            timeout=30,
+        )
+        if not resp.ok:
+            raise OpenAIOAuthError(
+                f"Device auth usercode request failed: HTTP {resp.status_code} {resp.text[:300]}"
+            )
+        data = resp.json()
+        device_auth_id = str(data.get("device_auth_id") or "").strip()
+        user_code = str(data.get("user_code") or "").strip()
+        server_interval = max(int(data.get("interval") or 1), 1)
+        if not device_auth_id or not user_code:
+            raise OpenAIOAuthError("Device auth returned incomplete response")
+
+        # Step 2: Display code to user
+        if on_user_code is not None:
+            on_user_code(OPENAI_DEVICE_AUTH_PAGE, user_code)
+        else:
+            print(f"\nOpen this URL: {OPENAI_DEVICE_AUTH_PAGE}")
+            print(f"Enter code:    {user_code}\n")
+
+        # Step 3: Poll for authorization completion
+        poll_interval = server_interval + OAUTH_POLLING_SAFETY_MARGIN_S
+        deadline = time.time() + timeout_seconds
+        authorization_code: Optional[str] = None
+        code_verifier: Optional[str] = None
+
+        while time.time() < deadline:
+            time.sleep(poll_interval)
+            poll_resp = requests.post(
+                f"{OPENAI_DEVICE_AUTH_URL}/token",
+                json={"device_auth_id": device_auth_id, "user_code": user_code},
+                timeout=30,
+            )
+            if poll_resp.status_code in (403, 404):
+                # User hasn't completed authorization yet
+                continue
+            if not poll_resp.ok:
+                raise OpenAIOAuthError(
+                    f"Device auth polling failed: HTTP {poll_resp.status_code} {poll_resp.text[:300]}"
+                )
+            poll_data = poll_resp.json()
+            authorization_code = str(poll_data.get("authorization_code") or "").strip()
+            code_verifier = str(poll_data.get("code_verifier") or "").strip()
+            if authorization_code:
+                break
+
+        if not authorization_code or not code_verifier:
+            raise OpenAIOAuthError("Timed out waiting for device authorization")
+
+        # Step 4: Exchange authorization code for tokens
+        tokens = exchange_code_for_tokens(
+            code=authorization_code,
+            redirect_uri=OPENAI_DEVICE_AUTH_CALLBACK,
+            code_verifier=code_verifier,
+        )
+        claims = jwt_org_context(tokens["id_token"])
+        record = {
+            "provider": "openai-codex",
+            "tokens": {
+                **tokens,
+                "account_id": claims.get("chatgpt_account_id"),
+                "organization_id": claims.get("organization_id"),
+                "project_id": claims.get("project_id"),
+            },
+            "last_refresh": _utc_now(),
+        }
+        return self.save(record)
+
     def refresh(self) -> Dict[str, Any]:
         auth = self.load()
         tokens = dict(auth.get("tokens") or {})
@@ -384,3 +521,88 @@ class OpenAIOAuthManager:
             except OSError:
                 continue
         raise OpenAIOAuthError("Could not start a local OAuth callback server")
+
+
+class CodexAPIClient:
+    """HTTP client wrapper for Codex API with auto token refresh and URL rewriting.
+
+    Intercepts requests to standard OpenAI endpoints and rewrites them to the
+    ChatGPT Codex backend, injecting the correct Bearer token and account headers.
+    """
+
+    def __init__(self, oauth_manager: Optional[OpenAIOAuthManager] = None) -> None:
+        self._oauth = oauth_manager or OpenAIOAuthManager()
+        self._session = requests.Session()
+
+    def _ensure_auth_headers(self) -> Dict[str, str]:
+        """Return headers with a valid Bearer token, refreshing if needed."""
+        access_token = self._oauth.ensure_access_token(refresh_if_needed=True)
+        if not access_token:
+            raise OpenAIOAuthError("No valid access token available; run login first")
+
+        auth = self._oauth.load()
+        tokens = dict(auth.get("tokens") or {})
+        headers: Dict[str, str] = {
+            "Authorization": f"Bearer {access_token}",
+            "originator": OPENAI_ORIGINATOR,
+        }
+        account_id = str(tokens.get("account_id") or "").strip()
+        if account_id:
+            headers["ChatGPT-Account-Id"] = account_id
+        return headers
+
+    @staticmethod
+    def _rewrite_url(url: str) -> str:
+        """Rewrite standard OpenAI API URLs to the Codex endpoint."""
+        parsed = urlparse(url)
+        if "/v1/responses" in parsed.path or "/chat/completions" in parsed.path:
+            return OPENAI_CODEX_API_ENDPOINT
+        return url
+
+    def request(
+        self,
+        method: str,
+        url: str,
+        *,
+        json_body: Optional[Any] = None,
+        headers: Optional[Dict[str, str]] = None,
+        timeout: int = 120,
+        **kwargs: Any,
+    ) -> requests.Response:
+        """Send a request with Codex auth, URL rewriting, and auto token refresh."""
+        final_url = self._rewrite_url(url)
+        auth_headers = self._ensure_auth_headers()
+        merged_headers = {**(headers or {}), **auth_headers}
+
+        resp = self._session.request(
+            method,
+            final_url,
+            json=json_body,
+            headers=merged_headers,
+            timeout=timeout,
+            **kwargs,
+        )
+
+        # If 401, try one token refresh and retry
+        if resp.status_code == 401:
+            try:
+                self._oauth.refresh()
+            except OpenAIOAuthError:
+                return resp
+            auth_headers = self._ensure_auth_headers()
+            merged_headers = {**(headers or {}), **auth_headers}
+            resp = self._session.request(
+                method,
+                final_url,
+                json=json_body,
+                headers=merged_headers,
+                timeout=timeout,
+                **kwargs,
+            )
+        return resp
+
+    def post(self, url: str, **kwargs: Any) -> requests.Response:
+        return self.request("POST", url, **kwargs)
+
+    def get(self, url: str, **kwargs: Any) -> requests.Response:
+        return self.request("GET", url, **kwargs)
