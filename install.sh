@@ -530,14 +530,16 @@ step "Step 10 — Installing OmicVerse"
 pip_install_pkg omicverse
 
 # ────────────────────────────────────────────────────────────
-step "Step 11 — Optional: Web interface  [omicverse[web]]"
+step "Step 11 — Optional: Web interface + channels  [omicclaw]"
 # ────────────────────────────────────────────────────────────
-echo "    Installs the OmicVerse web UI (omicverseweb)."
-echo "    Required if you want to run the browser-based interface."
-if maybe_ask_yes_no "Install web dependencies?"; then
-  pip_install_pkg omicverseweb
+echo "    Installs OmicClaw — the gateway-first workspace with web UI,"
+echo "    messaging channels (Telegram, WeChat, Feishu …), notebooks,"
+echo "    and agent workflows."
+echo "    Required if you want to run the browser-based interface or bot channels."
+if maybe_ask_yes_no "Install OmicClaw?"; then
+  pip_install_pkg omicclaw
 else
-  info "Skipping web dependencies"
+  info "Skipping OmicClaw"
 fi
 
 # ────────────────────────────────────────────────────────────
