@@ -5,10 +5,16 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 import time
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Any, Callable, Coroutine, List, Optional, Set
+
+
+def _content_key(data: bytes) -> str:
+    """Short content-based dedup key for PNG bytes (first 1 KB is enough)."""
+    return "sha:" + hashlib.sha256(data[:1024]).hexdigest()[:20]
 
 
 @dataclass
@@ -217,7 +223,10 @@ class AgentBridge:
                         continue
                     seen.add(key)
                     try:
-                        figs.append(base64.b64decode(b64))
+                        data = base64.b64decode(b64)
+                        # Record content hash so _harvest_file_figures skips duplicates
+                        seen.add(_content_key(data))
+                        figs.append(data)
                     except Exception:
                         pass
         except Exception:
@@ -270,7 +279,13 @@ class AgentBridge:
                 data = p.read_bytes()
                 if not data:
                     continue
+                ck = _content_key(data)
+                if ck in seen:
+                    # Same image already harvested from notebook display_data — skip.
+                    seen.add(key)
+                    continue
                 seen.add(key)
+                seen.add(ck)
                 figs.append(data)
             except Exception:
                 pass
@@ -370,11 +385,11 @@ class AgentBridge:
 
     @staticmethod
     def _candidate_dirs(roots: List[Path]) -> List[Path]:
-        """Return unique existing directories to scan (root + root/output + cwd/output)."""
+        """Return unique existing directories to scan (root + root/output + root/figures)."""
         dirs: List[Path] = []
         seen: Set[Path] = set()
         for root in roots:
-            for d in (root, root / "output"):
+            for d in (root, root / "output", root / "figures"):
                 try:
                     rd = d.resolve()
                 except Exception:

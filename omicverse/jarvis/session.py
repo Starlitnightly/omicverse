@@ -338,7 +338,28 @@ class SessionManager:
             self._ensure_session()
             result = self._kernel_executor.execute(code, adata=adata, timeout=self.timeout)
             self.session_prompt_count += 1
-            return result.get("adata") if isinstance(result, dict) else result
+            if isinstance(result, dict):
+                # Pipe captured matplotlib figures into the notebook structure so
+                # AgentBridge._harvest_notebook_figures() can find them.
+                figures_b64 = result.get("figures") or []
+                if figures_b64:
+                    nb = self.current_session.get("notebook")
+                    if nb is None:
+                        nb = {"cells": []}
+                        self.current_session["notebook"] = nb
+                    nb["cells"].append({
+                        "cell_type": "code",
+                        "outputs": [
+                            {
+                                "output_type": "display_data",
+                                "data": {"image/png": b64},
+                                "metadata": {},
+                            }
+                            for b64 in figures_b64
+                        ],
+                    })
+                return result.get("adata")
+            return result
 
         def _archive_current_session(self) -> None:
             if self.current_session is not None:

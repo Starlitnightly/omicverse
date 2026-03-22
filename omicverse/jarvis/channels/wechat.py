@@ -47,22 +47,17 @@ _DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com"
 _CDN_BASE_URL = "https://novac2c.cdn.weixin.qq.com/c2c"
 
 _WECHAT_CHANNEL_HINT = """\
-[Channel: WeChat]
-You are replying inside a WeChat chat via the iLink Bot API.
-Rules you MUST follow:
-1. Do NOT include file download links, sandbox:// paths, or local file paths of any kind.
-2. Do NOT use Markdown image syntax (![...](...)) or hyperlinks ([...](...)).
-3. When you save a figure/plot to disk, say only one short sentence like "图已生成，正在发送…". \
-The system will automatically upload and deliver the image as a WeChat image message — \
-you do not need to do anything else.
-4. Keep responses concise and plain-text; avoid heavy Markdown formatting (no tables, no fences).
-5. Never tell the user to "download", "open a browser", or "visit a URL" for results \
-that can be delivered directly in this chat.
-6. NEVER output internal reasoning, tool-call commentary, or meta-notes about your own \
-execution (e.g. "User requested mandatory tool call", "Complied by calling finish", \
-"No further computation required", "forced a tool-use requirement"). \
-If you have nothing useful to say to the user, reply with a single short sentence summarising \
-what was done.\
+[Channel: WeChat — image and text delivery rules]
+1. To produce a figure/plot: write and execute Python code that creates a matplotlib \
+figure (e.g. sc.pl.umap, sc.pl.violin, plt.plot). End the cell with plt.show() or \
+plt.savefig("output.png"). The gateway captures every matplotlib figure created during \
+code execution and sends it as a WeChat image message automatically — you do NOT need \
+to do anything else.
+2. NEVER provide image download links, sandbox:// paths, or Markdown image syntax. \
+Any link you output will NOT be visible in WeChat.
+3. After code runs, reply in plain text only: briefly describe what was plotted. \
+No Markdown tables, fences, bold, or hyperlinks.
+4. Never narrate your own tool usage ("I called finish", "mandatory tool call", etc.).\
 """
 _DEFAULT_LONG_POLL_TIMEOUT_MS = 35_000
 _DEFAULT_API_TIMEOUT_MS = 15_000
@@ -784,6 +779,13 @@ class WeChatJarvisBot:
             await self._send_session_text(session_key, f"分析失败: {exc}")
             return
 
+        logger.info(
+            "WeChat: bridge result figures=%d artifacts=%d error=%s",
+            len(result.figures),
+            len(result.artifacts),
+            result.error,
+        )
+
         if result.adata is not None:
             session.adata = result.adata
             try:
@@ -861,7 +863,7 @@ class WeChatJarvisBot:
             await self._send_session_text(session_key, chunk)
 
     def _build_full_request(self, session: Any, text: str) -> str:
-        ctx_parts: List[str] = [_WECHAT_CHANNEL_HINT]
+        ctx_parts: List[str] = []
         try:
             agents_md = session.get_agents_md()
             if agents_md:
@@ -874,6 +876,8 @@ class WeChatJarvisBot:
                 ctx_parts.append(f"[Analysis history]\n{memory_ctx}")
         except Exception:
             pass
+        # Channel hint goes last so task context takes priority over delivery rules.
+        ctx_parts.append(_WECHAT_CHANNEL_HINT)
         ctx_parts.append(f"[Current request]\n{text}")
         return "\n\n".join(ctx_parts)
 
