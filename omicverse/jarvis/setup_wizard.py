@@ -165,7 +165,11 @@ _COPY: Dict[Language, Dict[str, str]] = {
         "channel_title": "Choose a messaging channel",
         "telegram_config": "Telegram configuration",
         "discord_config": "Discord configuration",
+        "wechat_config": "WeChat configuration",
         "bot_token": "Bot token",
+        "wechat_bot_token": "WeChat bot token",
+        "wechat_base_url": "iLink base URL",
+        "wechat_allow_from": "Allow from user IDs (comma-separated, optional)",
         "allowed_users": "Allowed usernames or IDs (comma-separated, optional)",
         "feishu_config": "Feishu configuration",
         "connection_mode": "Connection mode",
@@ -252,7 +256,11 @@ _COPY: Dict[Language, Dict[str, str]] = {
         "channel_title": "选择消息渠道",
         "telegram_config": "Telegram 配置",
         "discord_config": "Discord 配置",
+        "wechat_config": "WeChat 配置",
         "bot_token": "Bot Token",
+        "wechat_bot_token": "WeChat Bot Token",
+        "wechat_base_url": "iLink Base URL",
+        "wechat_allow_from": "允许的用户 ID（逗号分隔，可留空）",
         "allowed_users": "允许的用户名或 ID（逗号分隔，可留空）",
         "feishu_config": "Feishu 配置",
         "connection_mode": "连接模式",
@@ -691,6 +699,25 @@ def _prompt_channel_config(channel: str, config: Dict[str, Any], language: Langu
         next_config["discord"] = cur
         return next_config
 
+    if channel == "wechat":
+        cur = dict(config.get("wechat") or {})
+        print(f"\n{_copy(language, 'wechat_config')}")
+        cur["token"] = _prompt_text(
+            _copy(language, "wechat_bot_token"),
+            str(cur.get("token") or ""),
+            secret=True,
+        )
+        cur["base_url"] = _prompt_text(
+            _copy(language, "wechat_base_url"),
+            str(cur.get("base_url") or "https://ilinkai.weixin.qq.com"),
+        )
+        cur["allow_from"] = _prompt_csv(
+            _copy(language, "wechat_allow_from"),
+            cur.get("allow_from") or [],
+        )
+        next_config["wechat"] = cur
+        return next_config
+
     if channel == "feishu":
         cur = dict(config.get("feishu") or {})
         print(f"\n{_copy(language, 'feishu_config')}")
@@ -997,6 +1024,7 @@ def run_setup_wizard(
             ("imessage", "iMessage"),
             ("telegram", "Telegram"),
             ("discord", "Discord"),
+            ("wechat", "WeChat"),
             ("feishu", "Feishu"),
             ("qq", "QQ"),
         ],

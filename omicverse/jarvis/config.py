@@ -38,6 +38,11 @@ def default_config() -> Dict[str, Any]:
         "discord": {
             "token": None,
         },
+        "wechat": {
+            "token": None,
+            "base_url": "https://ilinkai.weixin.qq.com",
+            "allow_from": [],
+        },
         "feishu": {
             "app_id": None,
             "app_secret": None,

@@ -64,7 +64,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--channel",
         default=None,
-        choices=["telegram", "discord", "feishu", "imessage", "qq"],
+        choices=["telegram", "discord", "wechat", "feishu", "imessage", "qq"],
         help="Channel backend to run",
     )
     parser.add_argument(
@@ -77,6 +77,26 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         dest="discord_token",
         help="Discord bot token (or set DISCORD_BOT_TOKEN env var)",
+    )
+    parser.add_argument(
+        "--wechat-token",
+        default=None,
+        dest="wechat_token",
+        help="WeChat iLink bot token (or set WECHAT_BOT_TOKEN env var)",
+    )
+    parser.add_argument(
+        "--wechat-base-url",
+        default=None,
+        dest="wechat_base_url",
+        help="WeChat iLink base URL (default: https://ilinkai.weixin.qq.com)",
+    )
+    parser.add_argument(
+        "--wechat-allow-from",
+        action="append",
+        default=None,
+        dest="wechat_allow_from",
+        metavar="USER_ID",
+        help="Allowed WeChat user ID. Repeat for multiple users. Omit to allow everyone.",
     )
     parser.add_argument(
         "--model",
@@ -380,6 +400,8 @@ def _has_bootstrap_credentials(args: argparse.Namespace) -> bool:
         or os.environ.get("TELEGRAM_BOT_TOKEN")
         or args.discord_token
         or os.environ.get("DISCORD_BOT_TOKEN")
+        or args.wechat_token
+        or os.environ.get("WECHAT_BOT_TOKEN")
         or (
             (args.feishu_app_id or os.environ.get("FEISHU_APP_ID"))
             and (args.feishu_app_secret or os.environ.get("FEISHU_APP_SECRET"))
@@ -1045,6 +1067,48 @@ def main(argv: Optional[List[str]] = None) -> int:
         try:
             run_discord_bot(
                 token=discord_token,
+                session_manager=sm,
+            )
+        except RuntimeError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
+        return 0
+
+    if channel == "wechat":
+        wechat_cfg = dict(config.get("wechat") or {})
+        wechat_token = args.wechat_token or os.environ.get("WECHAT_BOT_TOKEN") or wechat_cfg.get("token")
+        if not wechat_token:
+            msg = (
+                "ERROR: WeChat iLink bot token is required.\n"
+                "  Pass --wechat-token, run `omicverse jarvis --setup`, or set WECHAT_BOT_TOKEN."
+            )
+            if getattr(args, "with_web", False):
+                print(f"WARNING: {msg}\n  Running in web-only gateway mode.", file=sys.stderr)
+                return _web_only_loop()
+            print(msg, file=sys.stderr)
+            return 1
+        wechat_base_url = (
+            args.wechat_base_url
+            or os.environ.get("WECHAT_BASE_URL")
+            or wechat_cfg.get("base_url")
+            or "https://ilinkai.weixin.qq.com"
+        )
+        wechat_allow_from = (
+            args.wechat_allow_from
+            if args.wechat_allow_from is not None
+            else list(wechat_cfg.get("allow_from") or [])
+        )
+        from .channels.wechat import run_wechat_bot
+
+        print(
+            f"OmicVerse Jarvis starting (channel=wechat, model={model}, "
+            f"base_url={wechat_base_url}, allow_from={'all' if not wechat_allow_from else len(wechat_allow_from)}) ..."
+        )
+        try:
+            run_wechat_bot(
+                token=wechat_token,
+                base_url=wechat_base_url,
+                allow_from=[str(item) for item in wechat_allow_from],
                 session_manager=sm,
             )
         except RuntimeError as exc:
