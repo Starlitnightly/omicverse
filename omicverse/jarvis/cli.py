@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import importlib.util
 import logging
 import os
 import sys
@@ -610,24 +611,18 @@ def _web_only_loop(mode_label: str = "web-only") -> int:
     return 0
 
 
-def _web_project_candidates() -> List[Path]:
-    base_candidates = [
-        Path(__file__).resolve().parents[3] / "omicverse-project",
-        Path.home() / "Desktop" / "analysis" / "omicverse-project",
-    ]
-    project_names = ["omicclaw", "omicverse-web"]
-    candidates: List[Path] = []
-    for base in base_candidates:
-        for project_name in project_names:
-            candidates.append(base / project_name)
-    return candidates
-
-
 def _resolve_gateway_web_root() -> Optional[Path]:
-    candidates = _web_project_candidates()
-    for candidate in candidates:
-        if (candidate / "gateway" / "server.py").exists() and (candidate / "services").exists():
-            return candidate
+    """Find the omicclaw (or legacy omicverse-web) package root via importlib."""
+    for pkg_name in ("omicclaw", "omicverse_web"):
+        try:
+            spec = importlib.util.find_spec(pkg_name)
+            if spec is None or not spec.origin:
+                continue
+            pkg_dir = Path(spec.origin).parent
+            if (pkg_dir / "gateway" / "server.py").exists() and (pkg_dir / "services").exists():
+                return pkg_dir
+        except Exception:
+            continue
     return None
 
 
@@ -665,7 +660,7 @@ def _gateway_daemon_loop(
     try:
         gateway_web_root = _resolve_gateway_web_root()
         if gateway_web_root is None:
-            raise ImportError("Cannot locate omicverse-project/omicclaw or legacy omicverse-web")
+            raise ImportError("Cannot locate omicclaw or omicverse_web package. Install with: pip install omicclaw")
         gateway_web_root_str = str(gateway_web_root)
         if gateway_web_root_str not in sys.path:
             sys.path.insert(0, gateway_web_root_str)
