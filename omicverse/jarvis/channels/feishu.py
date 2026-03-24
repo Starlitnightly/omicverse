@@ -1050,17 +1050,11 @@ class FeishuRuntime:
             except Exception:
                 logger.warning("Failed to send artifact %s", art.filename)
 
-        summary = self._strip_local_paths((result.summary or "").strip())
-        has_artifacts = bool(result.reports or result.figures or result.artifacts)
-        if not has_artifacts and llm_buf.strip():
-            summary = _trim(llm_buf, max_len=3600)
-        elif not summary or summary.lower() in _BORING:
-            if llm_buf.strip():
-                summary = _trim(llm_buf, max_len=3600)
-            elif result.diagnostics:
-                hints = "\n".join(f"- {x}" for x in result.diagnostics[:5])
-                summary = f"⚠️ 未生成有效最终答复\n{hints}"
-            elif session.adata is not None:
+        summary = self._strip_local_paths(
+            bridge.pick_reply_text(result, llm_buf, max_len=3600)
+        )
+        if not summary:
+            if session.adata is not None:
                 a = session.adata
                 summary = f"✅ 分析完成\n🔬 {a.n_obs:,} cells × {a.n_vars:,} genes"
             else:

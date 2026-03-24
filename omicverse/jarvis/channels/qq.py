@@ -816,26 +816,14 @@ class QQRuntime:
         for art in list(result.artifacts or []):
             logger.info("QQ: artifact '%s' generated (file send not supported in QQ Bot API)", art.filename)
 
-        # Send summary — markdown rendering (mirrors Feishu send_markdown_card green "✅ 分析完成")
-        summary = self._strip_local_paths((result.summary or "").strip())
-        # When the agent gave a pure conversational response (no analysis
-        # artifacts produced), prefer the streamed LLM text over the
-        # finish()-tool summary which may be a mandatory-tool-use no-op.
-        has_artifacts = bool(result.reports or result.figures or result.artifacts)
-        if not has_artifacts and llm_buf.strip():
-            summary = _trim(llm_buf, max_len=1800)
-        elif not summary or summary.lower() in _BORING:
-            if llm_buf.strip():
-                summary = _trim(llm_buf, max_len=1800)
-            elif result.diagnostics:
-                hints = "\n".join(f"- {x}" for x in result.diagnostics[:5])
-                summary = f"未生成有效答复\n{hints}"
-            elif session.adata is not None:
-                a = session.adata
-                summary = f"分析完成\n{a.n_obs:,} cells x {a.n_vars:,} genes"
-            else:
-                summary = "分析完成"
-        for chunk in self._text_chunks(summary, limit=_MAX_TEXT):
+        # Send summary
+        summary = self._strip_local_paths(
+            bridge.pick_reply_text(result, llm_buf, max_len=1800)
+        )
+        if not summary and session.adata is not None:
+            a = session.adata
+            summary = f"分析完成\n{a.n_obs:,} cells x {a.n_vars:,} genes"
+        for chunk in self._text_chunks(summary or "分析完成", limit=_MAX_TEXT):
             await asyncio.to_thread(self._send_markdown, target, chunk, msg_id)
 
     # ── Message dispatcher ────────────────────────────────────────────────────

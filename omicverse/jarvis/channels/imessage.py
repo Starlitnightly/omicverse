@@ -680,14 +680,9 @@ class IMessageJarvisBot:
                 caption=f"附件: {artifact.filename}",
             )
 
-        summary = _strip_local_paths((result.summary or "").strip())
-        has_artifacts = bool(result.reports or result.figures or result.artifacts)
-        if not has_artifacts and llm_buf.strip():
-            summary = llm_buf[:1800]
-        elif not summary or summary.lower() in _BORING_SUMMARIES:
-            if llm_buf.strip():
-                summary = llm_buf[:1800]
-            elif session.adata is not None:
+        summary = _strip_local_paths(bridge.pick_reply_text(result, llm_buf))
+        if not summary:
+            if session.adata is not None:
                 a = session.adata
                 summary = f"分析完成\n{a.n_obs:,} cells x {a.n_vars:,} genes"
             else:

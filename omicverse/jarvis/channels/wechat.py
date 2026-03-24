@@ -929,28 +929,18 @@ class WeChatJarvisBot:
                 f"已生成 {len(result.artifacts)} 个附件，请在 Web 界面下载。",
             )
 
-        summary = _strip_local_paths((result.summary or "").strip())
-        # Suppress agent meta-commentary that leaked into the summary.
+        # pick_reply_text handles has_artifacts + llm_buf priority; WeChat then
+        # additionally strips agent meta-commentary fragments.
+        summary = _strip_local_paths(bridge.pick_reply_text(result, llm_buf))
         if summary and _META_COMMENTARY_RE.search(summary):
             logger.debug("WeChat: suppressing meta-commentary summary: %.120s", summary)
             summary = ""
-        has_artifacts = bool(result.reports or result.figures or result.artifacts)
-        if not has_artifacts and llm_buf.strip():
-            summary = _strip_local_paths(llm_buf.strip())
-            if _META_COMMENTARY_RE.search(summary):
-                summary = ""
-        if not summary or summary.lower() in _BORING_SUMMARIES:
-            if llm_buf.strip():
-                summary = _strip_local_paths(llm_buf.strip())
-                # Also suppress meta-commentary from raw llm buffer.
-                if _META_COMMENTARY_RE.search(summary):
-                    summary = ""
-            if not summary:
-                if session.adata is not None:
-                    adata = session.adata
-                    summary = f"分析完成\n{adata.n_obs:,} cells x {adata.n_vars:,} genes"
-                else:
-                    summary = "分析完成"
+        if not summary:
+            if session.adata is not None:
+                adata = session.adata
+                summary = f"分析完成\n{adata.n_obs:,} cells x {adata.n_vars:,} genes"
+            else:
+                summary = "分析完成"
         for chunk in _text_chunks(summary):
             await self._send_session_text(session_key, chunk)
 
