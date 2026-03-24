@@ -10,12 +10,13 @@ def _normalize_session_id(value: Any) -> str:
     return session_id
 
 
-def resolve_bridge_session_id(session: Any) -> str:
+def resolve_bridge_session_id(session: Any, *, create: bool = True) -> str:
     """Return the active agent session id for bridge routing.
 
-    This eagerly materializes the notebook session when the executor supports it,
-    so `get_prior_history*()` and `on_turn_complete*()` can route by the same
-    stable session id instead of falling back to chat scope ids.
+    When ``create`` is True, this eagerly materializes the notebook session when
+    the executor supports it so `get_prior_history*()` and `on_turn_complete*()`
+    can route by the same stable session id instead of falling back to chat
+    scope ids.
     """
     if session is None:
         return ""
@@ -51,7 +52,7 @@ def resolve_bridge_session_id(session: Any) -> str:
             return session_id
 
     ensure_session = getattr(executor, "_ensure_session", None)
-    if callable(ensure_session):
+    if create and callable(ensure_session):
         try:
             current_session = ensure_session()
         except Exception:
@@ -63,7 +64,7 @@ def resolve_bridge_session_id(session: Any) -> str:
 
     start_new_session = getattr(executor, "_start_new_session", None)
     should_start_new_session = getattr(executor, "_should_start_new_session", None)
-    if callable(start_new_session):
+    if create and callable(start_new_session):
         should_start = True
         if callable(should_start_new_session):
             try:
