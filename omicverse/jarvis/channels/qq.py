@@ -47,6 +47,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import requests
 
 from ..agent_bridge import AgentBridge
+from .._bridge_session import resolve_bridge_session_id
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from ..model_help import render_model_help
 
@@ -736,7 +737,12 @@ class QQRuntime:
 
         _scope_id = str(target.channel_id if hasattr(target, "channel_id") else target)
         _wb = getattr(self._sm, "gateway_web_bridge", None)
-        _prior_history = _wb.get_prior_history_simple("qq", "dm", _scope_id) if _wb else []
+        _prior_history = _wb.get_prior_history_simple(
+            "qq",
+            "dm",
+            _scope_id,
+            session_id=resolve_bridge_session_id(session),
+        ) if _wb else []
 
         bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
         try:
@@ -782,6 +788,7 @@ class QQRuntime:
                     llm_text=llm_buf,
                     adata=result.adata,
                     figures=result.figures or [],
+                    session_id=resolve_bridge_session_id(session),
                 )
             except Exception:
                 pass

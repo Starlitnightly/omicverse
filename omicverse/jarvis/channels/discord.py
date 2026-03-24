@@ -23,6 +23,7 @@ except ImportError:  # pragma: no cover - optional dependency
     _discord = None
 
 from ..agent_bridge import AgentBridge
+from .._bridge_session import resolve_bridge_session_id
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from ..model_help import render_model_help
 
@@ -364,9 +365,17 @@ class DiscordJarvisBot:
             if chunk:
                 llm_buf += chunk
 
+        web_bridge = getattr(self._sm, "gateway_web_bridge", None)
+        prior_history = web_bridge.get_prior_history_simple(
+            "discord",
+            session_key.scope_type,
+            session_key.scope_id,
+            session_id=resolve_bridge_session_id(session),
+        ) if web_bridge else []
+
         bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
         try:
-            result = await bridge.run(full_request, session.adata)
+            result = await bridge.run(full_request, session.adata, history=prior_history)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -394,7 +403,6 @@ class DiscordJarvisBot:
         except Exception:
             pass
 
-        web_bridge = getattr(self._sm, "gateway_web_bridge", None)
         if web_bridge is not None:
             try:
                 web_bridge.on_turn_complete_simple(
@@ -404,6 +412,7 @@ class DiscordJarvisBot:
                     user_text=user_text,
                     llm_text=llm_buf,
                     adata=result.adata,
+                    session_id=resolve_bridge_session_id(session),
                 )
             except Exception:
                 pass

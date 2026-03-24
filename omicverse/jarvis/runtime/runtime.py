@@ -6,6 +6,7 @@ import time
 from typing import Any, Awaitable, Callable, List, Optional, Protocol
 
 from ..agent_bridge import AgentRunResult
+from .._bridge_session import resolve_bridge_session_id
 from .execution_adapter import ExecutionAdapter, ExecutionCallbacks
 from .models import (
     ConversationRoute,
@@ -231,7 +232,10 @@ class MessageRuntime:
         prior_history: List[dict] = []
         if self._web_bridge is not None:
             try:
-                prior_history = self._web_bridge.get_prior_history(route) or []
+                prior_history = self._web_bridge.get_prior_history(
+                    route,
+                    session_id=resolve_bridge_session_id(session),
+                ) or []
             except Exception:
                 pass
 
@@ -266,6 +270,7 @@ class MessageRuntime:
                     llm_text=effective_llm_text,
                     adata=result.adata,
                     figures=result.figures or [],
+                    session_id=resolve_bridge_session_id(session),
                 )
             except Exception:
                 logger.warning("web_bridge.on_turn_complete failed (non-fatal)", exc_info=True)

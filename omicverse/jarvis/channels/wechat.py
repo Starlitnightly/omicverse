@@ -36,6 +36,7 @@ except ImportError:  # pragma: no cover
     _CRYPTO_AVAILABLE = False
 
 from ..agent_bridge import AgentBridge
+from .._bridge_session import resolve_bridge_session_id
 from ..config import default_state_dir
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from ..model_help import render_model_help
@@ -858,7 +859,10 @@ class WeChatJarvisBot:
 
         _wb = getattr(self._sm, "gateway_web_bridge", None)
         _prior_history = _wb.get_prior_history_simple(
-            "wechat", session_key.scope_type, session_key.scope_id
+            "wechat",
+            session_key.scope_type,
+            session_key.scope_id,
+            session_id=resolve_bridge_session_id(session),
         ) if _wb else []
 
         bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
@@ -909,6 +913,7 @@ class WeChatJarvisBot:
                     llm_text=llm_buf,
                     adata=result.adata,
                     figures=result.figures or [],
+                    session_id=resolve_bridge_session_id(session),
                 )
             except Exception:
                 pass

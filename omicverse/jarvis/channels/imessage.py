@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from ..agent_bridge import AgentBridge
+from .._bridge_session import resolve_bridge_session_id
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from ..model_help import render_model_help
 
@@ -603,7 +604,10 @@ class IMessageJarvisBot:
 
         _wb = getattr(self._sm, "gateway_web_bridge", None)
         _prior_history = _wb.get_prior_history_simple(
-            "imessage", session_key.scope_type, session_key.scope_id
+            "imessage",
+            session_key.scope_type,
+            session_key.scope_id,
+            session_id=resolve_bridge_session_id(session),
         ) if _wb else []
 
         await self._send_text(target, "⏳ 已收到，开始分析。")
@@ -652,6 +656,7 @@ class IMessageJarvisBot:
                     llm_text=llm_buf,
                     adata=result.adata,
                     figures=result.figures or [],
+                    session_id=resolve_bridge_session_id(session),
                 )
             except Exception:
                 pass
