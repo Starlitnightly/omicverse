@@ -818,7 +818,13 @@ class QQRuntime:
 
         # Send summary — markdown rendering (mirrors Feishu send_markdown_card green "✅ 分析完成")
         summary = self._strip_local_paths((result.summary or "").strip())
-        if not summary or summary.lower() in _BORING:
+        # When the agent gave a pure conversational response (no analysis
+        # artifacts produced), prefer the streamed LLM text over the
+        # finish()-tool summary which may be a mandatory-tool-use no-op.
+        has_artifacts = bool(result.reports or result.figures or result.artifacts)
+        if not has_artifacts and llm_buf.strip():
+            summary = _trim(llm_buf, max_len=1800)
+        elif not summary or summary.lower() in _BORING:
             if llm_buf.strip():
                 summary = _trim(llm_buf, max_len=1800)
             elif result.diagnostics:

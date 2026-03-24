@@ -1051,7 +1051,10 @@ class FeishuRuntime:
                 logger.warning("Failed to send artifact %s", art.filename)
 
         summary = self._strip_local_paths((result.summary or "").strip())
-        if not summary or summary.lower() in _BORING:
+        has_artifacts = bool(result.reports or result.figures or result.artifacts)
+        if not has_artifacts and llm_buf.strip():
+            summary = _trim(llm_buf, max_len=3600)
+        elif not summary or summary.lower() in _BORING:
             if llm_buf.strip():
                 summary = _trim(llm_buf, max_len=3600)
             elif result.diagnostics:

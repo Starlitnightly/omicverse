@@ -891,10 +891,14 @@ class OmicVerseLLMBackend:
     def _extract_openai_codex_account_id(cls, token: str) -> str:
         payload = cls._decode_openai_codex_jwt(token)
         auth = payload.get(_OPENAI_CODEX_JWT_CLAIM_PATH)
-        if not isinstance(auth, dict):
-            return ""
-        account_id = str(auth.get("chatgpt_account_id") or "").strip()
-        return account_id
+        if isinstance(auth, dict):
+            account_id = str(auth.get("chatgpt_account_id") or "").strip()
+            if account_id:
+                return account_id
+        # Fallback: env var injected by gateway when chatgpt_account_id is in
+        # stored auth (e.g. ~/.ovjarvis/auth.json tokens.account_id) but not
+        # embedded in the access_token JWT claims.
+        return os.environ.get("CHATGPT_ACCOUNT_ID", "")
 
     @staticmethod
     def _openai_codex_user_agent() -> str:

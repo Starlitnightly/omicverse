@@ -241,13 +241,18 @@ class MessageRuntime:
 
         self._persist_result(session=session, user_text=user_text, result=result)
 
+        # When no LLM text was streamed (e.g. agent called finish() directly
+        # without a preceding text-only turn), fall back to result.summary so
+        # that all channel presenters and the web bridge receive meaningful text.
+        effective_llm_text = llm_buf if llm_buf.strip() else (result.summary or "")
+
         # Mirror the completed turn into the web session (gateway mode)
         if self._web_bridge is not None:
             try:
                 self._web_bridge.on_turn_complete(
                     route=route,
                     user_text=user_text,
-                    llm_text=llm_buf,
+                    llm_text=effective_llm_text,
                     adata=result.adata,
                 )
             except Exception:
@@ -274,7 +279,7 @@ class MessageRuntime:
             route,
             session=session,
             user_text=user_text,
-            llm_text=llm_buf,
+            llm_text=effective_llm_text,
             result=result,
         ):
             await self._deliver(event)

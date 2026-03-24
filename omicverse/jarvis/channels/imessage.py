@@ -459,7 +459,25 @@ class IMessageJarvisBot:
             return
 
         text = str(message.get("text") or "").strip()
-        if not text and message.get("attachments"):
+        attachments = message.get("attachments") or []
+
+        # Check for .h5ad file attachments; the imsg RPC exposes local file
+        # paths so we can read them directly without a network download.
+        if isinstance(attachments, list):
+            for _att in attachments:
+                _path = str(
+                    (_att.get("path") if isinstance(_att, dict) else None) or ""
+                ).strip()
+                _fname = str(
+                    (_att.get("filename") if isinstance(_att, dict) else None)
+                    or (Path(_path).name if _path else "")
+                ).strip()
+                if _fname.lower().endswith(".h5ad") and _path:
+                    session = self._route_registry.get_or_create(session_key)
+                    await self._handle_h5ad_attachment(session_key, session, target, _path, _fname)
+                    return
+
+        if not text and attachments:
             text = "<media:attachment>"
         if not text:
             return
@@ -663,7 +681,10 @@ class IMessageJarvisBot:
             )
 
         summary = _strip_local_paths((result.summary or "").strip())
-        if not summary or summary.lower() in _BORING_SUMMARIES:
+        has_artifacts = bool(result.reports or result.figures or result.artifacts)
+        if not has_artifacts and llm_buf.strip():
+            summary = llm_buf[:1800]
+        elif not summary or summary.lower() in _BORING_SUMMARIES:
             if llm_buf.strip():
                 summary = llm_buf[:1800]
             elif session.adata is not None:
@@ -677,6 +698,38 @@ class IMessageJarvisBot:
     async def _send_text(self, target: str, text: str) -> None:
         for chunk in _text_chunks(text):
             await self._client.send_message(target, chunk)
+
+    async def _handle_h5ad_attachment(
+        self,
+        session_key,
+        session: Any,
+        target: str,
+        src_path: str,
+        file_name: str,
+    ) -> None:
+        """Copy a local .h5ad attachment into the session workspace and load it."""
+        await self._send_text(target, "⏳ 正在加载文件…")
+        try:
+            src = Path(src_path)
+            if not src.exists():
+                await self._send_text(target, f"❌ 找不到文件: {src_path}")
+                return
+            dest = session.workspace / file_name
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            import shutil
+            await asyncio.to_thread(shutil.copy2, str(src), str(dest))
+            loaded = await asyncio.to_thread(session.load_from_workspace, file_name)
+            if loaded is not None:
+                a = loaded
+                await self._send_text(
+                    target,
+                    f"✅ 加载成功\n🔬 {a.n_obs:,} cells × {a.n_vars:,} genes\n📁 {file_name}",
+                )
+            else:
+                await self._send_text(target, f"✅ 已接收 {file_name}，但自动加载失败，请检查文件格式。")
+        except Exception as exc:
+            logger.exception("iMessage failed to load h5ad attachment")
+            await self._send_text(target, f"❌ 文件处理失败: {exc}")
 
     async def _send_bytes(self, target: str, data: bytes, *, filename: str, caption: str) -> None:
         suffix = Path(filename).suffix or ".bin"

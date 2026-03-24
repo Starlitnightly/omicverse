@@ -167,6 +167,19 @@ class DiscordJarvisBot:
         if author is None or getattr(author, "bot", False):
             return
 
+        # Handle .h5ad file attachments before any text normalisation so that
+        # a file-only message (empty content) is not silently dropped.
+        attachments = list(getattr(message, "attachments", None) or [])
+        h5ad_list = [
+            a for a in attachments
+            if (getattr(a, "filename", "") or "").lower().endswith(".h5ad")
+        ]
+        if h5ad_list:
+            session_key = self._session_key(message)
+            session = self._registry.get_or_create(session_key)
+            await self._handle_h5ad_attachment(message, session, h5ad_list[0])
+            return
+
         text = self._normalize_message_text(message)
         logger.info(
             "Discord message received: channel_type=%s author=%s guild=%s content_len=%s normalized_len=%s",
@@ -427,7 +440,10 @@ class DiscordJarvisBot:
             )
 
         summary = _strip_local_paths((result.summary or "").strip())
-        if not summary or summary.lower() in _BORING_SUMMARIES:
+        has_artifacts = bool(result.reports or result.figures or result.artifacts)
+        if not has_artifacts and llm_buf.strip():
+            summary = llm_buf[:1800]
+        elif not summary or summary.lower() in _BORING_SUMMARIES:
             if llm_buf.strip():
                 summary = llm_buf[:1800]
             elif session.adata is not None:
@@ -497,6 +513,33 @@ class DiscordJarvisBot:
                 kwargs["mention_author"] = False
             await channel.send(chunk, **kwargs)
             first = False
+
+    async def _handle_h5ad_attachment(self, message, session: Any, attachment) -> None:
+        """Download a .h5ad attachment sent by the user and load it into the session."""
+        filename = getattr(attachment, "filename", None) or "upload.h5ad"
+        await self._send_text(message.channel, "⏳ 正在下载并加载…", reply_to=message)
+        try:
+            data = await attachment.read()
+            target = session.workspace / filename
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+            loaded = await asyncio.to_thread(session.load_from_workspace, filename)
+            if loaded is not None:
+                a = loaded
+                await self._send_text(
+                    message.channel,
+                    f"✅ 加载成功\n🔬 {a.n_obs:,} cells × {a.n_vars:,} genes\n📁 {filename}",
+                    reply_to=message,
+                )
+            else:
+                await self._send_text(
+                    message.channel,
+                    f"✅ 已接收 {filename}，但自动加载失败，请检查文件格式。",
+                    reply_to=message,
+                )
+        except Exception as exc:
+            logger.exception("Discord failed to load h5ad attachment")
+            await self._send_text(message.channel, f"❌ 文件处理失败: {exc}", reply_to=message)
 
     async def _send_file(
         self,
