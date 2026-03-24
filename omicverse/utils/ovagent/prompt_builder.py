@@ -252,3 +252,137 @@ class PromptBuilder:
                 "- Plan analysis workflows\n"
             )
         return msg
+
+
+# ---------------------------------------------------------------------------
+# Filesystem context instructions (extracted from smart_agent._build_*)
+# ---------------------------------------------------------------------------
+
+def build_filesystem_context_instructions(session_id: str = "N/A") -> str:
+    """Build instructions for using the filesystem context workspace.
+
+    This teaches LLMs how to use the filesystem-based context management
+    system for offloading intermediate results, plans, and notes.
+
+    Parameters
+    ----------
+    session_id : str
+        Current filesystem context session identifier.
+
+    Returns
+    -------
+    str
+        Instructions for filesystem context usage.
+    """
+    return f"""
+
+## Context Engineering with Filesystem Workspace
+
+You have access to a **filesystem-based context workspace** that allows you to:
+- Offload intermediate results to reduce memory/context usage
+- Save and track execution plans across multiple steps
+- Search for relevant context using patterns
+- Share context with sub-agents
+
+**Current Session**: `{session_id}`
+
+### Why Use the Workspace?
+
+1. **Reduce Context Window Usage**: Instead of keeping all results in memory, write them to disk
+2. **Track Multi-Step Workflows**: Save plans and update progress as you complete steps
+3. **Retrieve Relevant Context**: Search for notes when you need specific information
+4. **Debug and Audit**: All notes are persisted for later review
+
+### Available Context Operations
+
+#### 1. Writing Notes (Offload Results)
+Use `# CONTEXT_WRITE:` comments in your code to indicate what should be saved:
+
+```python
+# After completing a step, offload the result
+# CONTEXT_WRITE: qc_result -> {{"n_cells_before": original_count, "n_cells_after": adata.n_obs, "removed": removed_count}}
+
+# Example: Save intermediate statistics
+qc_stats = {{
+    "n_cells": adata.n_obs,
+    "n_genes": adata.n_vars,
+    "mito_pct_mean": float(adata.obs['pct_counts_mt'].mean()) if 'pct_counts_mt' in adata.obs else None
+}}
+# CONTEXT_WRITE: qc_stats -> qc_stats
+```
+
+#### 2. Saving Execution Plans
+For multi-step workflows, define a plan upfront:
+
+```python
+# CONTEXT_PLAN:
+# - Step 1: Quality Control [pending]
+# - Step 2: Normalization [pending]
+# - Step 3: Feature Selection [pending]
+# - Step 4: Dimensionality Reduction [pending]
+# - Step 5: Clustering [pending]
+```
+
+#### 3. Updating Plan Progress
+As you complete steps, update the plan:
+
+```python
+# CONTEXT_UPDATE: step=0, status=completed, result="QC removed 500 low-quality cells"
+```
+
+#### 4. Searching for Context
+When you need to reference previous results:
+
+```python
+# CONTEXT_SEARCH: pattern="qc*", type="glob"
+# Or for content search:
+# CONTEXT_SEARCH: pattern="resolution", type="grep"
+```
+
+### Context Categories
+
+Organize your notes by category:
+- **notes**: General observations and comments
+- **results**: Computation results (statistics, parameters)
+- **decisions**: Important choices and their rationale
+- **snapshots**: Data state at key points
+- **errors**: Error logs and debugging information
+
+### Best Practices
+
+1. **Write Early, Write Often**: Offload results as soon as they're computed
+2. **Use Descriptive Keys**: `clustering_leiden_res1.0` is better than `result1`
+3. **Include Metadata**: Add function names, parameters, timestamps
+4. **Reference Previous Context**: Check workspace before repeating computations
+5. **Update Plans Promptly**: Mark steps complete immediately after finishing
+
+### Example: Multi-Step Workflow with Context
+
+```python
+import omicverse as ov
+
+# CONTEXT_PLAN:
+# - Step 1: Quality Control [in_progress]
+# - Step 2: Preprocessing [pending]
+# - Step 3: Clustering [pending]
+
+# Step 1: QC
+original_cells = adata.n_obs
+adata = ov.pp.qc(adata, tresh={{'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250}})
+removed = original_cells - adata.n_obs
+
+# CONTEXT_WRITE: qc_result -> {{"original": original_cells, "remaining": adata.n_obs, "removed": removed}}
+# CONTEXT_UPDATE: step=0, status=completed, result="Removed " + str(removed) + " cells"
+
+print("QC completed: " + str(adata.n_obs) + " cells remaining")
+```
+
+### Automatic Context Injection
+
+The workspace context is automatically searched and injected into prompts when relevant.
+You can reference previous results without explicitly searching:
+
+- Recent notes are included automatically
+- Plan status is always visible
+- Relevant context is retrieved based on the current task
+"""
