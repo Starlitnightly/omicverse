@@ -54,13 +54,6 @@ if _parent_pkg is not None and _utils_pkg is not None:
         setattr(_utils_pkg, module_name, sys.modules[__name__])
 
 
-def _is_under_root(path: Path, root: Path) -> bool:
-    try:
-        path.resolve().relative_to(root.resolve())
-        return True
-    except ValueError:
-        return False
-
 # Internal LLM backend (Pantheon replacement)
 from .agent_backend import OmicVerseLLMBackend, Usage
 
@@ -113,7 +106,30 @@ from .harness.tool_catalog import (
 )
 from .context_compactor import ContextCompactor
 from .ovagent.runtime import OmicVerseRuntime
-from .ovagent.prompt_builder import PromptBuilder as _PromptBuilder, CODE_QUALITY_RULES as _CODE_QUALITY_RULES_EXT
+from .ovagent.auth import (
+    ResolvedBackend as _ResolvedBackend,
+    resolve_model_and_provider as _resolve_model_and_provider,
+    collect_api_key_env as _collect_api_key_env,
+    temporary_api_keys as _temporary_api_keys_cm,
+    display_backend_info as _display_backend_info,
+)
+from .ovagent.bootstrap import (
+    format_skill_overview as _format_skill_overview,
+    initialize_skill_registry as _initialize_skill_registry,
+    initialize_notebook_executor as _initialize_notebook_executor,
+    initialize_filesystem_context as _initialize_filesystem_context,
+    initialize_session_history as _initialize_session_history,
+    initialize_tracing as _initialize_tracing,
+    initialize_security as _initialize_security,
+    initialize_ov_runtime as _initialize_ov_runtime,
+    create_llm_backend as _create_llm_backend,
+    display_reflection_config as _display_reflection_config,
+)
+from .ovagent.prompt_builder import (
+    PromptBuilder as _PromptBuilder,
+    CODE_QUALITY_RULES as _CODE_QUALITY_RULES_EXT,
+    build_filesystem_context_instructions as _build_filesystem_context_instructions,
+)
 from .ovagent.analysis_executor import (
     AnalysisExecutor as _AnalysisExecutor,
     ProactiveCodeTransformer as _ProactiveCodeTransformerExt,
@@ -254,50 +270,28 @@ class OmicVerseAgent:
         self._emit = _emit
 
         _emit(EventLevel.INFO, "Initializing OmicVerse Smart Agent (internal backend)...", "init")
-        
-        # When using a custom endpoint (proxy), keep the model name as-is.
-        # Proxies expect the exact model name the user typed.
-        if endpoint:
-            print(f"   🔌 Proxy mode: model={model}, endpoint={endpoint}")
-        else:
-            # Normalize model ID for aliases and variations, then validate
-            original_model = model
-            try:
-                model = ModelConfig.normalize_model_id(model)  # type: ignore[attr-defined]
-            except Exception:
-                # Older ModelConfig without normalization: proceed as-is
-                model = model
-            if model != original_model:
-                print(f"   📝 Model ID normalized: {original_model} → {model}")
 
-            is_valid, validation_msg = ModelConfig.validate_model_setup(model, api_key)
-            if not is_valid:
-                print(f"❌ {validation_msg}")
-                raise ValueError(validation_msg)
-        
-        self.model = model
+        # --- Auth & backend resolution (ovagent.auth) --------------------------
+        backend = _resolve_model_and_provider(model, api_key, endpoint)
+        self.model = backend.model
         self.api_key = api_key
-        self.endpoint = endpoint or ModelConfig.get_endpoint_for_model(model)
-        # Store provider to allow provider-aware formatting of skills
-        self.provider = ModelConfig.get_provider_from_model(model, self.endpoint)
+        self.endpoint = backend.endpoint
+        self.provider = backend.provider
+
+        # --- Attribute defaults ------------------------------------------------
         self._llm: Optional[OmicVerseLLMBackend] = None
         self.skill_registry: Optional[SkillRegistry] = None
         self._skill_overview_text: str = ""
-        self._use_llm_skill_matching: bool = True  # Use LLM-based skill matching (Claude Code approach)
+        self._use_llm_skill_matching: bool = True
         self._managed_api_env: Dict[str, str] = {}
-        # Reflection configuration
         self.enable_reflection = enable_reflection
-        self.reflection_iterations = max(1, min(3, reflection_iterations))  # Clamp to 1-3
-        # Result review configuration
+        self.reflection_iterations = max(1, min(3, reflection_iterations))
         self.enable_result_review = enable_result_review
-        # Notebook execution configuration
         self.use_notebook_execution = use_notebook_execution
         self.max_prompts_per_session = max_prompts_per_session
         self._notebook_executor = None
-        # Filesystem context configuration (set early to avoid AttributeError)
         self.enable_filesystem_context = enable_filesystem_context
         self._filesystem_context: Optional[FilesystemContextManager] = None
-        # Token usage tracking at agent level
         self.last_usage = None
         self.last_usage_breakdown: Dict[str, Any] = {
             'generation': None,
@@ -313,117 +307,75 @@ class OmicVerseAgent:
         self._web_session_id = ""
         self._ov_runtime: Optional[OmicVerseRuntime] = None
         self._active_run_id = ""
+
+        # --- API key env collection (ovagent.auth) -----------------------------
         try:
-            self._managed_api_env = self._collect_api_key_env(api_key)
+            self._managed_api_env = _collect_api_key_env(
+                self.model, self.endpoint, api_key,
+            )
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.warning("Failed to collect API key environment variables: %s", exc)
             self._managed_api_env = {}
 
-        # Discover project skills for progressive disclosure guidance
-        self._initialize_skill_registry()
+        # --- Skill registry (ovagent.bootstrap) --------------------------------
+        self.skill_registry, self._skill_overview_text = _initialize_skill_registry()
 
-        # Display model info
-        provider = ModelConfig.get_provider_from_model(model, self.endpoint)
-        model_desc = ModelConfig.get_model_description(model)
-        print(f"    Model: {model_desc}")
-        print(f"    Provider: {provider.title()}")
-        print(f"    Endpoint: {self.endpoint}")
-        
-        # Check API key status
-        with self._temporary_api_keys():
-            key_available, key_msg = ModelConfig.check_api_key_availability(model)
-        if key_available:
-            print(f"   ✅ {key_msg}")
-        else:
-            print(f"   ⚠️  {key_msg}")
-        
+        # --- Display backend info (ovagent.auth) -------------------------------
+        _display_backend_info(
+            self.model, self.endpoint, self.provider,
+            self.api_key, self._managed_api_env,
+        )
+
+        # --- Subsystem bootstrap (ovagent.bootstrap) ---------------------------
         try:
             with self._temporary_api_keys():
                 self._setup_agent()
             stats = self._get_registry_stats()
             print(f"   📚 Function registry loaded: {stats['total_functions']} functions in {stats['categories']} categories")
 
-            # Display reflection and result review configuration
-            if self.enable_reflection:
-                print(f"   🔍 Reflection enabled: {self.reflection_iterations} iteration{'s' if self.reflection_iterations > 1 else ''} (code review & validation)")
-            else:
-                print(f"   ⚡ Reflection disabled (faster execution, no code validation)")
-
-            if self.enable_result_review:
-                print(f"   ✅ Result review enabled (output validation & assessment)")
-            else:
-                print(f"   ⚡ Result review disabled (no output validation)")
-
-            # Initialize notebook execution if enabled
-            if self.use_notebook_execution:
-                try:
-                    from .session_notebook_executor import SessionNotebookExecutor
-                    from pathlib import Path
-
-                    storage_dir = Path(notebook_storage_dir) if notebook_storage_dir else None
-                    self._notebook_executor = SessionNotebookExecutor(
-                        max_prompts_per_session=max_prompts_per_session,
-                        storage_dir=storage_dir,
-                        keep_notebooks=keep_execution_notebooks,
-                        timeout=notebook_timeout,
-                        strict_kernel_validation=strict_kernel_validation
-                    )
-
-                    print(f"   📓 Session-based notebook execution enabled")
-                    print(f"      Conda environment: {self._notebook_executor.conda_env or 'default'}")
-                    print(f"      Session limit: {max_prompts_per_session} prompts")
-                    print(f"      Storage: {self._notebook_executor.storage_dir}")
-
-                except Exception as e:
-                    print(f"   ⚠️  Notebook execution initialization failed: {e}")
-                    print(f"   ⚡ Falling back to in-process execution")
-                    self.use_notebook_execution = False
-                    self._notebook_executor = None
-            else:
-                print(f"   ⚡ Using in-process execution (no session isolation)")
-
-            # Initialize filesystem context management (attributes already set early in __init__)
-            if self.enable_filesystem_context:
-                try:
-                    base_dir = Path(context_storage_dir) if context_storage_dir else None
-                    self._filesystem_context = FilesystemContextManager(base_dir=base_dir)
-                    print(f"   📁 Filesystem context enabled")
-                    print(f"      Session: {self._filesystem_context.session_id}")
-                    print(f"      Storage: {self._filesystem_context._workspace_dir}")
-                except Exception as e:
-                    logger.warning(f"Filesystem context initialization failed: {e}")
-                    self.enable_filesystem_context = False
-                    self._filesystem_context = None
-                    print(f"   ⚠️  Filesystem context disabled (init failed: {e})")
-            else:
-                print(f"   ⚡ Filesystem context disabled")
-
-            if getattr(self._config, "history_enabled", False):
-                self._session_history = SessionHistory(path=self._config.history_path)
-                print(f"   📝 Session history enabled")
-
-            harness_config = getattr(self._config, "harness", None)
-            if harness_config is not None and getattr(harness_config, "enable_traces", False):
-                self._trace_store = RunTraceStore(root=harness_config.trace_dir)
-                print(f"   🧰 Harness tracing enabled")
-            if harness_config is not None and getattr(harness_config, "enable_context_compaction", False) and self._llm:
-                self._context_compactor = ContextCompactor(self._llm, self.model)
-                print(f"   🗜️  Harness context compaction enabled")
-
-            # Initialize security scanner
-            self._security_config: SecurityConfig = getattr(
-                self._config, "security", SecurityConfig()
+            _display_reflection_config(
+                self.enable_reflection,
+                self.reflection_iterations,
+                self.enable_result_review,
             )
-            self._security_scanner = CodeSecurityScanner(self._security_config)
-            print(f"   🛡️  Security scanner enabled (approval: {self._security_config.approval_mode.value})")
 
-            try:
-                self._ov_runtime = OmicVerseRuntime(repo_root=self._detect_repo_root())
-                if self._ov_runtime.workflow.exists:
-                    print(f"   📋 Workflow policy loaded: {self._ov_runtime.workflow.path}")
-            except Exception as exc:
-                logger.warning("OVAgent runtime initialization failed: %s", exc)
-                self._ov_runtime = None
+            # Notebook executor
+            nb_storage = Path(notebook_storage_dir) if notebook_storage_dir else None
+            self.use_notebook_execution, self._notebook_executor = (
+                _initialize_notebook_executor(
+                    use_notebook=self.use_notebook_execution,
+                    storage_dir=nb_storage,
+                    max_prompts_per_session=max_prompts_per_session,
+                    keep_notebooks=keep_execution_notebooks,
+                    timeout=notebook_timeout,
+                    strict_kernel_validation=strict_kernel_validation,
+                )
+            )
+
+            # Filesystem context
+            ctx_storage = Path(context_storage_dir) if context_storage_dir else None
+            self.enable_filesystem_context, self._filesystem_context = (
+                _initialize_filesystem_context(
+                    enabled=self.enable_filesystem_context,
+                    storage_dir=ctx_storage,
+                )
+            )
+
+            # Session history
+            self._session_history = _initialize_session_history(self._config)
+
+            # Harness tracing & context compaction
+            self._trace_store, self._context_compactor = _initialize_tracing(
+                self._config, self._llm, self.model,
+            )
+
+            # Security scanner
+            self._security_config, self._security_scanner = _initialize_security(
+                self._config,
+            )
+
+            # OmicVerse runtime (workflow / run-store bridge)
+            self._ov_runtime = _initialize_ov_runtime(self._detect_repo_root())
 
             # Extracted module delegates
             self._prompt_builder = _PromptBuilder(self)
@@ -437,49 +389,17 @@ class OmicVerseAgent:
                 self, self._prompt_builder, self._tool_runtime,
             )
 
-            print(f"✅ Smart Agent initialized successfully!")
+            print("✅ Smart Agent initialized successfully!")
         except Exception as e:
             print(f"❌ Agent initialization failed: {e}")
             raise
 
     def _initialize_skill_registry(self) -> None:
-        """Load skills from package install and current working directory and prepare routing helpers."""
+        """Load skills from package install and current working directory.
 
-        package_root = Path(__file__).resolve().parents[2]
-        cwd = Path.cwd()
-        try:
-            registry = build_multi_path_skill_registry(package_root, cwd)
-        except Exception as exc:  # pragma: no cover - defensive logging
-            print(f"⚠️  Failed to load Agent Skills: {exc}")
-            registry = None
-
-        if registry and registry.skill_metadata:
-            self.skill_registry = registry
-            self._skill_overview_text = self._format_skill_overview()
-
-            roots = discover_multi_path_skill_roots(package_root, cwd)
-            counts = {}
-            for label, root in roots:
-                counts[label] = sum(
-                    1
-                    for metadata in registry.skill_metadata.values()
-                    if _is_under_root(Path(metadata.path), root)
-                )
-            total = len(registry.skill_metadata)
-            msg = f"   🧭 Loaded {total} skills (progressive disclosure)"
-            summary_parts = []
-            if counts.get("Bundled"):
-                summary_parts.append(f"{counts['Bundled']} bundled")
-            if counts.get("Legacy Built-in"):
-                summary_parts.append(f"{counts['Legacy Built-in']} legacy built-in")
-            if counts.get("Workspace"):
-                summary_parts.append(f"{counts['Workspace']} user-created")
-            if summary_parts:
-                msg += f" ({' + '.join(summary_parts)})"
-            print(msg)
-        else:
-            self.skill_registry = None
-            self._skill_overview_text = ""
+        Delegates to :func:`ovagent.bootstrap.initialize_skill_registry`.
+        """
+        self.skill_registry, self._skill_overview_text = _initialize_skill_registry()
 
     def _get_registry_stats(self) -> dict:
         """Get statistics about the function registry."""
@@ -527,22 +447,11 @@ class OmicVerseAgent:
         return json.dumps(functions_info, indent=2, ensure_ascii=False)
     
     def _collect_api_key_env(self, api_key: Optional[str] = None) -> Dict[str, str]:
-        """Collect environment variables required for API authentication."""
+        """Collect environment variables required for API authentication.
 
-        if not api_key:
-            return {}
-
-        env_mapping: Dict[str, str] = {}
-        required_key = PROVIDER_API_KEYS.get(self.model)
-        if required_key:
-            env_mapping[required_key] = api_key
-
-        provider = ModelConfig.get_provider_from_model(self.model, self.endpoint)
-        if provider == "openai":
-            # Ensure OPENAI_API_KEY is always populated for OpenAI-compatible SDKs
-            env_mapping.setdefault("OPENAI_API_KEY", api_key)
-
-        return env_mapping
+        Delegates to :func:`ovagent.auth.collect_api_key_env`.
+        """
+        return _collect_api_key_env(self.model, self.endpoint, api_key)
 
     def help_short(self) -> str:
         """Return a short, non-expert help string with sample prompts."""
@@ -563,149 +472,19 @@ class OmicVerseAgent:
     def _build_filesystem_context_instructions(self) -> str:
         """Build instructions for using the filesystem context workspace.
 
-        This teaches LLMs how to use the filesystem-based context management
-        system for offloading intermediate results, plans, and notes.
-
-        Returns
-        -------
-        str
-            Instructions for filesystem context usage.
+        Delegates to :func:`ovagent.prompt_builder.build_filesystem_context_instructions`.
         """
         session_id = self._filesystem_context.session_id if self._filesystem_context else "N/A"
-
-        return f"""
-
-## Context Engineering with Filesystem Workspace
-
-You have access to a **filesystem-based context workspace** that allows you to:
-- Offload intermediate results to reduce memory/context usage
-- Save and track execution plans across multiple steps
-- Search for relevant context using patterns
-- Share context with sub-agents
-
-**Current Session**: `{session_id}`
-
-### Why Use the Workspace?
-
-1. **Reduce Context Window Usage**: Instead of keeping all results in memory, write them to disk
-2. **Track Multi-Step Workflows**: Save plans and update progress as you complete steps
-3. **Retrieve Relevant Context**: Search for notes when you need specific information
-4. **Debug and Audit**: All notes are persisted for later review
-
-### Available Context Operations
-
-#### 1. Writing Notes (Offload Results)
-Use `# CONTEXT_WRITE:` comments in your code to indicate what should be saved:
-
-```python
-# After completing a step, offload the result
-# CONTEXT_WRITE: qc_result -> {{"n_cells_before": original_count, "n_cells_after": adata.n_obs, "removed": removed_count}}
-
-# Example: Save intermediate statistics
-qc_stats = {{
-    "n_cells": adata.n_obs,
-    "n_genes": adata.n_vars,
-    "mito_pct_mean": float(adata.obs['pct_counts_mt'].mean()) if 'pct_counts_mt' in adata.obs else None
-}}
-# CONTEXT_WRITE: qc_stats -> qc_stats
-```
-
-#### 2. Saving Execution Plans
-For multi-step workflows, define a plan upfront:
-
-```python
-# CONTEXT_PLAN:
-# - Step 1: Quality Control [pending]
-# - Step 2: Normalization [pending]
-# - Step 3: Feature Selection [pending]
-# - Step 4: Dimensionality Reduction [pending]
-# - Step 5: Clustering [pending]
-```
-
-#### 3. Updating Plan Progress
-As you complete steps, update the plan:
-
-```python
-# CONTEXT_UPDATE: step=0, status=completed, result="QC removed 500 low-quality cells"
-```
-
-#### 4. Searching for Context
-When you need to reference previous results:
-
-```python
-# CONTEXT_SEARCH: pattern="qc*", type="glob"
-# Or for content search:
-# CONTEXT_SEARCH: pattern="resolution", type="grep"
-```
-
-### Context Categories
-
-Organize your notes by category:
-- **notes**: General observations and comments
-- **results**: Computation results (statistics, parameters)
-- **decisions**: Important choices and their rationale
-- **snapshots**: Data state at key points
-- **errors**: Error logs and debugging information
-
-### Best Practices
-
-1. **Write Early, Write Often**: Offload results as soon as they're computed
-2. **Use Descriptive Keys**: `clustering_leiden_res1.0` is better than `result1`
-3. **Include Metadata**: Add function names, parameters, timestamps
-4. **Reference Previous Context**: Check workspace before repeating computations
-5. **Update Plans Promptly**: Mark steps complete immediately after finishing
-
-### Example: Multi-Step Workflow with Context
-
-```python
-import omicverse as ov
-
-# CONTEXT_PLAN:
-# - Step 1: Quality Control [in_progress]
-# - Step 2: Preprocessing [pending]
-# - Step 3: Clustering [pending]
-
-# Step 1: QC
-original_cells = adata.n_obs
-adata = ov.pp.qc(adata, tresh={{'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250}})
-removed = original_cells - adata.n_obs
-
-# CONTEXT_WRITE: qc_result -> {{"original": original_cells, "remaining": adata.n_obs, "removed": removed}}
-# CONTEXT_UPDATE: step=0, status=completed, result="Removed " + str(removed) + " cells"
-
-print("QC completed: " + str(adata.n_obs) + " cells remaining")
-```
-
-### Automatic Context Injection
-
-The workspace context is automatically searched and injected into prompts when relevant.
-You can reference previous results without explicitly searching:
-
-- Recent notes are included automatically
-- Plan status is always visible
-- Relevant context is retrieved based on the current task
-"""
+        return _build_filesystem_context_instructions(session_id)
 
     @contextmanager
     def _temporary_api_keys(self):
-        """Temporarily inject API keys into the environment and clean up afterwards."""
+        """Temporarily inject API keys into the environment and clean up afterwards.
 
-        if not self._managed_api_env:
+        Delegates to :func:`ovagent.auth.temporary_api_keys`.
+        """
+        with _temporary_api_keys_cm(self._managed_api_env):
             yield
-            return
-
-        previous_values: Dict[str, Optional[str]] = {}
-        try:
-            for key, value in self._managed_api_env.items():
-                previous_values[key] = os.environ.get(key)
-                os.environ[key] = value
-            yield
-        finally:
-            for key, previous in previous_values.items():
-                if previous is None:
-                    os.environ.pop(key, None)
-                else:
-                    os.environ[key] = previous
 
     def _setup_agent(self):
         """Setup the internal agent backend with dynamic instructions."""
@@ -842,13 +621,11 @@ User request: "quality control with nUMI>500, mito<0.2"
                 os.environ[required_key] = self.api_key
 
         # Create the internal LLM backend
-        self._llm = OmicVerseLLMBackend(
+        self._llm = _create_llm_backend(
             system_prompt=instructions,
             model=self.model,
             api_key=self.api_key,
             endpoint=self.endpoint,
-            max_tokens=8192,
-            temperature=0.2,
         )
     
     def _search_functions(self, query: str) -> str:
@@ -3351,15 +3128,11 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         return "\n\n".join(blocks)
 
     def _format_skill_overview(self) -> str:
-        """Generate a bullet overview of available project skills."""
+        """Generate a bullet overview of available project skills.
 
-        if not self.skill_registry or not self.skill_registry.skill_metadata:
-            return ""
-        lines = [
-            f"- **{skill.name}** — {skill.description}"
-            for skill in sorted(self.skill_registry.skill_metadata.values(), key=lambda item: item.name.lower())
-        ]
-        return "\n".join(lines)
+        Delegates to :func:`ovagent.bootstrap.format_skill_overview`.
+        """
+        return _format_skill_overview(self.skill_registry)
 
     async def stream_async(self, request: str, adata: Any,
                            cancel_event=None, history=None,
