@@ -141,6 +141,10 @@ from .ovagent.turn_controller import (
     TurnController as _TurnController,
     FollowUpGate as _FollowUpGate,
 )
+from .ovagent.session_context import (
+    SessionService as _SessionService,
+    ContextService as _ContextService,
+)
 from .session_history import HistoryEntry, SessionHistory
 from .skill_registry import (
     SkillMatch,
@@ -391,6 +395,8 @@ class OmicVerseAgent:
             self._ov_runtime = _initialize_ov_runtime(self._detect_repo_root())
 
             # Extracted module delegates
+            self._session_service = _SessionService(self)
+            self._context_service = _ContextService(self)
             self._prompt_builder = _PromptBuilder(self)
             self._analysis_executor = _AnalysisExecutor(self)
             self._tool_runtime = _ToolRuntime(self, self._analysis_executor)
@@ -486,10 +492,9 @@ class OmicVerseAgent:
     def _build_filesystem_context_instructions(self) -> str:
         """Build instructions for using the filesystem context workspace.
 
-        Delegates to :func:`ovagent.prompt_builder.build_filesystem_context_instructions`.
+        Delegates to :class:`ContextService`.
         """
-        session_id = self._filesystem_context.session_id if self._filesystem_context else "N/A"
-        return _build_filesystem_context_instructions(session_id)
+        return self._context_service.build_filesystem_context_instructions()
 
     @contextmanager
     def _temporary_api_keys(self):
@@ -1053,19 +1058,18 @@ User request: "quality control with nUMI>500, mito<0.2"
         return self._prompt_builder.build_initial_user_message(request, adata)
 
     def _get_harness_session_id(self) -> str:
-        """Best-effort session identifier for harness traces/history."""
-        web_session_id = getattr(self, "_web_session_id", "")
-        if web_session_id:
-            return web_session_id
-        if self._filesystem_context is not None:
-            return self._filesystem_context.session_id
-        if self._notebook_executor is not None and self._notebook_executor.current_session:
-            return self._notebook_executor.current_session.get("session_id", "")
-        return ""
+        """Best-effort session identifier for harness traces/history.
+
+        Delegates to :class:`SessionService`.
+        """
+        return self._session_service.get_harness_session_id()
 
     def _get_runtime_session_id(self) -> str:
-        """Return the session key used by the harness runtime registry."""
-        return self._get_harness_session_id() or "default"
+        """Return the session key used by the harness runtime registry.
+
+        Delegates to :class:`SessionService`.
+        """
+        return self._session_service.get_runtime_session_id()
 
     def _get_visible_agent_tools(self, *, allowed_names: Optional[set[str]] = None) -> list[dict[str, Any]]:
         """Return the currently visible tool schemas for this session."""
@@ -1084,16 +1088,11 @@ User request: "quality control with nUMI>500, mito<0.2"
         return runtime_state.get_loaded_tools(self._get_runtime_session_id())
 
     def _refresh_runtime_working_directory(self) -> str:
-        """Keep runtime cwd aligned with the active worktree / filesystem context."""
-        session_id = self._get_runtime_session_id()
-        cwd = runtime_state.get_working_directory(session_id)
-        if cwd:
-            return cwd
-        current = os.getcwd()
-        if self._filesystem_context is not None:
-            current = str(self._filesystem_context._workspace_dir)
-        runtime_state.set_working_directory(session_id, current)
-        return current
+        """Keep runtime cwd aligned with the active worktree / filesystem context.
+
+        Delegates to :class:`SessionService`.
+        """
+        return self._session_service.refresh_runtime_working_directory()
 
     def _tool_blocked_in_plan_mode(self, tool_name: str) -> bool:
         spec = get_tool_spec(tool_name)
@@ -2335,114 +2334,34 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
     # ===================================================================
 
     def get_current_session_info(self) -> Optional[Dict[str, Any]]:
+        """Get information about current notebook session.
+
+        Delegates to :class:`SessionService`.
         """
-        Get information about current notebook session.
-
-        Returns
-        -------
-        Optional[Dict[str, Any]]
-            Session information dictionary with keys:
-            - session_id: Session identifier
-            - notebook_path: Path to session notebook
-            - prompt_count: Number of prompts executed in session
-            - max_prompts: Maximum prompts per session
-            - remaining_prompts: Prompts remaining before restart
-            - start_time: Session start time (ISO format)
-            Returns None if notebook execution is disabled or no session exists.
-
-        Examples
-        --------
-        >>> agent = ov.Agent(model="gpt-5.2")
-        >>> agent.run("preprocess data", adata)
-        >>> info = agent.get_current_session_info()
-        >>> print(f"Session: {info['session_id']}")
-        >>> print(f"Prompts: {info['prompt_count']}/{info['max_prompts']}")
-        """
-        if not self.use_notebook_execution or not self._notebook_executor:
-            return None
-
-        if not self._notebook_executor.current_session:
-            return None
-
-        session = self._notebook_executor.current_session
-        return {
-            'session_id': session['session_id'],
-            'notebook_path': str(session['notebook_path']),
-            'prompt_count': self._notebook_executor.session_prompt_count,
-            'max_prompts': self._notebook_executor.max_prompts_per_session,
-            'remaining_prompts': self.max_prompts_per_session - self._notebook_executor.session_prompt_count,
-            'start_time': session['start_time'].isoformat()
-        }
+        return self._session_service.get_current_session_info()
 
     def restart_session(self):
-        """
-        Manually restart notebook session (clear memory, start fresh).
+        """Manually restart notebook session (clear memory, start fresh).
 
-        This forces a new session to be created on the next execution,
-        useful for freeing memory or starting with a clean state.
-
-        Examples
-        --------
-        >>> agent = ov.Agent(model="gpt-5.2")
-        >>> agent.run("step 1", adata)
-        >>> agent.run("step 2", adata)
-        >>> # Force new session
-        >>> agent.restart_session()
-        >>> agent.run("step 3", adata)  # Runs in new session
+        Delegates to :class:`SessionService`.
         """
-        if self.use_notebook_execution and self._notebook_executor:
-            if self._notebook_executor.current_session:
-                print("⚙ = Manually restarting session...")
-                self._notebook_executor._archive_current_session()
-                self._notebook_executor.current_session = None
-                self._notebook_executor.session_prompt_count = 0
-                print("✓ Session cleared. Next prompt will start new session.")
-            else:
-                print("💡 No active session to restart")
-        else:
-            print("⚠️  Notebook execution is not enabled")
+        self._session_service.restart_session()
 
     def get_session_history(self) -> List[Dict[str, Any]]:
-        """
-        Get history of all archived notebook sessions.
+        """Get history of all archived notebook sessions.
 
-        Returns
-        -------
-        List[Dict[str, Any]]
-            List of session history dictionaries, each containing:
-            - session_id: Session identifier
-            - notebook_path: Path to archived notebook
-            - prompt_count: Number of prompts executed
-            - start_time: Session start time
-            - end_time: Session end time
-            - executions: List of execution records
-
-        Examples
-        --------
-        >>> agent = ov.Agent(model="gpt-5.2")
-        >>> # ... run several prompts causing session restarts ...
-        >>> history = agent.get_session_history()
-        >>> for session in history:
-        ...     print(f"{session['session_id']}: {session['prompt_count']} prompts")
+        Delegates to :class:`SessionService`.
         """
-        if self.use_notebook_execution and self._notebook_executor:
-            return self._notebook_executor.session_history
-        return []
+        return self._session_service.get_session_history()
 
     # ===================================================================
-    # Filesystem Context Management Methods
+    # Filesystem Context Management Methods (delegated to ContextService)
     # ===================================================================
 
     @property
     def filesystem_context(self) -> Optional[FilesystemContextManager]:
-        """Get the filesystem context manager.
-
-        Returns
-        -------
-        FilesystemContextManager or None
-            The context manager if enabled, None otherwise.
-        """
-        return self._filesystem_context if self.enable_filesystem_context else None
+        """Get the filesystem context manager. Delegates to :class:`ContextService`."""
+        return self._context_service.filesystem_context
 
     def write_note(
         self,
@@ -2451,42 +2370,8 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         category: str = "notes",
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
-        """Write a note to the filesystem context workspace.
-
-        Use this to offload intermediate results, observations, or decisions
-        from the context window to persistent storage. This reduces token usage
-        and enables selective context retrieval.
-
-        Parameters
-        ----------
-        key : str
-            Unique identifier for this note. Used for later retrieval.
-        content : str or dict
-            The note content. Can be free-form text or structured data.
-        category : str, optional
-            Category for organizing notes (default: "notes").
-            Options: notes, results, decisions, snapshots, figures, errors
-        metadata : dict, optional
-            Additional metadata to store with the note.
-
-        Returns
-        -------
-        str or None
-            Path to the stored note, or None if filesystem context is disabled.
-
-        Examples
-        --------
-        >>> agent.write_note("qc_stats", {"n_cells": 5000, "mito_pct": 0.05}, category="results")
-        >>> agent.write_note("observation", "Cluster 3 shows high mitochondrial content")
-        """
-        if not self._filesystem_context:
-            return None
-
-        try:
-            return self._filesystem_context.write_note(key, content, category, metadata)
-        except Exception as e:
-            logger.warning(f"Failed to write note: {e}")
-            return None
+        """Write a note to the filesystem context workspace. Delegates to :class:`ContextService`."""
+        return self._context_service.write_note(key, content, category, metadata)
 
     def search_context(
         self,
@@ -2494,119 +2379,20 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         match_type: str = "glob",
         max_results: int = 10,
     ) -> List[Dict[str, Any]]:
-        """Search the filesystem context for relevant notes.
-
-        Use glob patterns to find notes by key, or grep patterns to search
-        within note content.
-
-        Parameters
-        ----------
-        pattern : str
-            Search pattern. For glob: "pca*", "cluster_*". For grep: regex pattern.
-        match_type : str, optional
-            Type of search: "glob" (filename pattern) or "grep" (content search).
-            Default: "glob".
-        max_results : int, optional
-            Maximum number of results to return (default: 10).
-
-        Returns
-        -------
-        list of dict
-            Matching results with key, category, and content preview.
-
-        Examples
-        --------
-        >>> results = agent.search_context("cluster*", match_type="glob")
-        >>> results = agent.search_context("resolution", match_type="grep")
-        """
-        if not self._filesystem_context:
-            return []
-
-        try:
-            results = self._filesystem_context.search_context(pattern, match_type, max_results=max_results)
-            return [
-                {
-                    "key": r.key,
-                    "category": r.category,
-                    "preview": r.content_preview,
-                    "relevance": r.relevance_score,
-                }
-                for r in results
-            ]
-        except Exception as e:
-            logger.warning(f"Failed to search context: {e}")
-            return []
+        """Search the filesystem context for relevant notes. Delegates to :class:`ContextService`."""
+        return self._context_service.search_context(pattern, match_type, max_results)
 
     def get_relevant_context(
         self,
         query: str,
         max_tokens: int = 1000,
     ) -> str:
-        """Get context relevant to a query, formatted for LLM injection.
-
-        This method searches the filesystem context for notes relevant to
-        the given query and formats them for inclusion in prompts.
-
-        Parameters
-        ----------
-        query : str
-            The current task or query to find relevant context for.
-        max_tokens : int, optional
-            Approximate maximum tokens to return (default: 1000).
-
-        Returns
-        -------
-        str
-            Formatted context string ready for LLM injection.
-
-        Examples
-        --------
-        >>> context = agent.get_relevant_context("clustering")
-        >>> # Use context in custom prompts
-        """
-        if not self._filesystem_context:
-            return ""
-
-        try:
-            return self._filesystem_context.get_relevant_context(query, max_tokens)
-        except Exception as e:
-            logger.warning(f"Failed to get relevant context: {e}")
-            return ""
+        """Get context relevant to a query. Delegates to :class:`ContextService`."""
+        return self._context_service.get_relevant_context(query, max_tokens)
 
     def save_plan(self, steps: List[Dict[str, Any]]) -> Optional[str]:
-        """Save an execution plan to the filesystem context.
-
-        Plans are persisted and can be tracked across prompts.
-
-        Parameters
-        ----------
-        steps : list of dict
-            List of step definitions. Each step should have:
-            - description: What this step does
-            - status: pending, in_progress, completed, failed
-            - optional: function, parameters, expected_output
-
-        Returns
-        -------
-        str or None
-            Path to the plan file, or None if filesystem context is disabled.
-
-        Examples
-        --------
-        >>> agent.save_plan([
-        ...     {"description": "Run QC", "status": "pending"},
-        ...     {"description": "Normalize data", "status": "pending"},
-        ...     {"description": "Cluster cells", "status": "pending"},
-        ... ])
-        """
-        if not self._filesystem_context:
-            return None
-
-        try:
-            return self._filesystem_context.write_plan(steps)
-        except Exception as e:
-            logger.warning(f"Failed to save plan: {e}")
-            return None
+        """Save an execution plan. Delegates to :class:`ContextService`."""
+        return self._context_service.save_plan(steps)
 
     def update_plan_step(
         self,
@@ -2614,83 +2400,16 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         status: str,
         result: Optional[str] = None,
     ) -> None:
-        """Update the status of a plan step.
-
-        Parameters
-        ----------
-        step_index : int
-            Index of the step to update (0-based).
-        status : str
-            New status: pending, in_progress, completed, failed.
-        result : str, optional
-            Result or notes for this step.
-
-        Examples
-        --------
-        >>> agent.update_plan_step(0, "completed", "QC removed 500 low-quality cells")
-        >>> agent.update_plan_step(1, "in_progress")
-        """
-        if not self._filesystem_context:
-            return
-
-        try:
-            self._filesystem_context.update_plan_step(step_index, status, result)
-        except Exception as e:
-            logger.warning(f"Failed to update plan step: {e}")
+        """Update the status of a plan step. Delegates to :class:`ContextService`."""
+        self._context_service.update_plan_step(step_index, status, result)
 
     def get_workspace_summary(self) -> str:
-        """Get a summary of the filesystem context workspace.
-
-        Returns
-        -------
-        str
-            Markdown-formatted workspace summary including:
-            - Session ID
-            - Plan progress (if a plan exists)
-            - Notes by category
-            - Recent activity
-
-        Examples
-        --------
-        >>> print(agent.get_workspace_summary())
-        """
-        if not self._filesystem_context:
-            return "Filesystem context is disabled."
-
-        try:
-            return self._filesystem_context.get_session_summary()
-        except Exception as e:
-            logger.warning(f"Failed to get workspace summary: {e}")
-            return f"Error getting workspace summary: {e}"
+        """Get a summary of the filesystem context workspace. Delegates to :class:`ContextService`."""
+        return self._context_service.get_workspace_summary()
 
     def get_context_stats(self) -> Dict[str, Any]:
-        """Get statistics about the filesystem context workspace.
-
-        Returns
-        -------
-        dict
-            Workspace statistics including:
-            - session_id: Current session ID
-            - workspace_dir: Path to workspace directory
-            - categories: Notes count and size by category
-            - total_notes: Total number of notes
-            - total_size_bytes: Total size in bytes
-
-        Examples
-        --------
-        >>> stats = agent.get_context_stats()
-        >>> print(f"Total notes: {stats['total_notes']}")
-        """
-        if not self._filesystem_context:
-            return {"enabled": False}
-
-        try:
-            stats = self._filesystem_context.get_workspace_stats()
-            stats["enabled"] = True
-            return stats
-        except Exception as e:
-            logger.warning(f"Failed to get context stats: {e}")
-            return {"enabled": True, "error": str(e)}
+        """Get statistics about the filesystem context workspace. Delegates to :class:`ContextService`."""
+        return self._context_service.get_context_stats()
 
     def __del__(self):
         """Cleanup on agent deletion."""

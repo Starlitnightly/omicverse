@@ -9,6 +9,7 @@ from .analysis_executor import AnalysisExecutor, ProactiveCodeTransformer
 from .tool_runtime import ToolRuntime
 from .subagent_controller import SubagentController
 from .turn_controller import TurnController, FollowUpGate
+from .session_context import SessionService, ContextService
 from .auth import (
     ResolvedBackend,
     resolve_model_and_provider,
@@ -34,12 +35,14 @@ __all__ = [
     "AnalysisExecutor",
     "AnalysisRun",
     "CODE_QUALITY_RULES",
+    "ContextService",
     "FollowUpGate",
     "OmicVerseRuntime",
     "ProactiveCodeTransformer",
     "PromptBuilder",
     "ResolvedBackend",
     "RunStore",
+    "SessionService",
     "SubagentController",
     "ToolRuntime",
     "TurnController",
