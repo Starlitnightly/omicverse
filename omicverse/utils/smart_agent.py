@@ -97,12 +97,9 @@ from .harness import (
     hash_code_block,
     make_turn_id,
 )
-from .harness.runtime_state import runtime_state
 from .harness.tool_catalog import (
     get_default_loaded_tool_names,
-    get_tool_spec,
     get_visible_tool_schemas,
-    normalize_tool_name,
 )
 from .context_compactor import ContextCompactor
 from .ovagent.runtime import OmicVerseRuntime
@@ -134,7 +131,10 @@ from .ovagent.analysis_executor import (
     AnalysisExecutor as _AnalysisExecutor,
     ProactiveCodeTransformer as _ProactiveCodeTransformerExt,
 )
-from .ovagent.tool_runtime import ToolRuntime as _ToolRuntime
+from .ovagent.tool_runtime import (
+    LEGACY_AGENT_TOOLS as _LEGACY_AGENT_TOOLS,
+    ToolRuntime as _ToolRuntime,
+)
 from .ovagent.codegen_pipeline import CodegenPipeline as _CodegenPipeline
 from .ovagent.subagent_controller import SubagentController as _SubagentController
 from .ovagent.turn_controller import (
@@ -730,122 +730,11 @@ User request: "quality control with nUMI>500, mito<0.2"
     # Agentic Loop: Tool-calling based autonomous execution
     # =====================================================================
 
-    LEGACY_AGENT_TOOLS = [
-        {
-            "name": "inspect_data",
-            "description": "Inspect the AnnData or MuData object without modifying it.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "aspect": {
-                        "type": "string",
-                        "enum": ["shape", "obs", "var", "obsm", "uns", "layers", "full"],
-                    }
-                },
-                "required": ["aspect"],
-            },
-        },
-        {
-            "name": "execute_code",
-            "description": "Execute Python code against the current dataset.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "code": {"type": "string"},
-                    "description": {"type": "string"},
-                },
-                "required": ["code", "description"],
-            },
-        },
-        {
-            "name": "run_snippet",
-            "description": "Run read-only Python code on a shallow copy of the current dataset.",
-            "parameters": {
-                "type": "object",
-                "properties": {"code": {"type": "string"}},
-                "required": ["code"],
-            },
-        },
-        {
-            "name": "search_functions",
-            "description": "Search the OmicVerse function registry.",
-            "parameters": {
-                "type": "object",
-                "properties": {"query": {"type": "string"}},
-                "required": ["query"],
-            },
-        },
-        {
-            "name": "search_skills",
-            "description": "Search installed domain-specific skills.",
-            "parameters": {
-                "type": "object",
-                "properties": {"query": {"type": "string"}},
-                "required": ["query"],
-            },
-        },
-        {
-            "name": "delegate",
-            "description": "Delegate to an explore, plan, or execute subagent.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "agent_type": {"type": "string", "enum": ["explore", "plan", "execute"]},
-                    "task": {"type": "string"},
-                    "context": {"type": "string"},
-                },
-                "required": ["agent_type", "task"],
-            },
-        },
-        {
-            "name": "web_fetch",
-            "description": "Fetch a URL and return readable content.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "url": {"type": "string"},
-                    "prompt": {"type": "string"},
-                },
-                "required": ["url"],
-            },
-        },
-        {
-            "name": "web_search",
-            "description": "Search the web and return results.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string"},
-                    "num_results": {"type": "number"},
-                },
-                "required": ["query"],
-            },
-        },
-        {
-            "name": "web_download",
-            "description": "Download a file from a URL to disk.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "url": {"type": "string"},
-                    "filename": {"type": "string"},
-                    "directory": {"type": "string"},
-                },
-                "required": ["url"],
-            },
-        },
-        {
-            "name": "finish",
-            "description": "Declare the task complete and return the summary.",
-            "parameters": {
-                "type": "object",
-                "properties": {"summary": {"type": "string"}},
-                "required": ["summary"],
-            },
-        },
-    ]
-
-    AGENT_TOOLS = get_visible_tool_schemas(get_default_loaded_tool_names()) + LEGACY_AGENT_TOOLS
+    # Legacy tool schemas are now owned by ovagent.tool_runtime.
+    # These class-level aliases preserve backward compatibility for any
+    # code that references OmicVerseAgent.LEGACY_AGENT_TOOLS / AGENT_TOOLS.
+    LEGACY_AGENT_TOOLS = _LEGACY_AGENT_TOOLS
+    AGENT_TOOLS = get_visible_tool_schemas(get_default_loaded_tool_names()) + _LEGACY_AGENT_TOOLS
     _URL_PATTERN = re.compile(r"https?://|www\.", re.IGNORECASE)
     _ACTION_REQUEST_PATTERN = re.compile(
         r"\b(analy[sz]e|download|fetch|get|open|read|inspect|load|run|execute|search|lookup|look up|find|process|parse|clone|fix|edit|write)\b",
@@ -864,37 +753,10 @@ User request: "quality control with nUMI>500, mito<0.2"
         re.IGNORECASE,
     )
 
-    def _tool_inspect_data(self, adata: Any, aspect: str) -> str:
-        return self._tool_runtime._tool_inspect_data(adata, aspect)
-
     def _check_code_prerequisites(self, code: str, adata: Any) -> str:
         return self._analysis_executor.check_code_prerequisites(code, adata)
 
-    def _tool_execute_code(self, code: str, description: str, adata: Any) -> dict:
-        return self._tool_runtime._tool_execute_code(code, description, adata)
-
-    def _tool_run_snippet(self, code: str, adata: Any) -> str:
-        return self._tool_runtime._tool_run_snippet(code, adata)
-
-    def _tool_search_functions(self, query: str) -> str:
-        return self._tool_runtime._tool_search_functions(query)
-
-    def _tool_search_skills(self, query: str) -> str:
-        return self._tool_runtime._tool_search_skills(query)
-
-    # ----- Web tools -----
-
-    def _tool_web_fetch(self, url: str, prompt: str = None, timeout: int = 15) -> str:
-        return self._tool_runtime._tool_web_fetch(url, prompt=prompt, timeout=timeout)
-
-    def _tool_web_search(self, query: str, num_results: int = 5) -> str:
-        return self._tool_runtime._tool_web_search(query, num_results=num_results)
-
-    def _tool_web_download(self, url: str, filename: str = None,
-                           directory: str = None) -> str:
-        return self._tool_runtime._tool_web_download(url, filename=filename, directory=directory)
-
-    # ----- Claude-style tool helpers -----
+    # ----- Agent context helpers (used by ToolRuntime via protocol) -----
 
     def _resolve_local_path(self, file_path: str, *, allow_relative: bool = False) -> Path:
         path = Path(file_path).expanduser()
@@ -911,11 +773,11 @@ User request: "quality control with nUMI>500, mito<0.2"
 
     def _request_interaction(self, payload: dict[str, Any]) -> Any:
         if self._approval_handler is None:
-            # Headless / bench mode — auto-approve tool calls
             return True
         return self._approval_handler(payload)
 
     def _request_tool_approval(self, tool_name: str, *, reason: str, payload: dict[str, Any]) -> None:
+        from .harness.tool_catalog import get_tool_spec
         spec = get_tool_spec(tool_name)
         if spec is None or not spec.requires_approval:
             return
@@ -932,96 +794,12 @@ User request: "quality control with nUMI>500, mito<0.2"
         if not approved:
             raise PermissionError(f"{tool_name} was not approved by the user.")
 
-    def _tool_tool_search(self, query: str, max_results: int = 5) -> str:
-        return self._tool_runtime._tool_tool_search(query, max_results=max_results)
-
-    def _tool_read(self, file_path: str, offset: int = 0, limit: int = 2000, pages: str = "") -> str:
-        return self._tool_runtime._tool_read(file_path, offset=offset, limit=limit, pages=pages)
-
-    def _tool_edit(self, file_path: str, old_string: str, new_string: str, replace_all: bool = False) -> str:
-        return self._tool_runtime._tool_edit(
-            file_path, old_string, new_string, replace_all=replace_all,
-        )
-
-    def _tool_write(self, file_path: str, content: str) -> str:
-        return self._tool_runtime._tool_write(file_path, content)
-
-    def _tool_glob(self, pattern: str, root: str = "", max_results: int = 200) -> str:
-        return self._tool_runtime._tool_glob(pattern, root=root, max_results=max_results)
-
-    def _tool_grep(self, pattern: str, root: str = "", glob: str = "", max_results: int = 200) -> str:
-        return self._tool_runtime._tool_grep(pattern, root=root, glob=glob, max_results=max_results)
-
-    def _tool_notebook_edit(self, file_path: str, cell_index: int, source: str, cell_type: str = "") -> str:
-        return self._tool_runtime._tool_notebook_edit(
-            file_path, cell_index, source, cell_type=cell_type,
-        )
-
-    def _tool_create_task(self, title: str, description: str = "", status: str = "pending") -> str:
-        return self._tool_runtime._tool_create_task(title, description=description, status=status)
-
-    def _tool_get_task(self, task_id: str) -> str:
-        return self._tool_runtime._tool_get_task(task_id)
-
-    def _tool_list_tasks(self, status: str = "") -> str:
-        return self._tool_runtime._tool_list_tasks(status=status)
-
-    def _tool_task_output(self, task_id: str, offset: int = 0, limit: int = 200) -> str:
-        return self._tool_runtime._tool_task_output(task_id, offset=offset, limit=limit)
-
-    def _tool_task_stop(self, task_id: str) -> str:
-        return self._tool_runtime._tool_task_stop(task_id)
-
-    def _tool_task_update(self, task_id: str, status: str, summary: str = "") -> str:
-        return self._tool_runtime._tool_task_update(task_id, status, summary=summary)
-
-    def _tool_enter_plan_mode(self, reason: str = "") -> str:
-        return self._tool_runtime._tool_enter_plan_mode(reason=reason)
-
-    def _tool_exit_plan_mode(self, summary: str = "") -> str:
-        return self._tool_runtime._tool_exit_plan_mode(summary=summary)
-
     def _detect_repo_root(self, cwd: Optional[Path] = None) -> Optional[Path]:
         current = (cwd or Path(self._refresh_runtime_working_directory())).resolve()
         for candidate in (current, *current.parents):
             if (candidate / ".git").exists():
                 return candidate
         return None
-
-    def _tool_enter_worktree(self, branch_name: str = "", path: str = "", base_ref: str = "HEAD") -> str:
-        return self._tool_runtime._tool_enter_worktree(
-            branch_name=branch_name, path=path, base_ref=base_ref,
-        )
-
-    def _tool_skill(self, query: str, mode: str = "search") -> str:
-        return self._tool_runtime._tool_skill(query, mode=mode)
-
-    def _tool_list_mcp_resources(self, server: str = "") -> str:
-        return self._tool_runtime._tool_list_mcp_resources(server=server)
-
-    def _tool_read_mcp_resource(self, server: str, uri: str) -> str:
-        return self._tool_runtime._tool_read_mcp_resource(server, uri)
-
-    def _tool_ask_user_question(self, question: str, header: str = "", options: Optional[list[str]] = None) -> str:
-        return self._tool_runtime._tool_ask_user_question(
-            question, header=header, options=options,
-        )
-
-    def _tool_bash(
-        self,
-        command: str,
-        description: str = "",
-        timeout: int = 120000,
-        run_in_background: bool = False,
-        dangerouslyDisableSandbox: bool = False,
-    ) -> str:
-        return self._tool_runtime._tool_bash(
-            command,
-            description=description,
-            timeout=timeout,
-            run_in_background=run_in_background,
-            dangerouslyDisableSandbox=dangerouslyDisableSandbox,
-        )
 
     # ----- Subagent prompt builders -----
 
@@ -1072,20 +850,12 @@ User request: "quality control with nUMI>500, mito<0.2"
         return self._session_service.get_runtime_session_id()
 
     def _get_visible_agent_tools(self, *, allowed_names: Optional[set[str]] = None) -> list[dict[str, Any]]:
-        """Return the currently visible tool schemas for this session."""
-        session_id = self._get_runtime_session_id()
-        loaded = runtime_state.get_loaded_tools(session_id)
-        tools = get_visible_tool_schemas(loaded) + list(self.LEGACY_AGENT_TOOLS)
-        if allowed_names is None:
-            return tools
-        normalized_allowed = {normalize_tool_name(name) for name in allowed_names}
-        return [
-            tool for tool in tools
-            if tool["name"] in allowed_names or normalize_tool_name(tool["name"]) in normalized_allowed
-        ]
+        """Return the currently visible tool schemas — delegates to ToolRuntime."""
+        return self._tool_runtime.get_visible_agent_tools(allowed_names=allowed_names)
 
     def _get_loaded_tool_names(self) -> list[str]:
-        return runtime_state.get_loaded_tools(self._get_runtime_session_id())
+        """Return loaded tool names — delegates to ToolRuntime."""
+        return self._tool_runtime.get_loaded_tool_names()
 
     def _refresh_runtime_working_directory(self) -> str:
         """Keep runtime cwd aligned with the active worktree / filesystem context.
@@ -1095,14 +865,8 @@ User request: "quality control with nUMI>500, mito<0.2"
         return self._session_service.refresh_runtime_working_directory()
 
     def _tool_blocked_in_plan_mode(self, tool_name: str) -> bool:
-        spec = get_tool_spec(tool_name)
-        session_state = runtime_state.get_summary(self._get_runtime_session_id())
-        plan_mode = bool((session_state.get("plan_mode") or {}).get("enabled", False))
-        if not plan_mode:
-            return False
-        if spec is not None:
-            return spec.high_risk or spec.name in {"Bash", "Edit", "Write", "NotebookEdit", "EnterWorktree"}
-        return tool_name in {"execute_code", "web_download"}
+        """Check plan-mode blocking — delegates to ToolRuntime."""
+        return self._tool_runtime.tool_blocked_in_plan_mode(tool_name)
 
     def _request_requires_tool_action(self, request: str, adata: Any) -> bool:
         return _FollowUpGate.request_requires_tool_action(request, adata)
