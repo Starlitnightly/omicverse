@@ -937,9 +937,12 @@ class FeishuRuntime:
             last_progress = msg
             await _edit(force=True)
 
+        _wb = getattr(self._sm, "gateway_web_bridge", None)
+        _prior_history = _wb.get_prior_history_simple("feishu", "dm", chat_id) if _wb else []
+
         bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
         try:
-            result = await bridge.run(full_request or user_text, session.adata)
+            result = await bridge.run(full_request or user_text, session.adata, history=_prior_history)
         except asyncio.CancelledError:
             if draft_id:
                 ok = await asyncio.to_thread(
@@ -992,6 +995,7 @@ class FeishuRuntime:
                     user_text=user_text,
                     llm_text=llm_buf,
                     adata=result.adata,
+                    figures=result.figures or [],
                 )
             except Exception:
                 pass

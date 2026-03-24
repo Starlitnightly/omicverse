@@ -734,9 +734,13 @@ class QQRuntime:
             except Exception:
                 pass
 
+        _scope_id = str(target.channel_id if hasattr(target, "channel_id") else target)
+        _wb = getattr(self._sm, "gateway_web_bridge", None)
+        _prior_history = _wb.get_prior_history_simple("qq", "dm", _scope_id) if _wb else []
+
         bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
         try:
-            result = await bridge.run(full_request, session.adata)
+            result = await bridge.run(full_request, session.adata, history=_prior_history)
         except asyncio.CancelledError:
             await asyncio.to_thread(self._send_text, target, "已取消当前分析。", msg_id)
             raise
@@ -777,6 +781,7 @@ class QQRuntime:
                     user_text=user_text,
                     llm_text=llm_buf,
                     adata=result.adata,
+                    figures=result.figures or [],
                 )
             except Exception:
                 pass

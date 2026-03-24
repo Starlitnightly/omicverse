@@ -601,11 +601,16 @@ class IMessageJarvisBot:
             if chunk:
                 llm_buf += chunk
 
+        _wb = getattr(self._sm, "gateway_web_bridge", None)
+        _prior_history = _wb.get_prior_history_simple(
+            "imessage", session_key.scope_type, session_key.scope_id
+        ) if _wb else []
+
         await self._send_text(target, "⏳ 已收到，开始分析。")
         bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
 
         try:
-            result = await bridge.run(full_request, session.adata)
+            result = await bridge.run(full_request, session.adata, history=_prior_history)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -646,6 +651,7 @@ class IMessageJarvisBot:
                     user_text=user_text,
                     llm_text=llm_buf,
                     adata=result.adata,
+                    figures=result.figures or [],
                 )
             except Exception:
                 pass

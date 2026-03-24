@@ -90,6 +90,40 @@ class WebSessionBridge:
         sid = self.session_id_for_conversation_route(route)
         return self._sm.get_or_create(sid)
 
+    def get_prior_history(self, route: "ConversationRoute") -> list:
+        """Return prior conversation history for a ConversationRoute.
+
+        Returns the in-memory web session history — populated only when the
+        web UI has explicitly loaded this session.  Empty after server restart
+        until the web user selects the conversation.
+        """
+        try:
+            sid = self.session_id_for_conversation_route(route)
+            return self._history_for_sid(sid)
+        except Exception:
+            return []
+
+    def get_prior_history_simple(
+        self,
+        channel: str,
+        scope_type: str,
+        scope_id: str,
+        thread_id: Optional[str] = None,
+    ) -> list:
+        """Same as get_prior_history but takes plain strings (for QQ/Feishu/WeChat/iMessage)."""
+        try:
+            sid = _route_to_web_session_id(channel, scope_type, scope_id, thread_id)
+            return self._history_for_sid(sid)
+        except Exception:
+            return []
+
+    def _history_for_sid(self, sid: str) -> list:
+        """Look up in-memory web session history by session id."""
+        session = self._sm.get_session(sid)
+        if session is not None and session.history:
+            return session.get_history_dicts()
+        return []
+
     # ------------------------------------------------------------------
     # Turn write-back (called after analysis completes)
     # ------------------------------------------------------------------
@@ -100,6 +134,7 @@ class WebSessionBridge:
         user_text: str,
         llm_text: str,
         adata: Any = None,
+        figures: Optional[list] = None,
     ) -> None:
         """Mirror a completed analysis turn into the web AgentSession.
 
@@ -160,6 +195,7 @@ class WebSessionBridge:
         llm_text: str,
         adata: Any = None,
         thread_id: Optional[str] = None,
+        figures: Optional[list] = None,
     ) -> None:
         """String-based overload for channels that don't use ConversationRoute.
 

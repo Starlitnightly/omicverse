@@ -24,6 +24,7 @@ class ExecutionAdapter(Protocol):
         *,
         adata: Optional[Any],
         callbacks: ExecutionCallbacks,
+        history: Optional[list] = None,
     ) -> AgentRunResult:
         ...
 
@@ -38,10 +39,11 @@ class AgentBridgeExecutionAdapter:
         *,
         adata: Optional[Any],
         callbacks: ExecutionCallbacks,
+        history: Optional[list] = None,
     ) -> AgentRunResult:
         bridge = AgentBridge(
             session.agent,
             callbacks.progress_cb,
             callbacks.llm_chunk_cb,
         )
-        return await bridge.run(request, adata)
+        return await bridge.run(request, adata, history=history or [])

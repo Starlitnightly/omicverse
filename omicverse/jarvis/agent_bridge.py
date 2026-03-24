@@ -59,13 +59,18 @@ class AgentBridge:
     # Public API
     # ------------------------------------------------------------------
 
-    async def run(self, request: str, adata: Optional[Any]) -> AgentRunResult:
+    async def run(
+        self,
+        request: str,
+        adata: Optional[Any],
+        history: Optional[List[dict]] = None,
+    ) -> AgentRunResult:
         result = AgentRunResult()
         seen: Set[str] = set()
         diag_seen: Set[str] = set()
         self._run_started_at = time.time()
 
-        async for event in self._agent.stream_async(request, adata):
+        async for event in self._agent.stream_async(request, adata, history=history or []):
             etype   = event.get("type")
             content = event.get("content")
 

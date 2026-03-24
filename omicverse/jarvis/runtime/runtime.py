@@ -225,6 +225,16 @@ class MessageRuntime:
             last_progress = message
             await _update_draft(force=True)
 
+        # Load workspace history so the channel agent has multi-turn context.
+        # Falls back to [] if the bridge doesn't implement get_prior_history
+        # (e.g. plain WebSessionBridge) or if no workspace exists yet.
+        prior_history: List[dict] = []
+        if self._web_bridge is not None:
+            try:
+                prior_history = self._web_bridge.get_prior_history(route) or []
+            except Exception:
+                pass
+
         try:
             result = await self._execution.run(
                 session,
@@ -234,6 +244,7 @@ class MessageRuntime:
                     progress_cb=progress_cb,
                     llm_chunk_cb=llm_chunk_cb,
                 ),
+                history=prior_history,
             )
         except asyncio.CancelledError:
             await self._deliver(self._presenter.draft_cancelled(route))
@@ -254,6 +265,7 @@ class MessageRuntime:
                     user_text=user_text,
                     llm_text=effective_llm_text,
                     adata=result.adata,
+                    figures=result.figures or [],
                 )
             except Exception:
                 logger.warning("web_bridge.on_turn_complete failed (non-fatal)", exc_info=True)
