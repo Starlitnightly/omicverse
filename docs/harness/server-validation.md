@@ -28,3 +28,10 @@ OV_AGENT_RUN_HARNESS_TESTS=1 python -m omicverse.utils.verifier replay <trace_id
 OV_AGENT_RUN_HARNESS_TESTS=1 python -m omicverse.utils.verifier scenario <trace_id> --name smoke
 OV_AGENT_RUN_HARNESS_TESTS=1 python -m omicverse.utils.verifier cleanup --save-report
 ```
+
+## ngagent Review Bridge
+
+For ngagent-managed task review, use `./scripts/ci/ngagent_taiwan_review.sh`.
+That wrapper syncs the current task worktree to `/slow/ngagent-review/...` and
+executes the remote validation helper described in
+`docs/harness/ngagent-review-bridge.md`.
