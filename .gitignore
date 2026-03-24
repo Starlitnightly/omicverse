@@ -47,3 +47,5 @@ omicverse_web/data/
 .build/
 omicclaw/
 docs*
+# Multi-agent worktrees
+.worktrees/
