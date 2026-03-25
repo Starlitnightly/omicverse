@@ -25,6 +25,15 @@ from .context_budget import (
     create_subagent_budget_manager,
 )
 from .subagent_controller import SubagentController
+from .repair_loop import (
+    DEFAULT_MAX_RETRIES,
+    ExecutionRepairLoop,
+    FailureEnvelope,
+    RepairAttempt,
+    RepairResult,
+    build_dataset_context,
+    build_llm_repair_prompt,
+)
 from .tool_scheduler import (
     ExecutionBatch,
     ScheduleResult,
@@ -66,11 +75,16 @@ __all__ = [
     "CompactionCheckpoint",
     "ContextBudgetManager",
     "ContextService",
+    "DEFAULT_MAX_RETRIES",
     "ExecutionBatch",
+    "ExecutionRepairLoop",
+    "FailureEnvelope",
     "FollowUpGate",
     "OmicVerseRuntime",
     "ProactiveCodeTransformer",
     "PromptBuilder",
+    "RepairAttempt",
+    "RepairResult",
     "ResolvedBackend",
     "RunStore",
     "SessionService",
@@ -88,8 +102,10 @@ __all__ = [
     "IsolationMode",
     "OutputTier",
     "ParallelClass",
+    "build_dataset_context",
     "build_default_registry",
     "build_filesystem_context_instructions",
+    "build_llm_repair_prompt",
     "create_subagent_budget_manager",
     "execute_batch",
     "collect_api_key_env",

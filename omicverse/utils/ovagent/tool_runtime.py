@@ -518,6 +518,7 @@ class ToolRuntime:
         self, code: str, description: str, adata: Any
     ) -> dict:
         from .analysis_executor import ProactiveCodeTransformer
+        from .repair_loop import ExecutionRepairLoop
 
         code = ProactiveCodeTransformer().transform(code)
         if getattr(self._ctx, "_code_only_mode", False):
@@ -535,20 +536,58 @@ class ToolRuntime:
         prereq_warnings = self._executor.check_code_prerequisites(code, adata)
 
         self._executor._notebook_fallback_error = None
+
+        # --- Structured self-healing loop ---
+        repair_loop = ExecutionRepairLoop(self._executor, max_retries=3)
+
+        import asyncio as _asyncio
+
         try:
-            result = self._executor.execute_generated_code(
-                code, adata, capture_stdout=True
+            loop = _asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                repair_result = pool.submit(
+                    _asyncio.run,
+                    repair_loop.run(code, adata, phase="execution"),
+                ).result()
+        else:
+            repair_result = _asyncio.run(
+                repair_loop.run(code, adata, phase="execution")
             )
+
+        if repair_result.success:
+            result = repair_result.exec_result
             stdout = result.get("stdout", "") if isinstance(result, dict) else ""
-            result_adata = result.get("adata", adata) if isinstance(result, dict) else (result if result is not None else adata)
+            result_adata = (
+                result.get("adata", adata)
+                if isinstance(result, dict)
+                else (result if result is not None else adata)
+            )
 
             output_parts: List[str] = []
-            notebook_err = getattr(self._executor, "_notebook_fallback_error", None)
+            notebook_err = getattr(
+                self._executor, "_notebook_fallback_error", None
+            )
             if notebook_err:
                 output_parts.append(
                     f"WARNING: notebook session execution failed with error:\n{notebook_err}\n"
                     f"Fell back to in-process execution. Please fix the code to avoid this error."
                 )
+
+            # Annotate recovered attempts
+            if len(repair_result.attempts) > 1:
+                strategies = [
+                    a.strategy for a in repair_result.attempts if not a.success
+                ]
+                output_parts.append(
+                    f"RECOVERED after {len(repair_result.attempts)} attempt(s) "
+                    f"(strategies: {', '.join(strategies)})"
+                )
+
             if prereq_warnings:
                 output_parts.append(
                     f"PREREQUISITE WARNINGS: {prereq_warnings}"
@@ -573,52 +612,31 @@ class ToolRuntime:
                     else "Code executed successfully (no output)."
                 ),
             }
-        except Exception as e:
-            original_error = str(e)
-            tb_str = traceback.format_exc()
 
-            fixed_code = self._executor.apply_execution_error_fix(
-                code, original_error
-            )
-            if fixed_code:
-                try:
-                    result = self._executor.execute_generated_code(
-                        fixed_code, adata, capture_stdout=True
-                    )
-                    stdout = result.get("stdout", "")
-                    result_adata = result.get("adata", adata)
-                    output_parts = [
-                        f"RECOVERED (pattern fix): {original_error}"
-                    ]
-                    if stdout.strip():
-                        output_parts.append(f"stdout:\n{stdout[:3000]}")
-                    try:
-                        output_parts.append(
-                            f"Result adata shape: "
-                            f"{result_adata.shape[0]} cells x "
-                            f"{result_adata.shape[1]} features"
-                        )
-                    except Exception:
-                        output_parts.append(
-                            f"Result type: {type(result_adata).__name__}"
-                        )
-                    return {
-                        "adata": result_adata,
-                        "output": "\n".join(output_parts),
-                    }
-                except Exception:
-                    pass
-
+        # All repair attempts failed — return structured diagnostic
+        envelope = repair_result.final_envelope
+        if envelope is not None:
             error_output = (
-                f"ERROR: {e}\n\nTraceback (last 2000 chars):\n"
-                f"{tb_str[-2000:]}"
+                f"ERROR: {envelope.exception}: {envelope.summary}\n\n"
+                f"Phase: {envelope.phase}\n"
+                f"Attempts: {envelope.retry_count + 1}/{repair_loop.max_retries + 1}\n"
+                f"Traceback (last {len(envelope.traceback_excerpt)} chars):\n"
+                f"{envelope.traceback_excerpt}"
             )
-            if prereq_warnings:
-                error_output = (
-                    f"PREREQUISITE WARNINGS: {prereq_warnings}\n\n"
-                    f"{error_output}"
+            if envelope.repair_hints:
+                error_output += (
+                    "\nRepair hints:\n"
+                    + "\n".join(f"  - {h}" for h in envelope.repair_hints)
                 )
-            return {"adata": adata, "output": error_output}
+        else:
+            error_output = "ERROR: execution failed with no diagnostic envelope"
+
+        if prereq_warnings:
+            error_output = (
+                f"PREREQUISITE WARNINGS: {prereq_warnings}\n\n"
+                f"{error_output}"
+            )
+        return {"adata": adata, "output": error_output}
 
     def _tool_run_snippet(self, code: str, adata: Any) -> str:
         """Read-only snippet — no adata copy, no serialisation round-trip."""
