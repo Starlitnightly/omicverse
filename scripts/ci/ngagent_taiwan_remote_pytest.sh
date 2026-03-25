@@ -6,12 +6,13 @@ repo_root="$(cd -- "${script_dir}/../.." && pwd)"
 task_root="${TAIWAN_REMOTE_TASK_ROOT:-$(cd -- "${repo_root}/.." && pwd)}"
 env_dir="${OV_NGAGENT_REMOTE_ENV_DIR:-${task_root}/.ngagent-venv}"
 bootstrap_stamp="${env_dir}/.bootstrap-fingerprint"
+system_site_python="${OV_NGAGENT_REMOTE_SYSTEM_SITE_PYTHON:-${HOME}/micromamba/envs/aliyawak/bin/python}"
 
 if [[ -n "${OV_NGAGENT_REMOTE_BASE_PYTHON:-}" ]]; then
   base_python="${OV_NGAGENT_REMOTE_BASE_PYTHON}"
   use_system_site_packages=0
-elif [[ -x "${HOME}/micromamba/envs/aliyawak/bin/python" ]]; then
-  base_python="${HOME}/micromamba/envs/aliyawak/bin/python"
+elif [[ -x "${system_site_python}" ]]; then
+  base_python="${system_site_python}"
   use_system_site_packages=1
 else
   base_python="${OV_NGAGENT_REMOTE_FALLBACK_PYTHON:-python3}"
@@ -63,8 +64,7 @@ if [[ "${needs_bootstrap}" == "1" ]]; then
 fi
 
 if [[ -n "${OV_NGAGENT_REMOTE_PYTEST_TARGETS:-}" ]]; then
-  # shellcheck disable=SC2206
-  pytest_targets=(${OV_NGAGENT_REMOTE_PYTEST_TARGETS})
+  IFS=' ' read -r -a pytest_targets <<< "${OV_NGAGENT_REMOTE_PYTEST_TARGETS}"
 else
   pytest_targets=(
     tests/utils/test_agent_initialization.py

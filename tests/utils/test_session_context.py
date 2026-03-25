@@ -123,6 +123,10 @@ class FakeFilesystemContext:
         self._notes: Dict[str, Any] = {}
         self._plan: Optional[List[Dict[str, Any]]] = None
 
+    @property
+    def workspace_dir(self) -> str:
+        return self._workspace_dir
+
     def write_note(
         self, key: str, content: Any, category: str = "notes", metadata: Any = None
     ) -> str:

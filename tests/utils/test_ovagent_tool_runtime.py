@@ -9,6 +9,7 @@ from omicverse.utils.ovagent.tool_runtime import (
     LEGACY_AGENT_TOOLS,
     ToolRuntime,
 )
+from omicverse.utils.ovagent.protocol import AgentContext
 from omicverse.utils.ovagent import tool_runtime as tool_runtime_module
 from omicverse.utils.harness.runtime_state import runtime_state
 from omicverse.utils.harness.tool_catalog import (
@@ -34,8 +35,38 @@ def _unique_session_id() -> str:
 class _DummyCtx:
     """Minimal AgentContext stub for ToolRuntime tests."""
 
+    LEGACY_AGENT_TOOLS = LEGACY_AGENT_TOOLS
+
     def __init__(self, session_id: str = ""):
         self._session_id = session_id or _unique_session_id()
+        self.model = "gpt-5.4"
+        self.provider = "openai"
+        self.endpoint = "https://api.openai.com/v1"
+        self.api_key = None
+        self._llm = None
+        self._config = SimpleNamespace()
+        self._security_config = SimpleNamespace()
+        self._security_scanner = SimpleNamespace()
+        self._filesystem_context = None
+        self.skill_registry = None
+        self._notebook_executor = None
+        self._ov_runtime = None
+        self._trace_store = None
+        self._session_history = None
+        self._context_compactor = None
+        self._approval_handler = None
+        self._reporter = MagicMock()
+        self.last_usage = None
+        self.last_usage_breakdown = {}
+        self._last_run_trace = None
+        self._active_run_id = ""
+        self._web_session_id = ""
+        self._managed_api_env = {}
+        self._code_only_mode = False
+        self._code_only_captured_code = ""
+        self._code_only_captured_history = []
+        self.use_notebook_execution = False
+        self.enable_filesystem_context = False
 
     def _get_runtime_session_id(self) -> str:
         return self._session_id
@@ -56,6 +87,72 @@ class _DummyCtx:
                 "branch_value": "dynamo",
             }
         ]
+
+    def _get_harness_session_id(self) -> str:
+        return self._session_id
+
+    def _get_visible_agent_tools(self, *, allowed_names=None):
+        return []
+
+    def _get_loaded_tool_names(self):
+        return []
+
+    def _refresh_runtime_working_directory(self) -> str:
+        return "."
+
+    def _tool_blocked_in_plan_mode(self, tool_name: str) -> bool:
+        return False
+
+    def _detect_repo_root(self, cwd=None):
+        return None
+
+    def _resolve_local_path(self, file_path: str, *, allow_relative: bool = False):
+        raise NotImplementedError
+
+    def _ensure_server_tool_mode(self, tool_name: str) -> None:
+        return None
+
+    def _request_interaction(self, payload):
+        raise NotImplementedError
+
+    def _request_tool_approval(self, tool_name: str, *, reason: str, payload):
+        raise NotImplementedError
+
+    def _load_skill_guidance(self, slug: str) -> str:
+        return ""
+
+    def _extract_python_code(self, text: str):
+        return text
+
+    def _extract_python_code_strict(self, text: str):
+        return text
+
+    def _gather_code_candidates(self, text: str):
+        return [text]
+
+    def _normalize_code_candidate(self, code: str):
+        return code
+
+    def _collect_runtime_registry_entries(self, query: str, max_entries: int = 20):
+        return []
+
+    def _review_generated_code_lightweight(self, request: str, code: str, entries):
+        return code
+
+    def _contains_forbidden_scanpy_usage(self, code: str) -> bool:
+        return False
+
+    def _rewrite_scanpy_calls_with_registry(self, code: str, entries):
+        return code
+
+    def _run_agentic_loop(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def _build_agentic_system_prompt(self) -> str:
+        return ""
+
+    def _normalize_registry_entry_for_codegen(self, entry):
+        return entry
 
 
 # -----------------------------------------------------------------------
@@ -107,6 +204,10 @@ class TestLegacyAgentTools:
         """OmicVerseAgent.LEGACY_AGENT_TOOLS is the same object."""
         from omicverse.utils.smart_agent import OmicVerseAgent
         assert OmicVerseAgent.LEGACY_AGENT_TOOLS is LEGACY_AGENT_TOOLS
+
+    def test_dummy_ctx_satisfies_runtime_protocol(self):
+        """AgentContext remains runtime-checkable for duck-typed test doubles."""
+        assert isinstance(_DummyCtx(), AgentContext)
 
 
 class TestToolRuntimeVisibility:
@@ -204,6 +305,15 @@ class TestToolRuntimePlanMode:
             assert "plan mode" in result.lower()
         finally:
             runtime_state.exit_plan_mode(sid, reason="cleanup")
+
+    def test_agent_dispatch_without_subagent_controller_raises_runtimeerror(self):
+        rt, _ = self._make_rt()
+        tc = SimpleNamespace(
+            name="Agent",
+            arguments={"agent_type": "explore", "task": "inspect this"},
+        )
+        with pytest.raises(RuntimeError, match="Subagent controller is not initialized"):
+            asyncio.run(rt.dispatch_tool(tc, None, "test"))
 
 
 class TestDeferredToolLoading:

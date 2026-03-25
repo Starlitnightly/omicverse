@@ -102,6 +102,16 @@ class TestCodegenPipelineOwnership:
         assert callable(getattr(pipeline, "review_generated_code_lightweight", None))
         assert callable(getattr(pipeline, "rewrite_code_without_scanpy", None))
 
+    def test_fallback_minimal_workflow_uses_ov_not_scanpy(self):
+        """Fallback code should not generate scanpy calls that violate later guards."""
+        code = CodegenPipeline._fallback_minimal_workflow()
+        assert "import scanpy as sc" not in code
+        assert "sc.pp." not in code
+        assert "sc.tl." not in code
+        assert "ov.pp.normalize_total" in code
+        assert "ov.pp.log1p" in code
+        assert "ov.pp.highly_variable_genes" in code
+
 
 # ---------------------------------------------------------------------------
 # AC-2: smart_agent.py delegates rather than implementing inline

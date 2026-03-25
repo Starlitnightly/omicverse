@@ -257,20 +257,19 @@ class CodegenPipeline:
         return textwrap.dedent(
             """
             import omicverse as ov
-            import scanpy as sc
             # Fallback minimal workflow when code extraction fails
             adata = adata
-            sc.pp.normalize_total(adata, target_sum=1e4)
-            sc.pp.log1p(adata)
-            sc.pp.highly_variable_genes(adata, n_top_genes=2000, flavor='seurat')
-            sc.pp.pca(adata)
-            sc.pp.neighbors(adata)
+            ov.pp.normalize_total(adata, target_sum=1e4)
+            ov.pp.log1p(adata)
+            ov.pp.highly_variable_genes(adata, n_top_genes=2000, flavor='seurat')
+            ov.pp.pca(adata)
+            ov.pp.neighbors(adata)
             try:
-                sc.tl.leiden(adata)
+                ov.pp.leiden(adata)
             except Exception:
                 pass
             try:
-                sc.tl.umap(adata)
+                ov.pp.umap(adata)
             except Exception:
                 pass
             """

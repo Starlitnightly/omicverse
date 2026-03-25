@@ -176,6 +176,14 @@ class ToolRuntime:
         """Late-bind the subagent controller to avoid circular deps."""
         self._subagent_controller = controller
 
+    def _require_subagent_controller(self) -> Any:
+        """Return the bound subagent controller or raise a clear runtime error."""
+        if self._subagent_controller is None:
+            raise RuntimeError(
+                "Subagent controller is not initialized; Agent delegation is unavailable."
+            )
+        return self._subagent_controller
+
     # ------------------------------------------------------------------
     # Tool facade — visibility, plan-mode gating, loaded-tool tracking
     # ------------------------------------------------------------------
@@ -327,7 +335,8 @@ class ToolRuntime:
             print(
                 f"   -> Delegating to {agent_type} subagent: {task[:80]}..."
             )
-            sub_result = await self._subagent_controller.run_subagent(
+            subagent_controller = self._require_subagent_controller()
+            sub_result = await subagent_controller.run_subagent(
                 agent_type=agent_type,
                 task=task,
                 adata=current_adata,

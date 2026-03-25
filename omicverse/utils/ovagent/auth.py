@@ -41,18 +41,25 @@ def resolve_model_and_provider(
     Raises ``ValueError`` when validation fails (no proxy, invalid model/key).
     """
     if endpoint:
+        logger.info("Proxy mode enabled for model %s via endpoint %s", model, endpoint)
         print(f"   🔌 Proxy mode: model={model}, endpoint={endpoint}")
     else:
         original_model = model
         try:
             model = ModelConfig.normalize_model_id(model)
         except Exception:
-            pass  # Older ModelConfig without normalization: proceed as-is
+            logger.warning(
+                "Model ID normalization failed for %s; proceeding with the original ID",
+                model,
+                exc_info=True,
+            )
         if model != original_model:
+            logger.info("Model ID normalized from %s to %s", original_model, model)
             print(f"   📝 Model ID normalized: {original_model} → {model}")
 
         is_valid, validation_msg = ModelConfig.validate_model_setup(model, api_key)
         if not is_valid:
+            logger.error("Model setup validation failed for %s: %s", model, validation_msg)
             print(f"❌ {validation_msg}")
             raise ValueError(validation_msg)
 
@@ -116,6 +123,13 @@ def display_backend_info(
 ) -> None:
     """Print model / provider / key-status banner during init."""
     model_desc = ModelConfig.get_model_description(model)
+    logger.info(
+        "Resolved backend: model=%s provider=%s endpoint=%s managed_env_keys=%s",
+        model,
+        provider,
+        endpoint,
+        sorted(managed_env),
+    )
     print(f"    Model: {model_desc}")
     print(f"    Provider: {provider.title()}")
     print(f"    Endpoint: {endpoint}")
@@ -123,6 +137,8 @@ def display_backend_info(
     with temporary_api_keys(managed_env):
         key_available, key_msg = ModelConfig.check_api_key_availability(model)
     if key_available:
+        logger.info("API key availability check passed for %s: %s", model, key_msg)
         print(f"   ✅ {key_msg}")
     else:
+        logger.warning("API key availability check did not pass for %s: %s", model, key_msg)
         print(f"   ⚠️  {key_msg}")

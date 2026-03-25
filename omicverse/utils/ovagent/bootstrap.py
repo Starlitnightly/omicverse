@@ -66,6 +66,7 @@ def initialize_skill_registry(
     try:
         registry = build_multi_path_skill_registry(package_root, cwd)
     except Exception as exc:
+        logger.warning("Failed to load Agent Skills: %s", exc)
         print(f"⚠️  Failed to load Agent Skills: {exc}")
         return None, ""
 
@@ -137,6 +138,7 @@ def initialize_notebook_executor(
         print(f"      Storage: {executor.storage_dir}")
         return True, executor
     except Exception as e:
+        logger.warning("Notebook execution initialization failed: %s", e)
         print(f"   ⚠️  Notebook execution initialization failed: {e}")
         print("   ⚡ Falling back to in-process execution")
         return False, None
@@ -165,7 +167,7 @@ def initialize_filesystem_context(
         ctx = FilesystemContextManager(base_dir=storage_dir)
         print("   📁 Filesystem context enabled")
         print(f"      Session: {ctx.session_id}")
-        print(f"      Storage: {ctx._workspace_dir}")
+        print(f"      Storage: {ctx.workspace_dir}")
         return True, ctx
     except Exception as e:
         logger.warning("Filesystem context initialization failed: %s", e)

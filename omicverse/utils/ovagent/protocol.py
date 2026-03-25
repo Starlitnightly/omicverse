@@ -6,8 +6,8 @@ protocol instead of importing the concrete ``OmicVerseAgent`` class.
 This breaks the circular import between ``smart_agent.py`` and the
 ``ovagent/`` subpackage.
 
-The protocol is **not** ``@runtime_checkable`` — it is purely a
-type-checking aid (no runtime overhead).
+The protocol is ``@runtime_checkable`` so extracted modules and tests can
+validate duck-typed agent doubles at runtime when needed.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ from typing import (
     List,
     Optional,
     Protocol,
+    runtime_checkable,
 )
 
 if TYPE_CHECKING:
@@ -36,6 +37,7 @@ if TYPE_CHECKING:
     from .runtime import OmicVerseRuntime
 
 
+@runtime_checkable
 class AgentContext(Protocol):
     """Minimal surface that extracted ovagent modules access on the agent."""
 

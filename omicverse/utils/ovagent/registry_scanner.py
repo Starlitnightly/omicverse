@@ -9,11 +9,14 @@ and tool runtime can use for function retrieval and scoring.
 from __future__ import annotations
 
 import ast
+import logging
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ..._registry import _global_registry
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +93,7 @@ class RegistryScanner:
             from ...mcp.manifest import ensure_registry_populated
             ensure_registry_populated()
         except Exception:
-            pass
+            logger.warning("Failed to hydrate the runtime registry from MCP manifest", exc_info=True)
 
     @staticmethod
     def collect_runtime_entries(
@@ -254,6 +257,7 @@ class RegistryScanner:
                     source = file_path.read_text(encoding="utf-8")
                     tree = ast.parse(source, filename=str(file_path))
                 except Exception:
+                    logger.warning("Failed to statically scan registry entries from %s", file_path, exc_info=True)
                     continue
 
                 for node in tree.body:
@@ -354,6 +358,7 @@ def _literal_eval_or_default(node: Optional[ast.AST], default: Any) -> Any:
     try:
         return ast.literal_eval(node)
     except Exception:
+        logger.debug("Falling back to default during AST literal evaluation", exc_info=True)
         return default
 
 

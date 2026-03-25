@@ -67,7 +67,7 @@ class SessionService:
         current = os.getcwd()
         fs_ctx = getattr(self._ctx, "_filesystem_context", None)
         if fs_ctx is not None:
-            current = str(fs_ctx._workspace_dir)
+            current = str(fs_ctx.workspace_dir)
         runtime_state.set_working_directory(session_id, current)
         return current
 
