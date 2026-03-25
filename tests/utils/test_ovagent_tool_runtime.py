@@ -1,5 +1,6 @@
 import asyncio
 import json
+from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -70,6 +71,9 @@ class _DummyCtx:
 
     def _get_runtime_session_id(self) -> str:
         return self._session_id
+
+    def _emit(self, level, message: str, category: str = "") -> None:
+        return None
 
     def _collect_static_registry_entries(self, query: str, max_entries: int = 20):
         if query != "dynamo":
@@ -153,6 +157,10 @@ class _DummyCtx:
 
     def _normalize_registry_entry_for_codegen(self, entry):
         return entry
+
+    @contextmanager
+    def _temporary_api_keys(self):
+        yield
 
 
 # -----------------------------------------------------------------------
