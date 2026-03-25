@@ -128,6 +128,14 @@ class TestCollectApiKeyEnv:
         assert "OPENAI_API_KEY" in result
         assert result["OPENAI_API_KEY"] == "sk-test123"
 
+    def test_provider_key_lookup_uses_resolved_provider(self):
+        result = collect_api_key_env(
+            "anthropic/claude-opus-4-6-20260201",
+            None,
+            "anthropic-test-key",
+        )
+        assert result["ANTHROPIC_API_KEY"] == "anthropic-test-key"
+
 
 # ===================================================================
 # temporary_api_keys

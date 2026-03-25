@@ -176,7 +176,7 @@ class CodegenPipeline:
                 if code:
                     candidates.append(code)
 
-        # Strategy 5: GPT-5 specific - last code block (reasoning may come before)
+        # Strategy 5: prefer the last code block when reasoning precedes final code
         if len(candidates) > 1:
             candidates = list(reversed(candidates))
 
@@ -258,7 +258,6 @@ class CodegenPipeline:
             """
             import omicverse as ov
             # Fallback minimal workflow when code extraction fails
-            adata = adata
             ov.pp.normalize_total(adata, target_sum=1e4)
             ov.pp.log1p(adata)
             ov.pp.highly_variable_genes(adata, n_top_genes=2000, flavor='seurat')

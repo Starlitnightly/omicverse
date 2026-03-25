@@ -775,7 +775,8 @@ User request: "quality control with nUMI>500, mito<0.2"
             instructions += self._context_service.build_filesystem_context_instructions() if hasattr(self, '_context_service') else _build_filesystem_context_instructions(self._filesystem_context)
 
         if self.api_key:
-            required_key = PROVIDER_API_KEYS.get(self.model)
+            provider = ModelConfig.get_provider_from_model(self.model, self.endpoint)
+            required_key = PROVIDER_API_KEYS.get(provider)
             if required_key and not os.getenv(required_key):
                 os.environ[required_key] = self.api_key
 

@@ -108,6 +108,7 @@ class TestCodegenPipelineOwnership:
         assert "import scanpy as sc" not in code
         assert "sc.pp." not in code
         assert "sc.tl." not in code
+        assert "adata = adata" not in code
         assert "ov.pp.normalize_total" in code
         assert "ov.pp.log1p" in code
         assert "ov.pp.highly_variable_genes" in code
