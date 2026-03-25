@@ -48,6 +48,7 @@ from .tool_scheduler import (
     ToolScheduler,
     execute_batch,
 )
+from .event_stream import RuntimeEventEmitter
 from .turn_controller import TurnController, FollowUpGate
 from .session_context import SessionService, ContextService
 from .registry_scanner import RegistryScanner
@@ -94,6 +95,7 @@ __all__ = [
     "ProactiveCodeTransformer",
     "PromptBuilder",
     "RepairAttempt",
+    "RuntimeEventEmitter",
     "RepairResult",
     "ResolvedBackend",
     "RunStore",

@@ -17,8 +17,11 @@ Isolation contract
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, FrozenSet, List, Optional
+
+logger = logging.getLogger(__name__)
 
 from .context_budget import (
     BudgetSliceType,
@@ -220,9 +223,11 @@ class SubagentController:
         working_adata = adata
 
         for turn in range(runtime.max_turns):
-            print(
-                f"      \U0001f504 [{agent_type}] "
-                f"Turn {turn + 1}/{runtime.max_turns}"
+            logger.info(
+                "subagent_turn agent_type=%s turn=%d/%d",
+                agent_type,
+                turn + 1,
+                runtime.max_turns,
             )
 
             response = await self._ctx._llm.chat(
@@ -251,9 +256,11 @@ class SubagentController:
                 }
 
             for tc in response.tool_calls:
-                print(
-                    f"      \U0001f527 [{agent_type}] "
-                    f"{tc.name}({', '.join(f'{k}=' for k in tc.arguments)})"
+                logger.info(
+                    "subagent_tool agent_type=%s tool=%s args=[%s]",
+                    agent_type,
+                    tc.name,
+                    ", ".join(f"{k}=" for k in tc.arguments),
                 )
 
                 # Permission check before dispatch
@@ -284,9 +291,10 @@ class SubagentController:
                     tool_output = result.get("output", "Code executed.")
                 elif tc.name == "finish":
                     summary = tc.arguments.get("summary", "")
-                    print(
-                        f"      \u2705 [{agent_type}] "
-                        f"Finished: {summary[:120]}"
+                    logger.info(
+                        "subagent_finished agent_type=%s summary=%s",
+                        agent_type,
+                        summary[:120],
                     )
                     return {
                         "result": summary,
