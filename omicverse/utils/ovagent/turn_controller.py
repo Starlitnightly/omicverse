@@ -24,6 +24,8 @@ from ..harness.runtime_state import runtime_state
 from ..harness.tool_catalog import normalize_tool_name
 from ..session_history import HistoryEntry
 
+from .tool_scheduler import ToolScheduler, execute_batch, ScheduledCall
+
 if TYPE_CHECKING:
     from .prompt_builder import PromptBuilder
     from .protocol import AgentContext
@@ -1021,8 +1023,28 @@ class TurnController:
                 finished = False
                 no_tool_retry_count = 0
 
-                for tc in response.tool_calls:
-                    canonical = normalize_tool_name(tc.name)
+                # --- Schedule tool calls into batches ---
+                scheduler = ToolScheduler(
+                    self._tool_runtime.registry
+                )
+                schedule = scheduler.schedule(response.tool_calls)
+                logger.info(
+                    "tool_schedule turn=%d batches=%d parallel=%s "
+                    "total_calls=%d",
+                    turn + 1,
+                    schedule.total_batches,
+                    schedule.has_parallel,
+                    schedule.total_calls,
+                )
+
+                # Pre-allocate result slots indexed by original position
+                _ordered_results: List[Optional[tuple]] = [
+                    None
+                ] * schedule.total_calls
+                # Map from call index → step_id for trace coherence
+                _step_ids: Dict[int, str] = {}
+
+                for batch in schedule.batches:
                     if _is_cancelled():
                         print(
                             "   \u26d4 Cancelled before tool dispatch"
@@ -1058,249 +1080,283 @@ class TurnController:
                         self._save_conversation_log(messages)
                         return current_adata
 
-                    tool_step_id = recorder.add_step(
-                        "tool_call",
-                        name=canonical or tc.name,
-                        summary=f"{canonical or tc.name} dispatched",
-                        data={"arguments": tc.arguments},
-                    )
-                    print(
-                        f"   \U0001f527 Tool: {canonical or tc.name}"
-                        f"({', '.join(f'{k}=' for k in tc.arguments)})"
-                    )
-
-                    await emit(
-                        build_stream_event(
-                            "item_started",
-                            {
-                                "item_type": "tool_call",
-                                "name": canonical or tc.name,
-                            },
-                            turn_id=recorder.trace.turn_id,
-                            trace_id=recorder.trace.trace_id,
-                            step_id=tool_step_id,
-                            session_id=recorder.trace.session_id,
-                            category="item",
-                        )
-                    )
-                    await emit(
-                        build_stream_event(
+                    # Emit item_started for each call in the batch
+                    for sc in batch.calls:
+                        tc = sc.tool_call
+                        canonical = sc.canonical_name
+                        tool_step_id = recorder.add_step(
                             "tool_call",
-                            {
-                                "name": canonical or tc.name,
+                            name=canonical or tc.name,
+                            summary=f"{canonical or tc.name} dispatched",
+                            data={
                                 "arguments": tc.arguments,
+                                "batch_id": batch.batch_id,
+                                "parallel": batch.parallel,
                             },
-                            turn_id=recorder.trace.turn_id,
-                            trace_id=recorder.trace.trace_id,
-                            step_id=tool_step_id,
-                            session_id=recorder.trace.session_id,
-                            category="tool",
                         )
+                        _step_ids[sc.index] = tool_step_id
+                        print(
+                            f"   \U0001f527 Tool: {canonical or tc.name}"
+                            f"({', '.join(f'{k}=' for k in tc.arguments)})"
+                        )
+                        await emit(
+                            build_stream_event(
+                                "item_started",
+                                {
+                                    "item_type": "tool_call",
+                                    "name": canonical or tc.name,
+                                    "batch_id": batch.batch_id,
+                                    "parallel": batch.parallel,
+                                },
+                                turn_id=recorder.trace.turn_id,
+                                trace_id=recorder.trace.trace_id,
+                                step_id=tool_step_id,
+                                session_id=recorder.trace.session_id,
+                                category="item",
+                            )
+                        )
+                        await emit(
+                            build_stream_event(
+                                "tool_call",
+                                {
+                                    "name": canonical or tc.name,
+                                    "arguments": tc.arguments,
+                                },
+                                turn_id=recorder.trace.turn_id,
+                                trace_id=recorder.trace.trace_id,
+                                step_id=tool_step_id,
+                                session_id=recorder.trace.session_id,
+                                category="tool",
+                            )
+                        )
+
+                    # Dispatch the batch
+                    async def _dispatch_scheduled(
+                        sc: ScheduledCall,
+                    ) -> Any:
+                        return await self._tool_runtime.dispatch_tool(
+                            sc.tool_call, current_adata, request
+                        )
+
+                    batch_results = await execute_batch(
+                        batch, _dispatch_scheduled
                     )
 
-                    result = await self._tool_runtime.dispatch_tool(
-                        tc, current_adata, request
-                    )
-                    if canonical not in {
-                        "finish", "TaskGet", "TaskList",
-                        "TaskOutput", "ToolSearch",
-                    }:
-                        meaningful_tool_call_seen = True
+                    # Process results in original index order
+                    for call_idx, result in batch_results:
+                        sc = batch.calls[
+                            call_idx - batch.calls[0].index
+                        ]
+                        tc = sc.tool_call
+                        canonical = sc.canonical_name
+                        tool_step_id = _step_ids[call_idx]
 
-                    if (
-                        canonical
-                        in ("execute_code", "Agent", "delegate")
-                        and isinstance(result, dict)
-                        and "adata" in result
-                    ):
-                        current_adata = result["adata"]
-                        tool_output = result.get(
-                            "output", "Code executed."
-                        )
-                        if canonical == "execute_code":
-                            code = tc.arguments.get("code", "")
-                            recorder.add_step(
-                                "code",
-                                name=canonical,
-                                summary=tc.arguments.get(
-                                    "description", "Code executed"
-                                ),
-                                data={"code": code},
+                        if canonical not in {
+                            "finish", "TaskGet", "TaskList",
+                            "TaskOutput", "ToolSearch",
+                        }:
+                            meaningful_tool_call_seen = True
+
+                        if (
+                            canonical
+                            in ("execute_code", "Agent", "delegate")
+                            and isinstance(result, dict)
+                            and "adata" in result
+                        ):
+                            current_adata = result["adata"]
+                            tool_output = result.get(
+                                "output", "Code executed."
                             )
-                            recorder.add_artifact(
-                                "code",
-                                label=tc.arguments.get(
-                                    "description", "execute_code"
-                                ),
-                            )
-                            print(
-                                "      \u2705 "
-                                + tc.arguments.get(
-                                    "description", "Code executed"
+                            if canonical == "execute_code":
+                                code = tc.arguments.get("code", "")
+                                recorder.add_step(
+                                    "code",
+                                    name=canonical,
+                                    summary=tc.arguments.get(
+                                        "description", "Code executed"
+                                    ),
+                                    data={"code": code},
                                 )
+                                recorder.add_artifact(
+                                    "code",
+                                    label=tc.arguments.get(
+                                        "description", "execute_code"
+                                    ),
+                                )
+                                print(
+                                    "      \u2705 "
+                                    + tc.arguments.get(
+                                        "description", "Code executed"
+                                    )
+                                )
+                                await emit(
+                                    build_stream_event(
+                                        "code",
+                                        code,
+                                        turn_id=recorder.trace.turn_id,
+                                        trace_id=recorder.trace.trace_id,
+                                        session_id=recorder.trace.session_id,
+                                        category="execution",
+                                    )
+                                )
+                            else:
+                                print(
+                                    "      \u2705 delegate("
+                                    + tc.arguments.get("agent_type", "")
+                                    + ") completed"
+                                )
+
+                            shape = (
+                                (
+                                    current_adata.shape[0],
+                                    current_adata.shape[1],
+                                )
+                                if hasattr(current_adata, "shape")
+                                else None
+                            )
+                            recorder.add_step(
+                                "result",
+                                name=canonical or tc.name,
+                                summary="adata updated",
+                                data={"shape": shape},
                             )
                             await emit(
                                 build_stream_event(
-                                    "code",
-                                    code,
+                                    "result",
+                                    current_adata,
                                     turn_id=recorder.trace.turn_id,
                                     trace_id=recorder.trace.trace_id,
                                     session_id=recorder.trace.session_id,
                                     category="execution",
                                 )
+                                | {"shape": shape}
                             )
+                        elif canonical == "finish":
+                            summary = tc.arguments.get(
+                                "summary", "Task completed"
+                            )
+                            final_summary = summary
+                            recorder.add_step(
+                                "done", name=canonical, summary=summary
+                            )
+                            print(f"   \u2705 Finished: {summary}")
+                            tool_output = f"Task finished: {summary}"
+                            finished = True
+                        elif isinstance(result, str):
+                            tool_output = result
                         else:
-                            print(
-                                "      \u2705 delegate("
-                                + tc.arguments.get("agent_type", "")
-                                + ") completed"
+                            tool_output = str(result)
+
+                        # Truncate
+                        max_tool_output_chars = 8000
+                        if canonical in {
+                            "WebFetch", "WebSearch",
+                            "web_fetch", "web_search",
+                        }:
+                            max_tool_output_chars = 4000
+                        if len(tool_output) > max_tool_output_chars:
+                            tool_output = (
+                                tool_output[: max_tool_output_chars - 500]
+                                + "\n... (truncated)"
                             )
 
-                        shape = (
-                            (
-                                current_adata.shape[0],
-                                current_adata.shape[1],
-                            )
-                            if hasattr(current_adata, "shape")
-                            else None
+                        try:
+                            parsed_tool_output = json.loads(tool_output)
+                        except Exception as e:
+                            logger.debug("turn_controller: failed to parse tool output as JSON (%s)", e)
+                            parsed_tool_output = None
+
+                        if isinstance(parsed_tool_output, dict):
+                            if canonical == "ToolSearch":
+                                await emit(
+                                    build_stream_event(
+                                        "status",
+                                        {
+                                            "loaded_tools": (
+                                                parsed_tool_output.get(
+                                                    "loaded_tools", []
+                                                )
+                                            ),
+                                            "newly_loaded": (
+                                                parsed_tool_output.get(
+                                                    "newly_loaded", []
+                                                )
+                                            ),
+                                        },
+                                        turn_id=recorder.trace.turn_id,
+                                        trace_id=recorder.trace.trace_id,
+                                        step_id=tool_step_id,
+                                        session_id=recorder.trace.session_id,
+                                        category="runtime",
+                                    )
+                                )
+                            elif canonical in {
+                                "EnterPlanMode", "ExitPlanMode",
+                            }:
+                                await emit(
+                                    build_stream_event(
+                                        "status",
+                                        {"plan_mode": parsed_tool_output},
+                                        turn_id=recorder.trace.turn_id,
+                                        trace_id=recorder.trace.trace_id,
+                                        step_id=tool_step_id,
+                                        session_id=recorder.trace.session_id,
+                                        category="runtime",
+                                    )
+                                )
+                            elif canonical == "EnterWorktree":
+                                await emit(
+                                    build_stream_event(
+                                        "status",
+                                        {"worktree": parsed_tool_output},
+                                        turn_id=recorder.trace.turn_id,
+                                        trace_id=recorder.trace.trace_id,
+                                        step_id=tool_step_id,
+                                        session_id=recorder.trace.session_id,
+                                        category="runtime",
+                                    )
+                                )
+                            elif canonical in {
+                                "TaskCreate", "TaskUpdate",
+                                "TaskStop", "Bash",
+                            }:
+                                await emit(
+                                    build_stream_event(
+                                        "task_update",
+                                        parsed_tool_output,
+                                        turn_id=recorder.trace.turn_id,
+                                        trace_id=recorder.trace.trace_id,
+                                        step_id=tool_step_id,
+                                        session_id=recorder.trace.session_id,
+                                        category="task",
+                                    )
+                                )
+
+                        _ordered_results[call_idx] = (
+                            tc.id, tc.name, tool_output
                         )
-                        recorder.add_step(
-                            "result",
-                            name=canonical or tc.name,
-                            summary="adata updated",
-                            data={"shape": shape},
-                        )
+                        _sync_runtime_trace()
                         await emit(
                             build_stream_event(
-                                "result",
-                                current_adata,
+                                "item_completed",
+                                {
+                                    "item_type": "tool_call",
+                                    "name": canonical or tc.name,
+                                    "status": "success",
+                                    "batch_id": batch.batch_id,
+                                },
                                 turn_id=recorder.trace.turn_id,
                                 trace_id=recorder.trace.trace_id,
+                                step_id=tool_step_id,
                                 session_id=recorder.trace.session_id,
-                                category="execution",
+                                category="item",
                             )
-                            | {"shape": shape}
-                        )
-                    elif canonical == "finish":
-                        summary = tc.arguments.get(
-                            "summary", "Task completed"
-                        )
-                        final_summary = summary
-                        recorder.add_step(
-                            "done", name=canonical, summary=summary
-                        )
-                        print(f"   \u2705 Finished: {summary}")
-                        tool_output = f"Task finished: {summary}"
-                        finished = True
-                    elif isinstance(result, str):
-                        tool_output = result
-                    else:
-                        tool_output = str(result)
-
-                    # Truncate
-                    max_tool_output_chars = 8000
-                    if canonical in {
-                        "WebFetch", "WebSearch",
-                        "web_fetch", "web_search",
-                    }:
-                        max_tool_output_chars = 4000
-                    if len(tool_output) > max_tool_output_chars:
-                        tool_output = (
-                            tool_output[: max_tool_output_chars - 500]
-                            + "\n... (truncated)"
                         )
 
-                    try:
-                        parsed_tool_output = json.loads(tool_output)
-                    except Exception as e:
-                        logger.debug("turn_controller: failed to parse tool output as JSON (%s)", e)
-                        parsed_tool_output = None
-
-                    if isinstance(parsed_tool_output, dict):
-                        if canonical == "ToolSearch":
-                            await emit(
-                                build_stream_event(
-                                    "status",
-                                    {
-                                        "loaded_tools": (
-                                            parsed_tool_output.get(
-                                                "loaded_tools", []
-                                            )
-                                        ),
-                                        "newly_loaded": (
-                                            parsed_tool_output.get(
-                                                "newly_loaded", []
-                                            )
-                                        ),
-                                    },
-                                    turn_id=recorder.trace.turn_id,
-                                    trace_id=recorder.trace.trace_id,
-                                    step_id=tool_step_id,
-                                    session_id=recorder.trace.session_id,
-                                    category="runtime",
-                                )
-                            )
-                        elif canonical in {
-                            "EnterPlanMode", "ExitPlanMode",
-                        }:
-                            await emit(
-                                build_stream_event(
-                                    "status",
-                                    {"plan_mode": parsed_tool_output},
-                                    turn_id=recorder.trace.turn_id,
-                                    trace_id=recorder.trace.trace_id,
-                                    step_id=tool_step_id,
-                                    session_id=recorder.trace.session_id,
-                                    category="runtime",
-                                )
-                            )
-                        elif canonical == "EnterWorktree":
-                            await emit(
-                                build_stream_event(
-                                    "status",
-                                    {"worktree": parsed_tool_output},
-                                    turn_id=recorder.trace.turn_id,
-                                    trace_id=recorder.trace.trace_id,
-                                    step_id=tool_step_id,
-                                    session_id=recorder.trace.session_id,
-                                    category="runtime",
-                                )
-                            )
-                        elif canonical in {
-                            "TaskCreate", "TaskUpdate",
-                            "TaskStop", "Bash",
-                        }:
-                            await emit(
-                                build_stream_event(
-                                    "task_update",
-                                    parsed_tool_output,
-                                    turn_id=recorder.trace.turn_id,
-                                    trace_id=recorder.trace.trace_id,
-                                    step_id=tool_step_id,
-                                    session_id=recorder.trace.session_id,
-                                    category="task",
-                                )
-                            )
-
-                    tool_results.append(
-                        (tc.id, tc.name, tool_output)
-                    )
-                    _sync_runtime_trace()
-                    await emit(
-                        build_stream_event(
-                            "item_completed",
-                            {
-                                "item_type": "tool_call",
-                                "name": canonical or tc.name,
-                                "status": "success",
-                            },
-                            turn_id=recorder.trace.turn_id,
-                            trace_id=recorder.trace.trace_id,
-                            step_id=tool_step_id,
-                            session_id=recorder.trace.session_id,
-                            category="item",
-                        )
-                    )
+                # Collect results preserving original order
+                tool_results = [
+                    r for r in _ordered_results if r is not None
+                ]
 
                 self._append_tool_results(messages, tool_results)
 

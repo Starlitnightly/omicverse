@@ -17,6 +17,13 @@ from .tool_registry import (
     build_default_registry,
 )
 from .subagent_controller import SubagentController
+from .tool_scheduler import (
+    ExecutionBatch,
+    ScheduleResult,
+    ScheduledCall,
+    ToolScheduler,
+    execute_batch,
+)
 from .turn_controller import TurnController, FollowUpGate
 from .session_context import SessionService, ContextService
 from .registry_scanner import RegistryScanner
@@ -47,6 +54,7 @@ __all__ = [
     "AnalysisRun",
     "CODE_QUALITY_RULES",
     "ContextService",
+    "ExecutionBatch",
     "FollowUpGate",
     "OmicVerseRuntime",
     "ProactiveCodeTransformer",
@@ -55,9 +63,12 @@ __all__ = [
     "RunStore",
     "SessionService",
     "SubagentController",
+    "ScheduleResult",
+    "ScheduledCall",
     "ToolMetadata",
     "ToolRegistry",
     "ToolRuntime",
+    "ToolScheduler",
     "TurnController",
     "WorkflowConfig",
     "WorkflowDocument",
@@ -66,6 +77,7 @@ __all__ = [
     "ParallelClass",
     "build_default_registry",
     "build_filesystem_context_instructions",
+    "execute_batch",
     "collect_api_key_env",
     "create_llm_backend",
     "display_backend_info",
