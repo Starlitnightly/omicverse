@@ -1,12 +1,13 @@
 """AgentContext protocol — type-only contract for extracted ovagent modules.
 
 All extracted modules (PromptBuilder, AnalysisExecutor, ToolRuntime,
-SubagentController, TurnController) depend on this protocol instead of
-importing the concrete ``OmicVerseAgent`` class.  This breaks the circular
-import between ``smart_agent.py`` and the ``ovagent/`` subpackage.
+SubagentController, TurnController, CodegenPipeline) depend on this
+protocol instead of importing the concrete ``OmicVerseAgent`` class.
+This breaks the circular import between ``smart_agent.py`` and the
+``ovagent/`` subpackage.
 
-The protocol is **not** ``@runtime_checkable`` — it is purely a
-type-checking aid (no runtime overhead).
+The protocol is ``@runtime_checkable`` so extracted modules and tests can
+validate duck-typed agent doubles at runtime when needed.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from typing import (
     List,
     Optional,
     Protocol,
+    runtime_checkable,
 )
 
 if TYPE_CHECKING:
@@ -35,6 +37,7 @@ if TYPE_CHECKING:
     from .runtime import OmicVerseRuntime
 
 
+@runtime_checkable
 class AgentContext(Protocol):
     """Minimal surface that extracted ovagent modules access on the agent."""
 
@@ -66,6 +69,11 @@ class AgentContext(Protocol):
     _active_run_id: str
     _web_session_id: str
     _managed_api_env: Dict[str, str]
+
+    # ---- code-only mode state (used by CodegenPipeline and ToolRuntime) ----
+    _code_only_mode: bool
+    _code_only_captured_code: str
+    _code_only_captured_history: List[Dict[str, Any]]
 
     # ---- feature flags ----
     use_notebook_execution: bool
@@ -111,3 +119,15 @@ class AgentContext(Protocol):
     def _load_skill_guidance(self, slug: str) -> str: ...
 
     def _extract_python_code(self, text: str) -> Optional[str]: ...
+
+    def _normalize_registry_entry_for_codegen(self, entry: Dict[str, Any]) -> Dict[str, Any]: ...
+
+    def _build_agentic_system_prompt(self) -> str: ...
+
+    async def _run_agentic_loop(
+        self, request: str, adata: Any,
+        event_callback: Any = None,
+        cancel_event: Any = None,
+        history: Any = None,
+        approval_handler: Any = None,
+    ) -> Any: ...
