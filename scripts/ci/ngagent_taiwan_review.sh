@@ -71,6 +71,7 @@ remote_command=$(cat <<EOF
 set -euo pipefail
 cd $(printf '%q' "${remote_repo_path}")
 export TAIWAN_REMOTE_TASK_ROOT=$(printf '%q' "${remote_task_root}")
+export OV_NGAGENT_REMOTE_PYTEST_TARGETS=$(printf '%q' "${OV_NGAGENT_REMOTE_PYTEST_TARGETS:-}")
 ./scripts/ci/ngagent_taiwan_remote_pytest.sh
 EOF
 )
