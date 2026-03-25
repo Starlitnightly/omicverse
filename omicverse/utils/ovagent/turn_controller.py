@@ -24,6 +24,11 @@ from ..harness.runtime_state import runtime_state
 from ..harness.tool_catalog import normalize_tool_name
 from ..session_history import HistoryEntry
 
+from .context_budget import (
+    BudgetSliceType,
+    ContextBudgetManager,
+)
+from .tool_registry import OutputTier
 from .tool_scheduler import ToolScheduler, execute_batch, ScheduledCall
 
 if TYPE_CHECKING:
@@ -725,6 +730,19 @@ class TurnController:
             },
         )
 
+        # --- Token-aware context budget manager ---
+        budget_model = (
+            getattr(getattr(ctx._llm, "config", None), "model", None)
+            or ctx.model
+            or ""
+        )
+        budget_manager = ContextBudgetManager(model=budget_model)
+        budget_manager.record(
+            BudgetSliceType.system_prompt,
+            system_prompt,
+            content_key="system_prompt",
+        )
+
         current_adata = adata
         completed_without_tool_calls = False
         meaningful_tool_call_seen = False
@@ -1247,18 +1265,24 @@ class TurnController:
                         else:
                             tool_output = str(result)
 
-                        # Truncate
-                        max_tool_output_chars = 8000
-                        if canonical in {
-                            "WebFetch", "WebSearch",
-                            "web_fetch", "web_search",
-                        }:
-                            max_tool_output_chars = 4000
-                        if len(tool_output) > max_tool_output_chars:
-                            tool_output = (
-                                tool_output[: max_tool_output_chars - 500]
-                                + "\n... (truncated)"
-                            )
+                        # Tier-driven truncation via budget manager
+                        meta = self._tool_runtime.registry.get(
+                            canonical
+                        )
+                        output_tier = (
+                            meta.output_tier
+                            if meta is not None
+                            else OutputTier.standard
+                        )
+                        tool_output = budget_manager.truncate_output(
+                            tool_output, output_tier
+                        )
+                        budget_manager.record(
+                            BudgetSliceType.tool_output,
+                            tool_output,
+                            content_key=canonical or tc.name,
+                            tier=output_tier,
+                        )
 
                         try:
                             parsed_tool_output = json.loads(tool_output)
@@ -1392,6 +1416,40 @@ class TurnController:
                                 ._consecutive_readonly
                             ),
                         },
+                    )
+
+                # --- Incremental compaction checkpoint ---
+                if (
+                    not finished
+                    and budget_manager.should_compact()
+                    and len(messages) > 6
+                ):
+                    # Build a short summary of tool results from
+                    # this turn for the checkpoint
+                    turn_tool_names = [
+                        tc.name for tc in response.tool_calls
+                    ]
+                    cp_summary = (
+                        f"Tools called: {', '.join(turn_tool_names)}. "
+                        f"Budget utilization: "
+                        f"{budget_manager.utilization:.0%}."
+                    )
+                    budget_manager.add_checkpoint(
+                        turn_index=turn,
+                        summary=cp_summary,
+                        messages_covered=len(messages),
+                    )
+                    logger.info(
+                        "budget_checkpoint turn=%d "
+                        "utilization=%.2f messages=%d",
+                        turn + 1,
+                        budget_manager.utilization,
+                        len(messages),
+                    )
+                    recorder.add_step(
+                        "status",
+                        summary="budget_compaction_checkpoint",
+                        data=budget_manager.to_dict(),
                     )
 
                 if finished:

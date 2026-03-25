@@ -16,6 +16,14 @@ from .tool_registry import (
     ToolRegistry,
     build_default_registry,
 )
+from .context_budget import (
+    BudgetSlice,
+    BudgetSliceType,
+    CompactionCheckpoint,
+    ContextBudgetManager,
+    TruncationPolicy,
+    create_subagent_budget_manager,
+)
 from .subagent_controller import SubagentController
 from .tool_scheduler import (
     ExecutionBatch,
@@ -52,7 +60,11 @@ __all__ = [
     "ApprovalClass",
     "AnalysisExecutor",
     "AnalysisRun",
+    "BudgetSlice",
+    "BudgetSliceType",
     "CODE_QUALITY_RULES",
+    "CompactionCheckpoint",
+    "ContextBudgetManager",
     "ContextService",
     "ExecutionBatch",
     "FollowUpGate",
@@ -69,6 +81,7 @@ __all__ = [
     "ToolRegistry",
     "ToolRuntime",
     "ToolScheduler",
+    "TruncationPolicy",
     "TurnController",
     "WorkflowConfig",
     "WorkflowDocument",
@@ -77,6 +90,7 @@ __all__ = [
     "ParallelClass",
     "build_default_registry",
     "build_filesystem_context_instructions",
+    "create_subagent_budget_manager",
     "execute_batch",
     "collect_api_key_env",
     "create_llm_backend",
