@@ -7,6 +7,15 @@ from .protocol import AgentContext
 from .prompt_builder import PromptBuilder, CODE_QUALITY_RULES, build_filesystem_context_instructions
 from .analysis_executor import AnalysisExecutor, ProactiveCodeTransformer
 from .tool_runtime import ToolRuntime
+from .tool_registry import (
+    ApprovalClass,
+    IsolationMode,
+    OutputTier,
+    ParallelClass,
+    ToolMetadata,
+    ToolRegistry,
+    build_default_registry,
+)
 from .subagent_controller import SubagentController
 from .turn_controller import TurnController, FollowUpGate
 from .session_context import SessionService, ContextService
@@ -33,6 +42,7 @@ from .bootstrap import (
 
 __all__ = [
     "AgentContext",
+    "ApprovalClass",
     "AnalysisExecutor",
     "AnalysisRun",
     "CODE_QUALITY_RULES",
@@ -45,10 +55,16 @@ __all__ = [
     "RunStore",
     "SessionService",
     "SubagentController",
+    "ToolMetadata",
+    "ToolRegistry",
     "ToolRuntime",
     "TurnController",
     "WorkflowConfig",
     "WorkflowDocument",
+    "IsolationMode",
+    "OutputTier",
+    "ParallelClass",
+    "build_default_registry",
     "build_filesystem_context_instructions",
     "collect_api_key_env",
     "create_llm_backend",
