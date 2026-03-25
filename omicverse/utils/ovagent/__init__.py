@@ -5,6 +5,12 @@ from .runtime import OmicVerseRuntime
 from .workflow import WorkflowConfig, WorkflowDocument, load_workflow_document
 from .protocol import AgentContext
 from .prompt_builder import PromptBuilder, CODE_QUALITY_RULES, build_filesystem_context_instructions
+from .prompt_templates import (
+    PromptOverlay,
+    PromptTemplateEngine,
+    build_agentic_engine,
+    build_subagent_engine,
+)
 from .analysis_executor import AnalysisExecutor, ProactiveCodeTransformer
 from .tool_runtime import ToolRuntime
 from .tool_registry import (
@@ -94,6 +100,8 @@ __all__ = [
     "PermissionVerdict",
     "ProactiveCodeTransformer",
     "PromptBuilder",
+    "PromptOverlay",
+    "PromptTemplateEngine",
     "RepairAttempt",
     "RuntimeEventEmitter",
     "RepairResult",
@@ -116,9 +124,11 @@ __all__ = [
     "OutputTier",
     "ParallelClass",
     "build_dataset_context",
+    "build_agentic_engine",
     "build_default_registry",
     "build_filesystem_context_instructions",
     "build_llm_repair_prompt",
+    "build_subagent_engine",
     "create_default_policy",
     "create_subagent_budget_manager",
     "create_subagent_policy",
