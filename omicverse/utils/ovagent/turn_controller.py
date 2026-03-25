@@ -507,6 +507,7 @@ class TurnController:
         cancel_event=None,
         history=None,
         approval_handler=None,
+        request_content=None,
     ) -> Any:
         """Execute the agentic loop: LLM decides tools to call iteratively."""
         ctx = self._ctx
@@ -715,7 +716,9 @@ class TurnController:
             {
                 "role": "user",
                 "content": self._prompt_builder.build_initial_user_message(
-                    request, adata
+                    request,
+                    adata,
+                    extra_content=request_content,
                 ),
             },
         )
@@ -725,7 +728,7 @@ class TurnController:
         meaningful_tool_call_seen = False
         no_tool_retry_count = 0
         convergence_monitor = ConvergenceMonitor(
-            messages[-1]["content"] if messages else ""
+            request
         )
         llm_model_name = (
             getattr(getattr(ctx._llm, "config", None), "model", None)

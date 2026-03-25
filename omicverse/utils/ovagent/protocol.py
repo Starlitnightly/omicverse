@@ -130,4 +130,5 @@ class AgentContext(Protocol):
         cancel_event: Any = None,
         history: Any = None,
         approval_handler: Any = None,
+        request_content: Any = None,
     ) -> Any: ...

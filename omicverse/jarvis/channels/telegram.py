@@ -29,6 +29,12 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from .. import _fmt
 from ..config import default_state_dir
 from ..model_help import render_model_help
+from ..media_ingest import (
+    PreparedImage,
+    build_workspace_note,
+    compose_multimodal_user_text,
+    prepare_image_path,
+)
 from ..runtime import (
     AgentBridgeExecutionAdapter,
     ConversationRoute,
@@ -97,7 +103,8 @@ def _normalize_bot_username(username: Optional[str]) -> str:
 
 def _message_mentions_bot(message: Any, bot_username: Optional[str]) -> bool:
     name = _normalize_bot_username(bot_username)
-    text = (getattr(message, "text", None) or "").strip()
+    raw_text = getattr(message, "text", None)
+    text = (raw_text or getattr(message, "caption", None) or "").strip()
     if not name or not text:
         return False
 
@@ -105,7 +112,8 @@ def _message_mentions_bot(message: Any, bot_username: Optional[str]) -> bool:
     if mention_token in text.lower():
         return True
 
-    entities = list(getattr(message, "entities", None) or [])
+    entity_attr = "entities" if raw_text else "caption_entities"
+    entities = list(getattr(message, entity_attr, None) or [])
     for entity in entities:
         entity_type = str(getattr(entity, "type", "")).lower()
         if "mention" not in entity_type:
@@ -135,10 +143,18 @@ def _message_replies_to_bot(message: Any, bot_username: Optional[str]) -> bool:
 def telegram_trigger_for_update(update: Any, bot_username: Optional[str]) -> Optional[str]:
     route = telegram_route_from_update(update)
     if route.is_direct:
+        message = getattr(update, "effective_message", None)
+        if message is not None and (
+            (getattr(message, "text", None) or "").strip()
+            or (getattr(message, "caption", None) or "").strip()
+            or getattr(message, "photo", None)
+            or getattr(message, "document", None)
+        ):
+            return "direct"
         return "direct"
 
     message = getattr(update, "effective_message", None)
-    text = (getattr(message, "text", None) or "").strip()
+    text = (getattr(message, "text", None) or getattr(message, "caption", None) or "").strip()
     if not text:
         return None
     if _message_mentions_bot(message, bot_username):
@@ -156,17 +172,26 @@ def _strip_leading_bot_mention(text: str, bot_username: Optional[str]) -> str:
     return re.sub(pattern, "", text.strip(), count=1, flags=re.IGNORECASE)
 
 
-def telegram_runtime_envelope(update: Any, bot_username: Optional[str]) -> Optional[MessageEnvelope]:
+def telegram_runtime_envelope(
+    update: Any,
+    bot_username: Optional[str],
+    *,
+    metadata: Optional[Dict[str, Any]] = None,
+    image_note: str = "",
+) -> Optional[MessageEnvelope]:
     message = getattr(update, "effective_message", None)
     user = getattr(update, "effective_user", None)
-    text = (getattr(message, "text", None) or "").strip()
-    if not text or user is None:
+    text = (getattr(message, "text", None) or getattr(message, "caption", None) or "").strip()
+    if message is None or user is None:
         return None
 
     route = telegram_route_from_update(update)
     trigger = telegram_trigger_for_update(update, bot_username) or "implicit"
     normalized = _strip_leading_bot_mention(text, bot_username) if trigger == "mention" else text
     normalized = normalized.strip()
+    request_content = list((metadata or {}).get("request_content") or [])
+    if request_content or image_note:
+        normalized = compose_multimodal_user_text(normalized, image_note)
     if not normalized:
         return None
 
@@ -178,6 +203,7 @@ def telegram_runtime_envelope(update: Any, bot_username: Optional[str]) -> Optio
         message_id=str(getattr(message, "message_id", "")) or None,
         trigger=trigger,
         explicit_trigger=(trigger != "implicit"),
+        metadata=dict(metadata or {}),
     )
 
 
@@ -1058,6 +1084,81 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
             _chat_locks[chat_id] = lock
         return lock
 
+    async def _prepare_telegram_request_images(
+        message: Any,
+        bot: Any,
+        session: Any,
+    ) -> List[PreparedImage]:
+        prepared: List[PreparedImage] = []
+        upload_dir = session.workspace_dir / "uploads" / "telegram"
+        if getattr(message, "photo", None):
+            photo = message.photo[-1]
+            tg_file = await bot.get_file(photo.file_id)
+            raw_path = upload_dir / f"telegram_photo_{getattr(photo, 'file_unique_id', photo.file_id)}.jpg"
+            raw_path.parent.mkdir(parents=True, exist_ok=True)
+            await tg_file.download_to_drive(raw_path)
+            image = prepare_image_path(raw_path, prefix="telegram_image", source="telegram")
+            if image.path != raw_path and raw_path.exists():
+                raw_path.unlink(missing_ok=True)
+            prepared.append(image)
+
+        document = getattr(message, "document", None)
+        doc_mime = str(getattr(document, "mime_type", None) or "").strip().lower() if document else ""
+        doc_name = str(getattr(document, "file_name", None) or "").strip()
+        if document is not None and doc_mime.startswith("image/") and not doc_name.lower().endswith(".h5ad"):
+            tg_file = await bot.get_file(document.file_id)
+            raw_path = upload_dir / (doc_name or f"telegram_image_{document.file_unique_id}")
+            raw_path.parent.mkdir(parents=True, exist_ok=True)
+            await tg_file.download_to_drive(raw_path)
+            image = prepare_image_path(
+                raw_path,
+                mime_type=doc_mime,
+                prefix="telegram_image",
+                source="telegram",
+            )
+            if image.path != raw_path and raw_path.exists():
+                raw_path.unlink(missing_ok=True)
+            prepared.append(image)
+
+        return prepared[:4]
+
+    async def _handle_incoming_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        route = telegram_route_from_update(update)
+        session = await _get_session(update, route)
+        if session is None:
+            return
+
+        bot_username = getattr(context.bot, "username", None)
+        request_images = await _prepare_telegram_request_images(update.effective_message, context.bot, session)
+        image_note = build_workspace_note(
+            session.workspace_dir,
+            request_images,
+            header="[Attached Telegram images saved in workspace]",
+        )
+        envelope = telegram_runtime_envelope(
+            update,
+            bot_username,
+            metadata={
+                "request_content": [item.request_block for item in request_images],
+            } if request_images else {},
+            image_note=image_note,
+        )
+        if envelope is None:
+            return
+        try:
+            await runtime.handle_message(envelope)
+        except Exception as exc:
+            logger.exception("Failed to handle Telegram analysis message")
+            await update.message.reply_text(
+                _fmt.error_message(
+                    f"Agent 初始化失败：{exc}\n"
+                    "请检查 --model 参数，或运行 "
+                    "<code>import omicverse as ov; print(ov.list_supported_models())</code> "
+                    "查看可用模型。"
+                ),
+                parse_mode="HTML",
+            )
+
     def _keyboard_for_controls(controls: Tuple[str, ...]) -> Any:
         if set(controls) == {"save", "status", "memory"}:
             return _analysis_keyboard()
@@ -1614,6 +1715,9 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         if doc is None:
             return
         filename = doc.file_name or ""
+        if str(getattr(doc, "mime_type", "") or "").startswith("image/") and not filename.endswith(".h5ad"):
+            await _handle_incoming_analysis(update, context)
+            return
         if not filename.endswith(".h5ad"):
             await update.message.reply_text("⚠️  请发送 <code>.h5ad</code> 格式的文件。", parse_mode="HTML")
             return
@@ -1720,27 +1824,7 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
     async def handle_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not await _guard(update):
             return
-        user_text = (update.message.text or "").strip()
-        if not user_text:
-            return
-
-        bot_username = getattr(context.bot, "username", None)
-        envelope = telegram_runtime_envelope(update, bot_username)
-        if envelope is None:
-            return
-        try:
-            await runtime.handle_message(envelope)
-        except Exception as exc:
-            logger.exception("Failed to handle Telegram analysis message")
-            await update.message.reply_text(
-                _fmt.error_message(
-                    f"Agent 初始化失败：{exc}\n"
-                    "请检查 --model 参数，或运行 "
-                    "<code>import omicverse as ov; print(ov.list_supported_models())</code> "
-                    "查看可用模型。"
-                ),
-                parse_mode="HTML",
-            )
+        await _handle_incoming_analysis(update, context)
 
     # ------------------------------------------------------------------
     # Register all handlers
@@ -1763,4 +1847,5 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
     app.add_handler(CommandHandler("memory",    handle_memory))
     app.add_handler(CallbackQueryHandler(handle_callback, pattern=r"^jarvis:"))
     app.add_handler(MessageHandler(filters.Document.ALL,             handle_document))
+    app.add_handler(MessageHandler(filters.PHOTO,                    handle_analysis))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,  handle_analysis))

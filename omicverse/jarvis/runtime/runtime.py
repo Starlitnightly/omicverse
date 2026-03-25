@@ -163,6 +163,7 @@ class MessageRuntime:
 
         route = envelope.route
         full_request = self.build_full_request(session, envelope.text)
+        request_content = list((envelope.metadata or {}).get("request_content") or [])
 
         async def _runner() -> None:
             try:
@@ -171,6 +172,7 @@ class MessageRuntime:
                     route=route,
                     user_text=envelope.text,
                     full_request=full_request,
+                    request_content=request_content,
                 )
             except asyncio.CancelledError:
                 pass
@@ -198,6 +200,7 @@ class MessageRuntime:
         route: ConversationRoute,
         user_text: str,
         full_request: str,
+        request_content: Optional[List[dict]] = None,
     ) -> None:
         llm_buf = ""
         last_progress = ""
@@ -249,6 +252,7 @@ class MessageRuntime:
                     llm_chunk_cb=llm_chunk_cb,
                 ),
                 history=prior_history,
+                request_content=request_content or [],
             )
         except asyncio.CancelledError:
             await self._deliver(self._presenter.draft_cancelled(route))
@@ -371,6 +375,11 @@ class MessageRuntime:
         last = envelopes[-1]
         metadata = dict(last.metadata)
         metadata["queued_count"] = len(envelopes)
+        request_content: List[dict] = []
+        for env in envelopes:
+            request_content.extend(list((env.metadata or {}).get("request_content") or []))
+        if request_content:
+            metadata["request_content"] = request_content
         return MessageEnvelope(
             route=route,
             text=merged,

@@ -49,6 +49,13 @@ import requests
 from ..agent_bridge import AgentBridge
 from .._bridge_session import resolve_bridge_session_id
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
+from ..media_ingest import (
+    PreparedImage,
+    build_workspace_note,
+    compose_multimodal_user_text,
+    looks_like_image_name,
+    prepare_image_bytes,
+)
 from ..model_help import render_model_help
 
 logger = logging.getLogger("omicverse.jarvis.qq")
@@ -484,7 +491,7 @@ class QQRuntime:
         self._registry = GatewaySessionRegistry(session_manager)
         self._sm = session_manager
         self._tasks: Dict[str, RunningTask] = {}
-        self._pending: Dict[str, List[str]] = {}
+        self._pending: Dict[str, List[Dict[str, Any]]] = {}
         self._image_server = image_server
         # msg_seq tracking: QQ requires a unique, incrementing seq per msg_id
         # The ack message and all follow-up messages for the same msg_id share one counter
@@ -541,6 +548,185 @@ class QQRuntime:
             "\n\n".join(ctx_parts) + f"\n\n[Current request]\n{text}"
             if ctx_parts else text
         )
+
+    @staticmethod
+    def _looks_like_image_name(name: str) -> bool:
+        return looks_like_image_name(name)
+
+    @classmethod
+    def _looks_like_image_url(cls, url: str) -> bool:
+        lowered = (url or "").strip().lower()
+        if not lowered.startswith(("http://", "https://", "data:")):
+            return False
+        stem = lowered.split("?", 1)[0]
+        return cls._looks_like_image_name(stem) or any(
+            marker in lowered
+            for marker in ("/image", "image/", "content-type=image", "qpic.cn")
+        )
+
+    @classmethod
+    def _extract_inbound_image_candidates(
+        cls,
+        payload: Optional[Dict[str, Any]],
+    ) -> List[Dict[str, str]]:
+        if not isinstance(payload, dict):
+            return []
+
+        candidates: List[Dict[str, str]] = []
+        seen: Set[str] = set()
+
+        def _maybe_add(item: Any, source: str) -> None:
+            if not isinstance(item, dict):
+                return
+            url = str(
+                item.get("url")
+                or item.get("proxy_url")
+                or item.get("download_url")
+                or item.get("image_url")
+                or item.get("src")
+                or ""
+            ).strip()
+            if not url:
+                return
+            filename = str(
+                item.get("filename")
+                or item.get("file_name")
+                or item.get("name")
+                or item.get("title")
+                or ""
+            ).strip()
+            mime_type = str(
+                item.get("content_type")
+                or item.get("contentType")
+                or item.get("mime_type")
+                or item.get("mimeType")
+                or ""
+            ).strip()
+            if not (
+                mime_type.startswith("image/")
+                or cls._looks_like_image_name(filename)
+                or cls._looks_like_image_url(url)
+            ):
+                return
+            dedupe_key = f"{url}|{filename}|{mime_type}"
+            if dedupe_key in seen:
+                return
+            seen.add(dedupe_key)
+            candidates.append(
+                {
+                    "url": url,
+                    "filename": filename,
+                    "mime_type": mime_type,
+                    "source": source,
+                }
+            )
+
+        for key in (
+            "attachments",
+            "images",
+            "media_attachments",
+            "image_infos",
+            "image_info",
+            "media",
+            "image",
+            "attachment",
+            "file",
+        ):
+            value = payload.get(key)
+            if isinstance(value, list):
+                for item in value:
+                    _maybe_add(item, key)
+            else:
+                _maybe_add(value, key)
+
+        return candidates
+
+    @classmethod
+    def _payload_has_inbound_images(cls, payload: Optional[Dict[str, Any]]) -> bool:
+        return bool(cls._extract_inbound_image_candidates(payload))
+
+    def _download_inbound_image(
+        self,
+        candidate: Dict[str, str],
+        target_dir: Path,
+        index: int,
+    ) -> Optional[PreparedImage]:
+        url = candidate.get("url", "").strip()
+        if not url:
+            return None
+
+        target_dir.mkdir(parents=True, exist_ok=True)
+        response = None
+        errors: List[str] = []
+        for headers in ({}, self._client._headers()):
+            try:
+                response = requests.get(
+                    url,
+                    headers=headers,
+                    timeout=(10.0, 60.0),
+                )
+                response.raise_for_status()
+                break
+            except Exception as exc:
+                errors.append(str(exc))
+                response = None
+
+        if response is None:
+            logger.warning(
+                "QQ inbound image download failed url=%s errors=%s",
+                url,
+                " | ".join(errors[-2:]),
+            )
+            return None
+
+        mime_type = (
+            candidate.get("mime_type")
+            or response.headers.get("Content-Type")
+            or "application/octet-stream"
+        ).split(";", 1)[0].strip()
+        prepared = prepare_image_bytes(
+            response.content,
+            target_dir=target_dir,
+            filename=candidate.get("filename") or f"qq_image_{index}",
+            mime_type=mime_type,
+            prefix="qq_image",
+            source="qq",
+        )
+        logger.info(
+            "QQ inbound image stored path=%s size=%d",
+            prepared.path,
+            prepared.size,
+        )
+        return prepared
+
+    def _prepare_inbound_images(
+        self,
+        session: Any,
+        payload: Optional[Dict[str, Any]],
+    ) -> List[PreparedImage]:
+        candidates = self._extract_inbound_image_candidates(payload)
+        if not candidates:
+            return []
+
+        upload_dir = session.workspace / "uploads" / "qq"
+        prepared: List[PreparedImage] = []
+        for index, candidate in enumerate(candidates[:4], start=1):
+            downloaded = self._download_inbound_image(candidate, upload_dir, index)
+            if downloaded is None:
+                continue
+            prepared.append(downloaded)
+        return prepared
+
+    @staticmethod
+    def _coalesce_pending_requests(items: List[Dict[str, Any]]) -> tuple[str, List[Dict[str, Any]]]:
+        parts: List[str] = []
+        request_content: List[Dict[str, Any]] = []
+        for item in items:
+            text = str(item.get("text") or "").strip()
+            if text:
+                parts.append(text)
+            request_content.extend(list(item.get("request_content") or []))
+        return "\n\n".join(parts).strip(), request_content
 
     @staticmethod
     def _text_chunks(text: str, limit: int = _MAX_TEXT) -> List[str]:
@@ -651,11 +837,19 @@ class QQRuntime:
         msg_id: Optional[str],
         session: Any,
         user_text: str,
+        request_content: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         full_request = self._build_full_request(session, user_text)
         route = target.route_key()
         task = asyncio.create_task(
-            self._analysis_wrapper(target, msg_id, session, user_text, full_request)
+            self._analysis_wrapper(
+                target,
+                msg_id,
+                session,
+                user_text,
+                full_request,
+                request_content or [],
+            )
         )
         self._tasks[route] = RunningTask(task=task, request=user_text, started_at=time.time())
 
@@ -666,10 +860,18 @@ class QQRuntime:
         session: Any,
         user_text: str,
         full_request: str,
+        request_content: List[Dict[str, Any]],
     ) -> None:
         route = target.route_key()
         try:
-            await self._run_analysis(target, msg_id, session, user_text, full_request)
+            await self._run_analysis(
+                target,
+                msg_id,
+                session,
+                user_text,
+                full_request,
+                request_content,
+            )
         except asyncio.CancelledError:
             pass
         except Exception as exc:
@@ -682,8 +884,8 @@ class QQRuntime:
             self._tasks.pop(route, None)
             queued = self._pending.pop(route, [])
             if queued:
-                coalesced = "\n\n".join(queued)
                 n = len(queued)
+                coalesced, request_content = self._coalesce_pending_requests(queued)
                 try:
                     # Use None as msg_id for queued follow-ups: the original msg_id has
                     # almost certainly expired (>5 min) by now. Proactive send or new msg_id
@@ -694,7 +896,13 @@ class QQRuntime:
                 except Exception:
                     pass
                 asyncio.create_task(
-                    self._spawn_analysis(target, None, session, coalesced)
+                    self._spawn_analysis(
+                        target,
+                        None,
+                        session,
+                        coalesced,
+                        request_content=request_content,
+                    )
                 )
 
     async def _run_analysis(
@@ -704,6 +912,7 @@ class QQRuntime:
         session: Any,
         user_text: str,
         full_request: str,
+        request_content: List[Dict[str, Any]],
     ) -> None:
         llm_buf = ""
 
@@ -746,7 +955,12 @@ class QQRuntime:
 
         bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
         try:
-            result = await bridge.run(full_request, session.adata, history=_prior_history)
+            result = await bridge.run(
+                full_request,
+                session.adata,
+                history=_prior_history,
+                request_content=request_content,
+            )
         except asyncio.CancelledError:
             await asyncio.to_thread(self._send_text, target, "已取消当前分析。", msg_id)
             raise
@@ -849,6 +1063,7 @@ class QQRuntime:
         msg_id: str,
         group_id: Optional[str] = None,
         channel_id: Optional[str] = None,
+        payload: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Entry point called by the WebSocket gateway for each received message."""
         if msg_id:
@@ -872,17 +1087,26 @@ class QQRuntime:
         else:
             target = QQTarget(kind="c2c", id=sender_id)
 
-        self.submit(self._dispatch(target, msg_id, content))
+        self.submit(self._dispatch(target, msg_id, content, payload))
 
-    async def _dispatch(self, target: QQTarget, msg_id: str, raw_text: str) -> None:
+    async def _dispatch(
+        self,
+        target: QQTarget,
+        msg_id: str,
+        raw_text: str,
+        payload: Optional[Dict[str, Any]] = None,
+    ) -> None:
         text = (raw_text or "").strip()
         # Strip @bot mention prefix that QQ injects (e.g. "<@!botid> ")
         text = re.sub(r'^<@!?\w+>\s*', '', text).strip()
-        if not text:
-            return
 
         sk = self._session_key(target)
         session = self._registry.get_or_create(sk)
+        inbound_images = await asyncio.to_thread(self._prepare_inbound_images, session, payload)
+        if not text and inbound_images:
+            text = "请分析这张图片，并提取其中的关键信息。"
+        if not text:
+            return
         route = target.route_key()
         tokens = text.split()
         cmd = tokens[0].lower() if tokens else ""
@@ -932,9 +1156,22 @@ class QQRuntime:
             await self._handle_save(target, msg_id, session)
             return
 
+        image_note = build_workspace_note(
+            session.workspace,
+            inbound_images,
+            header="[Attached channel images saved in workspace]",
+        )
+        user_text = compose_multimodal_user_text(text, image_note)
+        request_content = [item.request_block for item in inbound_images]
+
         running = self._tasks.get(route)
         if running and not running.task.done():
-            self._pending.setdefault(route, []).append(text)
+            self._pending.setdefault(route, []).append(
+                {
+                    "text": user_text,
+                    "request_content": request_content,
+                }
+            )
             asyncio.create_task(
                 self._quick_chat(target, msg_id, session, text,
                                  running_request=running.request, queued=True)
@@ -955,9 +1192,17 @@ class QQRuntime:
                 ack = f"收到请求，开始分析...\n检测到文件: {names}\n使用 /load <文件名> 加载"
             else:
                 ack = "收到请求，开始分析...\n未检测到数据，Agent 将自行加载"
+        if inbound_images:
+            ack += f"\n检测到图片: {len(inbound_images)} 张（已保存到 workspace/uploads/qq）"
         await asyncio.to_thread(self._send_text, target, ack, msg_id)
 
-        await self._spawn_analysis(target, msg_id, session, text)
+        await self._spawn_analysis(
+            target,
+            msg_id,
+            session,
+            user_text,
+            request_content=request_content,
+        )
 
     # ── Command handlers ──────────────────────────────────────────────────────
 
@@ -1329,12 +1574,13 @@ def _run_gateway(
                         openid = (d.get("author") or {}).get("user_openid", "")
                         content = d.get("content", "")
                         msg_id = d.get("id", "")
-                        if openid and content.strip():
+                        if openid and (content.strip() or runtime._payload_has_inbound_images(d)):
                             runtime.handle_message(
                                 kind="c2c",
                                 sender_id=openid,
                                 content=content,
                                 msg_id=msg_id,
+                                payload=d,
                             )
 
                     elif t == "GROUP_AT_MESSAGE_CREATE":
@@ -1343,13 +1589,14 @@ def _run_gateway(
                         group_openid = d.get("group_openid", "")
                         content = d.get("content", "")
                         msg_id = d.get("id", "")
-                        if content.strip():
+                        if content.strip() or runtime._payload_has_inbound_images(d):
                             runtime.handle_message(
                                 kind="group",
                                 sender_id=member_openid,
                                 content=content,
                                 msg_id=msg_id,
                                 group_id=group_openid,
+                                payload=d,
                             )
 
                     elif t == "AT_MESSAGE_CREATE":
@@ -1358,13 +1605,14 @@ def _run_gateway(
                         channel_id = d.get("channel_id", "")
                         content = d.get("content", "")
                         msg_id = d.get("id", "")
-                        if content.strip():
+                        if content.strip() or runtime._payload_has_inbound_images(d):
                             runtime.handle_message(
                                 kind="guild",
                                 sender_id=sender_id,
                                 content=content,
                                 msg_id=msg_id,
                                 channel_id=channel_id,
+                                payload=d,
                             )
 
                     elif t == "DIRECT_MESSAGE_CREATE":
@@ -1373,13 +1621,14 @@ def _run_gateway(
                         guild_id = d.get("guild_id", "")
                         content = d.get("content", "")
                         msg_id = d.get("id", "")
-                        if content.strip():
+                        if content.strip() or runtime._payload_has_inbound_images(d):
                             runtime.handle_message(
                                 kind="dm",
                                 sender_id=sender_id,
                                 content=content,
                                 msg_id=msg_id,
                                 channel_id=guild_id,
+                                payload=d,
                             )
 
                 elif op == _OP_HEARTBEAT_ACK:

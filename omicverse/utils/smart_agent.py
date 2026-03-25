@@ -894,13 +894,15 @@ User request: "quality control with nUMI>500, mito<0.2"
                                event_callback=None,
                                cancel_event=None,
                                history=None,
-                               approval_handler=None) -> Any:
+                               approval_handler=None,
+                               request_content=None) -> Any:
         return await self._turn_controller.run_agentic_loop(
             request, adata,
             event_callback=event_callback,
             cancel_event=cancel_event,
             history=history,
             approval_handler=approval_handler,
+            request_content=request_content,
         )
 
     def _load_skill_guidance(self, skill_name: str) -> str:
@@ -1282,7 +1284,8 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
 
     async def stream_async(self, request: str, adata: Any,
                            cancel_event=None, history=None,
-                           approval_handler=None):
+                           approval_handler=None,
+                           request_content=None):
         """
         Stream agentic-loop events as the agent processes a request.
 
@@ -1320,6 +1323,7 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
                     cancel_event=cancel_event,
                     history=history,
                     approval_handler=approval_handler,
+                    request_content=request_content,
                 )
             except Exception as exc:
                 trace_id = getattr(getattr(self, "_last_run_trace", None), "trace_id", "")

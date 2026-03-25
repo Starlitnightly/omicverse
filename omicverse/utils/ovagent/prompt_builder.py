@@ -6,7 +6,7 @@ All methods are pure string construction with no side effects.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, List, Optional
 
 if TYPE_CHECKING:
     from .protocol import AgentContext
@@ -214,7 +214,13 @@ class PromptBuilder:
 
         return prompt
 
-    def build_initial_user_message(self, request: str, adata: Any) -> str:
+    def build_initial_user_message(
+        self,
+        request: str,
+        adata: Any,
+        *,
+        extra_content: Optional[List[dict]] = None,
+    ) -> Any:
         msg = f"Task: {request}\n\n"
         if getattr(self._ctx, "_code_only_mode", False):
             if adata is not None:
@@ -235,6 +241,8 @@ class PromptBuilder:
                     "Use the normal Jarvis tool workflow, then call execute_code with the "
                     "final OmicVerse Python script. The code will be captured, not run."
                 )
+            if extra_content:
+                return [{"type": "input_text", "text": msg}] + list(extra_content)
             return msg
         if adata is not None:
             dtype = type(adata).__name__
@@ -251,6 +259,8 @@ class PromptBuilder:
                 "- Answer bioinformatics questions\n"
                 "- Plan analysis workflows\n"
             )
+        if extra_content:
+            return [{"type": "input_text", "text": msg}] + list(extra_content)
         return msg
 
 

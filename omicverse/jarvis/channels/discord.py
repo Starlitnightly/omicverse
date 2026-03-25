@@ -25,6 +25,13 @@ except ImportError:  # pragma: no cover - optional dependency
 from ..agent_bridge import AgentBridge
 from .._bridge_session import resolve_bridge_session_id
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
+from ..media_ingest import (
+    PreparedImage,
+    build_workspace_note,
+    compose_multimodal_user_text,
+    looks_like_image_name,
+    prepare_image_bytes,
+)
 from ..model_help import render_model_help
 
 logger = logging.getLogger("omicverse.jarvis.discord")
@@ -96,7 +103,7 @@ class DiscordJarvisBot:
         self._stop_event = stop_event or threading.Event()
         self._registry = GatewaySessionRegistry(session_manager)
         self._tasks: Dict[str, RunningTask] = {}
-        self._pending: Dict[str, List[str]] = {}
+        self._pending: Dict[str, List[Dict[str, Any]]] = {}
         self._client = self._build_client()
 
     def _build_client(self):
@@ -181,6 +188,9 @@ class DiscordJarvisBot:
             await self._handle_h5ad_attachment(message, session, h5ad_list[0])
             return
 
+        session_key = self._session_key(message)
+        session = self._registry.get_or_create(session_key)
+        inbound_images = await self._prepare_inbound_images(message, session)
         text = self._normalize_message_text(message)
         logger.info(
             "Discord message received: channel_type=%s author=%s guild=%s content_len=%s normalized_len=%s",
@@ -190,7 +200,7 @@ class DiscordJarvisBot:
             len((getattr(message, "content", None) or "")),
             len(text),
         )
-        if not text:
+        if not text and not inbound_images:
             logger.warning(
                 "Discord message ignored because normalized content is empty. "
                 "If this was a guild message, mention the bot. "
@@ -198,10 +208,15 @@ class DiscordJarvisBot:
             )
             return
 
-        session_key = self._session_key(message)
-        session = self._registry.get_or_create(session_key)
         route = session_key.as_key()
         cmd, tail = self._command_parts(text)
+        image_note = build_workspace_note(
+            session.workspace,
+            inbound_images,
+            header="[Attached Discord images saved in workspace]",
+        )
+        user_text = compose_multimodal_user_text(text, image_note)
+        request_content = [item.request_block for item in inbound_images]
 
         if cmd == "/help":
             await self._send_text(
@@ -248,7 +263,12 @@ class DiscordJarvisBot:
 
         running = self._tasks.get(route)
         if running and not running.task.done():
-            self._pending.setdefault(route, []).append(text)
+            self._pending.setdefault(route, []).append(
+                {
+                    "text": user_text,
+                    "request_content": request_content,
+                }
+            )
             await self._send_text(
                 message.channel,
                 "⏭ 已加入当前会话队列，当前分析完成后继续处理。",
@@ -256,8 +276,15 @@ class DiscordJarvisBot:
             )
             return
 
-        await self._send_ack(message.channel, message, session)
-        await self._spawn_analysis(message.channel, message, session_key, session, text)
+        await self._send_ack(message.channel, message, session, image_count=len(inbound_images))
+        await self._spawn_analysis(
+            message.channel,
+            message,
+            session_key,
+            session,
+            user_text,
+            request_content=request_content,
+        )
 
     async def _handle_status(self, channel, source_message, session: Any, route: str) -> None:
         parts: List[str] = []
@@ -286,7 +313,7 @@ class DiscordJarvisBot:
         running.task.cancel()
         await self._send_text(channel, "🚫 已发送取消信号。", reply_to=source_message)
 
-    async def _send_ack(self, channel, source_message, session: Any) -> None:
+    async def _send_ack(self, channel, source_message, session: Any, *, image_count: int = 0) -> None:
         if session.adata is not None:
             adata = session.adata
             text = f"⏳ 已收到，开始分析。\n当前数据: {adata.n_obs:,} cells x {adata.n_vars:,} genes"
@@ -300,6 +327,8 @@ class DiscordJarvisBot:
                 text = f"⏳ 已收到，开始分析。\n检测到工作区数据文件: {names}"
             else:
                 text = "⏳ 已收到，开始分析。"
+        if image_count:
+            text += f"\n检测到图片: {image_count} 张（已保存到 workspace/uploads/discord）"
         await self._send_text(channel, text, reply_to=source_message)
 
     async def _spawn_analysis(
@@ -309,10 +338,18 @@ class DiscordJarvisBot:
         session_key: SessionKey,
         session: Any,
         user_text: str,
+        request_content: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         route = session_key.as_key()
         task = asyncio.create_task(
-            self._analysis_wrapper(channel, source_message, session_key, session, user_text)
+            self._analysis_wrapper(
+                channel,
+                source_message,
+                session_key,
+                session,
+                user_text,
+                request_content or [],
+            )
         )
         self._tasks[route] = RunningTask(task=task, request=user_text, started_at=time.time())
 
@@ -323,10 +360,18 @@ class DiscordJarvisBot:
         session_key: SessionKey,
         session: Any,
         user_text: str,
+        request_content: List[Dict[str, Any]],
     ) -> None:
         route = session_key.as_key()
         try:
-            await self._run_analysis(channel, source_message, session_key, session, user_text)
+            await self._run_analysis(
+                channel,
+                source_message,
+                session_key,
+                session,
+                user_text,
+                request_content,
+            )
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -338,7 +383,15 @@ class DiscordJarvisBot:
             if queued:
                 await self._send_text(channel, f"开始执行队列中的 {len(queued)} 条请求...")
                 next_session = self._registry.get_or_create(session_key)
-                await self._spawn_analysis(channel, None, session_key, next_session, "\n\n".join(queued))
+                coalesced, request_content = self._coalesce_pending_requests(queued)
+                await self._spawn_analysis(
+                    channel,
+                    None,
+                    session_key,
+                    next_session,
+                    coalesced,
+                    request_content=request_content,
+                )
 
     async def _run_analysis(
         self,
@@ -347,6 +400,7 @@ class DiscordJarvisBot:
         session_key: SessionKey,
         session: Any,
         user_text: str,
+        request_content: List[Dict[str, Any]],
     ) -> None:
         llm_buf = ""
         last_progress_sent = 0.0
@@ -375,7 +429,12 @@ class DiscordJarvisBot:
 
         bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
         try:
-            result = await bridge.run(full_request, session.adata, history=prior_history)
+            result = await bridge.run(
+                full_request,
+                session.adata,
+                history=prior_history,
+                request_content=request_content,
+            )
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -544,6 +603,50 @@ class DiscordJarvisBot:
         except Exception as exc:
             logger.exception("Discord failed to load h5ad attachment")
             await self._send_text(message.channel, f"❌ 文件处理失败: {exc}", reply_to=message)
+
+    async def _prepare_inbound_images(self, message, session: Any) -> List[PreparedImage]:
+        attachments = list(getattr(message, "attachments", None) or [])
+        if not attachments:
+            return []
+        upload_dir = session.workspace / "uploads" / "discord"
+        prepared: List[PreparedImage] = []
+        for attachment in attachments[:4]:
+            filename = getattr(attachment, "filename", None) or ""
+            content_type = str(getattr(attachment, "content_type", None) or "").strip().lower()
+            if filename.lower().endswith(".h5ad"):
+                continue
+            if not (content_type.startswith("image/") or looks_like_image_name(filename)):
+                continue
+            try:
+                data = await attachment.read()
+                prepared.append(
+                    prepare_image_bytes(
+                        data,
+                        target_dir=upload_dir,
+                        filename=filename or "discord_image",
+                        mime_type=content_type,
+                        prefix="discord_image",
+                        source="discord",
+                    )
+                )
+            except Exception:
+                logger.warning(
+                    "Discord inbound image preparation failed filename=%s",
+                    filename or "unknown",
+                    exc_info=True,
+                )
+        return prepared
+
+    @staticmethod
+    def _coalesce_pending_requests(items: List[Dict[str, Any]]) -> tuple[str, List[Dict[str, Any]]]:
+        parts: List[str] = []
+        request_content: List[Dict[str, Any]] = []
+        for item in items:
+            text = str(item.get("text") or "").strip()
+            if text:
+                parts.append(text)
+            request_content.extend(list(item.get("request_content") or []))
+        return "\n\n".join(parts).strip(), request_content
 
     async def _send_file(
         self,
