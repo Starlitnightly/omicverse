@@ -49,3 +49,4 @@ omicclaw/
 docs*
 # Multi-agent worktrees
 .worktrees/
+.orchestrator/
