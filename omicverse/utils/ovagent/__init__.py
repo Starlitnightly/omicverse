@@ -10,6 +10,7 @@ from .tool_runtime import ToolRuntime
 from .subagent_controller import SubagentController
 from .turn_controller import TurnController, FollowUpGate
 from .session_context import SessionService, ContextService
+from .registry_scanner import RegistryScanner
 from .auth import (
     ResolvedBackend,
     resolve_model_and_provider,
@@ -62,6 +63,7 @@ __all__ = [
     "initialize_skill_registry",
     "initialize_tracing",
     "load_workflow_document",
+    "RegistryScanner",
     "resolve_model_and_provider",
     "temporary_api_keys",
 ]
