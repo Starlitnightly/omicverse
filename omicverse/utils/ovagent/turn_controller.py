@@ -1209,7 +1209,8 @@ class TurnController:
 
                     try:
                         parsed_tool_output = json.loads(tool_output)
-                    except Exception:
+                    except Exception as e:
+                        logger.debug("turn_controller: failed to parse tool output as JSON (%s)", e)
                         parsed_tool_output = None
 
                     if isinstance(parsed_tool_output, dict):
@@ -1463,8 +1464,8 @@ class TurnController:
                     )
                     | {"error": True}
                 )
-            except Exception:
-                pass
+            except Exception as _emit_exc:
+                logger.debug("turn_controller: failed to emit error done event: %s", _emit_exc)
             raise
         finally:
             ctx._approval_handler = None

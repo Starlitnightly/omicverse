@@ -104,7 +104,8 @@ class ProactiveCodeTransformer:
                     if fixed_line != line:
                         logger.debug("ProactiveCodeTransformer: converted f-string in print")
                     fixed_lines.append(fixed_line)
-                except Exception:
+                except Exception as e:
+                    logger.debug("ProactiveCodeTransformer: f-string conversion failed (%s), keeping original line", e)
                     fixed_lines.append(line)
             else:
                 fixed_lines.append(line)

@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 import hashlib
+import logging
 import re
 from pathlib import Path
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 
 ALLOWED_WORKFLOW_DOMAINS = {"data-science", "bioinformatics"}
@@ -73,15 +76,15 @@ def _parse_front_matter_minimal(front_matter: str) -> dict[str, Any]:
 def _parse_front_matter(front_matter: str) -> dict[str, Any]:
     try:
         import yaml  # type: ignore
-    except Exception:
+    except ImportError:
         yaml = None
     if yaml is not None:
         try:
             payload = yaml.safe_load(front_matter) or {}
             if isinstance(payload, dict):
                 return payload
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("_parse_front_matter: yaml.safe_load failed (%s), falling back to minimal parser", e)
     return _parse_front_matter_minimal(front_matter)
 
 
