@@ -113,6 +113,49 @@ def _encrypt_aes_ecb(plaintext: bytes, key: bytes) -> bytes:
     return enc.update(padded) + enc.finalize()
 
 
+def _decrypt_aes_ecb(ciphertext: bytes, key: bytes) -> bytes:
+    """AES-128-ECB decrypt with PKCS7 unpadding."""
+    if not _CRYPTO_AVAILABLE:
+        raise RuntimeError(
+            "cryptography package is required for WeChat image download decryption. "
+            "Install it with: pip install cryptography"
+        )
+    cipher = Cipher(algorithms.AES(key), modes.ECB())
+    dec = cipher.decryptor()
+    padded = dec.update(ciphertext) + dec.finalize()
+    unpadder = _aes_padding.PKCS7(128).unpadder()
+    return unpadder.update(padded) + unpadder.finalize()
+
+
+def _build_cdn_download_url(encrypted_query_param: str, cdn_base_url: str = _CDN_BASE_URL) -> str:
+    return (
+        f"{cdn_base_url.rstrip('/')}/download"
+        f"?encrypted_query_param={urllib.parse.quote(encrypted_query_param, safe='')}"
+    )
+
+
+def _parse_cdn_aes_key(*, aes_key_b64: str = "", aeskey_hex: str = "") -> Optional[bytes]:
+    if aeskey_hex:
+        raw_hex = aeskey_hex.strip()
+        if len(raw_hex) == 32:
+            return bytes.fromhex(raw_hex)
+        raise ValueError(f"WeChat aeskey hex must be 32 chars, got {len(raw_hex)}")
+
+    if not aes_key_b64:
+        return None
+
+    decoded = base64.b64decode(aes_key_b64)
+    if len(decoded) == 16:
+        return decoded
+    if len(decoded) == 32:
+        text = decoded.decode("ascii", errors="strict")
+        if re.fullmatch(r"[0-9a-fA-F]{32}", text):
+            return bytes.fromhex(text)
+    raise ValueError(
+        f"WeChat aes_key must decode to 16 raw bytes or 32-char hex string, got {len(decoded)} bytes"
+    )
+
+
 @dataclass
 class RunningTask:
     task: asyncio.Task
@@ -488,6 +531,28 @@ class WeChatApiClient:
         file_resp.raise_for_status()
         return file_resp.content
 
+    def download_cdn_media(
+        self,
+        *,
+        encrypt_query_param: str,
+        aes_key_b64: str = "",
+        aeskey_hex: str = "",
+        cdn_base_url: str = _CDN_BASE_URL,
+        label: str = "wechat media",
+    ) -> bytes:
+        """Download media from WeChat CDN and decrypt when an AES key is present."""
+        url = _build_cdn_download_url(encrypt_query_param, cdn_base_url)
+        resp = requests.get(url, timeout=(10.0, 120.0))
+        resp.raise_for_status()
+        encrypted = resp.content
+        key = _parse_cdn_aes_key(aes_key_b64=aes_key_b64, aeskey_hex=aeskey_hex)
+        if key is None:
+            logger.debug("%s downloaded as plain CDN bytes (%d bytes)", label, len(encrypted))
+            return encrypted
+        decrypted = _decrypt_aes_ecb(encrypted, key)
+        logger.debug("%s downloaded+decrypted (%d bytes)", label, len(decrypted))
+        return decrypted
+
 
 class WeChatJarvisBot:
     def __init__(
@@ -634,21 +699,28 @@ class WeChatJarvisBot:
             return
 
         # Intercept .h5ad file uploads (item type 4) before passing text to the LLM.
-        # The file_item dict is expected to carry a file_key and file_name.
+        # Prefer the official openclaw-weixin media CDN fields; fall back to file_key
+        # for older payloads that still expose direct media download tokens.
         item_list = raw.get("item_list") or []
         for _item in item_list if isinstance(item_list, list) else []:
             if not isinstance(_item, dict) or _item.get("type") != 4:
                 continue
             _file_item = _item.get("file_item") or {}
             _fname = str(_file_item.get("file_name") or "").strip()
-            _fkey = str(
-                _file_item.get("file_key") or _file_item.get("media_id") or ""
-            ).strip()
-            if _fname.lower().endswith(".h5ad") and _fkey:
+            _media = _file_item.get("media") or {}
+            _enc = str((_media.get("encrypt_query_param") if isinstance(_media, dict) else "") or "").strip()
+            _fkey = str(_file_item.get("file_key") or _file_item.get("media_id") or "").strip()
+            if _fname.lower().endswith(".h5ad") and (_enc or _fkey):
                 self._context_tokens[from_user_id] = context_token
                 _sk = SessionKey(channel="wechat", scope_type="dm", scope_id=from_user_id)
                 _session = self._registry.get_or_create(_sk)
-                await self._handle_h5ad_file(_sk, _session, context_token, _fkey, _fname)
+                await self._handle_h5ad_file(
+                    _sk,
+                    _session,
+                    context_token,
+                    _file_item,
+                    _fname,
+                )
                 return
 
         session_key = SessionKey(channel="wechat", scope_type="dm", scope_id=from_user_id)
@@ -818,14 +890,14 @@ class WeChatJarvisBot:
         session_key: SessionKey,
         session: Any,
         context_token: str,
-        file_key: str,
+        file_item: Dict[str, Any],
         file_name: str,
     ) -> None:
         """Download a .h5ad file sent by the user and load it into the session."""
         self._context_tokens[session_key.scope_id] = context_token
         await self._send_session_text(session_key, "⏳ 正在下载并加载…", context_token=context_token)
         try:
-            data = await asyncio.to_thread(self._client.download_file, file_key)
+            data = await asyncio.to_thread(self._download_inbound_file_bytes, file_item, f"h5ad {file_name}")
             target = session.workspace / file_name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
@@ -1072,14 +1144,14 @@ class WeChatJarvisBot:
             )
             if not isinstance(payload, dict):
                 continue
-            file_key = str(
-                payload.get("file_key")
-                or payload.get("media_id")
-                or payload.get("download_param")
-                or payload.get("media_token")
+            media = payload.get("media") or {}
+            encrypt_query_param = str(
+                (media.get("encrypt_query_param") if isinstance(media, dict) else "")
+                or payload.get("encrypt_query_param")
                 or ""
             ).strip()
-            if not file_key:
+            file_key = str(payload.get("file_key") or payload.get("media_id") or "").strip()
+            if not (encrypt_query_param or file_key):
                 continue
             file_name = str(
                 payload.get("file_name")
@@ -1093,7 +1165,7 @@ class WeChatJarvisBot:
                 or "image/png"
             ).strip()
             try:
-                data = await asyncio.to_thread(self._client.download_file, file_key)
+                data = await asyncio.to_thread(self._download_inbound_image_bytes, payload, file_name)
                 prepared.append(
                     prepare_image_bytes(
                         data,
@@ -1113,6 +1185,50 @@ class WeChatJarvisBot:
             if len(prepared) >= 4:
                 break
         return prepared
+
+    def _download_inbound_image_bytes(self, image_item: Dict[str, Any], label: str) -> bytes:
+        media = image_item.get("media") or {}
+        encrypt_query_param = str(
+            (media.get("encrypt_query_param") if isinstance(media, dict) else "")
+            or image_item.get("encrypt_query_param")
+            or ""
+        ).strip()
+        if encrypt_query_param:
+            return self._client.download_cdn_media(
+                encrypt_query_param=encrypt_query_param,
+                aes_key_b64=str((media.get("aes_key") if isinstance(media, dict) else "") or "").strip(),
+                aeskey_hex=str(image_item.get("aeskey") or "").strip(),
+                label=f"WeChat inbound image {label}",
+            )
+        legacy_file_key = str(
+            image_item.get("file_key")
+            or image_item.get("media_id")
+            or image_item.get("download_param")
+            or image_item.get("media_token")
+            or ""
+        ).strip()
+        if not legacy_file_key:
+            raise RuntimeError("WeChat inbound image missing media reference")
+        return self._client.download_file(legacy_file_key)
+
+    def _download_inbound_file_bytes(self, file_item: Dict[str, Any], label: str) -> bytes:
+        media = file_item.get("media") or {}
+        encrypt_query_param = str(
+            (media.get("encrypt_query_param") if isinstance(media, dict) else "")
+            or file_item.get("encrypt_query_param")
+            or ""
+        ).strip()
+        if encrypt_query_param:
+            return self._client.download_cdn_media(
+                encrypt_query_param=encrypt_query_param,
+                aes_key_b64=str((media.get("aes_key") if isinstance(media, dict) else "") or "").strip(),
+                aeskey_hex=str(file_item.get("aeskey") or "").strip(),
+                label=f"WeChat inbound file {label}",
+            )
+        legacy_file_key = str(file_item.get("file_key") or file_item.get("media_id") or "").strip()
+        if not legacy_file_key:
+            raise RuntimeError("WeChat inbound file missing media reference")
+        return self._client.download_file(legacy_file_key)
 
     @staticmethod
     def _coalesce_pending_requests(items: List[Dict[str, Any]]) -> tuple[str, List[Dict[str, Any]]]:
