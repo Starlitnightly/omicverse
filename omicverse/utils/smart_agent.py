@@ -1594,3 +1594,10 @@ def Agent(model: str = "gpt-5.2", api_key: Optional[str] = None, endpoint: Optio
         reporter=reporter,
         verbose=verbose,
     )
+
+
+__all__ = [
+    "Agent",
+    "OmicVerseAgent",
+    "list_supported_models",
+]
