@@ -23,7 +23,6 @@ except ImportError:  # pragma: no cover - optional dependency
     _discord = None
 
 from ..agent_bridge import AgentBridge
-from .._bridge_session import resolve_bridge_session_id
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from ..model_help import render_model_help
 
@@ -166,19 +165,6 @@ class DiscordJarvisBot:
     async def _on_message(self, message) -> None:
         author = getattr(message, "author", None)
         if author is None or getattr(author, "bot", False):
-            return
-
-        # Handle .h5ad file attachments before any text normalisation so that
-        # a file-only message (empty content) is not silently dropped.
-        attachments = list(getattr(message, "attachments", None) or [])
-        h5ad_list = [
-            a for a in attachments
-            if (getattr(a, "filename", "") or "").lower().endswith(".h5ad")
-        ]
-        if h5ad_list:
-            session_key = self._session_key(message)
-            session = self._registry.get_or_create(session_key)
-            await self._handle_h5ad_attachment(message, session, h5ad_list[0])
             return
 
         text = self._normalize_message_text(message)
@@ -365,17 +351,9 @@ class DiscordJarvisBot:
             if chunk:
                 llm_buf += chunk
 
-        web_bridge = getattr(self._sm, "gateway_web_bridge", None)
-        prior_history = web_bridge.get_prior_history_simple(
-            "discord",
-            session_key.scope_type,
-            session_key.scope_id,
-            session_id=resolve_bridge_session_id(session),
-        ) if web_bridge else []
-
         bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
         try:
-            result = await bridge.run(full_request, session.adata, history=prior_history)
+            result = await bridge.run(full_request, session.adata)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -403,6 +381,7 @@ class DiscordJarvisBot:
         except Exception:
             pass
 
+        web_bridge = getattr(self._sm, "gateway_web_bridge", None)
         if web_bridge is not None:
             try:
                 web_bridge.on_turn_complete_simple(
@@ -412,7 +391,6 @@ class DiscordJarvisBot:
                     user_text=user_text,
                     llm_text=llm_buf,
                     adata=result.adata,
-                    session_id=resolve_bridge_session_id(session),
                 )
             except Exception:
                 pass
@@ -448,9 +426,11 @@ class DiscordJarvisBot:
                 caption=f"附件: {artifact.filename}",
             )
 
-        summary = _strip_local_paths(bridge.pick_reply_text(result, llm_buf))
-        if not summary:
-            if session.adata is not None:
+        summary = _strip_local_paths((result.summary or "").strip())
+        if not summary or summary.lower() in _BORING_SUMMARIES:
+            if llm_buf.strip():
+                summary = llm_buf[:1800]
+            elif session.adata is not None:
                 adata = session.adata
                 summary = f"分析完成\n{adata.n_obs:,} cells x {adata.n_vars:,} genes"
             else:
@@ -517,33 +497,6 @@ class DiscordJarvisBot:
                 kwargs["mention_author"] = False
             await channel.send(chunk, **kwargs)
             first = False
-
-    async def _handle_h5ad_attachment(self, message, session: Any, attachment) -> None:
-        """Download a .h5ad attachment sent by the user and load it into the session."""
-        filename = getattr(attachment, "filename", None) or "upload.h5ad"
-        await self._send_text(message.channel, "⏳ 正在下载并加载…", reply_to=message)
-        try:
-            data = await attachment.read()
-            target = session.workspace / filename
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(data)
-            loaded = await asyncio.to_thread(session.load_from_workspace, filename)
-            if loaded is not None:
-                a = loaded
-                await self._send_text(
-                    message.channel,
-                    f"✅ 加载成功\n🔬 {a.n_obs:,} cells × {a.n_vars:,} genes\n📁 {filename}",
-                    reply_to=message,
-                )
-            else:
-                await self._send_text(
-                    message.channel,
-                    f"✅ 已接收 {filename}，但自动加载失败，请检查文件格式。",
-                    reply_to=message,
-                )
-        except Exception as exc:
-            logger.exception("Discord failed to load h5ad attachment")
-            await self._send_text(message.channel, f"❌ 文件处理失败: {exc}", reply_to=message)
 
     async def _send_file(
         self,

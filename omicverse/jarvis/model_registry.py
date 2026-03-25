@@ -187,12 +187,9 @@ _FALLBACK_PROVIDER_DISPLAY_NAMES: Dict[str, str] = {
 _CHAT_EXTRA_PROVIDER_MODELS: Dict[str, Dict[str, str]] = {
     "openai": {
         "gpt-5.3-codex": "OpenAI Codex GPT-5.3",
-        "gpt-5.3-codex-spark": "OpenAI Codex GPT-5.3 Spark",
         "gpt-5.2-codex": "OpenAI Codex GPT-5.2",
-        "gpt-5.1-codex": "OpenAI Codex GPT-5.1",
         "gpt-5.1-codex-mini": "OpenAI Codex GPT-5.1 Mini",
         "gpt-5.1-codex-max": "OpenAI Codex GPT-5.1 Max",
-        "gpt-5.4-mini": "OpenAI GPT-5.4 Mini",
     },
     "ollama": {
         "qwen3:8b": "Ollama Qwen3 8B",

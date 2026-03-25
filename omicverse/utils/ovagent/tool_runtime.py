@@ -6,6 +6,7 @@ All tool handler methods follow the pattern ``_tool_<name>(self, ...)``.
 
 from __future__ import annotations
 
+import inspect
 import json
 import logging
 import mimetypes
@@ -14,11 +15,13 @@ import shutil
 import subprocess
 import time
 import traceback
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from ..harness.runtime_state import runtime_state
 from ..harness.tool_catalog import (
+    get_tool_spec,
     get_visible_tool_schemas,
     normalize_tool_name,
     resolve_tool_search,
@@ -32,8 +35,228 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Declarative tool dispatch registry — schema + executor + policy metadata
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ToolPolicy:
+    """Per-tool execution and dispatch policy metadata.
+
+    Every registered tool carries a ``ToolPolicy`` that the dispatcher
+    consults before invoking the executor.  External code can also query the
+    policy to learn a tool's characteristics without executing it.
+    """
+
+    blocked_in_plan_mode: bool = False
+    requires_server_mode: bool = False
+    needs_adata: bool = False
+    returns_adata: bool = False
+    parallel_safe: bool = True
+    read_only: bool = False
+    approval_class: str = "none"        # none | standard | high_risk
+    output_tier: str = "normal"         # normal | verbose | compact
+    isolation_mode: str = "in_process"  # in_process | subprocess | worktree
+
+
+@dataclass
+class ToolRegistryEntry:
+    """A tool bound to an executor with schema and policy metadata.
+
+    Adding a new tool to the runtime amounts to constructing one of these
+    entries and calling ``ToolDispatchRegistry.register(entry)``.  No central
+    dispatcher switch-case needs editing.
+    """
+
+    name: str
+    executor: Any           # (args: dict, adata: Any) -> Any
+    schema: dict            # JSON-schema for the tool's parameters
+    policy: ToolPolicy = field(default_factory=ToolPolicy)
+    aliases: tuple = ()     # additional names that resolve to this tool
+    description: str = ""
+
+
+class ToolDispatchRegistry:
+    """Registry-driven tool dispatch.
+
+    Resolves canonical names and aliases to ``ToolRegistryEntry`` objects so
+    the dispatcher performs a single lookup instead of a long if-elif chain.
+    """
+
+    def __init__(self) -> None:
+        self._entries: dict[str, ToolRegistryEntry] = {}
+        self._alias_map: dict[str, str] = {}
+
+    # -- mutators --
+
+    def register(self, entry: ToolRegistryEntry) -> None:
+        """Register (or replace) a tool entry."""
+        self._entries[entry.name] = entry
+        self._alias_map[entry.name] = entry.name
+        for alias in entry.aliases:
+            self._alias_map[alias] = entry.name
+
+    # -- queries --
+
+    def lookup(self, name: str) -> Optional[ToolRegistryEntry]:
+        """Return the entry for *name* or any alias, or ``None``."""
+        canonical = self._alias_map.get(name)
+        if canonical is None:
+            return None
+        return self._entries.get(canonical)
+
+    def __contains__(self, name: str) -> bool:
+        return name in self._alias_map
+
+    def __len__(self) -> int:
+        return len(self._entries)
+
+    @property
+    def entries(self) -> dict[str, ToolRegistryEntry]:
+        return dict(self._entries)
+
+    @property
+    def alias_map(self) -> dict[str, str]:
+        return dict(self._alias_map)
+
+
+# Legacy OmicVerse-specific tool schemas that are not part of the
+# Claude-style tool catalog but must still be exposed to the LLM.
+LEGACY_AGENT_TOOLS: list[dict[str, Any]] = [
+    {
+        "name": "inspect_data",
+        "description": "Inspect the AnnData or MuData object without modifying it.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "aspect": {
+                    "type": "string",
+                    "enum": ["shape", "obs", "var", "obsm", "uns", "layers", "full"],
+                }
+            },
+            "required": ["aspect"],
+        },
+    },
+    {
+        "name": "execute_code",
+        "description": "Execute Python code against the current dataset.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "code": {"type": "string"},
+                "description": {"type": "string"},
+            },
+            "required": ["code", "description"],
+        },
+    },
+    {
+        "name": "run_snippet",
+        "description": "Run read-only Python code on a shallow copy of the current dataset.",
+        "parameters": {
+            "type": "object",
+            "properties": {"code": {"type": "string"}},
+            "required": ["code"],
+        },
+    },
+    {
+        "name": "search_functions",
+        "description": "Search the OmicVerse function registry.",
+        "parameters": {
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "search_skills",
+        "description": "Search installed domain-specific skills.",
+        "parameters": {
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "delegate",
+        "description": "Delegate to an explore, plan, or execute subagent.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "agent_type": {"type": "string", "enum": ["explore", "plan", "execute"]},
+                "task": {"type": "string"},
+                "context": {"type": "string"},
+            },
+            "required": ["agent_type", "task"],
+        },
+    },
+    {
+        "name": "web_fetch",
+        "description": "Fetch a URL and return readable content.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string"},
+                "prompt": {"type": "string"},
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "web_search",
+        "description": "Search the web and return results.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "num_results": {"type": "number"},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "web_download",
+        "description": "Download a file from a URL to disk.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string"},
+                "filename": {"type": "string"},
+                "directory": {"type": "string"},
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "finish",
+        "description": "Declare the task complete and return the summary.",
+        "parameters": {
+            "type": "object",
+            "properties": {"summary": {"type": "string"}},
+            "required": ["summary"],
+        },
+    },
+]
+
+
+def _get_tool_schema(name: str) -> dict:
+    """Resolve the parameter schema for *name* from catalog or legacy defs."""
+    spec = get_tool_spec(name)
+    if spec and spec.parameters:
+        return dict(spec.parameters)
+    for tool_def in LEGACY_AGENT_TOOLS:
+        if tool_def["name"] == name:
+            return dict(tool_def["parameters"])
+    return {"type": "object", "properties": {}, "required": []}
+
+
 class ToolRuntime:
     """Dispatch and handle all agent tool calls.
+
+    This is the single source of truth for tool visibility, plan-mode
+    gating, legacy tool names, deferred loading semantics, and tool
+    dispatch.  Other modules should call into ``ToolRuntime`` rather than
+    duplicating these concerns.
 
     Parameters
     ----------
@@ -41,16 +264,541 @@ class ToolRuntime:
         The agent instance (accessed via protocol surface).
     executor : AnalysisExecutor
         The code execution engine (for execute_code / run_snippet).
+    permission_policy : PermissionPolicy or None
+        Optional per-tool permission policy.  When set, ``dispatch_tool``
+        consults the policy before executing.  Denied tools return an
+        error message without reaching the executor.
     """
 
-    def __init__(self, ctx: "AgentContext", executor: "AnalysisExecutor") -> None:
+    def __init__(
+        self,
+        ctx: "AgentContext",
+        executor: "AnalysisExecutor",
+        *,
+        permission_policy: Any = None,
+    ) -> None:
         self._ctx = ctx
         self._executor = executor
         self._subagent_controller: Any = None  # late-bound
+        self._permission_policy = permission_policy  # Optional[PermissionPolicy]
+        self._dispatch_registry = self._build_dispatch_registry()
 
     def set_subagent_controller(self, controller: Any) -> None:
         """Late-bind the subagent controller to avoid circular deps."""
         self._subagent_controller = controller
+
+    @property
+    def permission_policy(self) -> Any:
+        """Return the current permission policy (may be None)."""
+        return self._permission_policy
+
+    @permission_policy.setter
+    def permission_policy(self, policy: Any) -> None:
+        self._permission_policy = policy
+
+    def get_tool_policy(self, tool_name: str) -> Optional[ToolPolicy]:
+        """Return the ``ToolPolicy`` for *tool_name*, or None if unknown."""
+        normalized = normalize_tool_name(tool_name)
+        entry = self._dispatch_registry.lookup(normalized)
+        return entry.policy if entry is not None else None
+
+    # ------------------------------------------------------------------
+    # Declarative dispatch registry — built once at init
+    # ------------------------------------------------------------------
+
+    def _build_dispatch_registry(self) -> ToolDispatchRegistry:
+        """Build the declarative dispatch registry for all known tools.
+
+        Adding a new tool requires only a new ``register()`` call here —
+        no if-elif chain to edit.
+        """
+        reg = ToolDispatchRegistry()
+        s = _get_tool_schema  # shorthand
+
+        # ── Catalog / platform tools ───────────────────────────────
+
+        reg.register(ToolRegistryEntry(
+            name="ToolSearch",
+            executor=lambda args, _adata: self._tool_tool_search(
+                args.get("query", ""),
+                max_results=args.get("max_results", 5),
+            ),
+            schema=s("ToolSearch"),
+            policy=ToolPolicy(read_only=True),
+            description="Search and load deferred tools.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="Bash",
+            executor=lambda args, _adata: self._tool_bash(
+                args.get("command", ""),
+                description=args.get("description", ""),
+                timeout=args.get("timeout", 120000),
+                run_in_background=bool(args.get("run_in_background", False)),
+                dangerouslyDisableSandbox=bool(
+                    args.get("dangerouslyDisableSandbox", False)
+                ),
+            ),
+            schema=s("Bash"),
+            policy=ToolPolicy(
+                blocked_in_plan_mode=True,
+                requires_server_mode=True,
+                approval_class="high_risk",
+            ),
+            description="Execute shell commands.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="Read",
+            executor=lambda args, _adata: self._tool_read(
+                args.get("file_path", ""),
+                offset=args.get("offset", 0),
+                limit=args.get("limit", 2000),
+                pages=args.get("pages", ""),
+            ),
+            schema=s("Read"),
+            policy=ToolPolicy(read_only=True),
+            description="Read a local file.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="Edit",
+            executor=lambda args, _adata: self._tool_edit(
+                args.get("file_path", ""),
+                args.get("old_string", ""),
+                args.get("new_string", ""),
+                replace_all=bool(args.get("replace_all", False)),
+            ),
+            schema=s("Edit"),
+            policy=ToolPolicy(
+                blocked_in_plan_mode=True,
+                requires_server_mode=True,
+                approval_class="high_risk",
+            ),
+            description="Apply a targeted diff to a file.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="Write",
+            executor=lambda args, _adata: self._tool_write(
+                args.get("file_path", ""),
+                args.get("content", ""),
+            ),
+            schema=s("Write"),
+            policy=ToolPolicy(
+                blocked_in_plan_mode=True,
+                requires_server_mode=True,
+                approval_class="high_risk",
+            ),
+            description="Create or fully rewrite a file.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="Glob",
+            executor=lambda args, _adata: self._tool_glob(
+                args.get("pattern", ""),
+                root=args.get("root", ""),
+                max_results=args.get("max_results", 200),
+            ),
+            schema=s("Glob"),
+            policy=ToolPolicy(read_only=True),
+            description="Search for files by glob pattern.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="Grep",
+            executor=lambda args, _adata: self._tool_grep(
+                args.get("pattern", ""),
+                root=args.get("root", ""),
+                glob=args.get("glob", ""),
+                max_results=args.get("max_results", 200),
+            ),
+            schema=s("Grep"),
+            policy=ToolPolicy(read_only=True),
+            description="Search file contents by pattern.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="NotebookEdit",
+            executor=lambda args, _adata: self._tool_notebook_edit(
+                args.get("file_path", ""),
+                cell_index=args.get("cell_index", 0),
+                source=args.get("source", ""),
+                cell_type=args.get("cell_type", ""),
+            ),
+            schema=s("NotebookEdit"),
+            policy=ToolPolicy(
+                blocked_in_plan_mode=True,
+                requires_server_mode=True,
+                approval_class="high_risk",
+            ),
+            description="Edit cells in a Jupyter notebook.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="Agent",
+            executor=self._exec_agent,
+            schema=s("Agent"),
+            policy=ToolPolicy(needs_adata=True, parallel_safe=False),
+            aliases=("delegate",),
+            description="Delegate to a subagent.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="AskUserQuestion",
+            executor=self._exec_ask_user_question,
+            schema=s("AskUserQuestion"),
+            policy=ToolPolicy(parallel_safe=False),
+            description="Pause for user clarification.",
+        ))
+
+        # ── Task management ────────────────────────────────────────
+
+        reg.register(ToolRegistryEntry(
+            name="TaskCreate",
+            executor=lambda args, _adata: self._tool_create_task(
+                args.get("title", ""),
+                description=args.get("description", ""),
+                status=args.get("status", "pending"),
+            ),
+            schema=s("TaskCreate"),
+            description="Create a tracked task.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="TaskGet",
+            executor=lambda args, _adata: self._tool_get_task(
+                args.get("task_id", ""),
+            ),
+            schema=s("TaskGet"),
+            policy=ToolPolicy(read_only=True),
+            description="Get task details.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="TaskList",
+            executor=lambda args, _adata: self._tool_list_tasks(
+                status=args.get("status", ""),
+            ),
+            schema=s("TaskList"),
+            policy=ToolPolicy(read_only=True),
+            description="List tracked tasks.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="TaskOutput",
+            executor=lambda args, _adata: self._tool_task_output(
+                args.get("task_id", ""),
+                offset=args.get("offset", 0),
+                limit=args.get("limit", 200),
+            ),
+            schema=s("TaskOutput"),
+            policy=ToolPolicy(read_only=True),
+            description="Read captured task output.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="TaskStop",
+            executor=lambda args, _adata: self._tool_task_stop(
+                args.get("task_id", ""),
+            ),
+            schema=s("TaskStop"),
+            policy=ToolPolicy(
+                blocked_in_plan_mode=True,
+                requires_server_mode=True,
+                approval_class="high_risk",
+            ),
+            description="Stop a running task.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="TaskUpdate",
+            executor=lambda args, _adata: self._tool_task_update(
+                args.get("task_id", ""),
+                args.get("status", ""),
+                summary=args.get("summary", ""),
+            ),
+            schema=s("TaskUpdate"),
+            description="Update task status.",
+        ))
+
+        # ── Workflow / plan mode / worktree ────────────────────────
+
+        reg.register(ToolRegistryEntry(
+            name="EnterPlanMode",
+            executor=lambda args, _adata: self._tool_enter_plan_mode(
+                reason=args.get("reason", ""),
+            ),
+            schema=s("EnterPlanMode"),
+            description="Enter analysis-only mode.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="ExitPlanMode",
+            executor=lambda args, _adata: self._tool_exit_plan_mode(
+                summary=args.get("summary", ""),
+            ),
+            schema=s("ExitPlanMode"),
+            description="Exit planning mode.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="EnterWorktree",
+            executor=lambda args, _adata: self._tool_enter_worktree(
+                branch_name=args.get("branch_name", ""),
+                path=args.get("path", ""),
+                base_ref=args.get("base_ref", "HEAD"),
+            ),
+            schema=s("EnterWorktree"),
+            policy=ToolPolicy(
+                blocked_in_plan_mode=True,
+                requires_server_mode=True,
+                approval_class="high_risk",
+            ),
+            description="Switch into an isolated git worktree.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="Skill",
+            executor=lambda args, _adata: self._tool_skill(
+                args.get("query", ""),
+                mode=args.get("mode", "search"),
+            ),
+            schema=s("Skill"),
+            aliases=("search_skills",),
+            description="Load a skill or workflow guide.",
+        ))
+
+        # ── Web tools ──────────────────────────────────────────────
+
+        reg.register(ToolRegistryEntry(
+            name="WebFetch",
+            executor=lambda args, _adata: self._tool_web_fetch(
+                args.get("url", ""),
+                prompt=args.get("prompt"),
+            ),
+            schema=s("WebFetch"),
+            aliases=("web_fetch",),
+            description="Fetch a URL.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="WebSearch",
+            executor=lambda args, _adata: self._tool_web_search(
+                args.get("query", ""),
+                num_results=args.get("num_results", 5),
+            ),
+            schema=s("WebSearch"),
+            aliases=("web_search",),
+            description="Web search.",
+        ))
+
+        # ── MCP tools ──────────────────────────────────────────────
+
+        reg.register(ToolRegistryEntry(
+            name="ListMcpResourcesTool",
+            executor=lambda args, _adata: self._tool_list_mcp_resources(
+                server=args.get("server", ""),
+            ),
+            schema=s("ListMcpResourcesTool"),
+            policy=ToolPolicy(read_only=True),
+            description="List MCP resources.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="ReadMcpResourceTool",
+            executor=lambda args, _adata: self._tool_read_mcp_resource(
+                args.get("server", ""),
+                args.get("uri", ""),
+            ),
+            schema=s("ReadMcpResourceTool"),
+            policy=ToolPolicy(read_only=True),
+            description="Read an MCP resource.",
+        ))
+
+        # ── Legacy OmicVerse tools ─────────────────────────────────
+
+        reg.register(ToolRegistryEntry(
+            name="inspect_data",
+            executor=lambda args, adata: self._tool_inspect_data(
+                adata, args.get("aspect", "full"),
+            ),
+            schema=s("inspect_data"),
+            policy=ToolPolicy(needs_adata=True, read_only=True),
+            description="Inspect AnnData / MuData.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="execute_code",
+            executor=self._exec_execute_code,
+            schema=s("execute_code"),
+            policy=ToolPolicy(
+                blocked_in_plan_mode=True,
+                needs_adata=True,
+                returns_adata=True,
+            ),
+            description="Execute Python code against the dataset.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="run_snippet",
+            executor=self._exec_run_snippet,
+            schema=s("run_snippet"),
+            policy=ToolPolicy(needs_adata=True, read_only=True),
+            description="Run read-only Python snippet.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="search_functions",
+            executor=lambda args, _adata: self._tool_search_functions(
+                args.get("query", ""),
+            ),
+            schema=s("search_functions"),
+            policy=ToolPolicy(read_only=True),
+            description="Search OmicVerse function registry.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="web_download",
+            executor=lambda args, _adata: self._tool_web_download(
+                args.get("url", ""),
+                filename=args.get("filename"),
+                directory=args.get("directory"),
+            ),
+            schema=s("web_download"),
+            policy=ToolPolicy(blocked_in_plan_mode=True),
+            description="Download a file from URL.",
+        ))
+
+        reg.register(ToolRegistryEntry(
+            name="finish",
+            executor=lambda args, _adata: {
+                "finished": True,
+                "summary": args.get("summary", ""),
+            },
+            schema=s("finish"),
+            description="Declare task complete.",
+        ))
+
+        return reg
+
+    # ------------------------------------------------------------------
+    # Executor adapters for tools needing pre-dispatch validation
+    # ------------------------------------------------------------------
+
+    def _exec_execute_code(self, args: dict, adata: Any) -> Any:
+        """Executor for execute_code — validates non-empty code."""
+        code = args.get("code", "")
+        if not code or not code.strip():
+            return json.dumps(
+                {"error": "execute_code requires a non-empty 'code' argument."},
+                ensure_ascii=False,
+            )
+        return self._tool_execute_code(code, args.get("description", ""), adata)
+
+    def _exec_run_snippet(self, args: dict, adata: Any) -> Any:
+        """Executor for run_snippet — validates non-empty code."""
+        snippet = args.get("code", "")
+        if not snippet or not snippet.strip():
+            return json.dumps(
+                {"error": "run_snippet requires a non-empty 'code' argument."},
+                ensure_ascii=False,
+            )
+        return self._tool_run_snippet(snippet, adata)
+
+    def _exec_ask_user_question(self, args: dict, _adata: Any) -> Any:
+        """Executor for AskUserQuestion — validates non-empty question."""
+        question = args.get("question", "") or args.get("prompt", "")
+        if not question:
+            return json.dumps(
+                {"error": "AskUserQuestion requires a non-empty 'question' argument."},
+                ensure_ascii=False,
+            )
+        return self._tool_ask_user_question(
+            question,
+            header=args.get("header", ""),
+            options=args.get("options", []),
+        )
+
+    async def _exec_agent(self, args: dict, adata: Any) -> Any:
+        """Executor for Agent — async subagent delegation."""
+        agent_type = args.get(
+            "subagent_type", args.get("agent_type", "explore")
+        )
+        task = args.get("task", "")
+        context = args.get("context", "")
+        from .event_stream import make_event_bus
+        make_event_bus(getattr(self._ctx, "_reporter", None)).tool_delegated(agent_type, task)
+        sub_result = await self._subagent_controller.run_subagent(
+            agent_type=agent_type,
+            task=task,
+            adata=adata,
+            context=context,
+        )
+        if agent_type == "execute":
+            return {
+                "adata": sub_result["adata"],
+                "output": sub_result["result"],
+            }
+        return sub_result["result"]
+
+    # ------------------------------------------------------------------
+    # Tool facade — visibility, plan-mode gating, loaded-tool tracking
+    # ------------------------------------------------------------------
+
+    def get_visible_agent_tools(
+        self, *, allowed_names: Optional[set[str]] = None
+    ) -> list[dict[str, Any]]:
+        """Return the currently visible tool schemas for the active session.
+
+        Merges Claude-style catalog tools (core + loaded deferred) with the
+        legacy OmicVerse tool schemas.  When *allowed_names* is provided, only
+        tools whose name (or normalized name) appears in the set are returned.
+        """
+        session_id = self._ctx._get_runtime_session_id()
+        loaded = runtime_state.get_loaded_tools(session_id)
+        tools = get_visible_tool_schemas(loaded) + list(LEGACY_AGENT_TOOLS)
+        if allowed_names is None:
+            return tools
+        normalized_allowed = {normalize_tool_name(name) for name in allowed_names}
+        return [
+            tool for tool in tools
+            if tool["name"] in allowed_names
+            or normalize_tool_name(tool["name"]) in normalized_allowed
+        ]
+
+    def get_loaded_tool_names(self) -> list[str]:
+        """Return the set of currently loaded tool names for this session."""
+        return runtime_state.get_loaded_tools(self._ctx._get_runtime_session_id())
+
+    def tool_blocked_in_plan_mode(self, tool_name: str) -> bool:
+        """Check whether *tool_name* is blocked while plan mode is active.
+
+        The primary path consults the registry's per-tool ``ToolPolicy``.
+        A fallback remains for any name not yet in the dispatch registry.
+        """
+        session_state = runtime_state.get_summary(
+            self._ctx._get_runtime_session_id()
+        )
+        plan_mode = bool(
+            (session_state.get("plan_mode") or {}).get("enabled", False)
+        )
+        if not plan_mode:
+            return False
+
+        # Primary: consult registry policy metadata.
+        normalized = normalize_tool_name(tool_name)
+        entry = self._dispatch_registry.lookup(normalized)
+        if entry is not None:
+            return entry.policy.blocked_in_plan_mode
+
+        # Fallback for tools not yet in the dispatch registry.
+        spec = get_tool_spec(tool_name)
+        if spec is not None:
+            return spec.high_risk or spec.name in {
+                "Bash", "Edit", "Write", "NotebookEdit", "EnterWorktree",
+            }
+        return tool_name in {"execute_code", "web_download"}
 
     # ------------------------------------------------------------------
     # Dispatch
@@ -59,196 +807,48 @@ class ToolRuntime:
     async def dispatch_tool(
         self, tool_call: Any, current_adata: Any, request: str
     ) -> Any:
-        """Dispatch a tool call and return the result."""
+        """Dispatch a tool call via the declarative registry.
+
+        Lookup is a single registry hit — no if-elif chain.  Async
+        executors (e.g. Agent) are detected and awaited automatically.
+
+        When a ``PermissionPolicy`` is attached, the policy is consulted
+        before execution.  Denied tools return an error string.  Tools
+        requiring approval (ASK) delegate to the context's approval
+        handler when available, or deny when not.
+        """
         name = normalize_tool_name(tool_call.name)
         args = tool_call.arguments
 
-        if self._ctx._tool_blocked_in_plan_mode(name):
+        entry = self._dispatch_registry.lookup(name)
+        if entry is None:
+            return f"Unknown tool: {name}"
+
+        if self.tool_blocked_in_plan_mode(name):
             return f"{name} is blocked because the session is currently in plan mode."
 
-        if name == "ToolSearch":
-            return self._tool_tool_search(
-                args.get("query", ""),
-                max_results=args.get("max_results", 5),
+        # Permission policy gate
+        if self._permission_policy is not None:
+            from .permission_policy import PermissionVerdict
+            decision = self._permission_policy.check(
+                name,
+                tool_approval_class=entry.policy.approval_class,
+                tool_isolation_mode=entry.policy.isolation_mode,
             )
-        elif name == "Bash":
-            return self._tool_bash(
-                args.get("command", ""),
-                description=args.get("description", ""),
-                timeout=args.get("timeout", 120000),
-                run_in_background=bool(args.get("run_in_background", False)),
-                dangerouslyDisableSandbox=bool(
-                    args.get("dangerouslyDisableSandbox", False)
-                ),
-            )
-        elif name == "Read":
-            return self._tool_read(
-                args.get("file_path", ""),
-                offset=args.get("offset", 0),
-                limit=args.get("limit", 2000),
-                pages=args.get("pages", ""),
-            )
-        elif name == "Edit":
-            return self._tool_edit(
-                args.get("file_path", ""),
-                args.get("old_string", ""),
-                args.get("new_string", ""),
-                replace_all=bool(args.get("replace_all", False)),
-            )
-        elif name == "Write":
-            return self._tool_write(
-                args.get("file_path", ""),
-                args.get("content", ""),
-            )
-        elif name == "Glob":
-            return self._tool_glob(
-                args.get("pattern", ""),
-                root=args.get("root", ""),
-                max_results=args.get("max_results", 200),
-            )
-        elif name == "Grep":
-            return self._tool_grep(
-                args.get("pattern", ""),
-                root=args.get("root", ""),
-                glob=args.get("glob", ""),
-                max_results=args.get("max_results", 200),
-            )
-        elif name == "NotebookEdit":
-            return self._tool_notebook_edit(
-                args.get("file_path", ""),
-                cell_index=args.get("cell_index", 0),
-                source=args.get("source", ""),
-                cell_type=args.get("cell_type", ""),
-            )
-        elif name == "inspect_data":
-            return self._tool_inspect_data(
-                current_adata, args.get("aspect", "full")
-            )
-        elif name == "execute_code":
-            code = args.get("code", "")
-            if not code or not code.strip():
-                return json.dumps(
-                    {"error": "execute_code requires a non-empty 'code' argument."},
-                    ensure_ascii=False,
-                )
-            return self._tool_execute_code(
-                code,
-                args.get("description", ""),
-                current_adata,
-            )
-        elif name == "run_snippet":
-            snippet = args.get("code", "")
-            if not snippet or not snippet.strip():
-                return json.dumps(
-                    {"error": "run_snippet requires a non-empty 'code' argument."},
-                    ensure_ascii=False,
-                )
-            return self._tool_run_snippet(snippet, current_adata)
-        elif name == "search_functions":
-            return self._tool_search_functions(args.get("query", ""))
-        elif name == "search_skills":
-            return self._tool_search_skills(args.get("query", ""))
-        elif name == "Agent":
-            agent_type = args.get(
-                "subagent_type", args.get("agent_type", "explore")
-            )
-            task = args.get("task", "")
-            context = args.get("context", "")
-            print(
-                f"   -> Delegating to {agent_type} subagent: {task[:80]}..."
-            )
-            sub_result = await self._subagent_controller.run_subagent(
-                agent_type=agent_type,
-                task=task,
-                adata=current_adata,
-                context=context,
-            )
-            if agent_type == "execute":
-                return {
-                    "adata": sub_result["adata"],
-                    "output": sub_result["result"],
-                }
-            return sub_result["result"]
-        elif name == "AskUserQuestion":
-            question = args.get("question", "") or args.get("prompt", "")
-            if not question:
-                return json.dumps(
-                    {"error": "AskUserQuestion requires a non-empty 'question' argument."},
-                    ensure_ascii=False,
-                )
-            return self._tool_ask_user_question(
-                question,
-                header=args.get("header", ""),
-                options=args.get("options", []),
-            )
-        elif name == "TaskCreate":
-            return self._tool_create_task(
-                args.get("title", ""),
-                description=args.get("description", ""),
-                status=args.get("status", "pending"),
-            )
-        elif name == "TaskGet":
-            return self._tool_get_task(args.get("task_id", ""))
-        elif name == "TaskList":
-            return self._tool_list_tasks(status=args.get("status", ""))
-        elif name == "TaskOutput":
-            return self._tool_task_output(
-                args.get("task_id", ""),
-                offset=args.get("offset", 0),
-                limit=args.get("limit", 200),
-            )
-        elif name == "TaskStop":
-            return self._tool_task_stop(args.get("task_id", ""))
-        elif name == "TaskUpdate":
-            return self._tool_task_update(
-                args.get("task_id", ""),
-                args.get("status", ""),
-                summary=args.get("summary", ""),
-            )
-        elif name == "EnterPlanMode":
-            return self._tool_enter_plan_mode(reason=args.get("reason", ""))
-        elif name == "ExitPlanMode":
-            return self._tool_exit_plan_mode(summary=args.get("summary", ""))
-        elif name == "EnterWorktree":
-            return self._tool_enter_worktree(
-                branch_name=args.get("branch_name", ""),
-                path=args.get("path", ""),
-                base_ref=args.get("base_ref", "HEAD"),
-            )
-        elif name == "Skill":
-            return self._tool_skill(
-                args.get("query", ""),
-                mode=args.get("mode", "search"),
-            )
-        elif name == "WebFetch":
-            return self._tool_web_fetch(
-                args.get("url", ""),
-                prompt=args.get("prompt"),
-            )
-        elif name == "WebSearch":
-            return self._tool_web_search(
-                args.get("query", ""),
-                num_results=args.get("num_results", 5),
-            )
-        elif name == "ListMcpResourcesTool":
-            return self._tool_list_mcp_resources(
-                server=args.get("server", "")
-            )
-        elif name == "ReadMcpResourceTool":
-            return self._tool_read_mcp_resource(
-                args.get("server", ""),
-                args.get("uri", ""),
-            )
-        elif name == "web_download":
-            return self._tool_web_download(
-                args.get("url", ""),
-                filename=args.get("filename"),
-                directory=args.get("directory"),
-            )
-        elif name == "finish":
-            return {"finished": True, "summary": args.get("summary", "")}
-        else:
-            return f"Unknown tool: {name}"
+            if decision.verdict == PermissionVerdict.DENY:
+                return f"Permission denied for tool '{name}': {decision.reason}"
+            if decision.verdict == PermissionVerdict.ASK:
+                handler = getattr(self._ctx, "_approval_handler", None)
+                if handler is None:
+                    return (
+                        f"Tool '{name}' requires approval but no approval "
+                        f"handler is available. {decision.reason}"
+                    )
+
+        result = entry.executor(args, current_adata)
+        if inspect.isawaitable(result):
+            result = await result
+        return result
 
     # ------------------------------------------------------------------
     # OmicVerse data tools
@@ -394,43 +994,63 @@ class ToolRuntime:
                 ),
             }
         except Exception as e:
-            original_error = str(e)
-            tb_str = traceback.format_exc()
+            from .repair_loop import build_default_repair_loop
 
-            fixed_code = self._executor.apply_execution_error_fix(
-                code, original_error
+            def _exec_fn(repaired_code, exec_adata):
+                return self._executor.execute_generated_code(
+                    repaired_code, exec_adata, capture_stdout=True,
+                )
+
+            repair_loop = build_default_repair_loop(
+                executor=self._executor,
+                executor_fn=_exec_fn,
+                max_retries=3,
             )
-            if fixed_code:
-                try:
-                    result = self._executor.execute_generated_code(
-                        fixed_code, adata, capture_stdout=True
-                    )
-                    stdout = result.get("stdout", "")
-                    result_adata = result.get("adata", adata)
-                    output_parts = [
-                        f"RECOVERED (pattern fix): {original_error}"
-                    ]
-                    if stdout.strip():
-                        output_parts.append(f"stdout:\n{stdout[:3000]}")
-                    try:
-                        output_parts.append(
-                            f"Result adata shape: "
-                            f"{result_adata.shape[0]} cells x "
-                            f"{result_adata.shape[1]} features"
-                        )
-                    except Exception:
-                        output_parts.append(
-                            f"Result type: {type(result_adata).__name__}"
-                        )
-                    return {
-                        "adata": result_adata,
-                        "output": "\n".join(output_parts),
-                    }
-                except Exception:
-                    pass
+            repair_result = repair_loop.run(
+                code=code,
+                adata=adata,
+                initial_exception=e,
+                tool_name="execute_code",
+            )
 
+            if repair_result.success:
+                result_adata = repair_result.final_adata or adata
+                output_parts = [
+                    f"RECOVERED ({repair_result.winning_strategy}): "
+                    f"{e}"
+                ]
+                if repair_result.final_output:
+                    stdout = ""
+                    for line in repair_result.final_output.splitlines():
+                        if line.startswith("stdout:"):
+                            stdout = repair_result.final_output
+                            break
+                    if stdout.strip():
+                        output_parts.append(stdout[:3000])
+                    else:
+                        output_parts.append(repair_result.final_output[:3000])
+                try:
+                    output_parts.append(
+                        f"Result adata shape: "
+                        f"{result_adata.shape[0]} cells x "
+                        f"{result_adata.shape[1]} features"
+                    )
+                except Exception:
+                    output_parts.append(
+                        f"Result type: {type(result_adata).__name__}"
+                    )
+                return {
+                    "adata": result_adata,
+                    "output": "\n".join(output_parts),
+                }
+
+            # All repair attempts failed — return structured error
+            tb_str = traceback.format_exc()
+            envelope = repair_result.final_envelope
             error_output = (
-                f"ERROR: {e}\n\nTraceback (last 2000 chars):\n"
+                envelope.to_llm_message()
+                if envelope is not None
+                else f"ERROR: {e}\n\nTraceback (last 2000 chars):\n"
                 f"{tb_str[-2000:]}"
             )
             if prereq_warnings:
@@ -951,7 +1571,7 @@ class ToolRuntime:
         replace_all: bool = False,
     ) -> str:
         self._ctx._ensure_server_tool_mode("Edit")
-        if self._ctx._tool_blocked_in_plan_mode("Edit"):
+        if self.tool_blocked_in_plan_mode("Edit"):
             return "Edit is blocked while the session is in plan mode."
         path = self._ctx._resolve_local_path(file_path)
         if not path.exists():
@@ -983,7 +1603,7 @@ class ToolRuntime:
 
     def _tool_write(self, file_path: str, content: str) -> str:
         self._ctx._ensure_server_tool_mode("Write")
-        if self._ctx._tool_blocked_in_plan_mode("Write"):
+        if self.tool_blocked_in_plan_mode("Write"):
             return "Write is blocked while the session is in plan mode."
         path = self._ctx._resolve_local_path(file_path)
         self._ctx._request_tool_approval(
@@ -1062,7 +1682,7 @@ class ToolRuntime:
         cell_type: str = "",
     ) -> str:
         self._ctx._ensure_server_tool_mode("NotebookEdit")
-        if self._ctx._tool_blocked_in_plan_mode("NotebookEdit"):
+        if self.tool_blocked_in_plan_mode("NotebookEdit"):
             return (
                 "NotebookEdit is blocked while the session is in plan mode."
             )
@@ -1189,7 +1809,7 @@ class ToolRuntime:
         base_ref: str = "HEAD",
     ) -> str:
         self._ctx._ensure_server_tool_mode("EnterWorktree")
-        if self._ctx._tool_blocked_in_plan_mode("EnterWorktree"):
+        if self.tool_blocked_in_plan_mode("EnterWorktree"):
             return (
                 "EnterWorktree is blocked while the session is in plan mode."
             )
@@ -1449,7 +2069,7 @@ class ToolRuntime:
         dangerouslyDisableSandbox: bool = False,
     ) -> str:
         self._ctx._ensure_server_tool_mode("Bash")
-        if self._ctx._tool_blocked_in_plan_mode("Bash"):
+        if self.tool_blocked_in_plan_mode("Bash"):
             return "Bash is blocked while the session is in plan mode."
         reason = description or f"Run shell command: {command[:120]}"
         self._ctx._request_tool_approval(

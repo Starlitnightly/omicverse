@@ -180,6 +180,8 @@ class AnalysisExecutor:
 
     def __init__(self, ctx: "AgentContext") -> None:
         self._ctx = ctx
+        from .event_stream import make_event_bus
+        self._event_bus = make_event_bus(getattr(ctx, "_reporter", None))
 
     # -- prerequisite checks ------------------------------------------------
 
@@ -293,7 +295,7 @@ class AnalysisExecutor:
             return False
 
         pip_name = _PACKAGE_ALIASES.get(package_name, package_name)
-        print(f"   📦 Auto-installing missing package: {pip_name}")
+        self._event_bus.execution_status(f"   📦 Auto-installing missing package: {pip_name}")
 
         try:
             result = _subprocess.run(
@@ -301,13 +303,13 @@ class AnalysisExecutor:
                 capture_output=True, text=True, timeout=120,
             )
             if result.returncode == 0:
-                print(f"   ✅ Successfully installed {pip_name}")
+                self._event_bus.execution_status(f"   ✅ Successfully installed {pip_name}")
                 for key in list(sys.modules.keys()):
                     if key == package_name or key.startswith(package_name + "."):
                         del sys.modules[key]
                 return True
             else:
-                print(f"   ❌ pip install failed: {result.stderr[:200]}")
+                self._event_bus.execution_status(f"   ❌ pip install failed: {result.stderr[:200]}")
                 return False
         except Exception as exc:
             logger.warning("Auto-install of %r failed: %s", pip_name, exc)
@@ -350,11 +352,11 @@ class AnalysisExecutor:
         )
 
         try:
-            print("   🔬 LLM diagnosing execution error...")
+            self._event_bus.recovery_attempt("diagnosis", "   🔬 LLM diagnosing execution error...")
             response = await self._ctx._llm.run(diagnosis_prompt)
             diagnosed_code = self._ctx._extract_python_code(response)
             if diagnosed_code and diagnosed_code.strip():
-                print(f"   💡 LLM generated fix ({len(diagnosed_code)} chars)")
+                self._event_bus.recovery_attempt("fix", f"   💡 LLM generated fix ({len(diagnosed_code)} chars)")
                 return diagnosed_code
         except Exception as exc:
             logger.warning("LLM error diagnosis failed: %s", exc)
@@ -433,16 +435,15 @@ class AnalysisExecutor:
                 logger.warning("Approval handler failed, denying execution: %s", exc)
                 return False
 
-        print("\n" + "=" * 60)
-        print("GENERATED CODE REVIEW")
-        print("=" * 60)
+        sep = "=" * 60
         display = code if len(code) < 2000 else code[:2000] + "\n... (truncated)"
-        for i, line in enumerate(display.split("\n"), 1):
-            print(f"  {i:3d} | {line}")
+        numbered = "\n".join(f"  {i:3d} | {line}" for i, line in enumerate(display.split("\n"), 1))
+        report_block = ""
         if violations:
-            print()
-            print(self._ctx._security_scanner.format_report(violations))
-        print("=" * 60)
+            report_block = "\n" + self._ctx._security_scanner.format_report(violations)
+        self._event_bus.execution_status(
+            f"\n{sep}\nGENERATED CODE REVIEW\n{sep}\n{numbered}{report_block}\n{sep}"
+        )
         try:
             response = input("Execute this code? [y/N]: ").strip().lower()
             return response in ("y", "yes")
@@ -544,12 +545,8 @@ class AnalysisExecutor:
                     ) from e
                 elif fb == SandboxFallbackPolicy.WARN_AND_FALLBACK:
                     self._notebook_fallback_error = str(e)
-                    if hasattr(self._ctx, "_emit"):
-                        self._ctx._emit(EventLevel.WARNING, f"Session execution failed: {e}", "execution")
-                        self._ctx._emit(EventLevel.INFO, "Falling back to in-process execution...", "execution")
-                    else:
-                        print(f"\u26a0\ufe0f  Session execution failed: {e}")
-                        print("   Falling back to in-process execution...")
+                    self._event_bus.execution_status(f"\u26a0\ufe0f  Session execution failed: {e}")
+                    self._event_bus.execution_status("   Falling back to in-process execution...")
 
         # Legacy in-process execution
         compiled = compile(code, "<omicverse-agent>", "exec")

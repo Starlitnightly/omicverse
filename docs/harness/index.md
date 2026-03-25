@@ -9,7 +9,7 @@ This directory is the system of record for the OVAgent harness layer.
 - `tool-catalog.md`: current runtime catalog and Claude-style substrate mapping
 - `tool-loading.md`: static-vs-deferred loading rules and future invariants
 - `approval-and-questions.md`: pause/resume contract for approvals and future questions
-- `server-validation.md`: Taiwan-server-only validation policy and commands
+- `server-validation.md`: remote validation policy and native `ngagent remote` commands
 - `cleanup-policy.md`: recurring cleanup and drift-control rules
 
 ## Server-Only Entry Points

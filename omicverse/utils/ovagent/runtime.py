@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Optional
 
+from .contracts import PromptLayer, PromptLayerKind
 from .run_store import AnalysisRun, RunStore
 from .workflow import WorkflowDocument, load_workflow_document, resolve_repo_root
 
@@ -33,6 +34,23 @@ class OmicVerseRuntime:
         if not workflow.body and not workflow.config.default_tools:
             return base_prompt
         return base_prompt.rstrip() + "\n\n" + workflow.build_prompt_block()
+
+    def build_workflow_layer(self, *, priority: int = 90) -> Optional[PromptLayer]:
+        """Return the workflow overlay as a ``PromptLayer``, or ``None``.
+
+        This is the template-engine counterpart of :meth:`compose_system_prompt`:
+        instead of concatenating strings, the caller adds the returned layer
+        to a :class:`PromptTemplateEngine`.
+        """
+        workflow = self.reload_workflow()
+        if not workflow.body and not workflow.config.default_tools:
+            return None
+        return PromptLayer(
+            kind=PromptLayerKind.WORKFLOW,
+            content=workflow.build_prompt_block(),
+            priority=priority,
+            source="workflow",
+        )
 
     def start_analysis_run(
         self,

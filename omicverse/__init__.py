@@ -34,7 +34,6 @@ Examples:
     >>>
     >>> # Smart Agent approach
     >>> agent = ov.Agent(model="gpt-4o-mini", api_key="your-key")
-    >>> codex_agent = ov.Agent(model="gpt-5.3-codex", auth_mode="openai_oauth")
     >>> adata = agent.run("quality control with nUMI>500, mito<0.2", adata)
     >>> adata = agent.run("preprocess with 2000 HVGs", adata)
     >>> adata = agent.run("leiden clustering resolution=1.0", adata)

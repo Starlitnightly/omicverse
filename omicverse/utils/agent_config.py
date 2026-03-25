@@ -29,8 +29,6 @@ class LLMConfig:
     model: str = "gemini-2.5-flash"
     api_key: Optional[str] = None
     endpoint: Optional[str] = None
-    auth_mode: str = "environment"
-    auth_file: Optional[Path] = None
     reasoning_effort: str = "high"  # "low" | "medium" | "high" for GPT-5
 
 
@@ -166,8 +164,6 @@ class AgentConfig:
                 model=kw.get("model", "gemini-2.5-flash"),
                 api_key=kw.get("api_key"),
                 endpoint=kw.get("endpoint"),
-                auth_mode=kw.get("auth_mode", "environment"),
-                auth_file=Path(kw["auth_file"]).expanduser() if kw.get("auth_file") else None,
             ),
             reflection=ReflectionConfig(
                 enabled=kw.get("enable_reflection", True),

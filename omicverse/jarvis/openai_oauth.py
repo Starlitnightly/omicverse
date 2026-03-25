@@ -373,24 +373,6 @@ class OpenAIOAuthManager:
 
         return access_token or None
 
-    def ensure_access_token_with_codex_fallback(
-        self,
-        *,
-        refresh_if_needed: bool = True,
-        import_codex_if_missing: bool = True,
-    ) -> Optional[str]:
-        """Return a usable access token, importing Codex CLI auth when available."""
-
-        access_token = self.ensure_access_token(refresh_if_needed=refresh_if_needed)
-        if access_token or not import_codex_if_missing:
-            return access_token
-
-        imported = self.import_codex_auth()
-        if not imported:
-            return None
-
-        return self.ensure_access_token(refresh_if_needed=refresh_if_needed)
-
     @staticmethod
     def _create_callback_server(event: threading.Event) -> ThreadingHTTPServer:
         for port in (OPENAI_CALLBACK_PORT, 0):

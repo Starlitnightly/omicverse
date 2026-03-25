@@ -47,3 +47,8 @@ omicverse_web/data/
 .build/
 omicclaw/
 docs*
+# Multi-agent worktrees
+.worktrees/
+
+# Local orchestrator state
+.orchestrator/
