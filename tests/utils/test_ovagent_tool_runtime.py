@@ -200,9 +200,7 @@ class TestToolRuntimePlanMode:
         runtime_state.enter_plan_mode(sid, reason="test")
         try:
             tc = SimpleNamespace(name="Bash", arguments={"command": "ls"})
-            result = asyncio.get_event_loop().run_until_complete(
-                rt.dispatch_tool(tc, None, "test")
-            )
+            result = asyncio.run(rt.dispatch_tool(tc, None, "test"))
             assert "plan mode" in result.lower()
         finally:
             runtime_state.exit_plan_mode(sid, reason="cleanup")
