@@ -82,11 +82,11 @@ def collect_api_key_env(
         return {}
 
     env_mapping: Dict[str, str] = {}
-    provider = ModelConfig.get_provider_from_model(model, endpoint)
-    required_key = PROVIDER_API_KEYS.get(provider)
+    required_key = PROVIDER_API_KEYS.get(model)
     if required_key:
         env_mapping[required_key] = api_key
 
+    provider = ModelConfig.get_provider_from_model(model, endpoint)
     if provider == "openai":
         env_mapping.setdefault("OPENAI_API_KEY", api_key)
 
