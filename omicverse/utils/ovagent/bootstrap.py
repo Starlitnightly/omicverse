@@ -1,9 +1,17 @@
-"""Agent subsystem initialization.
+"""Agent subsystem initialization — CLI bootstrap banners.
 
 Extracted from ``OmicVerseAgent.__init__`` so that each bootstrap concern
 has its own focused, testable function.  Every function here is a pure
 factory — it creates and returns a subsystem value without storing it on
 an agent instance.
+
+CLI banner contract
+-------------------
+The ``print()`` calls in this module are **intentional, explicitly scoped
+CLI startup banners**.  They provide non-authoritative human feedback
+during agent initialization and are NOT part of the structured
+observability contract.  Machine consumers must read from the logger or
+harness event stream (see ``event_stream.py``), never from stdout.
 """
 
 from __future__ import annotations

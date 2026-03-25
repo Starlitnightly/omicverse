@@ -28,6 +28,7 @@ from .context_budget import (
     BudgetSliceType,
     ContextBudgetManager,
 )
+from .event_stream import RuntimeEventEmitter
 from .tool_registry import OutputTier
 from .tool_scheduler import ToolScheduler, execute_batch, ScheduledCall
 
@@ -498,7 +499,7 @@ class TurnController:
             out_file.write_text(
                 json.dumps(_safe(messages), indent=2, ensure_ascii=False)
             )
-            print(f"   \U0001f4dd Conversation log saved: {out_file}")
+            logger.info("conversation_log_saved path=%s", out_file)
         except Exception as exc:
             logger.debug("Failed to save conversation log: %s", exc)
 
@@ -625,6 +626,12 @@ class TurnController:
             ]
 
         _sync_runtime_trace()
+
+        emitter = RuntimeEventEmitter(
+            recorder=recorder,
+            event_callback=event_callback,
+            source="turn_loop",
+        )
 
         async def emit(event):
             recorder.add_event(event)
@@ -768,7 +775,6 @@ class TurnController:
             for turn in range(max_turns):
                 # --- Cancel checkpoint: before LLM call ---
                 if _is_cancelled():
-                    print("   \u26d4 Cancelled before LLM call")
                     recorder.add_step(
                         "status", summary="cancelled_before_llm"
                     )
@@ -782,21 +788,15 @@ class TurnController:
                     )
                     if ctx._trace_store is not None:
                         recorder.save(ctx._trace_store)
-                    await emit(
-                        build_stream_event(
-                            "done",
-                            "Cancelled",
-                            turn_id=recorder.trace.turn_id,
-                            trace_id=recorder.trace.trace_id,
-                            session_id=recorder.trace.session_id,
-                            category="lifecycle",
-                        )
-                        | {"cancelled": True}
+                    await emitter.turn_cancelled(
+                        "before_llm_call",
+                        turn_id=recorder.trace.turn_id,
+                        trace_id=recorder.trace.trace_id,
+                        session_id=recorder.trace.session_id,
                     )
                     self._save_conversation_log(messages)
                     return current_adata
 
-                print(f"   \U0001f504 Turn {turn + 1}/{max_turns}")
                 tool_choice = FollowUpGate.select_tool_choice(
                     request=request,
                     adata=current_adata,
@@ -812,14 +812,13 @@ class TurnController:
                         turn + 1,
                     )
 
-                logger.info(
-                    "agentic_llm_call_start turn=%d/%d tool_choice=%s "
-                    "messages=%d post_tool=%s",
-                    turn + 1,
+                await emitter.turn_started(
+                    turn,
                     max_turns,
                     tool_choice,
-                    len(messages),
-                    "yes" if meaningful_tool_call_seen else "no",
+                    turn_id=recorder.trace.turn_id,
+                    trace_id=recorder.trace.trace_id,
+                    session_id=recorder.trace.session_id,
                 )
                 t_llm_start = time.time()
                 stall_retries = 0
@@ -927,9 +926,11 @@ class TurnController:
                             "llm_chunk",
                             summary=final_summary[:200],
                         )
-                        print(
-                            "   \U0001f4ac Agent response: "
-                            f"{final_summary[:200]}"
+                        await emitter.agent_response(
+                            final_summary,
+                            turn_id=recorder.trace.turn_id,
+                            trace_id=recorder.trace.trace_id,
+                            session_id=recorder.trace.session_id,
                         )
                         await emit(
                             build_stream_event(
@@ -1064,9 +1065,6 @@ class TurnController:
 
                 for batch in schedule.batches:
                     if _is_cancelled():
-                        print(
-                            "   \u26d4 Cancelled before tool dispatch"
-                        )
                         recorder.add_step(
                             "status",
                             summary="cancelled_before_tool_dispatch",
@@ -1084,16 +1082,11 @@ class TurnController:
                         )
                         if ctx._trace_store is not None:
                             recorder.save(ctx._trace_store)
-                        await emit(
-                            build_stream_event(
-                                "done",
-                                "Cancelled",
-                                turn_id=recorder.trace.turn_id,
-                                trace_id=recorder.trace.trace_id,
-                                session_id=recorder.trace.session_id,
-                                category="lifecycle",
-                            )
-                            | {"cancelled": True}
+                        await emitter.turn_cancelled(
+                            "before_tool_dispatch",
+                            turn_id=recorder.trace.turn_id,
+                            trace_id=recorder.trace.trace_id,
+                            session_id=recorder.trace.session_id,
                         )
                         self._save_conversation_log(messages)
                         return current_adata
@@ -1113,9 +1106,15 @@ class TurnController:
                             },
                         )
                         _step_ids[sc.index] = tool_step_id
-                        print(
-                            f"   \U0001f527 Tool: {canonical or tc.name}"
-                            f"({', '.join(f'{k}=' for k in tc.arguments)})"
+                        await emitter.tool_dispatched(
+                            canonical or tc.name,
+                            tc.arguments,
+                            batch_id=batch.batch_id,
+                            parallel=batch.parallel,
+                            step_id=tool_step_id,
+                            turn_id=recorder.trace.turn_id,
+                            trace_id=recorder.trace.trace_id,
+                            session_id=recorder.trace.session_id,
                         )
                         await emit(
                             build_stream_event(
@@ -1201,11 +1200,13 @@ class TurnController:
                                         "description", "execute_code"
                                     ),
                                 )
-                                print(
-                                    "      \u2705 "
-                                    + tc.arguments.get(
+                                await emitter.execution_completed(
+                                    tc.arguments.get(
                                         "description", "Code executed"
-                                    )
+                                    ),
+                                    turn_id=recorder.trace.turn_id,
+                                    trace_id=recorder.trace.trace_id,
+                                    session_id=recorder.trace.session_id,
                                 )
                                 await emit(
                                     build_stream_event(
@@ -1218,10 +1219,11 @@ class TurnController:
                                     )
                                 )
                             else:
-                                print(
-                                    "      \u2705 delegate("
-                                    + tc.arguments.get("agent_type", "")
-                                    + ") completed"
+                                await emitter.delegation_completed(
+                                    tc.arguments.get("agent_type", ""),
+                                    turn_id=recorder.trace.turn_id,
+                                    trace_id=recorder.trace.trace_id,
+                                    session_id=recorder.trace.session_id,
                                 )
 
                             shape = (
@@ -1257,7 +1259,12 @@ class TurnController:
                             recorder.add_step(
                                 "done", name=canonical, summary=summary
                             )
-                            print(f"   \u2705 Finished: {summary}")
+                            await emitter.task_finished(
+                                summary,
+                                turn_id=recorder.trace.turn_id,
+                                trace_id=recorder.trace.trace_id,
+                                session_id=recorder.trace.session_id,
+                            )
                             tool_output = f"Task finished: {summary}"
                             finished = True
                         elif isinstance(result, str):
@@ -1512,16 +1519,6 @@ class TurnController:
                     )
                 )
             else:
-                logger.warning(
-                    "agentic_loop_max_turns max_turns=%d "
-                    "meaningful_tool=%s",
-                    max_turns,
-                    meaningful_tool_call_seen,
-                )
-                print(
-                    f"   \u26a0\ufe0f  Max turns ({max_turns}) reached, "
-                    "returning current result"
-                )
                 final_summary = final_summary or (
                     f"Reached max turns ({max_turns})"
                 )
@@ -1533,16 +1530,11 @@ class TurnController:
                 _finalize_analysis_run("max_turns", final_summary)
                 if ctx._trace_store is not None:
                     recorder.save(ctx._trace_store)
-                await emit(
-                    build_stream_event(
-                        "done",
-                        final_summary,
-                        turn_id=recorder.trace.turn_id,
-                        trace_id=recorder.trace.trace_id,
-                        session_id=recorder.trace.session_id,
-                        category="lifecycle",
-                    )
-                    | {"max_turns": True}
+                await emitter.max_turns_reached(
+                    max_turns,
+                    turn_id=recorder.trace.turn_id,
+                    trace_id=recorder.trace.trace_id,
+                    session_id=recorder.trace.session_id,
                 )
             if ctx.last_usage:
                 await emit(

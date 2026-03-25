@@ -359,8 +359,10 @@ class ToolRuntime:
         )
         task = args.get("task", "")
         context = args.get("context", "")
-        print(
-            f"   -> Delegating to {agent_type} subagent: {task[:80]}..."
+        logger.info(
+            "delegation_started agent_type=%s task=%s",
+            agent_type,
+            task[:80],
         )
         subagent_controller = self._require_subagent_controller()
         sub_result = await subagent_controller.run_subagent(
