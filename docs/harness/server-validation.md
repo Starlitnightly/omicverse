@@ -29,9 +29,12 @@ OV_AGENT_RUN_HARNESS_TESTS=1 python -m omicverse.utils.verifier scenario <trace_
 OV_AGENT_RUN_HARNESS_TESTS=1 python -m omicverse.utils.verifier cleanup --save-report
 ```
 
-## ngagent Review Bridge
+## Review Execution
 
-For ngagent-managed task review, use `./scripts/ci/ngagent_taiwan_review.sh`.
-That wrapper syncs the current task worktree to `/slow/ngagent-review/...` and
-executes the remote validation helper described in
-`docs/harness/ngagent-review-bridge.md`.
+Server-only harness validation may be orchestrated externally, but this
+repository does not treat any transport/bootstrap wrapper as part of the OV
+runtime contract. The stable contract here is only:
+
+- harness validation is server-gated
+- required environment flags must be set explicitly
+- verifier commands must run against the server environment
