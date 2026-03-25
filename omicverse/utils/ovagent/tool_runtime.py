@@ -29,6 +29,7 @@ from ..._registry import _global_registry
 
 if TYPE_CHECKING:
     from .analysis_executor import AnalysisExecutor
+    from .permission_policy import PermissionPolicy
     from .protocol import AgentContext
     from .tool_registry import ToolRegistry
 
@@ -395,16 +396,30 @@ class ToolRuntime:
     # ------------------------------------------------------------------
 
     async def dispatch_tool(
-        self, tool_call: Any, current_adata: Any, request: str
+        self,
+        tool_call: Any,
+        current_adata: Any,
+        request: str,
+        *,
+        permission_policy: Optional["PermissionPolicy"] = None,
     ) -> Any:
         """Dispatch a tool call through the registry and return the result.
 
         Resolution flow:
         1. Resolve the tool name via the registry (handles canonical names,
            catalog aliases, legacy aliases, and case normalization).
-        2. Check plan-mode blocking for the resolved canonical name.
-        3. Look up the bound handler callable.
-        4. Call the handler with ``(args, adata, request)`` and await if async.
+        2. Check the optional *permission_policy* (deny → immediate return).
+        3. Check plan-mode blocking for the resolved canonical name.
+        4. Look up the bound handler callable.
+        5. Call the handler with ``(args, adata, request)`` and await if async.
+
+        Parameters
+        ----------
+        permission_policy : PermissionPolicy, optional
+            When provided, the tool is checked against the policy before
+            dispatch.  Denied tools return an error message immediately
+            without executing.  This is used by subagent isolation to
+            enforce scoped tool restrictions.
         """
         raw_name = tool_call.name
         args = tool_call.arguments
@@ -414,6 +429,14 @@ class ToolRuntime:
         if not canonical:
             # Fallback through catalog normalization for edge cases
             canonical = normalize_tool_name(raw_name)
+
+        # Permission policy check (when provided by caller)
+        if permission_policy is not None:
+            decision = permission_policy.check(canonical)
+            if decision.is_denied:
+                return (
+                    f"Permission denied for {canonical}: {decision.reason}"
+                )
 
         if self.tool_blocked_in_plan_mode(canonical):
             return (

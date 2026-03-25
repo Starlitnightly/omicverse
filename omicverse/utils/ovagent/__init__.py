@@ -24,7 +24,7 @@ from .context_budget import (
     TruncationPolicy,
     create_subagent_budget_manager,
 )
-from .subagent_controller import SubagentController
+from .subagent_controller import SubagentController, SubagentRuntime
 from .repair_loop import (
     DEFAULT_MAX_RETRIES,
     ExecutionRepairLoop,
@@ -33,6 +33,13 @@ from .repair_loop import (
     RepairResult,
     build_dataset_context,
     build_llm_repair_prompt,
+)
+from .permission_policy import (
+    PermissionDecision,
+    PermissionPolicy,
+    PermissionVerdict,
+    create_default_policy,
+    create_subagent_policy,
 )
 from .tool_scheduler import (
     ExecutionBatch,
@@ -81,6 +88,9 @@ __all__ = [
     "FailureEnvelope",
     "FollowUpGate",
     "OmicVerseRuntime",
+    "PermissionDecision",
+    "PermissionPolicy",
+    "PermissionVerdict",
     "ProactiveCodeTransformer",
     "PromptBuilder",
     "RepairAttempt",
@@ -89,6 +99,7 @@ __all__ = [
     "RunStore",
     "SessionService",
     "SubagentController",
+    "SubagentRuntime",
     "ScheduleResult",
     "ScheduledCall",
     "ToolMetadata",
@@ -106,7 +117,9 @@ __all__ = [
     "build_default_registry",
     "build_filesystem_context_instructions",
     "build_llm_repair_prompt",
+    "create_default_policy",
     "create_subagent_budget_manager",
+    "create_subagent_policy",
     "execute_batch",
     "collect_api_key_env",
     "create_llm_backend",

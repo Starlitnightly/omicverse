@@ -8,6 +8,22 @@ This breaks the circular import between ``smart_agent.py`` and the
 
 The protocol is ``@runtime_checkable`` so extracted modules and tests can
 validate duck-typed agent doubles at runtime when needed.
+
+Isolation boundary
+------------------
+``AgentContext`` describes the *parent* agent surface.  Subagents do NOT
+receive a full ``AgentContext``; instead they operate through a
+``SubagentRuntime`` (see ``subagent_controller.py``) that exposes only
+the scoped state a subagent is allowed to read or mutate:
+
+* ``SubagentRuntime.permission_policy`` — per-tool allow/ask/deny decisions.
+* ``SubagentRuntime.budget_manager``   — subagent-local token budget.
+* ``SubagentRuntime.tool_schemas``     — snapshotted (frozen) tool schemas.
+* ``SubagentRuntime.last_usage``       — subagent-local usage tracking.
+
+This separation ensures that subagent turns cannot implicitly mutate
+parent-agent state such as ``last_usage``, ``last_usage_breakdown``, or
+the parent's live tool registry.
 """
 
 from __future__ import annotations
