@@ -196,7 +196,7 @@ def __getattr__(name):
                 module = importlib.import_module('.llm', package='omicverse')
                 _lazy_modules[name] = module
                 return module
-            except Exception:
+            except ImportError:
                 return None
 
         elif name == 'datacollect':
@@ -212,7 +212,7 @@ def __getattr__(name):
                 module = importlib.import_module('.agent', package='omicverse')
                 _lazy_modules[name] = module
                 return module
-            except Exception:
+            except ImportError:
                 return None
 
         else:
@@ -223,7 +223,8 @@ def __getattr__(name):
             except ImportError as e:
                 _lazy_modules.pop(name, None)
                 raise AttributeError(
-                    f"Maybe some package not installed, checked the other outputss for more details."
+                    f"Failed to import omicverse.{name}: {e}. "
+                    f"A required dependency may not be installed."
                 ) from e
 
     # If not found, raise AttributeError

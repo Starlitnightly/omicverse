@@ -1784,8 +1784,8 @@ class TurnController:
                     )
                     | {"error": True}
                 )
-            except Exception:
-                pass
+            except Exception as _emit_exc:
+                logger.debug("turn_controller: failed to emit error done event: %s", _emit_exc)
             raise
         finally:
             ctx._approval_handler = None

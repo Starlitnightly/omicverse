@@ -855,10 +855,14 @@ class OmicVerseLLMBackend:
 
             return self._retry(_make_call)
 
-        except ImportError:
+        except ImportError as exc:
+            if getattr(exc, "name", None) == "openai":
+                raise RuntimeError(
+                    "openai package not installed. Install openai>=1.0 for tool-calling support."
+                ) from exc
             raise RuntimeError(
-                "openai package not installed. Install openai>=1.0 for tool-calling support."
-            )
+                f"OpenAI import failed during tool-calling setup: {exc}"
+            ) from exc
 
     @staticmethod
     def _is_openai_codex_base_url(base_url: str) -> bool:
@@ -1367,10 +1371,14 @@ class OmicVerseLLMBackend:
 
             return self._retry(_make_call)
 
-        except ImportError:
+        except ImportError as exc:
+            if getattr(exc, "name", None) == "openai":
+                raise RuntimeError(
+                    "openai package not installed. Install openai>=1.0 for Responses API tool support."
+                ) from exc
             raise RuntimeError(
-                "openai package not installed. Install openai>=1.0 for Responses API tool support."
-            )
+                f"OpenAI import failed during Responses API setup: {exc}"
+            ) from exc
 
     def _chat_tools_anthropic(
         self,

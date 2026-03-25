@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 import json
+import logging
 from pathlib import Path
 import time
 import uuid
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 from .workflow import WorkflowDocument
 
@@ -169,7 +172,8 @@ class RunStore:
             try:
                 payload = json.loads(manifest.read_text(encoding="utf-8"))
                 runs.append(AnalysisRun.from_dict(payload))
-            except Exception:
+            except Exception as e:
+                logger.debug("list_runs: skipping malformed manifest %s: %s", manifest, e)
                 continue
         return runs
 

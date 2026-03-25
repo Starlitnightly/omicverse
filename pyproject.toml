@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "omicverse"
-version = "2.0.7rc1"
+version = "2.0.8rc1"
 description = "OmicVerse: A single pipeline for exploring the entire transcriptome universe"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -148,7 +148,7 @@ jarvis = [
   "requests>=2.0",
   "pillow>=9.0",
   "nbformat>=5.0",
-  "socksio"
+  "httpx[socks]",
 ]
 
 tests = [
