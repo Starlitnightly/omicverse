@@ -90,6 +90,75 @@ class WebSessionBridge:
         sid = self.session_id_for_conversation_route(route)
         return self._sm.get_or_create(sid)
 
+    @staticmethod
+    def _sid_from_hints(
+        default_sid: str,
+        *,
+        channel_session_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+    ) -> str:
+        for value in (channel_session_id, session_id, conversation_id):
+            if value is None:
+                continue
+            resolved = str(value).strip()
+            if resolved:
+                return resolved
+        return default_sid
+
+    def get_prior_history(
+        self,
+        route: "ConversationRoute",
+        session_id: Optional[str] = None,
+        channel_session_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+    ) -> list:
+        """Return prior conversation history for a ConversationRoute.
+
+        Returns the in-memory web session history — populated only when the
+        web UI has explicitly loaded this session.  Empty after server restart
+        until the web user selects the conversation.
+        """
+        try:
+            sid = self._sid_from_hints(
+                self.session_id_for_conversation_route(route),
+                channel_session_id=channel_session_id,
+                session_id=session_id,
+                conversation_id=conversation_id,
+            )
+            return self._history_for_sid(sid)
+        except Exception:
+            return []
+
+    def get_prior_history_simple(
+        self,
+        channel: str,
+        scope_type: str,
+        scope_id: str,
+        thread_id: Optional[str] = None,
+        channel_session_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+    ) -> list:
+        """Same as get_prior_history but takes plain strings (for QQ/Feishu/WeChat/iMessage)."""
+        try:
+            sid = self._sid_from_hints(
+                _route_to_web_session_id(channel, scope_type, scope_id, thread_id),
+                channel_session_id=channel_session_id,
+                session_id=session_id,
+                conversation_id=conversation_id,
+            )
+            return self._history_for_sid(sid)
+        except Exception:
+            return []
+
+    def _history_for_sid(self, sid: str) -> list:
+        """Look up in-memory web session history by session id."""
+        session = self._sm.get_session(sid)
+        if session is not None and session.history:
+            return session.get_history_dicts()
+        return []
+
     # ------------------------------------------------------------------
     # Turn write-back (called after analysis completes)
     # ------------------------------------------------------------------
@@ -100,6 +169,10 @@ class WebSessionBridge:
         user_text: str,
         llm_text: str,
         adata: Any = None,
+        figures: Optional[list] = None,
+        session_id: Optional[str] = None,
+        channel_session_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
     ) -> None:
         """Mirror a completed analysis turn into the web AgentSession.
 
@@ -119,7 +192,12 @@ class WebSessionBridge:
             Updated AnnData object, if the analysis mutated it.
         """
         try:
-            sid = self.session_id_for_conversation_route(route)
+            sid = self._sid_from_hints(
+                self.session_id_for_conversation_route(route),
+                channel_session_id=channel_session_id,
+                session_id=session_id,
+                conversation_id=conversation_id,
+            )
             web_session = self._sm.get_or_create(sid)
             # Tag user message with channel source for clarity in the web UI
             tagged_user = f"[{route.channel}] {user_text}"
@@ -160,13 +238,22 @@ class WebSessionBridge:
         llm_text: str,
         adata: Any = None,
         thread_id: Optional[str] = None,
+        figures: Optional[list] = None,
+        channel_session_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
     ) -> None:
         """String-based overload for channels that don't use ConversationRoute.
 
         Feishu, QQ and iMessage channels pass routing info as plain strings.
         """
         try:
-            sid = _route_to_web_session_id(channel, scope_type, scope_id, thread_id)
+            sid = self._sid_from_hints(
+                _route_to_web_session_id(channel, scope_type, scope_id, thread_id),
+                channel_session_id=channel_session_id,
+                session_id=session_id,
+                conversation_id=conversation_id,
+            )
             web_session = self._sm.get_or_create(sid)
             tagged_user = f"[{channel}] {user_text}"
             web_session.add_message("user", tagged_user)

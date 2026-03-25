@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-          fetch-depth: 0   # full history lets mkdocs show last-updated dates
+          fetch-depth: 1   # shallow clone is sufficient for docs deployment
 
       # ── 2. Python ────────────────────────────────────────────────────────
       - uses: actions/setup-python@v5
@@ -47,7 +47,7 @@ jobs:
       # rather than the submodule (omicverse-tutorials) repo.
       - name: Deploy to GitHub Pages
         run: |
-          mkdocs gh-deploy --force \
+          mkdocs gh-deploy --force --no-history \
             --config-file omicverse_guide/mkdocs.yml \
             --remote-branch gh-pages \
             --message "docs: auto-deploy from {sha}"

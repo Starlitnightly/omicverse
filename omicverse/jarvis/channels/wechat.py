@@ -36,6 +36,7 @@ except ImportError:  # pragma: no cover
     _CRYPTO_AVAILABLE = False
 
 from ..agent_bridge import AgentBridge
+from .._bridge_session import resolve_bridge_session_id
 from ..config import default_state_dir
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from ..model_help import render_model_help
@@ -450,6 +451,37 @@ class WeChatApiClient:
                     data.get("errmsg") or f"WeChat send_image failed (ret={ret}, errcode={errcode})"
                 )
 
+    def download_file(self, file_key: str) -> bytes:
+        """Download a file from the WeChat iLink server by file_key.
+
+        Calls ``/ilink/bot/getmediadownloadurl`` to obtain a temporary CDN URL,
+        then fetches the raw bytes from that URL.  The exact endpoint name may
+        differ across iLink deployments — adjust if the server returns an error.
+        """
+        payload = {
+            "file_key": file_key,
+            "base_info": {"channel_version": "jarvis"},
+        }
+        body = json.dumps(payload, ensure_ascii=False)
+        resp = requests.post(
+            f"{self._base_url}/ilink/bot/getmediadownloadurl",
+            data=body.encode("utf-8"),
+            headers=self._headers(body),
+            timeout=(10.0, 30.0),
+        )
+        resp.raise_for_status()
+        result = resp.json()
+        download_url = (
+            ((result.get("data") or {}).get("download_url"))
+            or result.get("download_url")
+            or result.get("url")
+        )
+        if not download_url:
+            raise RuntimeError(f"WeChat file download URL not returned by server: {result}")
+        file_resp = requests.get(download_url, timeout=(10.0, 120.0))
+        file_resp.raise_for_status()
+        return file_resp.content
+
 
 class WeChatJarvisBot:
     def __init__(
@@ -595,6 +627,24 @@ class WeChatJarvisBot:
             logger.warning("WeChat message ignored because context_token is missing: from=%s", from_user_id)
             return
 
+        # Intercept .h5ad file uploads (item type 4) before passing text to the LLM.
+        # The file_item dict is expected to carry a file_key and file_name.
+        item_list = raw.get("item_list") or []
+        for _item in item_list if isinstance(item_list, list) else []:
+            if not isinstance(_item, dict) or _item.get("type") != 4:
+                continue
+            _file_item = _item.get("file_item") or {}
+            _fname = str(_file_item.get("file_name") or "").strip()
+            _fkey = str(
+                _file_item.get("file_key") or _file_item.get("media_id") or ""
+            ).strip()
+            if _fname.lower().endswith(".h5ad") and _fkey:
+                self._context_tokens[from_user_id] = context_token
+                _sk = SessionKey(channel="wechat", scope_type="dm", scope_id=from_user_id)
+                _session = self._registry.get_or_create(_sk)
+                await self._handle_h5ad_file(_sk, _session, context_token, _fkey, _fname)
+                return
+
         text = _extract_text(raw.get("item_list"))
         logger.info(
             "WeChat message received: from=%s message_type=%s content_len=%s",
@@ -725,6 +775,44 @@ class WeChatJarvisBot:
                 text = "⏳ 已收到，开始分析。"
         await self._send_session_text(session_key, text, context_token=context_token)
 
+    async def _handle_h5ad_file(
+        self,
+        session_key: SessionKey,
+        session: Any,
+        context_token: str,
+        file_key: str,
+        file_name: str,
+    ) -> None:
+        """Download a .h5ad file sent by the user and load it into the session."""
+        self._context_tokens[session_key.scope_id] = context_token
+        await self._send_session_text(session_key, "⏳ 正在下载并加载…", context_token=context_token)
+        try:
+            data = await asyncio.to_thread(self._client.download_file, file_key)
+            target = session.workspace / file_name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+            loaded = await asyncio.to_thread(session.load_from_workspace, file_name)
+            if loaded is not None:
+                a = loaded
+                await self._send_session_text(
+                    session_key,
+                    f"✅ 加载成功\n🔬 {a.n_obs:,} cells × {a.n_vars:,} genes\n📁 {file_name}",
+                    context_token=context_token,
+                )
+            else:
+                await self._send_session_text(
+                    session_key,
+                    f"✅ 已接收 {file_name}，但自动加载失败，请检查文件格式。",
+                    context_token=context_token,
+                )
+        except Exception as exc:
+            logger.exception("WeChat failed to handle h5ad file")
+            await self._send_session_text(
+                session_key,
+                f"❌ 文件处理失败: {exc}",
+                context_token=context_token,
+            )
+
     async def _spawn_analysis(self, session_key: SessionKey, session: Any, user_text: str) -> None:
         route = session_key.as_key()
         task = asyncio.create_task(self._analysis_wrapper(session_key, session, user_text))
@@ -769,9 +857,17 @@ class WeChatJarvisBot:
             if chunk:
                 llm_buf += chunk
 
+        _wb = getattr(self._sm, "gateway_web_bridge", None)
+        _prior_history = _wb.get_prior_history_simple(
+            "wechat",
+            session_key.scope_type,
+            session_key.scope_id,
+            session_id=resolve_bridge_session_id(session),
+        ) if _wb else []
+
         bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
         try:
-            result = await bridge.run(full_request, session.adata)
+            result = await bridge.run(full_request, session.adata, history=_prior_history)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -816,6 +912,8 @@ class WeChatJarvisBot:
                     user_text=user_text,
                     llm_text=llm_buf,
                     adata=result.adata,
+                    figures=result.figures or [],
+                    session_id=resolve_bridge_session_id(session),
                 )
             except Exception:
                 pass
@@ -842,23 +940,18 @@ class WeChatJarvisBot:
                 f"已生成 {len(result.artifacts)} 个附件，请在 Web 界面下载。",
             )
 
-        summary = _strip_local_paths((result.summary or "").strip())
-        # Suppress agent meta-commentary that leaked into the summary.
+        # pick_reply_text handles has_artifacts + llm_buf priority; WeChat then
+        # additionally strips agent meta-commentary fragments.
+        summary = _strip_local_paths(bridge.pick_reply_text(result, llm_buf))
         if summary and _META_COMMENTARY_RE.search(summary):
             logger.debug("WeChat: suppressing meta-commentary summary: %.120s", summary)
             summary = ""
-        if not summary or summary.lower() in _BORING_SUMMARIES:
-            if llm_buf.strip():
-                summary = _strip_local_paths(llm_buf.strip())
-                # Also suppress meta-commentary from raw llm buffer.
-                if _META_COMMENTARY_RE.search(summary):
-                    summary = ""
-            if not summary:
-                if session.adata is not None:
-                    adata = session.adata
-                    summary = f"分析完成\n{adata.n_obs:,} cells x {adata.n_vars:,} genes"
-                else:
-                    summary = "分析完成"
+        if not summary:
+            if session.adata is not None:
+                adata = session.adata
+                summary = f"分析完成\n{adata.n_obs:,} cells x {adata.n_vars:,} genes"
+            else:
+                summary = "分析完成"
         for chunk in _text_chunks(summary):
             await self._send_session_text(session_key, chunk)
 

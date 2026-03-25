@@ -59,13 +59,18 @@ class AgentBridge:
     # Public API
     # ------------------------------------------------------------------
 
-    async def run(self, request: str, adata: Optional[Any]) -> AgentRunResult:
+    async def run(
+        self,
+        request: str,
+        adata: Optional[Any],
+        history: Optional[List[dict]] = None,
+    ) -> AgentRunResult:
         result = AgentRunResult()
         seen: Set[str] = set()
         diag_seen: Set[str] = set()
         self._run_started_at = time.time()
 
-        async for event in self._agent.stream_async(request, adata):
+        async for event in self._agent.stream_async(request, adata, history=history or []):
             etype   = event.get("type")
             content = event.get("content")
 
@@ -149,6 +154,47 @@ class AgentBridge:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def pick_reply_text(
+        result: "AgentRunResult",
+        llm_buf: str,
+        *,
+        max_len: int = 1800,
+        boring: Optional[Set[str]] = None,
+    ) -> str:
+        """Return the best text to send back to the user.
+
+        Priority rules
+        --------------
+        1. When **no analysis artifacts** were produced (no figures, reports,
+           or file attachments) *and* the agent streamed LLM text, that text
+           IS the reply — the agent gave a conversational answer.  The
+           ``finish()`` summary in this case is just a mandatory-tool-use
+           no-op, so we ignore it.
+        2. Otherwise fall back to ``result.summary`` unless it is boring/empty,
+           in which case try ``llm_buf``, then diagnostics, then a generic
+           completion string.
+        """
+        _boring: Set[str] = boring if boring is not None else {
+            "分析完成", "分析完成。", "task completed", "done", "完成",
+        }
+        llm_text = (llm_buf or "").strip()
+        summary = (result.summary or "").strip()
+        has_artifacts = bool(result.reports or result.figures or result.artifacts)
+
+        if not has_artifacts and llm_text:
+            return llm_text[:max_len]
+
+        if not summary or summary.lower() in _boring:
+            if llm_text:
+                return llm_text[:max_len]
+            if result.diagnostics:
+                hints = "\n".join(f"- {x}" for x in result.diagnostics[:5])
+                return f"未生成有效答复\n{hints}"
+            return "分析完成"
+
+        return summary[:max_len]
 
     async def _progress(self, msg: str) -> None:
         if self._progress_cb is not None:

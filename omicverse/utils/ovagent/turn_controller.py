@@ -145,12 +145,13 @@ class FollowUpGate:
             return False
         if cls.BLOCKER_PATTERN.search(text):
             return False
-        if cls.response_is_promissory(text):
+        needs_action = cls.request_requires_tool_action(request, adata)
+        if cls.response_is_promissory(text) and needs_action:
+            # Only follow up when there is actually a task to execute.
+            # Pure offers like "I can help you" without actionable context
+            # should not trigger a forced tool-call turn.
             return True
-        if (
-            cls.request_requires_tool_action(request, adata)
-            and not cls.RESULT_PATTERN.search(text)
-        ):
+        if needs_action and not cls.RESULT_PATTERN.search(text):
             return True
         return False
 

@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 import requests
 
 from ..agent_bridge import AgentBridge
+from .._bridge_session import resolve_bridge_session_id
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from ..model_help import render_model_help
 from ..runtime import ConversationRoute
@@ -937,9 +938,17 @@ class FeishuRuntime:
             last_progress = msg
             await _edit(force=True)
 
+        _wb = getattr(self._sm, "gateway_web_bridge", None)
+        _prior_history = _wb.get_prior_history_simple(
+            "feishu",
+            "dm",
+            chat_id,
+            session_id=resolve_bridge_session_id(session),
+        ) if _wb else []
+
         bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
         try:
-            result = await bridge.run(full_request or user_text, session.adata)
+            result = await bridge.run(full_request or user_text, session.adata, history=_prior_history)
         except asyncio.CancelledError:
             if draft_id:
                 ok = await asyncio.to_thread(
@@ -992,6 +1001,8 @@ class FeishuRuntime:
                     user_text=user_text,
                     llm_text=llm_buf,
                     adata=result.adata,
+                    figures=result.figures or [],
+                    session_id=resolve_bridge_session_id(session),
                 )
             except Exception:
                 pass
@@ -1050,14 +1061,11 @@ class FeishuRuntime:
             except Exception:
                 logger.warning("Failed to send artifact %s", art.filename)
 
-        summary = self._strip_local_paths((result.summary or "").strip())
-        if not summary or summary.lower() in _BORING:
-            if llm_buf.strip():
-                summary = _trim(llm_buf, max_len=3600)
-            elif result.diagnostics:
-                hints = "\n".join(f"- {x}" for x in result.diagnostics[:5])
-                summary = f"⚠️ 未生成有效最终答复\n{hints}"
-            elif session.adata is not None:
+        summary = self._strip_local_paths(
+            bridge.pick_reply_text(result, llm_buf, max_len=3600)
+        )
+        if not summary:
+            if session.adata is not None:
                 a = session.adata
                 summary = f"✅ 分析完成\n🔬 {a.n_obs:,} cells × {a.n_vars:,} genes"
             else:

@@ -20,3 +20,9 @@ def test_supported_models_ascii_fallback(monkeypatch):
     listing = model_config.ModelConfig.list_supported_models()
     assert "Usage:" in listing
     assert "💡" not in listing
+
+
+def test_codex_model_is_supported():
+    assert model_config.ModelConfig.is_model_supported("gpt-5.3-codex")
+    assert model_config.ModelConfig.normalize_model_id("openai/gpt-5.3-codex") == "gpt-5.3-codex"
+    assert model_config.ModelConfig.normalize_model_id("openai/gpt-5.3-codex-spark") == "gpt-5.3-codex-spark"

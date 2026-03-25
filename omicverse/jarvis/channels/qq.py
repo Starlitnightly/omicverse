@@ -47,6 +47,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import requests
 
 from ..agent_bridge import AgentBridge
+from .._bridge_session import resolve_bridge_session_id
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from ..model_help import render_model_help
 
@@ -734,9 +735,18 @@ class QQRuntime:
             except Exception:
                 pass
 
+        _scope_id = str(target.channel_id if hasattr(target, "channel_id") else target)
+        _wb = getattr(self._sm, "gateway_web_bridge", None)
+        _prior_history = _wb.get_prior_history_simple(
+            "qq",
+            "dm",
+            _scope_id,
+            session_id=resolve_bridge_session_id(session),
+        ) if _wb else []
+
         bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
         try:
-            result = await bridge.run(full_request, session.adata)
+            result = await bridge.run(full_request, session.adata, history=_prior_history)
         except asyncio.CancelledError:
             await asyncio.to_thread(self._send_text, target, "已取消当前分析。", msg_id)
             raise
@@ -777,6 +787,8 @@ class QQRuntime:
                     user_text=user_text,
                     llm_text=llm_buf,
                     adata=result.adata,
+                    figures=result.figures or [],
+                    session_id=resolve_bridge_session_id(session),
                 )
             except Exception:
                 pass
@@ -816,20 +828,14 @@ class QQRuntime:
         for art in list(result.artifacts or []):
             logger.info("QQ: artifact '%s' generated (file send not supported in QQ Bot API)", art.filename)
 
-        # Send summary — markdown rendering (mirrors Feishu send_markdown_card green "✅ 分析完成")
-        summary = self._strip_local_paths((result.summary or "").strip())
-        if not summary or summary.lower() in _BORING:
-            if llm_buf.strip():
-                summary = _trim(llm_buf, max_len=1800)
-            elif result.diagnostics:
-                hints = "\n".join(f"- {x}" for x in result.diagnostics[:5])
-                summary = f"未生成有效答复\n{hints}"
-            elif session.adata is not None:
-                a = session.adata
-                summary = f"分析完成\n{a.n_obs:,} cells x {a.n_vars:,} genes"
-            else:
-                summary = "分析完成"
-        for chunk in self._text_chunks(summary, limit=_MAX_TEXT):
+        # Send summary
+        summary = self._strip_local_paths(
+            bridge.pick_reply_text(result, llm_buf, max_len=1800)
+        )
+        if not summary and session.adata is not None:
+            a = session.adata
+            summary = f"分析完成\n{a.n_obs:,} cells x {a.n_vars:,} genes"
+        for chunk in self._text_chunks(summary or "分析完成", limit=_MAX_TEXT):
             await asyncio.to_thread(self._send_markdown, target, chunk, msg_id)
 
     # ── Message dispatcher ────────────────────────────────────────────────────

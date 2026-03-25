@@ -465,6 +465,33 @@ class SessionManager:
                 session.adata = shared
         return session
 
+    def find_session_by_bridge_session_id(self, bridge_session_id: str) -> Optional[JarvisSession]:
+        """Return an existing JarvisSession whose live notebook session matches."""
+        target = str(bridge_session_id or "").strip()
+        if not target:
+            return None
+
+        try:
+            from ._bridge_session import resolve_bridge_session_id
+        except Exception:
+            return None
+
+        with self._lock:
+            sessions = [
+                session
+                for user_sessions in self._sessions.values()
+                for session in user_sessions.values()
+            ]
+
+        for session in sessions:
+            try:
+                current = resolve_bridge_session_id(session, create=False)
+            except Exception:
+                current = ""
+            if current == target:
+                return session
+        return None
+
     def set_shared_adata(self, adata: Any) -> None:
         """Set the shared AnnData reference used by all Jarvis sessions."""
         with self._lock:

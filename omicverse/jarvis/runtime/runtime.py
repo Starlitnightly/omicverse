@@ -6,6 +6,7 @@ import time
 from typing import Any, Awaitable, Callable, List, Optional, Protocol
 
 from ..agent_bridge import AgentRunResult
+from .._bridge_session import resolve_bridge_session_id
 from .execution_adapter import ExecutionAdapter, ExecutionCallbacks
 from .models import (
     ConversationRoute,
@@ -225,6 +226,19 @@ class MessageRuntime:
             last_progress = message
             await _update_draft(force=True)
 
+        # Load workspace history so the channel agent has multi-turn context.
+        # Falls back to [] if the bridge doesn't implement get_prior_history
+        # (e.g. plain WebSessionBridge) or if no workspace exists yet.
+        prior_history: List[dict] = []
+        if self._web_bridge is not None:
+            try:
+                prior_history = self._web_bridge.get_prior_history(
+                    route,
+                    session_id=resolve_bridge_session_id(session),
+                ) or []
+            except Exception:
+                pass
+
         try:
             result = await self._execution.run(
                 session,
@@ -234,6 +248,7 @@ class MessageRuntime:
                     progress_cb=progress_cb,
                     llm_chunk_cb=llm_chunk_cb,
                 ),
+                history=prior_history,
             )
         except asyncio.CancelledError:
             await self._deliver(self._presenter.draft_cancelled(route))
@@ -241,14 +256,21 @@ class MessageRuntime:
 
         self._persist_result(session=session, user_text=user_text, result=result)
 
+        # When no LLM text was streamed (e.g. agent called finish() directly
+        # without a preceding text-only turn), fall back to result.summary so
+        # that all channel presenters and the web bridge receive meaningful text.
+        effective_llm_text = llm_buf if llm_buf.strip() else (result.summary or "")
+
         # Mirror the completed turn into the web session (gateway mode)
         if self._web_bridge is not None:
             try:
                 self._web_bridge.on_turn_complete(
                     route=route,
                     user_text=user_text,
-                    llm_text=llm_buf,
+                    llm_text=effective_llm_text,
                     adata=result.adata,
+                    figures=result.figures or [],
+                    session_id=resolve_bridge_session_id(session),
                 )
             except Exception:
                 logger.warning("web_bridge.on_turn_complete failed (non-fatal)", exc_info=True)
@@ -274,7 +296,7 @@ class MessageRuntime:
             route,
             session=session,
             user_text=user_text,
-            llm_text=llm_buf,
+            llm_text=effective_llm_text,
             result=result,
         ):
             await self._deliver(event)
