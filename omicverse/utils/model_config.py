@@ -79,8 +79,16 @@ register_provider(ProviderInfo(
     model_prefixes=("gpt-", "o1", "o3", "o4"),
     models={
         "gpt-5": "OpenAI GPT-5 (Latest)",
+        "gpt-5.3-codex": "OpenAI Codex GPT-5.3",
+        "gpt-5.3-codex-spark": "OpenAI Codex GPT-5.3 Spark",
         "gpt-5.2": "OpenAI GPT-5.2",
+        "gpt-5.2-codex": "OpenAI Codex GPT-5.2",
+        "gpt-5.1": "OpenAI GPT-5.1",
+        "gpt-5.1-codex": "OpenAI Codex GPT-5.1",
+        "gpt-5.1-codex-mini": "OpenAI Codex GPT-5.1 Mini",
+        "gpt-5.1-codex-max": "OpenAI Codex GPT-5.1 Max",
         "gpt-5.4": "OpenAI GPT-5.4",
+        "gpt-5.4-mini": "OpenAI GPT-5.4 Mini",
         "gpt-5.4-pro": "OpenAI GPT-5.4 Pro",
         "gpt-5-mini": "OpenAI GPT-5 Mini",
         "gpt-5-nano": "OpenAI GPT-5 Nano",
@@ -468,6 +476,13 @@ _RAW_MODEL_ALIASES = {
     "glm-4.5v": "zhipu/glm-4.5v",
     # OpenAI o4
     "openai/o4-mini": "o4-mini",
+    "gpt-5.3-codex-latest": "gpt-5.3-codex",
+    "openai/gpt-5.3-codex": "gpt-5.3-codex",
+    "openai/gpt-5.3-codex-spark": "gpt-5.3-codex-spark",
+    "openai/gpt-5.2-codex": "gpt-5.2-codex",
+    "openai/gpt-5.1-codex": "gpt-5.1-codex",
+    "openai/gpt-5.1-codex-mini": "gpt-5.1-codex-mini",
+    "openai/gpt-5.1-codex-max": "gpt-5.1-codex-max",
 }
 
 MODEL_ALIASES: Dict[str, str] = {key.lower(): value for key, value in _RAW_MODEL_ALIASES.items()}
