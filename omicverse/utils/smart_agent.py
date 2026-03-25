@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import re
+import sys
 import threading
 from contextlib import contextmanager
 from pathlib import Path
@@ -139,6 +140,27 @@ from .filesystem_context import FilesystemContextManager
 
 
 logger = logging.getLogger(__name__)
+
+
+def _wire_package_import_compatibility() -> None:
+    """Expose parent package references without probing lazy __getattr__ hooks."""
+    parent_pkg = sys.modules.get("omicverse")
+    utils_pkg = sys.modules.get("omicverse.utils")
+    module = sys.modules.get(__name__)
+    if parent_pkg is None or utils_pkg is None or module is None:
+        return
+
+    parent_attrs = getattr(parent_pkg, "__dict__", {})
+    if "utils" not in parent_attrs:
+        setattr(parent_pkg, "utils", utils_pkg)
+
+    module_name = __name__.rsplit(".", 1)[-1]
+    utils_attrs = getattr(utils_pkg, "__dict__", {})
+    if module_name not in utils_attrs:
+        setattr(utils_pkg, module_name, module)
+
+
+_wire_package_import_compatibility()
 
 
 class OmicVerseAgent:
