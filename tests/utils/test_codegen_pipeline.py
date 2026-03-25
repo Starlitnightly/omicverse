@@ -198,6 +198,7 @@ class TestClawCompatibility:
             self, request, adata,
             event_callback=None, cancel_event=None,
             history=None, approval_handler=None,
+            request_content=None,
         ):
             seen["request"] = request
             assert self._code_only_mode is True
@@ -234,6 +235,7 @@ class TestClawCompatibility:
             self, request, adata,
             event_callback=None, cancel_event=None,
             history=None, approval_handler=None,
+            request_content=None,
         ):
             raise RuntimeError("simulated failure")
 
@@ -297,6 +299,7 @@ class TestClawCompatibility:
             self, request, adata,
             event_callback=None, cancel_event=None,
             history=None, approval_handler=None,
+            request_content=None,
         ):
             raise AssertionError("Loop should not be called for direct Python")
 

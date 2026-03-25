@@ -153,7 +153,7 @@ def test_stream_async_emits_harness_metadata():
     agent._last_run_trace = None
     agent._get_harness_session_id = MethodType(lambda self: "session-1", agent)
 
-    async def _fake_run_agentic_loop(self, request, adata, event_callback=None, cancel_event=None, history=None, approval_handler=None):
+    async def _fake_run_agentic_loop(self, request, adata, event_callback=None, cancel_event=None, history=None, approval_handler=None, request_content=None):
         await event_callback(build_stream_event(
             "tool_call",
             {"name": "inspect_data", "arguments": {"aspect": "shape"}},
@@ -206,7 +206,7 @@ def test_generate_code_async_reuses_agentic_loop_and_captures_execute_code():
 
     seen = {}
 
-    async def _fake_run_agentic_loop(self, request, adata, event_callback=None, cancel_event=None, history=None, approval_handler=None):
+    async def _fake_run_agentic_loop(self, request, adata, event_callback=None, cancel_event=None, history=None, approval_handler=None, request_content=None):
         seen["request"] = request
         assert self._code_only_mode is True
         self._capture_code_only_snippet("import omicverse as ov\nov.pp.qc(adata)")

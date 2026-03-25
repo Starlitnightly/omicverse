@@ -19,7 +19,7 @@ pytestmark = pytest.mark.skipif(
 
 
 class _FakeAgent:
-    async def stream_async(self, prompt, adata, cancel_event=None, history=None, approval_handler=None):
+    async def stream_async(self, prompt, adata, cancel_event=None, history=None, approval_handler=None, request_content=None):
         yield {
             "type": "tool_call",
             "content": {"name": "inspect_data", "arguments": {"aspect": "shape"}},

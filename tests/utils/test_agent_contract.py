@@ -225,10 +225,13 @@ class TestStreamAsync:
         agent._get_harness_session_id = MethodType(
             lambda self: "sess-test", agent
         )
+        seen = {}
 
         async def _fake_loop(self, request, adata, event_callback=None,
                              cancel_event=None, history=None,
-                             approval_handler=None):
+                             approval_handler=None,
+                             request_content=None):
+            seen["request_content"] = request_content
             await event_callback(build_stream_event(
                 "tool_call",
                 {"name": "inspect_data", "arguments": {}},
@@ -245,7 +248,11 @@ class TestStreamAsync:
 
         async def _collect():
             events = []
-            async for event in agent.stream_async("inspect", object()):
+            async for event in agent.stream_async(
+                "inspect",
+                object(),
+                request_content=[{"type": "input_text", "text": "inspect"}],
+            ):
                 events.append(event)
             return events
 
@@ -253,6 +260,7 @@ class TestStreamAsync:
 
         assert len(events) == 2
         assert all("type" in e for e in events)
+        assert seen["request_content"] == [{"type": "input_text", "text": "inspect"}]
         assert events[0]["type"] == "tool_call"
         assert events[1]["type"] == "done"
 
@@ -265,7 +273,8 @@ class TestStreamAsync:
 
         async def _exploding_loop(self, request, adata, event_callback=None,
                                   cancel_event=None, history=None,
-                                  approval_handler=None):
+                                  approval_handler=None,
+                                  request_content=None):
             raise RuntimeError("boom")
 
         agent._run_agentic_loop = MethodType(_exploding_loop, agent)
