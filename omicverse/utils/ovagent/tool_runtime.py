@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from ..harness.runtime_state import runtime_state
 from ..harness.tool_catalog import (
+    get_tool_spec,
     get_visible_tool_schemas,
     normalize_tool_name,
     resolve_tool_search,
@@ -32,8 +33,131 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# Legacy OmicVerse-specific tool schemas that are not part of the
+# Claude-style tool catalog but must still be exposed to the LLM.
+LEGACY_AGENT_TOOLS: list[dict[str, Any]] = [
+    {
+        "name": "inspect_data",
+        "description": "Inspect the AnnData or MuData object without modifying it.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "aspect": {
+                    "type": "string",
+                    "enum": ["shape", "obs", "var", "obsm", "uns", "layers", "full"],
+                }
+            },
+            "required": ["aspect"],
+        },
+    },
+    {
+        "name": "execute_code",
+        "description": "Execute Python code against the current dataset.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "code": {"type": "string"},
+                "description": {"type": "string"},
+            },
+            "required": ["code", "description"],
+        },
+    },
+    {
+        "name": "run_snippet",
+        "description": "Run read-only Python code on a shallow copy of the current dataset.",
+        "parameters": {
+            "type": "object",
+            "properties": {"code": {"type": "string"}},
+            "required": ["code"],
+        },
+    },
+    {
+        "name": "search_functions",
+        "description": "Search the OmicVerse function registry.",
+        "parameters": {
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "search_skills",
+        "description": "Search installed domain-specific skills.",
+        "parameters": {
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "delegate",
+        "description": "Delegate to an explore, plan, or execute subagent.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "agent_type": {"type": "string", "enum": ["explore", "plan", "execute"]},
+                "task": {"type": "string"},
+                "context": {"type": "string"},
+            },
+            "required": ["agent_type", "task"],
+        },
+    },
+    {
+        "name": "web_fetch",
+        "description": "Fetch a URL and return readable content.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string"},
+                "prompt": {"type": "string"},
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "web_search",
+        "description": "Search the web and return results.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "num_results": {"type": "number"},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "web_download",
+        "description": "Download a file from a URL to disk.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string"},
+                "filename": {"type": "string"},
+                "directory": {"type": "string"},
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "finish",
+        "description": "Declare the task complete and return the summary.",
+        "parameters": {
+            "type": "object",
+            "properties": {"summary": {"type": "string"}},
+            "required": ["summary"],
+        },
+    },
+]
+
+
 class ToolRuntime:
     """Dispatch and handle all agent tool calls.
+
+    This is the single source of truth for tool visibility, plan-mode
+    gating, legacy tool names, deferred loading semantics, and tool
+    dispatch.  Other modules should call into ``ToolRuntime`` rather than
+    duplicating these concerns.
 
     Parameters
     ----------
@@ -53,6 +177,52 @@ class ToolRuntime:
         self._subagent_controller = controller
 
     # ------------------------------------------------------------------
+    # Tool facade — visibility, plan-mode gating, loaded-tool tracking
+    # ------------------------------------------------------------------
+
+    def get_visible_agent_tools(
+        self, *, allowed_names: Optional[set[str]] = None
+    ) -> list[dict[str, Any]]:
+        """Return the currently visible tool schemas for the active session.
+
+        Merges Claude-style catalog tools (core + loaded deferred) with the
+        legacy OmicVerse tool schemas.  When *allowed_names* is provided, only
+        tools whose name (or normalized name) appears in the set are returned.
+        """
+        session_id = self._ctx._get_runtime_session_id()
+        loaded = runtime_state.get_loaded_tools(session_id)
+        tools = get_visible_tool_schemas(loaded) + list(LEGACY_AGENT_TOOLS)
+        if allowed_names is None:
+            return tools
+        normalized_allowed = {normalize_tool_name(name) for name in allowed_names}
+        return [
+            tool for tool in tools
+            if tool["name"] in allowed_names
+            or normalize_tool_name(tool["name"]) in normalized_allowed
+        ]
+
+    def get_loaded_tool_names(self) -> list[str]:
+        """Return the set of currently loaded tool names for this session."""
+        return runtime_state.get_loaded_tools(self._ctx._get_runtime_session_id())
+
+    def tool_blocked_in_plan_mode(self, tool_name: str) -> bool:
+        """Check whether *tool_name* is blocked while plan mode is active."""
+        spec = get_tool_spec(tool_name)
+        session_state = runtime_state.get_summary(
+            self._ctx._get_runtime_session_id()
+        )
+        plan_mode = bool(
+            (session_state.get("plan_mode") or {}).get("enabled", False)
+        )
+        if not plan_mode:
+            return False
+        if spec is not None:
+            return spec.high_risk or spec.name in {
+                "Bash", "Edit", "Write", "NotebookEdit", "EnterWorktree",
+            }
+        return tool_name in {"execute_code", "web_download"}
+
+    # ------------------------------------------------------------------
     # Dispatch
     # ------------------------------------------------------------------
 
@@ -63,7 +233,7 @@ class ToolRuntime:
         name = normalize_tool_name(tool_call.name)
         args = tool_call.arguments
 
-        if self._ctx._tool_blocked_in_plan_mode(name):
+        if self.tool_blocked_in_plan_mode(name):
             return f"{name} is blocked because the session is currently in plan mode."
 
         if name == "ToolSearch":
@@ -951,7 +1121,7 @@ class ToolRuntime:
         replace_all: bool = False,
     ) -> str:
         self._ctx._ensure_server_tool_mode("Edit")
-        if self._ctx._tool_blocked_in_plan_mode("Edit"):
+        if self.tool_blocked_in_plan_mode("Edit"):
             return "Edit is blocked while the session is in plan mode."
         path = self._ctx._resolve_local_path(file_path)
         if not path.exists():
@@ -983,7 +1153,7 @@ class ToolRuntime:
 
     def _tool_write(self, file_path: str, content: str) -> str:
         self._ctx._ensure_server_tool_mode("Write")
-        if self._ctx._tool_blocked_in_plan_mode("Write"):
+        if self.tool_blocked_in_plan_mode("Write"):
             return "Write is blocked while the session is in plan mode."
         path = self._ctx._resolve_local_path(file_path)
         self._ctx._request_tool_approval(
@@ -1062,7 +1232,7 @@ class ToolRuntime:
         cell_type: str = "",
     ) -> str:
         self._ctx._ensure_server_tool_mode("NotebookEdit")
-        if self._ctx._tool_blocked_in_plan_mode("NotebookEdit"):
+        if self.tool_blocked_in_plan_mode("NotebookEdit"):
             return (
                 "NotebookEdit is blocked while the session is in plan mode."
             )
@@ -1189,7 +1359,7 @@ class ToolRuntime:
         base_ref: str = "HEAD",
     ) -> str:
         self._ctx._ensure_server_tool_mode("EnterWorktree")
-        if self._ctx._tool_blocked_in_plan_mode("EnterWorktree"):
+        if self.tool_blocked_in_plan_mode("EnterWorktree"):
             return (
                 "EnterWorktree is blocked while the session is in plan mode."
             )
@@ -1449,7 +1619,7 @@ class ToolRuntime:
         dangerouslyDisableSandbox: bool = False,
     ) -> str:
         self._ctx._ensure_server_tool_mode("Bash")
-        if self._ctx._tool_blocked_in_plan_mode("Bash"):
+        if self.tool_blocked_in_plan_mode("Bash"):
             return "Bash is blocked while the session is in plan mode."
         reason = description or f"Run shell command: {command[:120]}"
         self._ctx._request_tool_approval(
