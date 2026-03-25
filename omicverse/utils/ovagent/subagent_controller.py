@@ -8,6 +8,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from .context_budget import (
+    BudgetSliceType,
+    create_subagent_budget_manager,
+)
+from .tool_registry import OutputTier
+
 if TYPE_CHECKING:
     from .prompt_builder import PromptBuilder
     from .protocol import AgentContext
@@ -57,6 +63,18 @@ class SubagentController:
 
         subagent_tools = self._ctx._get_visible_agent_tools(
             allowed_names=set(config.allowed_tools)
+        )
+
+        # Subagent budget manager (tighter policies than main agent)
+        budget_model = (
+            getattr(
+                getattr(self._ctx._llm, "config", None), "model", None
+            )
+            or self._ctx.model
+            or ""
+        )
+        budget_manager = create_subagent_budget_manager(
+            model=budget_model
         )
 
         messages = [
@@ -134,8 +152,22 @@ class SubagentController:
                 else:
                     tool_output = str(result)
 
-                if len(tool_output) > 6000:
-                    tool_output = tool_output[:5500] + "\n... (truncated)"
+                # Tier-driven truncation via shared budget model
+                meta = self._tool_runtime.registry.get(tc.name)
+                output_tier = (
+                    meta.output_tier
+                    if meta is not None
+                    else OutputTier.standard
+                )
+                tool_output = budget_manager.truncate_output(
+                    tool_output, output_tier
+                )
+                budget_manager.record(
+                    BudgetSliceType.tool_output,
+                    tool_output,
+                    content_key=tc.name,
+                    tier=output_tier,
+                )
 
                 tool_msg = self._ctx._llm.format_tool_result_message(
                     tc.id, tc.name, tool_output
