@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "omicverse"
-version = "2.0.6rc1"
+version = "2.0.7rc1"
 description = "OmicVerse: A single pipeline for exploring the entire transcriptome universe"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -77,7 +77,6 @@ dependencies = [
     'marsilea',
     #'wandb',
     'openai>=1.0',
-    'socksio',
     'omicverse-skills>=0.1.0',
     'omicverse-notebook',
     #'cvxpy>=1.3',
