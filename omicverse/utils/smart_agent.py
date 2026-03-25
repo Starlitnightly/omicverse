@@ -1,70 +1,37 @@
 """
-OmicVerse Smart Agent (internal LLM backend)
+OmicVerse Smart Agent — thin facade / composer.
 
-This module provides a smart agent that can understand natural language requests
-and automatically execute appropriate OmicVerse functions. It now uses a built-in
-LLM backend (see `agent_backend.py`) instead of the external Pantheon framework.
+This module provides the public ``OmicVerseAgent`` class and the ``Agent()``
+factory.  All substantial logic now lives in the ``ovagent/`` subpackage;
+this file wires the subsystems together and exposes the stable public API.
 
 Usage:
     import omicverse as ov
     result = ov.Agent("quality control with nUMI>500, mito<0.2", adata)
 """
 
-import sys
-import os
 import asyncio
 import json
-import re
-import inspect
-import ast
-import textwrap
-import time
-import builtins
-import warnings
-import threading
-import traceback
 import logging
+import os
+import re
+import sys
+import threading
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Union
 
-# ---------------------------------------------------------------------------
-# Compatibility helpers
-# ---------------------------------------------------------------------------
-
-# Some of the test doubles create a lightweight ``omicverse`` package stub that
-# does not populate the ``utils`` attribute on the parent package or expose this
-# module as ``omicverse.utils.smart_agent``.  Python 3.10 (used in CI) requires
-# these attributes to be set manually for ``unittest.mock.patch`` lookups to
-# succeed.  When this module is imported in the test suite, we make sure the
-# parent references are wired correctly.
-_parent_pkg = sys.modules.get("omicverse")
-_utils_pkg = sys.modules.get("omicverse.utils")
-if _parent_pkg is not None and _utils_pkg is not None:
-    # Avoid ``hasattr`` here: the real ``omicverse`` package implements
-    # ``__getattr__`` for lazy imports, and probing ``utils`` would re-enter the
-    # lazy loader while ``omicverse.utils.smart_agent`` is still importing.
-    parent_attrs = getattr(_parent_pkg, "__dict__", {})
-    if "utils" not in parent_attrs:
-        setattr(_parent_pkg, "utils", _utils_pkg)
-
-    module_name = __name__.split(".")[-1]
-    utils_attrs = getattr(_utils_pkg, "__dict__", {})
-    if module_name not in utils_attrs:
-        setattr(_utils_pkg, module_name, sys.modules[__name__])
-
-
-# Internal LLM backend (Pantheon replacement)
+# Internal LLM backend
 from .agent_backend import OmicVerseLLMBackend, Usage
 
-# Import registry system and model configuration
+# Registry system and model configuration
 from .._registry import _global_registry
 from .model_config import ModelConfig, PROVIDER_API_KEYS
 
-# P0-2: Grouped configuration dataclasses
+# Grouped configuration dataclasses
 from .agent_config import AgentConfig, SandboxFallbackPolicy
 
-# P0-3: Structured error hierarchy
+# Structured error hierarchy
 from .agent_errors import (
     OVAgentError,
     ProviderError,
@@ -74,7 +41,7 @@ from .agent_errors import (
     SecurityViolationError,
 )
 
-# P2-4: Sandbox security hardening
+# Sandbox security hardening
 from .agent_sandbox import (
     ApprovalMode,
     CodeSecurityScanner,
@@ -82,13 +49,15 @@ from .agent_sandbox import (
     SecurityConfig,
 )
 
-# P1-1: Structured event reporting
+# Structured event reporting
 from .agent_reporter import (
     AgentEvent,
     EventLevel,
     Reporter,
     make_reporter,
 )
+
+# Harness helpers
 from .harness import (
     RunTraceRecorder,
     RunTraceStore,
@@ -101,7 +70,11 @@ from .harness.tool_catalog import (
     get_default_loaded_tool_names,
     get_visible_tool_schemas,
 )
+
+# Context compactor
 from .context_compactor import ContextCompactor
+
+# OVAgent extracted modules
 from .ovagent.runtime import OmicVerseRuntime
 from .ovagent.auth import (
     ResolvedBackend as _ResolvedBackend,
@@ -129,7 +102,7 @@ from .ovagent.prompt_builder import (
 )
 from .ovagent.analysis_executor import (
     AnalysisExecutor as _AnalysisExecutor,
-    ProactiveCodeTransformer as _ProactiveCodeTransformerExt,
+    ProactiveCodeTransformer,
 )
 from .ovagent.tool_runtime import (
     LEGACY_AGENT_TOOLS as _LEGACY_AGENT_TOOLS,
@@ -145,7 +118,12 @@ from .ovagent.session_context import (
     SessionService as _SessionService,
     ContextService as _ContextService,
 )
+from .ovagent.registry_scanner import RegistryScanner as _RegistryScanner
+
+# Session history
 from .session_history import HistoryEntry, SessionHistory
+
+# Skill registry
 from .skill_registry import (
     SkillMatch,
     SkillMetadata,
@@ -157,17 +135,32 @@ from .skill_registry import (
     build_multi_path_skill_registry,
 )
 
-# Import filesystem context management for context engineering
-# Reference: https://blog.langchain.com/how-agents-can-use-filesystems-for-context-engineering/
+# Filesystem context management
 from .filesystem_context import FilesystemContextManager
 
 
 logger = logging.getLogger(__name__)
 
 
-# ProactiveCodeTransformer is now in ovagent/analysis_executor.py — keep a
-# backward-compatible alias so existing code/tests referencing it still work.
-ProactiveCodeTransformer = _ProactiveCodeTransformerExt
+def _wire_package_import_compatibility() -> None:
+    """Expose parent package references without probing lazy __getattr__ hooks."""
+    parent_pkg = sys.modules.get("omicverse")
+    utils_pkg = sys.modules.get("omicverse.utils")
+    module = sys.modules.get(__name__)
+    if parent_pkg is None or utils_pkg is None or module is None:
+        return
+
+    parent_attrs = getattr(parent_pkg, "__dict__", {})
+    if "utils" not in parent_attrs:
+        setattr(parent_pkg, "utils", utils_pkg)
+
+    module_name = __name__.rsplit(".", 1)[-1]
+    utils_attrs = getattr(utils_pkg, "__dict__", {})
+    if module_name not in utils_attrs:
+        setattr(utils_pkg, module_name, module)
+
+
+_wire_package_import_compatibility()
 
 
 class OmicVerseAgent:
@@ -181,6 +174,10 @@ class OmicVerseAgent:
         agent = ov.Agent(api_key="your-api-key")  # Uses gpt-5.2 by default
         result_adata = agent.run("quality control with nUMI>500, mito<0.2", adata)
     """
+
+    # Class-level tool schemas (backward-compat surface)
+    LEGACY_AGENT_TOOLS = _LEGACY_AGENT_TOOLS
+    AGENT_TOOLS = get_visible_tool_schemas(get_default_loaded_tool_names()) + _LEGACY_AGENT_TOOLS
 
     @property
     def _codegen(self) -> "_CodegenPipeline":
@@ -324,6 +321,7 @@ class OmicVerseAgent:
         self._web_session_id = ""
         self._ov_runtime: Optional[OmicVerseRuntime] = None
         self._active_run_id = ""
+        self._registry_scanner = _RegistryScanner()
 
         # --- API key env collection (ovagent.auth) -----------------------------
         try:
@@ -414,21 +412,16 @@ class OmicVerseAgent:
             print(f"❌ Agent initialization failed: {e}")
             raise
 
-    def _initialize_skill_registry(self) -> None:
-        """Load skills from package install and current working directory.
-
-        Delegates to :func:`ovagent.bootstrap.initialize_skill_registry`.
-        """
-        self.skill_registry, self._skill_overview_text = _initialize_skill_registry()
+    # =====================================================================
+    # Internal setup (called once from __init__)
+    # =====================================================================
 
     def _get_registry_stats(self) -> dict:
         """Get statistics about the function registry."""
-        # Use static AST scan to count all registered functions (not just imported ones)
         static_entries = self._load_static_registry_entries()
         unique_functions = set(e['full_name'] for e in static_entries)
         categories = set(e['category'] for e in static_entries)
 
-        # Fall back to runtime registry if static scan finds nothing
         if not unique_functions:
             for entry in _global_registry._registry.values():
                 unique_functions.add(entry['full_name'])
@@ -439,20 +432,16 @@ class OmicVerseAgent:
             'categories': len(categories),
             'category_list': list(categories)
         }
-    
+
     def _get_available_functions_info(self) -> str:
         """Get formatted information about all available functions."""
         functions_info = []
-        
-        # Get all unique functions from registry
         processed_functions = set()
         for entry in _global_registry._registry.values():
             full_name = entry['full_name']
             if full_name in processed_functions:
                 continue
             processed_functions.add(full_name)
-            
-            # Format function information
             info = {
                 'name': entry['short_name'],
                 'full_name': entry['full_name'],
@@ -463,54 +452,12 @@ class OmicVerseAgent:
                 'examples': entry['examples']
             }
             functions_info.append(info)
-        
         return json.dumps(functions_info, indent=2, ensure_ascii=False)
-    
-    def _collect_api_key_env(self, api_key: Optional[str] = None) -> Dict[str, str]:
-        """Collect environment variables required for API authentication.
-
-        Delegates to :func:`ovagent.auth.collect_api_key_env`.
-        """
-        return _collect_api_key_env(self.model, self.endpoint, api_key)
-
-    def help_short(self) -> str:
-        """Return a short, non-expert help string with sample prompts."""
-        examples = [
-            "basic single-cell QC and clustering",
-            "batch integration with harmony on this adata",
-            "simple trajectory with DPT, root on paul15_clusters=7MEP, list top genes",
-            "find markers for each Leiden cluster (wilcoxon)",
-            "doublet check and report rate",
-        ]
-        return (
-            "ov.Agent quick start (use only your provided adata):\n"
-            "- " + "\n- ".join(examples) + "\n"
-            "Notes: do not create new/dummy AnnData; prefer use_raw=False unless you need raw; "
-            "allowed libs: omicverse/scanpy/matplotlib."
-        )
-
-    def _build_filesystem_context_instructions(self) -> str:
-        """Build instructions for using the filesystem context workspace.
-
-        Delegates to :class:`ContextService`.
-        """
-        return self._context_service.build_filesystem_context_instructions()
-
-    @contextmanager
-    def _temporary_api_keys(self):
-        """Temporarily inject API keys into the environment and clean up afterwards.
-
-        Delegates to :func:`ovagent.auth.temporary_api_keys`.
-        """
-        with _temporary_api_keys_cm(self._managed_api_env):
-            yield
 
     def _setup_agent(self):
         """Setup the internal agent backend with dynamic instructions."""
-        
-        # Get current function information dynamically
         functions_info = self._get_available_functions_info()
-        
+
         instructions = """
 You are an intelligent OmicVerse assistant that can automatically discover and execute functions based on natural language requests.
 
@@ -629,134 +576,54 @@ User request: "quality control with nUMI>500, mito<0.2"
                 f"{self._skill_overview_text}"
             )
 
-        # Add filesystem context instructions if enabled
         if self.enable_filesystem_context and self._filesystem_context:
-            instructions += self._build_filesystem_context_instructions()
-        
-        # Prepare API key environment pin if passed (non-destructive)
+            instructions += self._context_service.build_filesystem_context_instructions() if hasattr(self, '_context_service') else _build_filesystem_context_instructions(self._filesystem_context)
+
         if self.api_key:
             required_key = PROVIDER_API_KEYS.get(self.model)
             if required_key and not os.getenv(required_key):
                 os.environ[required_key] = self.api_key
 
-        # Create the internal LLM backend
         self._llm = _create_llm_backend(
             system_prompt=instructions,
             model=self.model,
             api_key=self.api_key,
             endpoint=self.endpoint,
         )
-    
-    def _search_functions(self, query: str) -> str:
-        """
-        Search for functions in the OmicVerse registry.
-        
-        Parameters
-        ----------
-        query : str
-            Search query
-            
-        Returns
-        -------
-        str
-            JSON formatted search results
-        """
-        try:
-            results = _global_registry.find(query)
-            
-            if not results:
-                return json.dumps({"error": f"No functions found for query: '{query}'"})
-            
-            # Format results for the agent
-            formatted_results = []
-            for entry in results:
-                formatted_results.append({
-                    'name': entry['short_name'],
-                    'full_name': entry['full_name'],
-                    'description': entry['description'],
-                    'signature': entry['signature'],
-                    'aliases': entry['aliases'],
-                    'examples': entry['examples'],
-                    'category': entry['category']
-                })
-            
-            return json.dumps({
-                "found": len(formatted_results),
-                "functions": formatted_results
-            }, indent=2)
-            
-        except Exception as e:
-            return json.dumps({"error": f"Error searching functions: {str(e)}"})
-    
-    def _get_function_details(self, function_name: str) -> str:
-        """
-        Get detailed information about a specific function.
-
-        Parameters
-        ----------
-        function_name : str
-            Function name or alias
-            
-        Returns
-        -------
-        str
-            JSON formatted function details
-        """
-        try:
-            results = _global_registry.find(function_name)
-            
-            if not results:
-                return json.dumps({"error": f"Function '{function_name}' not found"})
-            
-            entry = results[0]  # Get first match
-            
-            return json.dumps({
-                'name': entry['short_name'],
-                'full_name': entry['full_name'],
-                'description': entry['description'],
-                'signature': entry['signature'],
-                'parameters': entry.get('parameters', []),
-                'aliases': entry['aliases'],
-                'examples': entry['examples'],
-                'category': entry['category'],
-                'docstring': entry['docstring'],
-                'help': f"Function: {entry['full_name']}\nSignature: {entry['signature']}\n\nDescription:\n{entry['description']}\n\nDocstring:\n{entry['docstring']}\n\nExamples:\n" + "\n".join(entry['examples'])
-            }, indent=2)
-            
-        except Exception as e:
-            return json.dumps({"error": f"Error getting function details: {str(e)}"})
 
     # =====================================================================
-    # Agentic Loop: Tool-calling based autonomous execution
+    # Protocol-required methods (called by ovagent modules via AgentContext)
     # =====================================================================
 
-    # Legacy tool schemas are now owned by ovagent.tool_runtime.
-    # These class-level aliases preserve backward compatibility for any
-    # code that references OmicVerseAgent.LEGACY_AGENT_TOOLS / AGENT_TOOLS.
-    LEGACY_AGENT_TOOLS = _LEGACY_AGENT_TOOLS
-    AGENT_TOOLS = get_visible_tool_schemas(get_default_loaded_tool_names()) + _LEGACY_AGENT_TOOLS
-    _URL_PATTERN = re.compile(r"https?://|www\.", re.IGNORECASE)
-    _ACTION_REQUEST_PATTERN = re.compile(
-        r"\b(analy[sz]e|download|fetch|get|open|read|inspect|load|run|execute|search|lookup|look up|find|process|parse|clone|fix|edit|write)\b",
-        re.IGNORECASE,
-    )
-    _PROMISSORY_PATTERN = re.compile(
-        r"\b(let me|i(?:'ll| will| can)|going to|start by|first(?:,)?\s+i(?:'ll| will)|can continue\?|could continue\?|re-?start)\b",
-        re.IGNORECASE,
-    )
-    _BLOCKER_PATTERN = re.compile(
-        r"\b(can(?:not|'t)|unable|failed|error|need your|please provide|approval required|missing|not installed|permission denied)\b",
-        re.IGNORECASE,
-    )
-    _RESULT_PATTERN = re.compile(
-        r"\b(found|fetched|downloaded|loaded|read|parsed|here (?:is|are)|summary|supplementary|links?)\b",
-        re.IGNORECASE,
-    )
+    @contextmanager
+    def _temporary_api_keys(self):
+        """Temporarily inject API keys into the environment and clean up afterwards."""
+        with _temporary_api_keys_cm(self._managed_api_env):
+            yield
 
-    def _check_code_prerequisites(self, code: str, adata: Any) -> str:
-        return self._analysis_executor.check_code_prerequisites(code, adata)
+    def _get_harness_session_id(self) -> str:
+        """Best-effort session identifier for harness traces/history."""
+        return self._session_service.get_harness_session_id()
 
-    # ----- Agent context helpers (used by ToolRuntime via protocol) -----
+    def _get_runtime_session_id(self) -> str:
+        """Return the session key used by the harness runtime registry."""
+        return self._session_service.get_runtime_session_id()
+
+    def _get_visible_agent_tools(self, *, allowed_names: Optional[set[str]] = None) -> list[dict[str, Any]]:
+        """Return the currently visible tool schemas."""
+        return self._tool_runtime.get_visible_agent_tools(allowed_names=allowed_names)
+
+    def _get_loaded_tool_names(self) -> list[str]:
+        """Return loaded tool names."""
+        return self._tool_runtime.get_loaded_tool_names()
+
+    def _refresh_runtime_working_directory(self) -> str:
+        """Keep runtime cwd aligned with the active worktree / filesystem context."""
+        return self._session_service.refresh_runtime_working_directory()
+
+    def _tool_blocked_in_plan_mode(self, tool_name: str) -> bool:
+        """Check plan-mode blocking."""
+        return self._tool_runtime.tool_blocked_in_plan_mode(tool_name)
 
     def _resolve_local_path(self, file_path: str, *, allow_relative: bool = False) -> Path:
         path = Path(file_path).expanduser()
@@ -801,102 +668,16 @@ User request: "quality control with nUMI>500, mito<0.2"
                 return candidate
         return None
 
-    # ----- Subagent prompt builders -----
+    def _extract_python_code(self, response_text: str) -> str:
+        """Extract executable Python code from the agent response using AST validation."""
+        return self._codegen.extract_python_code(response_text)
 
-    _CODE_QUALITY_RULES = _CODE_QUALITY_RULES_EXT
-
-    # -- Prompt building (delegated to ovagent.prompt_builder) ---------------
-
-    def _build_explore_prompt(self, context: str) -> str:
-        return self._prompt_builder.build_explore_prompt(context)
-
-    def _build_plan_prompt(self, context: str) -> str:
-        return self._prompt_builder.build_plan_prompt(context)
-
-    def _build_execute_prompt(self, context: str) -> str:
-        return self._prompt_builder.build_execute_prompt(context)
-
-    def _build_subagent_system_prompt(self, agent_type: str, context: str = "") -> str:
-        return self._prompt_builder.build_subagent_system_prompt(agent_type, context)
-
-    def _build_subagent_user_message(self, task: str, adata: Any) -> str:
-        return self._prompt_builder.build_subagent_user_message(task, adata)
-
-    async def _run_subagent(
-        self, agent_type: str, task: str, adata: Any, context: str = "",
-    ) -> dict:
-        return await self._subagent_controller.run_subagent(
-            agent_type=agent_type, task=task, adata=adata, context=context,
-        )
+    def _normalize_registry_entry_for_codegen(self, entry: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert registry entries to public-facing ov.* names for code generation."""
+        return _RegistryScanner.normalize_entry(entry)
 
     def _build_agentic_system_prompt(self) -> str:
         return self._prompt_builder.build_agentic_system_prompt()
-
-    def _build_initial_user_message(self, request: str, adata: Any) -> str:
-        return self._prompt_builder.build_initial_user_message(request, adata)
-
-    def _get_harness_session_id(self) -> str:
-        """Best-effort session identifier for harness traces/history.
-
-        Delegates to :class:`SessionService`.
-        """
-        return self._session_service.get_harness_session_id()
-
-    def _get_runtime_session_id(self) -> str:
-        """Return the session key used by the harness runtime registry.
-
-        Delegates to :class:`SessionService`.
-        """
-        return self._session_service.get_runtime_session_id()
-
-    def _get_visible_agent_tools(self, *, allowed_names: Optional[set[str]] = None) -> list[dict[str, Any]]:
-        """Return the currently visible tool schemas — delegates to ToolRuntime."""
-        return self._tool_runtime.get_visible_agent_tools(allowed_names=allowed_names)
-
-    def _get_loaded_tool_names(self) -> list[str]:
-        """Return loaded tool names — delegates to ToolRuntime."""
-        return self._tool_runtime.get_loaded_tool_names()
-
-    def _refresh_runtime_working_directory(self) -> str:
-        """Keep runtime cwd aligned with the active worktree / filesystem context.
-
-        Delegates to :class:`SessionService`.
-        """
-        return self._session_service.refresh_runtime_working_directory()
-
-    def _tool_blocked_in_plan_mode(self, tool_name: str) -> bool:
-        """Check plan-mode blocking — delegates to ToolRuntime."""
-        return self._tool_runtime.tool_blocked_in_plan_mode(tool_name)
-
-    def _request_requires_tool_action(self, request: str, adata: Any) -> bool:
-        return _FollowUpGate.request_requires_tool_action(request, adata)
-
-    def _response_is_promissory(self, content: str) -> bool:
-        return _FollowUpGate.response_is_promissory(content)
-
-    def _select_agent_tool_choice(self, *, request, adata, turn_index, had_meaningful_tool_call, forced_retry) -> str:
-        return _FollowUpGate.select_tool_choice(
-            request=request, adata=adata, turn_index=turn_index,
-            had_meaningful_tool_call=had_meaningful_tool_call, forced_retry=forced_retry,
-        )
-
-    def _should_continue_after_text_response(self, *, request, response_content, adata, had_meaningful_tool_call) -> bool:
-        return _FollowUpGate.should_continue_after_text(
-            request=request, response_content=response_content,
-            adata=adata, had_meaningful_tool_call=had_meaningful_tool_call,
-        )
-
-    def _build_no_tool_follow_up_message(self, request, *, retry_count=0, max_retries=2) -> str:
-        return _FollowUpGate.build_no_tool_follow_up(request, retry_count=retry_count, max_retries=max_retries)
-
-    def _persist_harness_history(self, request: str) -> None:
-        self._turn_controller._persist_harness_history(request)
-
-    def _append_tool_results(self, messages: list, tool_results: list) -> None:
-        self._turn_controller._append_tool_results(messages, tool_results)
-
-    async def _dispatch_tool(self, tool_call, current_adata: Any, request: str):
-        return await self._tool_runtime.dispatch_tool(tool_call, current_adata, request)
 
     async def _run_agentic_loop(self, request: str, adata: Any,
                                event_callback=None,
@@ -911,45 +692,16 @@ User request: "quality control with nUMI>500, mito<0.2"
             approval_handler=approval_handler,
         )
 
-    def _save_conversation_log(self, messages: list) -> None:
-        _TurnController._save_conversation_log(messages)
-
-    def _list_project_skills(self) -> str:
-        """Return a JSON catalog of the discovered project skills."""
-
-        if not self.skill_registry or not self.skill_registry.skill_metadata:
-            return json.dumps({"skills": [], "message": "No project skills available."}, indent=2)
-
-        skills_payload = [
-            {
-                "name": skill.name,
-                "slug": skill.slug,
-                "description": skill.description,
-                "path": str(skill.path),
-                "metadata": skill.metadata,
-            }
-            for skill in sorted(self.skill_registry.skill_metadata.values(), key=lambda item: item.name.lower())
-        ]
-        return json.dumps({"skills": skills_payload}, indent=2)
-
     def _load_skill_guidance(self, skill_name: str) -> str:
-        """Return the detailed instructions for a requested skill.
-
-        This triggers lazy loading of the full skill content if using progressive disclosure.
-        """
-
+        """Return the detailed instructions for a requested skill."""
         if not self.skill_registry or not self.skill_registry.skill_metadata:
             return json.dumps({"error": "No project skills are available."})
-
         if not skill_name or not skill_name.strip():
             return json.dumps({"error": "Provide a skill name to load guidance."})
-
-        # Lazy load the full skill content
         slug = skill_name.strip().lower()
         definition = self.skill_registry.load_full_skill(slug)
         if not definition:
             return json.dumps({"error": f"Skill '{skill_name}' not found."})
-
         return json.dumps(
             {
                 "name": definition.name,
@@ -961,14 +713,136 @@ User request: "quality control with nUMI>500, mito<0.2"
             indent=2,
         )
 
+    # =====================================================================
+    # Registry scanner delegates (thin wrappers over RegistryScanner)
+    # =====================================================================
+
+    @property
+    def _scanner(self) -> _RegistryScanner:
+        """Lazily create RegistryScanner for agents constructed via __new__."""
+        scanner = getattr(self, "_registry_scanner", None)
+        if scanner is None:
+            scanner = _RegistryScanner()
+            self._registry_scanner = scanner
+        return scanner
+
+    def _load_static_registry_entries(self) -> List[Dict[str, Any]]:
+        """Parse @register_function metadata plus nested method/branch capabilities."""
+        return self._scanner.load_static_entries()
+
+    def _collect_relevant_registry_entries(self, request: str, max_entries: int = 8) -> List[Dict[str, Any]]:
+        """Return a compact set of registry entries relevant to a free-form request."""
+        return self._scanner.collect_relevant_entries(request, max_entries)
+
+    def _collect_static_registry_entries(self, request: str, max_entries: int = 8) -> List[Dict[str, Any]]:
+        """Search the static AST-derived registry snapshot."""
+        return self._scanner.collect_static_entries(request, max_entries)
+
+    def _score_registry_entry_for_codegen(self, request: str, entry: Dict[str, Any]) -> float:
+        """Score a registry entry for lightweight code generation retrieval."""
+        return _RegistryScanner.score_entry(request, entry)
+
+    # =====================================================================
+    # FollowUp gate delegates (used by tests via agent instance)
+    # =====================================================================
+
+    def _request_requires_tool_action(self, request: str, adata: Any) -> bool:
+        return _FollowUpGate.request_requires_tool_action(request, adata)
+
+    def _response_is_promissory(self, content: str) -> bool:
+        return _FollowUpGate.response_is_promissory(content)
+
+    def _select_agent_tool_choice(self, *, request, adata, turn_index, had_meaningful_tool_call, forced_retry) -> str:
+        return _FollowUpGate.select_tool_choice(
+            request=request, adata=adata, turn_index=turn_index,
+            had_meaningful_tool_call=had_meaningful_tool_call, forced_retry=forced_retry,
+        )
+
+    # =====================================================================
+    # Tool dispatch delegates
+    # =====================================================================
+
+    async def _dispatch_tool(self, tool_call, current_adata: Any, request: str):
+        return await self._tool_runtime.dispatch_tool(tool_call, current_adata, request)
+
+    # =====================================================================
+    # Codegen pipeline delegates
+    # =====================================================================
+
+    def _capture_code_only_snippet(self, code: str, description: str = "") -> None:
+        """Store the latest code snippet captured from execute_code in code-only mode."""
+        self._codegen.capture_code_only_snippet(code, description)
+
+    def _select_codegen_skill_matches(self, request: str, top_k: int = 2) -> List[SkillMatch]:
+        return self._codegen.select_codegen_skill_matches(request, top_k)
+
+    def _format_registry_context_for_codegen(self, entries: List[Dict[str, Any]]) -> str:
+        return self._codegen.format_registry_context_for_codegen(entries)
+
+    @staticmethod
+    def _format_prerequisites_for_codegen_entry(entry: Dict[str, Any]) -> str:
+        return _CodegenPipeline.format_prerequisites_for_codegen_entry(entry)
+
+    def _build_code_generation_system_prompt(self, adata: Any) -> str:
+        return self._codegen.build_code_generation_system_prompt(adata)
+
+    @staticmethod
+    def _build_code_generation_user_prompt(request: str, adata: Any) -> str:
+        return _CodegenPipeline.build_code_generation_user_prompt(request, adata)
+
+    @staticmethod
+    def _contains_forbidden_scanpy_usage(code: str) -> bool:
+        return _CodegenPipeline.contains_forbidden_scanpy_usage(code)
+
+    def _rewrite_scanpy_calls_with_registry(self, code: str, entries: List[Dict[str, Any]]) -> str:
+        return self._codegen.rewrite_scanpy_calls_with_registry(code, entries)
+
+    async def _rewrite_code_without_scanpy(self, code: str, request: str, adata: Any, registry_context: str = "", skill_guidance: str = "") -> tuple:
+        return await self._codegen.rewrite_code_without_scanpy(code, request, adata, registry_context, skill_guidance)
+
+    async def _review_generated_code_lightweight(self, code: str, request: str, adata: Any) -> tuple:
+        return await self._codegen.review_generated_code_lightweight(code, request, adata)
+
+    @staticmethod
+    def _build_code_only_agentic_request(request: str, adata: Any) -> str:
+        return _CodegenPipeline.build_code_only_agentic_request(request, adata)
+
+    async def _generate_code_via_agentic_loop(self, request: str, adata: Any, *, progress_callback: Optional[Callable[[str], None]] = None) -> str:
+        return await self._codegen.generate_code_via_agentic_loop(request, adata, progress_callback=progress_callback)
+
+    def _gather_code_candidates(self, response_text: str) -> List[str]:
+        return self._codegen.gather_code_candidates(response_text)
+
+    @staticmethod
+    def _looks_like_python(code: str) -> bool:
+        return _CodegenPipeline.looks_like_python(code)
+
+    @staticmethod
+    def _extract_inline_python(response_text: str) -> str:
+        return _CodegenPipeline.extract_inline_python(response_text)
+
+    @staticmethod
+    def _normalize_code_candidate(code: str) -> str:
+        return _CodegenPipeline.normalize_code_candidate(code)
+
+    def _extract_python_code_strict(self, response_text: str) -> str:
+        return self._codegen.extract_python_code_strict(response_text)
+
+    async def _review_result(self, original_adata: Any, result_adata: Any, request: str, code: str) -> Dict[str, Any]:
+        return await self._codegen.review_result(original_adata, result_adata, request, code)
+
+    async def _reflect_on_code(self, code: str, request: str, adata: Any, iteration: int = 1) -> Dict[str, Any]:
+        return await self._codegen.reflect_on_code(code, request, adata, iteration)
+
+    def _detect_direct_python_request(self, request: str) -> Optional[str]:
+        return self._codegen.detect_direct_python_request(request)
+
     @staticmethod
     def _merge_usage_stats(usages: List[Optional[Usage]]) -> Optional[Usage]:
         """Merge usage records from multiple lightweight codegen calls."""
-
         valid = [usage for usage in usages if usage is not None]
         if not valid:
             return None
-
         return Usage(
             input_tokens=sum(max(0, usage.input_tokens) for usage in valid),
             output_tokens=sum(max(0, usage.output_tokens) for usage in valid),
@@ -977,759 +851,15 @@ User request: "quality control with nUMI>500, mito<0.2"
             provider=valid[-1].provider,
         )
 
-    def _collect_relevant_registry_entries(
-        self,
-        request: str,
-        max_entries: int = 8,
-    ) -> List[Dict[str, Any]]:
-        """Return a compact set of registry entries relevant to a free-form request."""
-
-        if max_entries <= 0:
-            return []
-
-        self._ensure_runtime_registry_for_codegen()
-
-        runtime_entries = self._collect_runtime_registry_entries(
-            request,
-            max_entries=max_entries * 3,
-        )
-        static_entries = self._collect_static_registry_entries(
-            request,
-            max_entries=max_entries * 3,
-        )
-
-        merged: Dict[str, Tuple[float, int, Dict[str, Any]]] = {}
-        for raw_entry in [*runtime_entries, *static_entries]:
-            entry = self._normalize_registry_entry_for_codegen(raw_entry)
-            full_name = entry.get("full_name", "")
-            if not full_name:
-                continue
-            score = self._score_registry_entry_for_codegen(request, entry)
-            if score <= 0:
-                continue
-            # Prefer higher score, then runtime over static when tied.
-            source_rank = 1 if entry.get("source") == "runtime" else 0
-            current = merged.get(full_name)
-            if current is None or (score, source_rank) > (current[0], current[1]):
-                merged[full_name] = (score, source_rank, entry)
-
-        ranked = sorted(
-            merged.values(),
-            key=lambda item: (item[0], item[1], item[2].get("full_name", "")),
-            reverse=True,
-        )
-        return [entry for _, _, entry in ranked[:max_entries]]
-
-    def _ensure_runtime_registry_for_codegen(self) -> None:
-        """Hydrate the runtime registry when a partial lazy-import state is insufficient."""
-
-        if getattr(_global_registry, "_registry", None):
-            return
-
-        try:
-            from ..mcp.manifest import ensure_registry_populated
-
-            ensure_registry_populated()
-        except Exception as exc:  # pragma: no cover - defensive
-            logger.warning("Runtime registry hydration for claw failed: %s", exc)
-
-    def _collect_runtime_registry_entries(
-        self,
-        request: str,
-        max_entries: int = 8,
-    ) -> List[Dict[str, Any]]:
-        """Query the in-memory registry when it has been hydrated successfully."""
-
-        if not getattr(_global_registry, "_registry", None):
-            return []
-
-        seen: set = set()
-        entries: List[Dict[str, Any]] = []
-
-        def _add_matches(query: str) -> None:
-            if not query or len(entries) >= max_entries:
-                return
-            for entry in _global_registry.find(query):
-                full_name = entry.get("full_name", "")
-                if not full_name or full_name in seen:
-                    continue
-                seen.add(full_name)
-                entries.append(entry)
-                if len(entries) >= max_entries:
-                    return
-
-        _add_matches(request)
-
-        keywords = [
-            token for token in re.findall(r"[A-Za-z_][A-Za-z0-9_\\.\\-]*", request or "")
-            if len(token) >= 2
-        ]
-        for keyword in keywords[:12]:
-            _add_matches(keyword)
-            if len(entries) >= max_entries:
-                break
-
-        return entries
-
-    def _normalize_registry_entry_for_codegen(self, entry: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert registry entries to public-facing ov.* names for code generation."""
-
-        normalized = dict(entry)
-        source = normalized.get("source")
-        normalized["source"] = source if str(source).startswith("static_ast") else "runtime"
-
-        original_full_name = str(normalized.get("full_name", "") or "")
-        normalized["registry_full_name"] = original_full_name
-
-        public_name = original_full_name
-        short_name = str(normalized.get("short_name") or normalized.get("name") or "")
-
-        if original_full_name.startswith("omicverse."):
-            parts = original_full_name.split(".")
-            if len(parts) >= 2:
-                domain = parts[1]
-                if domain == "_settings":
-                    public_name = f"ov.core.{short_name or parts[-1]}"
-                elif domain:
-                    public_name = f"ov.{domain}.{short_name or parts[-1]}"
-
-        normalized["full_name"] = public_name
-        return normalized
-
-    def _score_registry_entry_for_codegen(
-        self,
-        request: str,
-        entry: Dict[str, Any],
-    ) -> float:
-        """Score a registry entry for lightweight code generation retrieval."""
-
-        query = (request or "").strip().lower()
-        if not query:
-            return 0.0
-
-        tokens = [
-            token for token in re.findall(r"[a-z0-9_\\.\\-]+", query)
-            if len(token) >= 2
-        ]
-        aliases = [str(alias).lower() for alias in (entry.get("aliases") or [])]
-        haystack_parts = [
-            entry.get("name", ""),
-            entry.get("short_name", ""),
-            entry.get("full_name", ""),
-            entry.get("registry_full_name", ""),
-            entry.get("category", ""),
-            entry.get("description", ""),
-            " ".join(aliases),
-            " ".join(entry.get("examples", []) or []),
-            " ".join(entry.get("imports", []) or []),
-        ]
-        haystack = " ".join(str(part) for part in haystack_parts).lower()
-
-        score = 0.0
-        if query == str(entry.get("full_name", "")).lower():
-            score += 10.0
-        if query == str(entry.get("short_name", "")).lower():
-            score += 9.0
-        if query in haystack:
-            score += 4.0
-
-        for alias in aliases:
-            if alias == query:
-                score += 8.0
-            elif alias and alias in query:
-                score += 2.0
-
-        for token in tokens:
-            if token in haystack:
-                score += 1.25
-
-        public_name = str(entry.get("full_name", ""))
-        if public_name.startswith(("ov.pp.", "ov.single.", "ov.pl.", "ov.bulk.", "ov.space.")):
-            score += 0.5
-
-        if public_name.startswith("ov.datasets.") and not any(
-            word in query for word in ("dataset", "download", "read", "load", "example", "demo")
-        ):
-            score -= 2.0
-
-        if public_name.startswith("ov.core.") and not any(
-            word in query for word in ("reference", "table", "gpu", "cpu", "settings")
-        ):
-            score -= 2.0
-
-        return score
-
-    def _load_static_registry_entries(self) -> List[Dict[str, Any]]:
-        """Parse @register_function metadata plus nested method/branch capabilities."""
-
-        cached = getattr(self, "_static_registry_entries_cache", None)
-        if cached is not None:
-            return cached
-
-        package_root = Path(__file__).resolve().parents[1]
-        search_roots = (
-            "pp", "pl", "single", "bulk", "space", "utils",
-            "io", "alignment", "external", "biocontext", "bulk2single", "datasets",
-        )
-        entries: List[Dict[str, Any]] = []
-        seen: set = set()
-
-        for root_name in search_roots:
-            root = package_root / root_name
-            if not root.exists():
-                continue
-            for file_path in sorted(root.rglob("*.py")):
-                if file_path.name == "__init__.py":
-                    continue
-                if "__pycache__" in file_path.parts or ".ipynb_checkpoints" in file_path.parts:
-                    continue
-                try:
-                    source = file_path.read_text(encoding="utf-8")
-                    tree = ast.parse(source, filename=str(file_path))
-                except Exception:
-                    continue
-
-                for node in tree.body:
-                    if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                        continue
-                    decorator = self._find_register_function_decorator(node)
-                    if decorator is None:
-                        continue
-                    for entry in self._build_static_registry_entries(file_path, node, decorator):
-                        full_name = entry.get("full_name", "")
-                        if not full_name or full_name in seen:
-                            continue
-                        seen.add(full_name)
-                        entries.append(entry)
-
-        self._static_registry_entries_cache = entries
-        return entries
-
-    @staticmethod
-    def _find_register_function_decorator(node: Union[ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef]) -> Optional[ast.Call]:
-        """Return the register_function decorator call when present."""
-
-        for decorator in node.decorator_list:
-            if not isinstance(decorator, ast.Call):
-                continue
-            func = decorator.func
-            if isinstance(func, ast.Name) and func.id == "register_function":
-                return decorator
-            if isinstance(func, ast.Attribute) and func.attr == "register_function":
-                return decorator
-        return None
-
-    @staticmethod
-    def _literal_eval_or_default(node: Optional[ast.AST], default: Any) -> Any:
-        if node is None:
-            return default
-        try:
-            return ast.literal_eval(node)
-        except Exception:
-            return default
-
-    @staticmethod
-    def _derive_static_signature(node: Union[ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef]) -> str:
-        """Build a lightweight signature string from AST."""
-
-        if isinstance(node, ast.ClassDef):
-            return f"{node.name}(...)"
-
-        arg_names = [arg.arg for arg in node.args.args]
-        if arg_names and arg_names[0] == "self":
-            arg_names = arg_names[1:]
-        return f"{node.name}({', '.join(arg_names)})"
-
-    def _build_static_registry_entries(
-        self,
-        file_path: Path,
-        node: Union[ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef],
-        decorator: ast.Call,
-    ) -> List[Dict[str, Any]]:
-        """Build the primary static entry plus nested method/branch entries."""
-
-        base_entry = self._build_static_registry_entry(file_path, node, decorator)
-        if not base_entry:
-            return []
-
-        entries = [base_entry]
-        entries.extend(self._build_nested_static_registry_entries(node, base_entry))
-        return entries
-
-    def _build_nested_static_registry_entries(
-        self,
-        node: Union[ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef],
-        base_entry: Dict[str, Any],
-    ) -> List[Dict[str, Any]]:
-        """Expand registered classes/functions into searchable method and branch entries."""
-
-        nested: List[Dict[str, Any]] = []
-        if isinstance(node, ast.ClassDef):
-            for child in node.body:
-                if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    continue
-                if child.name.startswith("_"):
-                    continue
-                method_entry = self._build_static_method_entry(base_entry, node, child)
-                if not method_entry:
-                    continue
-                nested.append(method_entry)
-                nested.extend(self._build_static_branch_entries(child, method_entry, base_entry))
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            nested.extend(self._build_static_branch_entries(node, base_entry, base_entry))
-        return nested
-
-    def _build_static_method_entry(
-        self,
-        base_entry: Dict[str, Any],
-        class_node: ast.ClassDef,
-        method_node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
-    ) -> Optional[Dict[str, Any]]:
-        """Create a searchable entry for a public method on a registered class."""
-
-        aliases: List[str] = [
-            method_node.name,
-            f"{class_node.name}.{method_node.name}",
-            f"{base_entry.get('short_name', class_node.name)} {method_node.name}",
-        ]
-        for alias in (base_entry.get("aliases") or [])[:8]:
-            alias = str(alias).strip()
-            if alias:
-                aliases.append(f"{alias} {method_node.name}")
-
-        description = ast.get_docstring(method_node) or (
-            f"Method `{method_node.name}` on {base_entry.get('full_name', class_node.name)}."
-        )
-
-        return {
-            "name": method_node.name,
-            "short_name": method_node.name,
-            "full_name": f"{base_entry.get('full_name', class_node.name)}.{method_node.name}",
-            "module": base_entry.get("module", ""),
-            "aliases": list(dict.fromkeys(aliases)),
-            "category": base_entry.get("category", ""),
-            "description": description,
-            "examples": self._filter_examples_for_method(base_entry.get("examples", []), method_node.name),
-            "related": [base_entry.get("full_name", "")],
-            "signature": self._derive_static_signature(method_node),
-            "docstring": ast.get_docstring(method_node) or "",
-            "prerequisites": base_entry.get("prerequisites", {}) or {},
-            "requires": base_entry.get("requires", {}) or {},
-            "produces": base_entry.get("produces", {}) or {},
-            "source": "static_ast_method",
-            "parent_full_name": base_entry.get("full_name", ""),
-            "imports": self._collect_import_targets(method_node.body),
-        }
-
-    @staticmethod
-    def _filter_examples_for_method(examples: List[str], method_name: str) -> List[str]:
-        """Keep examples most relevant to a nested method entry."""
-
-        if not examples:
-            return []
-        matches = [example for example in examples if method_name in str(example)]
-        return matches[:3] if matches else list(examples[:2])
-
-    def _build_static_branch_entries(
-        self,
-        node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
-        parent_entry: Dict[str, Any],
-        owner_entry: Dict[str, Any],
-    ) -> List[Dict[str, Any]]:
-        """Create searchable entries for string-dispatched branches like method='celltypist'."""
-
-        entries: List[Dict[str, Any]] = []
-        seen: set[Tuple[str, str]] = set()
-
-        for child in ast.walk(node):
-            if not isinstance(child, ast.If):
-                continue
-            for param_name, branch_value in self._extract_branch_variants(child.test):
-                key = (param_name, branch_value)
-                if key in seen:
-                    continue
-                seen.add(key)
-                imports = self._collect_import_targets(child.body)
-                aliases = [
-                    branch_value,
-                    f"{node.name} {branch_value}",
-                    f"{param_name} {branch_value}",
-                    f"{parent_entry.get('short_name', node.name)} {branch_value}",
-                ]
-                for alias in (owner_entry.get("aliases") or [])[:8]:
-                    alias = str(alias).strip()
-                    if alias:
-                        aliases.append(f"{alias} {branch_value}")
-                examples = self._filter_examples_for_branch(
-                    parent_entry.get("examples", []),
-                    param_name,
-                    branch_value,
-                )
-                description = (
-                    f"Variant of `{parent_entry.get('full_name', node.name)}` when "
-                    f"`{param_name}='{branch_value}'`."
-                )
-                if imports:
-                    description += " Imports/uses: " + ", ".join(imports) + "."
-
-                entries.append({
-                    "name": branch_value,
-                    "short_name": branch_value,
-                    "full_name": f"{parent_entry.get('full_name', node.name)}[{param_name}={branch_value}]",
-                    "module": parent_entry.get("module", ""),
-                    "aliases": list(dict.fromkeys(aliases)),
-                    "category": parent_entry.get("category", ""),
-                    "description": description,
-                    "examples": examples,
-                    "related": [parent_entry.get("full_name", "")],
-                    "signature": parent_entry.get("signature", self._derive_static_signature(node)),
-                    "docstring": parent_entry.get("docstring", ""),
-                    "prerequisites": parent_entry.get("prerequisites", {}) or {},
-                    "requires": parent_entry.get("requires", {}) or {},
-                    "produces": parent_entry.get("produces", {}) or {},
-                    "source": "static_ast_branch",
-                    "parent_full_name": parent_entry.get("full_name", ""),
-                    "branch_parameter": param_name,
-                    "branch_value": branch_value,
-                    "imports": imports,
-                })
-
-        return entries
-
-    @staticmethod
-    def _filter_examples_for_branch(examples: List[str], param_name: str, branch_value: str) -> List[str]:
-        """Keep examples mentioning the relevant branch parameter/value when possible."""
-
-        if not examples:
-            return []
-        value_lower = branch_value.lower()
-        param_lower = param_name.lower()
-        matches = [
-            example for example in examples
-            if value_lower in str(example).lower() or param_lower in str(example).lower()
-        ]
-        return matches[:3] if matches else list(examples[:2])
-
-    def _extract_branch_variants(self, test: ast.AST) -> List[Tuple[str, str]]:
-        """Extract simple string-dispatch branches from an ``if`` test."""
-
-        variants: List[Tuple[str, str]] = []
-        if isinstance(test, ast.BoolOp) and isinstance(test.op, ast.Or):
-            for value in test.values:
-                variants.extend(self._extract_branch_variants(value))
-            return variants
-
-        if not isinstance(test, ast.Compare) or len(test.ops) != 1 or len(test.comparators) != 1:
-            return variants
-
-        subject = self._branch_subject_name(test.left)
-        comparator = test.comparators[0]
-        op = test.ops[0]
-        values: List[str] = []
-
-        if isinstance(op, ast.Eq):
-            values = self._branch_string_values(comparator)
-        elif isinstance(op, ast.In):
-            values = self._branch_string_values(comparator)
-
-        if subject and values:
-            variants.extend((subject, value) for value in values)
-        return variants
-
-    @staticmethod
-    def _branch_subject_name(node: ast.AST) -> str:
-        if isinstance(node, ast.Name):
-            return node.id
-        if isinstance(node, ast.Attribute):
-            return node.attr
-        return ""
-
-    @staticmethod
-    def _branch_string_values(node: ast.AST) -> List[str]:
-        if isinstance(node, ast.Constant) and isinstance(node.value, str):
-            return [node.value]
-        if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
-            values: List[str] = []
-            for child in node.elts:
-                if isinstance(child, ast.Constant) and isinstance(child.value, str):
-                    values.append(child.value)
-            return values
-        return []
-
-    @staticmethod
-    def _collect_import_targets(statements: List[ast.stmt]) -> List[str]:
-        """Collect import targets mentioned inside a function or branch body."""
-
-        module = ast.Module(body=list(statements), type_ignores=[])
-        imports: List[str] = []
-        for child in ast.walk(module):
-            if isinstance(child, ast.Import):
-                for alias in child.names:
-                    if alias.name:
-                        imports.append(alias.name.split(".")[0])
-            elif isinstance(child, ast.ImportFrom):
-                if child.module:
-                    imports.append(child.module.split(".")[0])
-                for alias in child.names:
-                    if alias.name and alias.name != "*":
-                        imports.append(alias.name.split(".")[0])
-        return list(dict.fromkeys(imports))
-
-    def _build_static_registry_entry(
-        self,
-        file_path: Path,
-        node: Union[ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef],
-        decorator: ast.Call,
-    ) -> Optional[Dict[str, Any]]:
-        """Convert one @register_function AST node into a registry-like record."""
-
-        rel = file_path.relative_to(Path(__file__).resolve().parents[1])
-        if not rel.parts:
-            return None
-        domain = rel.parts[0]
-        if domain not in {"pp", "pl", "single", "bulk", "space", "utils"}:
-            return None
-
-        args = list(decorator.args)
-        aliases = self._literal_eval_or_default(args[0], []) if len(args) >= 1 else []
-        category = self._literal_eval_or_default(args[1], "") if len(args) >= 2 else ""
-        description = self._literal_eval_or_default(args[2], "") if len(args) >= 3 else ""
-        examples = self._literal_eval_or_default(args[3], []) if len(args) >= 4 else []
-
-        kw = {item.arg: item.value for item in decorator.keywords if item.arg}
-        aliases = self._literal_eval_or_default(kw.get("aliases"), aliases)
-        category = self._literal_eval_or_default(kw.get("category"), category)
-        description = self._literal_eval_or_default(kw.get("description"), description)
-        examples = self._literal_eval_or_default(kw.get("examples"), examples)
-        related = self._literal_eval_or_default(kw.get("related"), [])
-        prerequisites = self._literal_eval_or_default(kw.get("prerequisites"), {})
-        requires = self._literal_eval_or_default(kw.get("requires"), {})
-        produces = self._literal_eval_or_default(kw.get("produces"), {})
-
-        full_name = f"ov.{domain}.{node.name}"
-        module_name = "omicverse." + ".".join(rel.with_suffix("").parts)
-
-        return {
-            "name": node.name,
-            "short_name": node.name,
-            "full_name": full_name,
-            "module": module_name,
-            "aliases": aliases or [],
-            "category": category or domain,
-            "description": description or (ast.get_docstring(node) or ""),
-            "examples": examples or [],
-            "related": related or [],
-            "signature": self._derive_static_signature(node),
-            "docstring": ast.get_docstring(node) or "",
-            "prerequisites": prerequisites or {},
-            "requires": requires or {},
-            "produces": produces or {},
-            "source": "static_ast",
-        }
-
-    def _collect_static_registry_entries(
-        self,
-        request: str,
-        max_entries: int = 8,
-    ) -> List[Dict[str, Any]]:
-        """Search the static AST-derived registry snapshot."""
-
-        query = (request or "").strip().lower()
-        if not query:
-            return []
-
-        tokens = [token for token in re.findall(r"[a-z0-9_\\.\\-]+", query) if len(token) >= 2]
-        entries = self._load_static_registry_entries()
-        scored: List[Tuple[float, Dict[str, Any]]] = []
-
-        for entry in entries:
-            aliases = entry.get("aliases", []) or []
-            haystack = " ".join(
-                [
-                    entry.get("name", ""),
-                    entry.get("short_name", ""),
-                    entry.get("full_name", ""),
-                    entry.get("category", ""),
-                    entry.get("description", ""),
-                    " ".join(aliases),
-                    " ".join(entry.get("examples", []) or []),
-                    " ".join(entry.get("imports", []) or []),
-                ]
-            ).lower()
-
-            score = 0.0
-            if query == entry.get("name", "").lower():
-                score += 8.0
-            if query == entry.get("short_name", "").lower():
-                score += 8.0
-            if query == entry.get("full_name", "").lower():
-                score += 9.0
-            if query in haystack:
-                score += 4.0
-            for alias in aliases:
-                alias_lower = str(alias).lower()
-                if query == alias_lower:
-                    score += 8.0
-                elif alias_lower and alias_lower in query:
-                    score += 2.0
-            for token in tokens:
-                if token and token in haystack:
-                    score += 1.0
-
-            if score > 0:
-                scored.append((score, entry))
-
-        scored.sort(key=lambda item: item[0], reverse=True)
-        return [entry for _, entry in scored[:max_entries]]
-
-    def _select_codegen_skill_matches(self, request: str, top_k: int = 2) -> List[SkillMatch]:
-        """Select skills for codegen using the same loaded skill registry as Jarvis."""
-        return self._codegen.select_codegen_skill_matches(request, top_k)
-
-    def _format_registry_context_for_codegen(
-        self,
-        entries: List[Dict[str, Any]],
-    ) -> str:
-        """Format a compact registry snippet for code-only generation."""
-        return self._codegen.format_registry_context_for_codegen(entries)
-
-    def _format_prerequisites_for_codegen_entry(self, entry: Dict[str, Any]) -> str:
-        """Format prerequisites from runtime registry or static AST metadata."""
-        return _CodegenPipeline.format_prerequisites_for_codegen_entry(entry)
-
-    def _build_code_generation_system_prompt(self, adata: Any) -> str:
-        """Build the code-only prompt on top of the fully initialized Agent prompt."""
-        return self._codegen.build_code_generation_system_prompt(adata)
-
-    def _build_code_generation_user_prompt(self, request: str, adata: Any) -> str:
-        """Build the lightweight user prompt for code-only generation."""
-        return _CodegenPipeline.build_code_generation_user_prompt(request, adata)
-
-    @staticmethod
-    def _contains_forbidden_scanpy_usage(code: str) -> bool:
-        """Disallow raw scanpy usage in registry-first claw generation."""
-        return _CodegenPipeline.contains_forbidden_scanpy_usage(code)
-
-    def _rewrite_scanpy_calls_with_registry(
-        self,
-        code: str,
-        entries: List[Dict[str, Any]],
-    ) -> str:
-        """Best-effort mechanical rewrite from scanpy-style calls to ov.* calls."""
-        return self._codegen.rewrite_scanpy_calls_with_registry(code, entries)
-
-    async def _rewrite_code_without_scanpy(
-        self,
-        code: str,
-        request: str,
-        adata: Any,
-        registry_context: str = "",
-        skill_guidance: str = "",
-    ) -> Tuple[str, Optional[Usage]]:
-        """Rewrite code to strict OmicVerse-only style when scanpy slips in."""
-        return await self._codegen.rewrite_code_without_scanpy(
-            code, request, adata, registry_context, skill_guidance,
-        )
-
-    async def _review_generated_code_lightweight(
-        self,
-        code: str,
-        request: str,
-        adata: Any,
-    ) -> Tuple[str, Optional[Usage]]:
-        """Run a lightweight reflection pass and return improved code if possible."""
-        return await self._codegen.review_generated_code_lightweight(code, request, adata)
-
-    def _capture_code_only_snippet(self, code: str, description: str = "") -> None:
-        """Store the latest code snippet captured from execute_code in code-only mode."""
-        self._codegen.capture_code_only_snippet(code, description)
-
-    def _build_code_only_agentic_request(self, request: str, adata: Any) -> str:
-        """Wrap a raw claw request so the normal agentic loop produces code instead of running it."""
-        return _CodegenPipeline.build_code_only_agentic_request(request, adata)
-
-    async def _generate_code_via_agentic_loop(
-        self,
-        request: str,
-        adata: Any,
-        *,
-        progress_callback: Optional[Callable[[str], None]] = None,
-    ) -> str:
-        """Run the normal Jarvis agentic loop and capture the final execute_code snippet."""
-        return await self._codegen.generate_code_via_agentic_loop(
-            request, adata, progress_callback=progress_callback,
-        )
-
-    async def generate_code_async(
-        self,
-        request: str,
-        adata: Any = None,
-        *,
-        max_functions: int = 8,
-        progress_callback: Optional[Callable[[str], None]] = None,
-    ) -> str:
-        """Generate OmicVerse Python code without executing it."""
-        return await self._codegen.generate_code_async(
-            request, adata,
-            max_functions=max_functions,
-            progress_callback=progress_callback,
-        )
-
-    def generate_code(
-        self,
-        request: str,
-        adata: Any = None,
-        *,
-        max_functions: int = 8,
-        progress_callback: Optional[Callable[[str], None]] = None,
-    ) -> str:
-        """Synchronous wrapper for code-only OmicVerse generation."""
-        return self._codegen.generate_code(
-            request, adata,
-            max_functions=max_functions,
-            progress_callback=progress_callback,
-        )
-
-    def _extract_python_code(self, response_text: str) -> str:
-        """Extract executable Python code from the agent response using AST validation."""
-        return self._codegen.extract_python_code(response_text)
-
-    def _gather_code_candidates(self, response_text: str) -> List[str]:
-        """Enhanced code extraction with multiple strategies to handle various formats."""
-        return self._codegen.gather_code_candidates(response_text)
-
-    def _looks_like_python(self, code: str) -> bool:
-        """Heuristic check if code snippet looks like Python."""
-        return _CodegenPipeline.looks_like_python(code)
-
-    def _extract_inline_python(self, response_text: str) -> str:
-        """Heuristically gather inline Python statements for AST validation."""
-        return _CodegenPipeline.extract_inline_python(response_text)
-
-    def _normalize_code_candidate(self, code: str) -> str:
-        """Ensure imports and formatting are in place for execution."""
-        return _CodegenPipeline.normalize_code_candidate(code)
-
-    def _extract_python_code_strict(self, response_text: str) -> str:
-        """Extract executable Python code without logging errors or falling back."""
-        return self._codegen.extract_python_code_strict(response_text)
-
-    async def _review_result(self, original_adata: Any, result_adata: Any, request: str, code: str) -> Dict[str, Any]:
-        """Review execution result to validate it matches the user's task assignment."""
-        return await self._codegen.review_result(
-            original_adata, result_adata, request, code,
-        )
-
-    async def _reflect_on_code(self, code: str, request: str, adata: Any, iteration: int = 1) -> Dict[str, Any]:
-        """Reflect on generated code to identify issues and improvements."""
-        return await self._codegen.reflect_on_code(code, request, adata, iteration)
+    # =====================================================================
+    # Analysis executor delegates
+    # =====================================================================
+
+    def _check_code_prerequisites(self, code: str, adata: Any) -> str:
+        return self._analysis_executor.check_code_prerequisites(code, adata)
 
     def _apply_execution_error_fix(self, code: str, error_msg: str) -> Optional[str]:
         return self._analysis_executor.apply_execution_error_fix(code, error_msg)
-
-    # ------------------------------------------------------------------
-    # Self-repair helpers — delegated to AnalysisExecutor (P3-1)
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _extract_package_name(error_msg: str) -> Optional[str]:
@@ -1738,30 +868,14 @@ User request: "quality control with nUMI>500, mito<0.2"
     def _auto_install_package(self, package_name: str) -> bool:
         return self._analysis_executor.auto_install_package(package_name)
 
-    async def _diagnose_error_with_llm(
-        self,
-        code: str,
-        error_msg: str,
-        traceback_str: str,
-        adata: Any,
-    ) -> Optional[str]:
-        return await self._analysis_executor.diagnose_error_with_llm(
-            code, error_msg, traceback_str, adata,
-        )
+    async def _diagnose_error_with_llm(self, code: str, error_msg: str, traceback_str: str, adata: Any) -> Optional[str]:
+        return await self._analysis_executor.diagnose_error_with_llm(code, error_msg, traceback_str, adata)
 
     def _validate_outputs(self, code: str, output_dir: Optional[str] = None) -> List[str]:
         return self._analysis_executor.validate_outputs(code, output_dir)
 
-    async def _generate_completion_code(
-        self,
-        original_code: str,
-        missing_files: List[str],
-        adata: Any,
-        request: str,
-    ) -> Optional[str]:
-        return await self._analysis_executor.generate_completion_code(
-            original_code, missing_files, adata, request,
-        )
+    async def _generate_completion_code(self, original_code: str, missing_files: List[str], adata: Any, request: str) -> Optional[str]:
+        return await self._analysis_executor.generate_completion_code(original_code, missing_files, adata, request)
 
     def _request_approval(self, code: str, violations: list) -> bool:
         return self._analysis_executor.request_approval(code, violations)
@@ -1776,128 +890,37 @@ User request: "quality control with nUMI>500, mito<0.2"
     def _process_context_directives(self, code: str, local_vars: Dict[str, Any]) -> None:
         self._analysis_executor.process_context_directives(code, local_vars)
 
-    def _handle_context_write(self, directive: str, local_vars: Dict[str, Any]) -> None:
-        self._analysis_executor._handle_context_write(directive, local_vars)
-
-    def _handle_context_update(self, directive: str) -> None:
-        self._analysis_executor._handle_context_update(directive)
-
-    @staticmethod
-    def _parse_plan_step(step_text: str) -> Optional[Dict[str, Any]]:
-        return _AnalysisExecutor._parse_plan_step(step_text)
-
     def _build_sandbox_globals(self) -> Dict[str, Any]:
         return self._analysis_executor.build_sandbox_globals()
 
-    def _detect_direct_python_request(self, request: str) -> Optional[str]:
-        """Detect and return user-provided Python code to execute directly."""
-        return self._codegen.detect_direct_python_request(request)
+    # =====================================================================
+    # Skill helpers
+    # =====================================================================
 
-    async def run_async(self, request: str, adata: Any) -> Any:
-        """
-        Process a natural language request using the agentic tool-calling loop.
-
-        The agent autonomously inspects data, searches functions/skills,
-        generates and executes code, and delegates subtasks until the request
-        is fulfilled or the turn limit is reached.
-
-        Parameters
-        ----------
-        request : str
-            Natural language description of what to do.
-        adata : Any
-            AnnData/MuData object to process.
-
-        Returns
-        -------
-        Any
-            Processed adata object.
-
-        Examples
-        --------
-        >>> agent.run("qc with nUMI>500", adata)
-        >>> agent.run("complete bulk DEG pipeline", adata)
-        """
-
-        print(f"\n{'=' * 70}")
-        print(f"🤖 OmicVerse Agent Processing Request")
-        print(f"{'=' * 70}")
-        print(f"Request: \"{request}\"")
-        if adata is not None and hasattr(adata, 'shape'):
-            print(f"Dataset: {adata.shape[0]} cells × {adata.shape[1]} genes")
-        else:
-            print(f"Dataset: None (knowledge query)")
-        print(f"{'=' * 70}\n")
-
-        # Direct execution path for explicit Python snippets (no LLM required)
-        direct_code = self._detect_direct_python_request(request)
-        if direct_code:
-            print(f"🧪 Direct Python detected → executing without model calls")
-            # Reset usage tracking for clarity
-            self.last_usage = None
-            self.last_usage_breakdown = {
-                'generation': None,
-                'reflection': [],
-                'review': [],
-                'total': None
+    def _list_project_skills(self) -> str:
+        """Return a JSON catalog of the discovered project skills."""
+        if not self.skill_registry or not self.skill_registry.skill_metadata:
+            return json.dumps({"skills": [], "message": "No project skills available."}, indent=2)
+        skills_payload = [
+            {
+                "name": skill.name,
+                "slug": skill.slug,
+                "description": skill.description,
+                "path": str(skill.path),
+                "metadata": skill.metadata,
             }
-            try:
-                result_adata = self._execute_generated_code(direct_code, adata)
-                print(f"✅ Python code executed directly.")
-                return result_adata
-            except Exception as exc:
-                print(f"❌ Direct Python execution failed: {exc}")
-                raise
-
-        # If user explicitly selected the Python provider, require executable code
-        if self.provider == "python":
-            raise ValueError("Python provider requires executable Python code in the request.")
-
-        return await self._run_agentic_mode(request, adata)
-
-    async def _run_agentic_mode(self, request: str, adata: Any) -> Any:
-        """Agentic loop mode: LLM autonomously calls tools to complete the task."""
-        print(f"🤖 Mode: Agentic Loop (tool-calling)")
-        print()
-
-        try:
-            result = await self._run_agentic_loop(request, adata)
-            self._persist_harness_history(request)
-
-            print()
-            print(f"{'=' * 70}")
-            print(f"✅ SUCCESS - Agentic loop completed!")
-            print(f"{'=' * 70}\n")
-
-            return result
-        except Exception as e:
-            self._persist_harness_history(request)
-            print()
-            print(f"{'=' * 70}")
-            print(f"❌ ERROR - Agentic loop failed: {e}")
-            print(f"{'=' * 70}\n")
-            raise
+            for skill in sorted(self.skill_registry.skill_metadata.values(), key=lambda item: item.name.lower())
+        ]
+        return json.dumps({"skills": skills_payload}, indent=2)
 
     async def _select_skill_matches_llm(self, request: str, top_k: int = 2) -> List[str]:
-        """Use LLM to select relevant skills based on the request (Claude Code approach).
-
-        This is pure LLM reasoning - no algorithmic routing, embeddings, or pattern matching.
-        The LLM reads skill descriptions and decides which skills match the user's intent.
-
-        Returns:
-            List of skill slugs matched by the LLM
-        """
+        """Use LLM to select relevant skills based on the request."""
         if not self.skill_registry or not self.skill_registry.skill_metadata:
             return []
-
-        # Format all available skills for LLM
         skills_list = []
         for skill in sorted(self.skill_registry.skill_metadata.values(), key=lambda s: s.name.lower()):
             skills_list.append(f"- **{skill.slug}**: {skill.description}")
-
         skills_catalog = "\n".join(skills_list)
-
-        # Ask LLM to match skills
         matching_prompt = f"""You are a skill matching system. Given a user request and a list of available skills, determine which skills (if any) are relevant.
 
 User Request: "{request}"
@@ -1919,22 +942,18 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
                 if not self._llm:
                     return []
                 response = await self._llm.run(matching_prompt)
-
-            # Extract JSON array from response
-            import re
-            json_match = re.search(r'\[.*?\]', response, re.DOTALL)
+            import re as _re
+            json_match = _re.search(r'\[.*?\]', response, _re.DOTALL)
             if json_match:
                 matched_slugs = json.loads(json_match.group(0))
                 return [slug for slug in matched_slugs if slug in self.skill_registry.skill_metadata]
             return []
-
         except Exception as exc:
             logger.warning(f"LLM skill matching failed: {exc}")
             return []
 
     def _format_skill_guidance(self, matches: List[SkillMatch]) -> str:
         """Format skill instructions for prompt injection."""
-
         if not matches:
             return ""
         blocks = []
@@ -1947,11 +966,108 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         return "\n\n".join(blocks)
 
     def _format_skill_overview(self) -> str:
-        """Generate a bullet overview of available project skills.
-
-        Delegates to :func:`ovagent.bootstrap.format_skill_overview`.
-        """
+        """Generate a bullet overview of available project skills."""
         return _format_skill_overview(self.skill_registry)
+
+    def help_short(self) -> str:
+        """Return a short, non-expert help string with sample prompts."""
+        examples = [
+            "basic single-cell QC and clustering",
+            "batch integration with harmony on this adata",
+            "simple trajectory with DPT, root on paul15_clusters=7MEP, list top genes",
+            "find markers for each Leiden cluster (wilcoxon)",
+            "doublet check and report rate",
+        ]
+        return (
+            "ov.Agent quick start (use only your provided adata):\n"
+            "- " + "\n- ".join(examples) + "\n"
+            "Notes: do not create new/dummy AnnData; prefer use_raw=False unless you need raw; "
+            "allowed libs: omicverse/scanpy/matplotlib."
+        )
+
+    # =====================================================================
+    # Public API: run / stream
+    # =====================================================================
+
+    async def run_async(self, request: str, adata: Any) -> Any:
+        """
+        Process a natural language request using the agentic tool-calling loop.
+
+        Parameters
+        ----------
+        request : str
+            Natural language description of what to do.
+        adata : Any
+            AnnData/MuData object to process.
+
+        Returns
+        -------
+        Any
+            Processed adata object.
+        """
+        print(f"\n{'=' * 70}")
+        print(f"🤖 OmicVerse Agent Processing Request")
+        print(f"{'=' * 70}")
+        print(f"Request: \"{request}\"")
+        if adata is not None and hasattr(adata, 'shape'):
+            print(f"Dataset: {adata.shape[0]} cells × {adata.shape[1]} genes")
+        else:
+            print(f"Dataset: None (knowledge query)")
+        print(f"{'=' * 70}\n")
+
+        # Direct execution path for explicit Python snippets (no LLM required)
+        direct_code = self._detect_direct_python_request(request)
+        if direct_code:
+            print(f"🧪 Direct Python detected → executing without model calls")
+            self.last_usage = None
+            self.last_usage_breakdown = {
+                'generation': None, 'reflection': [], 'review': [], 'total': None
+            }
+            try:
+                result_adata = self._execute_generated_code(direct_code, adata)
+                print(f"✅ Python code executed directly.")
+                return result_adata
+            except Exception as exc:
+                print(f"❌ Direct Python execution failed: {exc}")
+                raise
+
+        if self.provider == "python":
+            raise ValueError("Python provider requires executable Python code in the request.")
+
+        return await self._run_agentic_mode(request, adata)
+
+    async def _run_agentic_mode(self, request: str, adata: Any) -> Any:
+        """Agentic loop mode: LLM autonomously calls tools to complete the task."""
+        print(f"🤖 Mode: Agentic Loop (tool-calling)")
+        print()
+
+        try:
+            result = await self._run_agentic_loop(request, adata)
+            self._turn_controller._persist_harness_history(request)
+            print()
+            print(f"{'=' * 70}")
+            print(f"✅ SUCCESS - Agentic loop completed!")
+            print(f"{'=' * 70}\n")
+            return result
+        except Exception as e:
+            self._turn_controller._persist_harness_history(request)
+            print()
+            print(f"{'=' * 70}")
+            print(f"❌ ERROR - Agentic loop failed: {e}")
+            print(f"{'=' * 70}\n")
+            raise
+
+    async def generate_code_async(self, request: str, adata: Any = None, *, max_functions: int = 8, progress_callback: Optional[Callable[[str], None]] = None) -> str:
+        """Generate OmicVerse Python code without executing it."""
+        return await self._codegen.generate_code_async(
+            request, adata, max_functions=max_functions, progress_callback=progress_callback,
+        )
+
+    def generate_code(self, request: str, adata: Any = None, *, max_functions: int = 8, progress_callback: Optional[Callable[[str], None]] = None) -> str:
+        """Synchronous wrapper for code-only OmicVerse generation."""
+        return self._codegen.generate_code(
+            request, adata, max_functions=max_functions, progress_callback=progress_callback,
+        )
 
     async def stream_async(self, request: str, adata: Any,
                            cancel_event=None, history=None,
@@ -1978,26 +1094,7 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         Yields
         ------
         dict
-            Dictionary with ``'type'`` and ``'content'`` keys. Types:
-
-            - ``'tool_call'``: Agent dispatched a tool (``content`` has ``name`` and ``arguments``).
-            - ``'llm_chunk'``: LLM assistant text response.
-            - ``'code'``: Python code sent to ``execute_code``.
-            - ``'result'``: Updated adata after execution (also has ``'shape'``).
-            - ``'done'``: Agent declared the task complete (may have ``'cancelled': True``).
-            - ``'error'``: An error occurred.
-            - ``'usage'``: Token usage statistics (final event).
-
-        Examples
-        --------
-        >>> agent = ov.Agent(model="gpt-4o-mini")
-        >>> async for event in agent.stream_async("qc with nUMI>500", adata):
-        ...     if event['type'] == 'llm_chunk':
-        ...         print(event['content'], end='', flush=True)
-        ...     elif event['type'] == 'result':
-        ...         result_adata = event['content']
-        ...     elif event['type'] == 'usage':
-        ...         print(f"Tokens used: {event['content'].total_tokens}")
+            Dictionary with ``'type'`` and ``'content'`` keys.
         """
         queue: asyncio.Queue = asyncio.Queue()
 
@@ -2024,7 +1121,6 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
                     session_id=self._get_harness_session_id(),
                     category="runtime",
                 ))
-                # Defense-in-depth: ensure a done event is always emitted
                 await queue.put(build_stream_event(
                     "done",
                     f"Error: {exc}",
@@ -2049,19 +1145,19 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
     def run(self, request: str, adata: Any) -> Any:
         """
         Process a natural language request with the provided adata (main method).
-        
+
         Parameters
         ----------
         request : str
             Natural language description of what to do
         adata : Any
             AnnData object to process
-            
+
         Returns
         -------
         Any
             Processed adata object (modified)
-            
+
         Examples
         --------
         >>> agent = ov.Agent(model="gpt-4o-mini")
@@ -2094,117 +1190,95 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         return asyncio.run(self.run_async(request, adata))
 
     # ===================================================================
-    # Session Management Methods
+    # Session Management Methods (delegated to SessionService)
     # ===================================================================
 
     def get_current_session_info(self) -> Optional[Dict[str, Any]]:
-        """Get information about current notebook session.
-
-        Delegates to :class:`SessionService`.
-        """
+        """Get information about current notebook session."""
         return self._session_service.get_current_session_info()
 
     def restart_session(self):
-        """Manually restart notebook session (clear memory, start fresh).
-
-        Delegates to :class:`SessionService`.
-        """
+        """Manually restart notebook session (clear memory, start fresh)."""
         self._session_service.restart_session()
 
     def get_session_history(self) -> List[Dict[str, Any]]:
-        """Get history of all archived notebook sessions.
-
-        Delegates to :class:`SessionService`.
-        """
+        """Get history of all archived notebook sessions."""
         return self._session_service.get_session_history()
 
     # ===================================================================
-    # Filesystem Context Management Methods (delegated to ContextService)
+    # Filesystem Context Management (delegated to ContextService)
     # ===================================================================
 
     @property
     def filesystem_context(self) -> Optional[FilesystemContextManager]:
-        """Get the filesystem context manager. Delegates to :class:`ContextService`."""
+        """Get the filesystem context manager."""
         return self._context_service.filesystem_context
 
-    def write_note(
-        self,
-        key: str,
-        content: Union[str, Dict[str, Any]],
-        category: str = "notes",
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Optional[str]:
-        """Write a note to the filesystem context workspace. Delegates to :class:`ContextService`."""
+    def write_note(self, key: str, content: Union[str, Dict[str, Any]], category: str = "notes", metadata: Optional[Dict[str, Any]] = None) -> Optional[str]:
+        """Write a note to the filesystem context workspace."""
         return self._context_service.write_note(key, content, category, metadata)
 
-    def search_context(
-        self,
-        pattern: str,
-        match_type: str = "glob",
-        max_results: int = 10,
-    ) -> List[Dict[str, Any]]:
-        """Search the filesystem context for relevant notes. Delegates to :class:`ContextService`."""
+    def search_context(self, pattern: str, match_type: str = "glob", max_results: int = 10) -> List[Dict[str, Any]]:
+        """Search the filesystem context for relevant notes."""
         return self._context_service.search_context(pattern, match_type, max_results)
 
-    def get_relevant_context(
-        self,
-        query: str,
-        max_tokens: int = 1000,
-    ) -> str:
-        """Get context relevant to a query. Delegates to :class:`ContextService`."""
+    def get_relevant_context(self, query: str, max_tokens: int = 1000) -> str:
+        """Get context relevant to a query."""
         return self._context_service.get_relevant_context(query, max_tokens)
 
     def save_plan(self, steps: List[Dict[str, Any]]) -> Optional[str]:
-        """Save an execution plan. Delegates to :class:`ContextService`."""
+        """Save an execution plan."""
         return self._context_service.save_plan(steps)
 
-    def update_plan_step(
-        self,
-        step_index: int,
-        status: str,
-        result: Optional[str] = None,
-    ) -> None:
-        """Update the status of a plan step. Delegates to :class:`ContextService`."""
+    def update_plan_step(self, step_index: int, status: str, result: Optional[str] = None) -> None:
+        """Update the status of a plan step."""
         self._context_service.update_plan_step(step_index, status, result)
 
     def get_workspace_summary(self) -> str:
-        """Get a summary of the filesystem context workspace. Delegates to :class:`ContextService`."""
+        """Get a summary of the filesystem context workspace."""
         return self._context_service.get_workspace_summary()
 
     def get_context_stats(self) -> Dict[str, Any]:
-        """Get statistics about the filesystem context workspace. Delegates to :class:`ContextService`."""
+        """Get statistics about the filesystem context workspace."""
         return self._context_service.get_context_stats()
+
+    # ===================================================================
+    # Cleanup
+    # ===================================================================
 
     def __del__(self):
         """Cleanup on agent deletion."""
         if hasattr(self, '_notebook_executor') and self._notebook_executor:
             try:
                 self._notebook_executor.shutdown()
-            except:
+            except Exception:
                 pass
-
-        # Cleanup filesystem context if needed
         if hasattr(self, '_filesystem_context') and self._filesystem_context:
             try:
                 self._filesystem_context.cleanup_session(keep_summary=True)
-            except:
+            except Exception:
                 pass
+
+
+# =====================================================================
+# Module-level API
+# =====================================================================
 
 
 def list_supported_models(show_all: bool = False) -> str:
     """
     List all supported models for OmicVerse Smart Agent.
-    
+
     Parameters
     ----------
     show_all : bool, optional
         If True, show all models. If False, show top 3 per provider (default: False)
-        
+
     Returns
     -------
     str
         Formatted list of supported models with API key status
-        
+
     Examples
     --------
     >>> import omicverse as ov
@@ -2212,6 +1286,7 @@ def list_supported_models(show_all: bool = False) -> str:
     >>> print(ov.list_supported_models(show_all=True))
     """
     return ModelConfig.list_supported_models(show_all)
+
 
 def Agent(model: str = "gpt-5.2", api_key: Optional[str] = None, endpoint: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, approval_mode: str = "never", agent_mode: str = "agentic", max_agent_turns: int = 15, security_level: Optional[str] = None, *, config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True) -> OmicVerseAgent:
     """
@@ -2236,10 +1311,8 @@ def Agent(model: str = "gpt-5.2", api_key: Optional[str] = None, endpoint: Optio
         Enable result review to validate output matches user intent (default: True)
     use_notebook_execution : bool, optional
         Execute code in separate Jupyter notebook for isolation and debugging (default: True).
-        Set to False to use legacy in-process execution.
     max_prompts_per_session : int, optional
         Number of prompts to execute in same notebook session before restart (default: 5).
-        This prevents memory bloat while maintaining context for iterative analysis.
     notebook_storage_dir : str, optional
         Directory to store session notebooks. Defaults to ~/.ovagent/sessions
     keep_execution_notebooks : bool, optional
@@ -2247,18 +1320,19 @@ def Agent(model: str = "gpt-5.2", api_key: Optional[str] = None, endpoint: Optio
     notebook_timeout : int, optional
         Execution timeout in seconds (default: 600)
     strict_kernel_validation : bool, optional
-        If True, raise error if kernel not found. If False, fall back to python3 kernel (default: True)
+        If True, raise error if kernel not found. If False, fall back to python3 (default: True)
     enable_filesystem_context : bool, optional
-        Enable filesystem-based context management for offloading intermediate results,
-        plans, and notes to disk. This reduces context window usage and enables
-        selective context retrieval. Default: True.
+        Enable filesystem-based context management. Default: True.
     context_storage_dir : str, optional
         Directory for storing context files. Defaults to ~/.ovagent/context/
     approval_mode : str, optional
         When to prompt the user before executing generated code.
-        "never" (default): execute immediately.
-        "always": always show code and ask for approval.
-        "on_violation": ask only when security scanner finds issues.
+    config : AgentConfig, optional
+        Grouped configuration object.
+    reporter : Reporter, optional
+        Structured event reporter.
+    verbose : bool, optional
+        Whether to emit events to stdout (default: True).
 
     Returns
     -------
@@ -2268,44 +1342,8 @@ def Agent(model: str = "gpt-5.2", api_key: Optional[str] = None, endpoint: Optio
     Examples
     --------
     >>> import omicverse as ov
-    >>> import scanpy as sc
-    >>>
-    >>> # Create agent instance with full validation (default, session-based execution)
     >>> agent = ov.Agent(model="gpt-5", api_key="your-key")
-    >>>
-    >>> # Create agent with multiple reflection iterations
-    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", reflection_iterations=2)
-    >>>
-    >>> # Create agent without validation (fastest execution)
-    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", enable_reflection=False, enable_result_review=False)
-    >>>
-    >>> # Disable notebook execution (use legacy in-process execution)
-    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", use_notebook_execution=False)
-    >>>
-    >>> # Maximum isolation (new session per prompt)
-    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", max_prompts_per_session=1)
-    >>>
-    >>> # Longer sessions for complex workflows
-    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", max_prompts_per_session=10)
-    >>>
-    >>> # Custom storage directory
-    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", notebook_storage_dir="~/my_project/sessions")
-    >>>
-    >>> # Load data
-    >>> adata = sc.datasets.pbmc3k()
-    >>>
-    >>> # Use agent for quality control
     >>> adata = agent.run("quality control with nUMI>500, mito<0.2", adata)
-    >>>
-    >>> # Use agent for preprocessing
-    >>> adata = agent.run("preprocess with 2000 highly variable genes", adata)
-    >>>
-    >>> # Use agent for clustering
-    >>> adata = agent.run("leiden clustering resolution=1.0", adata)
-    >>>
-    >>> # Check session info
-    >>> info = agent.get_current_session_info()
-    >>> print(f"Session: {info['session_id']}, Prompts: {info['prompt_count']}/{info['max_prompts']}")
     """
     return OmicVerseAgent(
         model=model,
@@ -2330,7 +1368,3 @@ def Agent(model: str = "gpt-5.2", api_key: Optional[str] = None, endpoint: Optio
         reporter=reporter,
         verbose=verbose,
     )
-
-
-# Export the main functions
-__all__ = ["Agent", "OmicVerseAgent", "list_supported_models"]
