@@ -796,13 +796,29 @@ User request: "quality control with nUMI>500, mito<0.2"
         with _temporary_api_keys_cm(self._managed_api_env):
             yield
 
+    def _get_session_service(self) -> _SessionService:
+        """Lazily construct SessionService for legacy __new__-based instances."""
+        service = getattr(self, "_session_service", None)
+        if service is None:
+            service = _SessionService(self)
+            self._session_service = service
+        return service
+
+    def _get_context_service(self) -> _ContextService:
+        """Lazily construct ContextService for legacy __new__-based instances."""
+        service = getattr(self, "_context_service", None)
+        if service is None:
+            service = _ContextService(self)
+            self._context_service = service
+        return service
+
     def _get_harness_session_id(self) -> str:
         """Best-effort session identifier for harness traces/history."""
-        return self._session_service.get_harness_session_id()
+        return self._get_session_service().get_harness_session_id()
 
     def _get_runtime_session_id(self) -> str:
         """Return the session key used by the harness runtime registry."""
-        return self._session_service.get_runtime_session_id()
+        return self._get_session_service().get_runtime_session_id()
 
     def _get_visible_agent_tools(self, *, allowed_names: Optional[set[str]] = None) -> list[dict[str, Any]]:
         """Return the currently visible tool schemas."""
@@ -814,7 +830,7 @@ User request: "quality control with nUMI>500, mito<0.2"
 
     def _refresh_runtime_working_directory(self) -> str:
         """Keep runtime cwd aligned with the active worktree / filesystem context."""
-        return self._session_service.refresh_runtime_working_directory()
+        return self._get_session_service().refresh_runtime_working_directory()
 
     def _tool_blocked_in_plan_mode(self, tool_name: str) -> bool:
         """Check plan-mode blocking."""
@@ -1390,15 +1406,15 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
 
     def get_current_session_info(self) -> Optional[Dict[str, Any]]:
         """Get information about current notebook session."""
-        return self._session_service.get_current_session_info()
+        return self._get_session_service().get_current_session_info()
 
     def restart_session(self):
         """Manually restart notebook session (clear memory, start fresh)."""
-        self._session_service.restart_session()
+        self._get_session_service().restart_session()
 
     def get_session_history(self) -> List[Dict[str, Any]]:
         """Get history of all archived notebook sessions."""
-        return self._session_service.get_session_history()
+        return self._get_session_service().get_session_history()
 
     # ===================================================================
     # Filesystem Context Management (delegated to ContextService)
@@ -1407,35 +1423,35 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
     @property
     def filesystem_context(self) -> Optional[FilesystemContextManager]:
         """Get the filesystem context manager."""
-        return self._context_service.filesystem_context
+        return self._get_context_service().filesystem_context
 
     def write_note(self, key: str, content: Union[str, Dict[str, Any]], category: str = "notes", metadata: Optional[Dict[str, Any]] = None) -> Optional[str]:
         """Write a note to the filesystem context workspace."""
-        return self._context_service.write_note(key, content, category, metadata)
+        return self._get_context_service().write_note(key, content, category, metadata)
 
     def search_context(self, pattern: str, match_type: str = "glob", max_results: int = 10) -> List[Dict[str, Any]]:
         """Search the filesystem context for relevant notes."""
-        return self._context_service.search_context(pattern, match_type, max_results)
+        return self._get_context_service().search_context(pattern, match_type, max_results)
 
     def get_relevant_context(self, query: str, max_tokens: int = 1000) -> str:
         """Get context relevant to a query."""
-        return self._context_service.get_relevant_context(query, max_tokens)
+        return self._get_context_service().get_relevant_context(query, max_tokens)
 
     def save_plan(self, steps: List[Dict[str, Any]]) -> Optional[str]:
         """Save an execution plan."""
-        return self._context_service.save_plan(steps)
+        return self._get_context_service().save_plan(steps)
 
     def update_plan_step(self, step_index: int, status: str, result: Optional[str] = None) -> None:
         """Update the status of a plan step."""
-        self._context_service.update_plan_step(step_index, status, result)
+        self._get_context_service().update_plan_step(step_index, status, result)
 
     def get_workspace_summary(self) -> str:
         """Get a summary of the filesystem context workspace."""
-        return self._context_service.get_workspace_summary()
+        return self._get_context_service().get_workspace_summary()
 
     def get_context_stats(self) -> Dict[str, Any]:
         """Get statistics about the filesystem context workspace."""
-        return self._context_service.get_context_stats()
+        return self._get_context_service().get_context_stats()
 
     # ===================================================================
     # Cleanup
