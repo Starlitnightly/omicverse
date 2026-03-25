@@ -143,7 +143,7 @@ class TestNotebookFallbackErrorReporting(unittest.TestCase):
         async def run():
             return await rt.dispatch_tool(FakeToolCall(), adata, "test")
 
-        raw = asyncio.get_event_loop().run_until_complete(run())
+        raw = asyncio.run(run())
         parsed = json.loads(raw)
         self.assertIn("error", parsed)
         self.assertIn("non-empty", parsed["error"])

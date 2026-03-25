@@ -199,6 +199,11 @@ class FilesystemContextManager:
             return self.base_dir / self.parent_session_id
         return self.base_dir / self.session_id
 
+    @property
+    def workspace_dir(self) -> Path:
+        """Public accessor for the session workspace path."""
+        return self._workspace_dir
+
     def _ensure_workspace_structure(self) -> None:
         """Create the workspace directory structure if it doesn't exist."""
         # Create main directories
