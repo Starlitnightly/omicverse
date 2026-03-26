@@ -119,11 +119,15 @@ class TestOpenAIStreaming:
             api_key="test-key"
         )
 
-        # Mock the HTTP call
-        async def mock_http_fallback(base_url, api_key, prompt):
+        # Mock at module level — after decomposition the module-level function
+        # is called directly, not the instance wrapper.
+        async def mock_http_fallback(backend_, base_url, api_key, prompt):
             yield "Full response from HTTP"
 
-        monkeypatch.setattr(backend, "_stream_openai_http_fallback", mock_http_fallback)
+        monkeypatch.setattr(
+            "omicverse.utils.agent_backend_streaming._stream_openai_http_fallback",
+            mock_http_fallback,
+        )
 
         # Remove openai from sys.modules to trigger ImportError
         with patch.dict('sys.modules', {'openai': None}):
@@ -151,11 +155,15 @@ class TestOpenAIStreaming:
             api_key="test-key"
         )
 
-        # Mock the responses API streaming
-        async def mock_responses_stream(base_url, api_key, prompt):
+        # Mock at module level — after decomposition the module-level function
+        # is called directly, not the instance wrapper.
+        async def mock_responses_stream(backend_, base_url, api_key, prompt):
             yield "GPT-5 full response"
 
-        monkeypatch.setattr(backend, "_stream_openai_responses", mock_responses_stream)
+        monkeypatch.setattr(
+            "omicverse.utils.agent_backend_streaming._stream_openai_responses",
+            mock_responses_stream,
+        )
 
         chunks = []
         async for chunk in backend._stream_openai_compatible("Test prompt"):
