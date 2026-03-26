@@ -327,11 +327,10 @@ class TestRealProviderE2E:
 
     def test_01_relay_connectivity(self, credentials, relay_check, evidence):
         """Verify the relay endpoint is reachable and lists models."""
-        evidence.relay_info = {
-            "base_url": credentials["base_url"],
-            "masked_key": credentials["masked_key"],
-            **relay_check,
-        }
+        # Do not store credential-file-derived values (base_url, masked_key)
+        # in evidence — CodeQL flags them as clear-text sensitive data when
+        # the report is later written to disk or printed.
+        evidence.relay_info = {**relay_check}
         assert relay_check["ok"], f"Relay check failed: {relay_check}"
         assert relay_check["model_count"] > 0, "No models available on relay"
 
@@ -361,7 +360,6 @@ class TestRealProviderE2E:
         evidence.agent_info = {
             "model": model,
             "provider": getattr(agent, "provider", "unknown"),
-            "endpoint": credentials["base_url"],
             "init_duration_s": round(init_duration, 2),
         }
         evidence.record_step(
@@ -553,14 +551,15 @@ def _run_standalone() -> int:
     )
     try:
         creds = _parse_credentials(cred_path)
-        print(f"[OK] Credentials loaded (key: {creds['masked_key']})")
+        print("[OK] Credentials loaded")
     except Exception as exc:
         print(f"[FAIL] Credential loading: {exc}")
         return 1
 
-    # Step 2: relay
+    # Step 2: relay — use credential values only for the API call,
+    # never store them in evidence that gets logged/written to disk.
     relay = _check_relay_connectivity(creds["base_url"], creds["api_key"])
-    ev.relay_info = {"base_url": creds["base_url"], "masked_key": creds["masked_key"], **relay}
+    ev.relay_info = {**relay}
     if not relay["ok"]:
         print(f"[FAIL] Relay unreachable: {relay.get('error')}")
         return 1
