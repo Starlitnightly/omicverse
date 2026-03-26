@@ -592,101 +592,155 @@ class TestToolRuntimeExecSeam:
 
 
 class TestToolRuntimeIOSeam:
-    """Filesystem/notebook tool methods on ToolRuntime.
+    """Filesystem/notebook tools — extracted to tool_runtime_io.py."""
 
-    Target: tool_runtime_io.py
-    """
-
-    IO_METHODS = {
-        "_tool_read",
-        "_tool_edit",
-        "_tool_write",
-        "_tool_glob",
-        "_tool_grep",
-        "_tool_notebook_edit",
+    IO_HANDLER_FUNCTIONS = {
+        "handle_read",
+        "handle_edit",
+        "handle_write",
+        "handle_glob",
+        "handle_grep",
+        "handle_notebook_edit",
     }
 
-    def test_io_methods_exist(self):
-        for name in self.IO_METHODS:
-            assert hasattr(ToolRuntime, name), (
-                f"ToolRuntime missing IO method '{name}'"
+    # These methods no longer live on ToolRuntime; they are module-level
+    # functions in tool_runtime_io.
+    IO_METHODS: set = set()
+
+    def test_io_handlers_exist_in_extracted_module(self):
+        from omicverse.utils.ovagent import tool_runtime_io
+        for name in self.IO_HANDLER_FUNCTIONS:
+            assert hasattr(tool_runtime_io, name), (
+                f"tool_runtime_io missing handler '{name}'"
+            )
+            assert callable(getattr(tool_runtime_io, name))
+
+    def test_io_methods_removed_from_facade(self):
+        removed = {
+            "_tool_read", "_tool_edit", "_tool_write",
+            "_tool_glob", "_tool_grep", "_tool_notebook_edit",
+        }
+        for name in removed:
+            assert not hasattr(ToolRuntime, name), (
+                f"ToolRuntime still has '{name}' — should be extracted"
             )
 
 
 class TestToolRuntimeWebSeam:
-    """Web/network tool methods on ToolRuntime.
+    """Web/network tools — extracted to tool_runtime_web.py."""
 
-    Target: tool_runtime_web.py
-    """
-
-    WEB_METHODS = {
-        "_tool_web_fetch",
-        "_tool_web_search",
-        "_tool_web_download",
+    WEB_HANDLER_FUNCTIONS = {
+        "handle_web_fetch",
+        "handle_web_search",
+        "handle_web_download",
     }
 
-    def test_web_methods_exist(self):
-        for name in self.WEB_METHODS:
-            assert hasattr(ToolRuntime, name), (
-                f"ToolRuntime missing web method '{name}'"
+    # These methods no longer live on ToolRuntime.
+    WEB_METHODS: set = set()
+
+    def test_web_handlers_exist_in_extracted_module(self):
+        from omicverse.utils.ovagent import tool_runtime_web
+        for name in self.WEB_HANDLER_FUNCTIONS:
+            assert hasattr(tool_runtime_web, name), (
+                f"tool_runtime_web missing handler '{name}'"
+            )
+            assert callable(getattr(tool_runtime_web, name))
+
+    def test_web_methods_removed_from_facade(self):
+        removed = {"_tool_web_fetch", "_tool_web_search", "_tool_web_download"}
+        for name in removed:
+            assert not hasattr(ToolRuntime, name), (
+                f"ToolRuntime still has '{name}' — should be extracted"
             )
 
 
 class TestToolRuntimeWorkspaceSeam:
-    """Task/plan/worktree/skill/MCP tool methods on ToolRuntime.
+    """Task/plan/worktree/skill/MCP tools — extracted to tool_runtime_workspace.py.
 
-    Target: tool_runtime_workspace.py
+    Methods that remain on the facade (core/execution family) are tracked
+    separately in the facade-methods set below.
     """
 
-    WORKSPACE_METHODS = {
-        "_tool_create_task",
-        "_tool_get_task",
-        "_tool_list_tasks",
-        "_tool_task_output",
-        "_tool_task_stop",
-        "_tool_task_update",
-        "_tool_enter_plan_mode",
-        "_tool_exit_plan_mode",
-        "_tool_enter_worktree",
-        "_tool_skill",
-        "_tool_list_mcp_resources",
-        "_tool_read_mcp_resource",
+    WORKSPACE_HANDLER_FUNCTIONS = {
+        "handle_create_task",
+        "handle_get_task",
+        "handle_list_tasks",
+        "handle_task_output",
+        "handle_task_stop",
+        "handle_task_update",
+        "handle_enter_plan_mode",
+        "handle_exit_plan_mode",
+        "handle_enter_worktree",
+        "handle_skill",
+        "handle_search_skills",
+        "handle_list_mcp_resources",
+        "handle_read_mcp_resource",
+        "handle_ask_user_question",
+    }
+
+    # Core/execution methods that the old workspace seam listed but that
+    # actually stay on the ToolRuntime facade.
+    FACADE_METHODS = {
         "_tool_tool_search",
-        "_tool_ask_user_question",
         "_tool_inspect_data",
         "_tool_search_functions",
-        "_tool_search_skills",
         "_dispatch_ask_user_question",
     }
 
-    def test_workspace_methods_exist(self):
-        for name in self.WORKSPACE_METHODS:
+    # Empty — everything formerly here is now in the extracted module or
+    # reclassified into FACADE_METHODS.
+    WORKSPACE_METHODS: set = set()
+
+    def test_workspace_handlers_exist_in_extracted_module(self):
+        from omicverse.utils.ovagent import tool_runtime_workspace
+        for name in self.WORKSPACE_HANDLER_FUNCTIONS:
+            assert hasattr(tool_runtime_workspace, name), (
+                f"tool_runtime_workspace missing handler '{name}'"
+            )
+            assert callable(getattr(tool_runtime_workspace, name))
+
+    def test_facade_methods_still_on_runtime(self):
+        for name in self.FACADE_METHODS:
             assert hasattr(ToolRuntime, name), (
-                f"ToolRuntime missing workspace method '{name}'"
+                f"ToolRuntime should still have facade method '{name}'"
+            )
+
+    def test_workspace_methods_removed_from_facade(self):
+        removed = {
+            "_tool_create_task", "_tool_get_task", "_tool_list_tasks",
+            "_tool_task_output", "_tool_task_stop", "_tool_task_update",
+            "_tool_enter_plan_mode", "_tool_exit_plan_mode",
+            "_tool_enter_worktree", "_tool_skill", "_tool_search_skills",
+            "_tool_list_mcp_resources", "_tool_read_mcp_resource",
+            "_tool_ask_user_question",
+        }
+        for name in removed:
+            assert not hasattr(ToolRuntime, name), (
+                f"ToolRuntime still has '{name}' — should be extracted"
             )
 
 
 class TestToolRuntimeMethodPartition:
-    """All _tool_* methods on ToolRuntime are accounted for in exactly one seam.
+    """All _tool_* methods on ToolRuntime are accounted for.
 
-    This prevents methods from being forgotten during extraction.
+    After IO/web/workspace extraction, only execution and core methods
+    remain on the facade.  This test ensures no method is forgotten.
     """
 
-    ALL_SEAM_METHODS = (
+    # Methods that remain on the ToolRuntime facade after extraction.
+    ALL_FACADE_METHODS = (
         TestToolRuntimeExecSeam.EXEC_METHODS
-        | TestToolRuntimeIOSeam.IO_METHODS
-        | TestToolRuntimeWebSeam.WEB_METHODS
-        | TestToolRuntimeWorkspaceSeam.WORKSPACE_METHODS
+        | TestToolRuntimeWorkspaceSeam.FACADE_METHODS
     )
 
     def test_no_undocumented_tool_methods(self):
-        """Every _tool_* and _dispatch_* method is assigned to a seam."""
+        """Every _tool_* and _dispatch_* method on the facade is accounted for."""
         actual_tool_methods = {
             name for name in dir(ToolRuntime)
             if (name.startswith("_tool_") or name.startswith("_dispatch_"))
             and callable(getattr(ToolRuntime, name))
         }
-        undocumented = actual_tool_methods - self.ALL_SEAM_METHODS
+        undocumented = actual_tool_methods - self.ALL_FACADE_METHODS
         assert not undocumented, (
             f"Undocumented ToolRuntime methods (assign to a seam): {undocumented}"
         )
@@ -1082,6 +1136,8 @@ class TestNoBehaviorChange:
             "event_stream.py", "permission_policy.py", "prompt_builder.py",
             "prompt_templates.py", "protocol.py", "registry_scanner.py",
             "repair_loop.py", "run_store.py", "runtime.py",
+            "tool_runtime_io.py", "tool_runtime_web.py",
+            "tool_runtime_workspace.py",
             "session_context.py", "subagent_controller.py",
             "tool_registry.py", "tool_runtime.py", "tool_scheduler.py",
             "turn_controller.py", "turn_followup.py", "turn_artifacts.py",
