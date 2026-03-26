@@ -110,6 +110,8 @@ full = [
   'metatime>=1.3.0',
   'graphtools>=1.5',
   'boltons>=23.0',
+  'cytoolz>=0.12',
+  'frozendict>=2.3',
   'leidenalg>=0.9',
   'gdown>=4.6',
   'wandb',

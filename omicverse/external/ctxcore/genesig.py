@@ -8,13 +8,14 @@ from itertools import chain, repeat
 from pathlib import Path
 from typing import Mapping
 
+import functools
+
 import attr
 import yaml
-from cytoolz import dissoc, first, keyfilter, memoize, merge, merge_with, second
-from frozendict import frozendict
 
 
 def convert(genes) -> Mapping[str, float]:  # noqa: D103
+    from frozendict import frozendict
     # Genes supplied as dictionary.
     if isinstance(genes, ABCMapping):
         return frozendict(genes)
@@ -174,24 +175,26 @@ class GeneSignature(yaml.YAMLObject):
             raise ValueError(msg)
 
     @property
-    @memoize
+    @functools.lru_cache(maxsize=None)
     def genes(self) -> tuple[str, ...]:
         """Return genes in this signature.
 
         Genes are sorted in descending order according to weight.
         """
+        from cytoolz import first, second
         return tuple(
             map(first, sorted(self.gene2weight.items(), key=second, reverse=True))
         )
 
     @property
-    @memoize
+    @functools.lru_cache(maxsize=None)
     def weights(self) -> tuple[float, ...]:
         """
         Return the weights of the genes in this signature.
 
         Genes are sorted in descending order according to weight.
         """
+        from cytoolz import second
         return tuple(
             map(second, sorted(self.gene2weight.items(), key=second, reverse=True))
         )
@@ -210,6 +213,7 @@ class GeneSignature(yaml.YAMLObject):
     def copy(self, **kwargs) -> GeneSignature:
         """Create a copy of this signature."""
         # noinspection PyTypeChecker
+        from cytoolz import merge
         try:
             return GeneSignature(**merge(vars(self), kwargs))
         except TypeError:
@@ -252,6 +256,8 @@ class GeneSignature(yaml.YAMLObject):
         :param other: The other :class:`GeneSignature`.
         :return: the new :class:`GeneSignature` instance.
         """
+        from cytoolz import merge_with
+        from frozendict import frozendict
         return self.copy(
             name=f"({self.name} | {other.name})"
             if self.name != other.name
@@ -274,6 +280,8 @@ class GeneSignature(yaml.YAMLObject):
         :param other: The other :class:`GeneSignature`.
         :return: the new :class:`GeneSignature` instance.
         """
+        from cytoolz import dissoc
+        from frozendict import frozendict
         return self.copy(
             name=f"({self.name} - {other.name})"
             if self.name != other.name
@@ -294,6 +302,8 @@ class GeneSignature(yaml.YAMLObject):
         :param other: The other :class:`GeneSignature`.
         :return: the new :class:`GeneSignature` instance.
         """
+        from cytoolz import keyfilter, merge_with
+        from frozendict import frozendict
         genes = set(self.gene2weight.keys()).intersection(set(other.gene2weight.keys()))
         return self.copy(
             name=f"({self.name} & {other.name})"
@@ -317,6 +327,7 @@ class GeneSignature(yaml.YAMLObject):
 
     def head(self, n: int = 5) -> GeneSignature:
         """Returns a gene signature with only the top n targets."""
+        from cytoolz import keyfilter
         assert n >= 1, "n must be greater than or equal to one."
         genes = self.genes[
             0:n
@@ -417,6 +428,7 @@ class Regulon(GeneSignature, yaml.YAMLObject):
 
     def copy(self, **kwargs) -> Regulon:
         """Create a copy of this regulon."""
+        from cytoolz import merge
         try:
             return Regulon(**merge(vars(self), kwargs))
         except TypeError:
