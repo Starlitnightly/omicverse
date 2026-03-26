@@ -183,8 +183,16 @@ def test_tool_search_functions_falls_back_to_static_registry(monkeypatch):
 def test_execute_code_returns_full_debug_output_but_truncated_llm_output():
     runtime = ToolRuntime.__new__(ToolRuntime)
 
+    class _Ctx:
+        _code_only_mode = False
+
+        @staticmethod
+        def _extract_python_code(text):
+            return text
+
     class _Executor:
         _notebook_fallback_error = None
+        _ctx = _Ctx()
 
         def check_code_prerequisites(self, code, adata):
             return ""
@@ -194,9 +202,6 @@ def test_execute_code_returns_full_debug_output_but_truncated_llm_output():
                 "adata": adata,
                 "stdout": "A" * 3500,
             }
-
-    class _Ctx:
-        _code_only_mode = False
 
     runtime._ctx = _Ctx()
     runtime._executor = _Executor()
@@ -422,3 +427,178 @@ class TestSmartAgentDelegation:
             assert not hasattr(OmicVerseAgent, name), (
                 f"OmicVerseAgent still has {name} — should be removed"
             )
+
+
+# -----------------------------------------------------------------------
+# Task-025: Registry-driven dispatch tests
+# -----------------------------------------------------------------------
+
+
+class TestRegistryDrivenDispatch:
+    """Registry-driven dispatch preserves canonical names, aliases, and behavior."""
+
+    def _make_rt(self):
+        ctx = _DummyCtx()
+        return ToolRuntime(ctx, _DummyExecutor())
+
+    def test_registry_is_initialized(self):
+        rt = self._make_rt()
+        assert rt.registry is not None
+        entries = rt.registry.all_entries()
+        assert len(entries) > 0
+
+    def test_all_handler_keys_are_bound(self):
+        rt = self._make_rt()
+        unresolved = rt.registry.validate_handlers()
+        assert unresolved == [], f"Unresolved handler keys: {unresolved}"
+
+    def test_canonical_catalog_tools_resolve(self):
+        rt = self._make_rt()
+        for name in [
+            "ToolSearch", "Bash", "Read", "Edit", "Write", "Glob", "Grep",
+            "NotebookEdit", "Agent", "AskUserQuestion", "EnterPlanMode",
+            "ExitPlanMode", "EnterWorktree", "Skill", "WebFetch",
+            "WebSearch", "ListMcpResourcesTool", "ReadMcpResourceTool",
+        ]:
+            canonical = rt.registry.resolve_name(name)
+            assert canonical == name, f"{name} did not resolve to itself"
+            handler = rt.registry.get_handler(name)
+            assert handler is not None, f"No handler for {name}"
+
+    def test_legacy_tools_resolve(self):
+        rt = self._make_rt()
+        for name in [
+            "inspect_data", "execute_code", "run_snippet",
+            "search_functions", "web_download", "finish",
+        ]:
+            canonical = rt.registry.resolve_name(name)
+            assert canonical == name, f"Legacy tool {name} did not resolve"
+            handler = rt.registry.get_handler(name)
+            assert handler is not None, f"No handler for legacy tool {name}"
+
+    def test_legacy_aliases_resolve_to_catalog_tools(self):
+        rt = self._make_rt()
+        assert rt.registry.resolve_name("delegate") == "Agent"
+        assert rt.registry.resolve_name("web_fetch") == "WebFetch"
+        assert rt.registry.resolve_name("web_search") == "WebSearch"
+        assert rt.registry.resolve_name("search_skills") == "Skill"
+
+    def test_case_insensitive_resolution(self):
+        rt = self._make_rt()
+        assert rt.registry.resolve_name("bash") == "Bash"
+        assert rt.registry.resolve_name("read") == "Read"
+
+    def test_dispatch_tool_search_via_registry(self):
+        rt = self._make_rt()
+        tc = SimpleNamespace(name="ToolSearch", arguments={"query": "select:Edit"})
+        result = asyncio.run(rt.dispatch_tool(tc, None, "test"))
+        parsed = json.loads(result)
+        assert "Edit" in parsed.get("selected_tools", [])
+
+    def test_dispatch_finish_via_registry(self):
+        rt = self._make_rt()
+        tc = SimpleNamespace(name="finish", arguments={"summary": "all done"})
+        result = asyncio.run(rt.dispatch_tool(tc, None, "test"))
+        assert result == {"finished": True, "summary": "all done"}
+
+    def test_dispatch_unknown_tool_via_registry(self):
+        rt = self._make_rt()
+        tc = SimpleNamespace(name="nonexistent_tool_xyz", arguments={})
+        result = asyncio.run(rt.dispatch_tool(tc, None, "test"))
+        assert "Unknown tool" in result
+
+    def test_dispatch_inspect_data_passes_adata(self):
+        rt = self._make_rt()
+        tc = SimpleNamespace(name="inspect_data", arguments={"aspect": "shape"})
+        result = asyncio.run(rt.dispatch_tool(tc, None, "test"))
+        assert "No dataset" in result
+
+    def test_dispatch_execute_code_empty_validation(self):
+        rt = self._make_rt()
+        tc = SimpleNamespace(
+            name="execute_code", arguments={"code": "", "description": ""}
+        )
+        result = asyncio.run(rt.dispatch_tool(tc, None, "test"))
+        parsed = json.loads(result)
+        assert "error" in parsed
+
+    def test_dispatch_run_snippet_empty_validation(self):
+        rt = self._make_rt()
+        tc = SimpleNamespace(name="run_snippet", arguments={"code": "  "})
+        result = asyncio.run(rt.dispatch_tool(tc, None, "test"))
+        parsed = json.loads(result)
+        assert "error" in parsed
+
+    def test_dispatch_ask_user_question_empty_validation(self):
+        rt = self._make_rt()
+        tc = SimpleNamespace(name="AskUserQuestion", arguments={})
+        result = asyncio.run(rt.dispatch_tool(tc, None, "test"))
+        parsed = json.loads(result)
+        assert "error" in parsed
+
+    def test_plan_mode_blocking_via_registry_dispatch(self):
+        ctx = _DummyCtx()
+        rt = ToolRuntime(ctx, _DummyExecutor())
+        sid = ctx._session_id
+        runtime_state.enter_plan_mode(sid, reason="test")
+        try:
+            tc = SimpleNamespace(name="Bash", arguments={"command": "ls"})
+            result = asyncio.run(rt.dispatch_tool(tc, None, "test"))
+            assert "plan mode" in result.lower()
+        finally:
+            runtime_state.exit_plan_mode(sid, reason="cleanup")
+
+    def test_plan_mode_blocking_legacy_tools_via_registry(self):
+        ctx = _DummyCtx()
+        rt = ToolRuntime(ctx, _DummyExecutor())
+        sid = ctx._session_id
+        runtime_state.enter_plan_mode(sid, reason="test")
+        try:
+            tc = SimpleNamespace(
+                name="execute_code",
+                arguments={"code": "x=1", "description": "test"},
+            )
+            result = asyncio.run(rt.dispatch_tool(tc, None, "test"))
+            assert "plan mode" in result.lower()
+        finally:
+            runtime_state.exit_plan_mode(sid, reason="cleanup")
+
+    def test_agent_dispatch_via_registry_without_controller_raises(self):
+        rt = self._make_rt()
+        tc = SimpleNamespace(
+            name="Agent",
+            arguments={"agent_type": "explore", "task": "inspect this"},
+        )
+        with pytest.raises(RuntimeError, match="Subagent controller"):
+            asyncio.run(rt.dispatch_tool(tc, None, "test"))
+
+    def test_dispatch_search_functions_via_registry(self, monkeypatch):
+        rt = self._make_rt()
+        fake_registry = SimpleNamespace(find=lambda query: [])
+        monkeypatch.setattr(tool_runtime_module, "_global_registry", fake_registry)
+        tc = SimpleNamespace(
+            name="search_functions", arguments={"query": "dynamo"}
+        )
+        result = asyncio.run(rt.dispatch_tool(tc, None, "test"))
+        assert "dynamo" in result.lower()
+
+    def test_dispatch_via_legacy_alias_delegate(self):
+        """Dispatching 'delegate' resolves through the registry to Agent."""
+        rt = self._make_rt()
+        tc = SimpleNamespace(
+            name="delegate",
+            arguments={"agent_type": "explore", "task": "test"},
+        )
+        # Should resolve to Agent and fail without controller
+        with pytest.raises(RuntimeError, match="Subagent controller"):
+            asyncio.run(rt.dispatch_tool(tc, None, "test"))
+
+    def test_handler_count_matches_registered_entries(self):
+        rt = self._make_rt()
+        entries = rt.registry.all_entries()
+        bound_keys = set()
+        for meta in entries:
+            handler = rt.registry.get_handler(meta.canonical_name)
+            if handler is not None:
+                bound_keys.add(meta.handler_key)
+        assert bound_keys == rt.registry.handler_keys()
