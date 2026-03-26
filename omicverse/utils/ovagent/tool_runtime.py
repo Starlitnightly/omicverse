@@ -36,6 +36,15 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _truncate_text(text: str, limit: int) -> str:
+    """Truncate text for LLM-facing tool output while preserving total length."""
+    if limit <= 0 or len(text) <= limit:
+        return text
+    suffix = f"\n... (truncated, total_chars={len(text)})"
+    keep = max(0, limit - len(suffix))
+    return text[:keep] + suffix
+
+
 # Legacy OmicVerse-specific tool schemas that are not part of the
 # Claude-style tool catalog but must still be exposed to the LLM.
 LEGACY_AGENT_TOOLS: list[dict[str, Any]] = [
@@ -594,48 +603,66 @@ class ToolRuntime:
             )
 
             output_parts: List[str] = []
+            debug_output_parts: List[str] = []
             notebook_err = getattr(
                 self._executor, "_notebook_fallback_error", None
             )
             if notebook_err:
-                output_parts.append(
+                notebook_msg = (
                     f"WARNING: notebook session execution failed with error:\n{notebook_err}\n"
                     f"Fell back to in-process execution. Please fix the code to avoid this error."
                 )
+                output_parts.append(notebook_msg)
+                debug_output_parts.append(notebook_msg)
 
             # Annotate recovered attempts
             if len(repair_result.attempts) > 1:
                 strategies = [
                     a.strategy for a in repair_result.attempts if not a.success
                 ]
-                output_parts.append(
+                recovery_msg = (
                     f"RECOVERED after {len(repair_result.attempts)} attempt(s) "
                     f"(strategies: {', '.join(strategies)})"
                 )
+                output_parts.append(recovery_msg)
+                debug_output_parts.append(recovery_msg)
 
             if prereq_warnings:
-                output_parts.append(
-                    f"PREREQUISITE WARNINGS: {prereq_warnings}"
-                )
+                warning_msg = f"PREREQUISITE WARNINGS: {prereq_warnings}"
+                output_parts.append(warning_msg)
+                debug_output_parts.append(warning_msg)
             if stdout.strip():
-                output_parts.append(f"stdout:\n{stdout[:3000]}")
-            try:
                 output_parts.append(
+                    f"stdout:\n{_truncate_text(stdout, 3000)}"
+                )
+                debug_output_parts.append(f"stdout:\n{stdout}")
+            try:
+                result_msg = (
                     f"Result adata shape: {result_adata.shape[0]} cells x "
                     f"{result_adata.shape[1]} features"
                 )
+                output_parts.append(result_msg)
+                debug_output_parts.append(result_msg)
             except Exception:
-                output_parts.append(
-                    f"Result type: {type(result_adata).__name__}"
-                )
+                result_msg = f"Result type: {type(result_adata).__name__}"
+                output_parts.append(result_msg)
+                debug_output_parts.append(result_msg)
 
+            llm_output = (
+                "\n".join(output_parts)
+                if output_parts
+                else "Code executed successfully (no output)."
+            )
+            debug_output = (
+                "\n".join(debug_output_parts)
+                if debug_output_parts
+                else "Code executed successfully (no output)."
+            )
             return {
                 "adata": result_adata,
-                "output": (
-                    "\n".join(output_parts)
-                    if output_parts
-                    else "Code executed successfully (no output)."
-                ),
+                "output": llm_output,
+                "debug_output": debug_output,
+                "stdout": stdout,
             }
 
         # All repair attempts failed — return structured diagnostic
@@ -656,12 +683,22 @@ class ToolRuntime:
         else:
             error_output = "ERROR: execution failed with no diagnostic envelope"
 
+        debug_error_output = error_output
         if prereq_warnings:
             error_output = (
                 f"PREREQUISITE WARNINGS: {prereq_warnings}\n\n"
                 f"{error_output}"
             )
-        return {"adata": adata, "output": error_output}
+            debug_error_output = (
+                f"PREREQUISITE WARNINGS: {prereq_warnings}\n\n"
+                f"{debug_error_output}"
+            )
+        return {
+            "adata": adata,
+            "output": error_output,
+            "debug_output": debug_error_output,
+            "stdout": "",
+        }
 
     def _tool_run_snippet(self, code: str, adata: Any) -> str:
         """Read-only snippet — no adata copy, no serialisation round-trip."""

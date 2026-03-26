@@ -13,6 +13,7 @@ import logging
 import os
 import re
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from ..harness import (
@@ -47,11 +48,29 @@ logger = logging.getLogger(__name__)
 class FollowUpGate:
     """Stateless helpers for the follow-up / retry heuristic."""
 
+    NON_COMPLETING_TOOLS = frozenset({
+        "inspectdata",
+        "runsnippet",
+        "searchfunctions",
+        "searchskills",
+        "toolsearch",
+        "read",
+        "glob",
+        "grep",
+        "ls",
+        "taskget",
+        "tasklist",
+        "taskoutput",
+        "enterplanmode",
+        "exitplanmode",
+    })
+
     URL_PATTERN = re.compile(r"https?://|www\.", re.IGNORECASE)
     ACTION_REQUEST_PATTERN = re.compile(
         r"\b(analy[sz]e|download|fetch|get|open|read|inspect|load|run|"
         r"execute|search|lookup|look up|find|process|parse|clone|fix|"
-        r"edit|write)\b",
+        r"edit|write|plot|draw|figure|visuali[sz]e|visualization|"
+        r"chart|graph|image|png|umap|tsne|heatmap|send)\b",
         re.IGNORECASE,
     )
     PROMISSORY_PATTERN = re.compile(
@@ -89,7 +108,9 @@ class FollowUpGate:
             for marker in (
                 "\u6570\u636e", "dataset", "\u4e0b\u8f7d",
                 "\u5206\u6790", "\u5904\u7406", "\u8bfb\u53d6",
-                "\u6253\u5f00", "\u641c\u7d22",
+                "\u6253\u5f00", "\u641c\u7d22", "\u7ed8\u56fe",
+                "\u753b\u56fe", "\u56fe", "\u56fe\u7247",
+                "\u53d1\u56fe", "\u53d1\u9001", "umap",
             )
         ):
             return True
@@ -191,6 +212,12 @@ class FollowUpGate:
                 "with `WebFetch`/`web_fetch` before continuing."
             )
         return base
+
+    @classmethod
+    def tool_counts_as_meaningful_progress(cls, tool_name: str) -> bool:
+        canonical = normalize_tool_name(tool_name) or tool_name or ""
+        key = str(canonical).replace("_", "").lower()
+        return key not in cls.NON_COMPLETING_TOOLS
 
 
 # ---------------------------------------------------------------------------
@@ -502,6 +529,195 @@ class TurnController:
             logger.info("conversation_log_saved path=%s", out_file)
         except Exception as exc:
             logger.debug("Failed to save conversation log: %s", exc)
+
+    @staticmethod
+    def _slugify_for_filename(text: str, *, max_len: int = 48) -> str:
+        cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", (text or "").strip())
+        cleaned = cleaned.strip("._-")
+        if not cleaned:
+            return "tool"
+        return cleaned[:max_len]
+
+    def _persist_tool_debug_output(
+        self,
+        tool_name: str,
+        output: str,
+        *,
+        turn_index: int,
+        tool_index: int,
+        description: str = "",
+    ) -> Optional[Path]:
+        fs_ctx = getattr(self._ctx, "_filesystem_context", None)
+        workspace_dir = getattr(fs_ctx, "workspace_dir", None)
+        if workspace_dir is None or not output:
+            return None
+        results_dir = Path(workspace_dir) / "results"
+        results_dir.mkdir(parents=True, exist_ok=True)
+        suffix = self._slugify_for_filename(description or tool_name)
+        file_path = results_dir / (
+            f"{tool_name}_turn_{turn_index:02d}_tool_{tool_index:02d}_{suffix}.log"
+        )
+        header = (
+            f"tool={tool_name}\n"
+            f"turn={turn_index}\n"
+            f"tool_index={tool_index}\n"
+            f"description={description or tool_name}\n"
+            f"chars={len(output)}\n"
+            "-----\n"
+        )
+        file_path.write_text(header + output, encoding="utf-8")
+        return file_path
+
+    def _persist_execute_code_source(
+        self,
+        code: str,
+        *,
+        turn_index: int,
+        tool_index: int,
+        description: str = "",
+    ) -> Optional[Path]:
+        fs_ctx = getattr(self._ctx, "_filesystem_context", None)
+        workspace_dir = getattr(fs_ctx, "workspace_dir", None)
+        if workspace_dir is None or not code:
+            return None
+        results_dir = Path(workspace_dir) / "results"
+        results_dir.mkdir(parents=True, exist_ok=True)
+        suffix = self._slugify_for_filename(description or "execute_code")
+        file_path = results_dir / (
+            f"execute_code_turn_{turn_index:02d}_tool_{tool_index:02d}_{suffix}.py"
+        )
+        file_path.write_text(code, encoding="utf-8")
+        return file_path
+
+    def _persist_execute_code_stdout(
+        self,
+        stdout: str,
+        *,
+        turn_index: int,
+        tool_index: int,
+        description: str = "",
+    ) -> Optional[Path]:
+        if not stdout:
+            return None
+        fs_ctx = getattr(self._ctx, "_filesystem_context", None)
+        workspace_dir = getattr(fs_ctx, "workspace_dir", None)
+        if workspace_dir is None:
+            return None
+        results_dir = Path(workspace_dir) / "results"
+        results_dir.mkdir(parents=True, exist_ok=True)
+        suffix = self._slugify_for_filename(description or "execute_code_stdout")
+        file_path = results_dir / (
+            f"execute_code_stdout_turn_{turn_index:02d}_tool_{tool_index:02d}_{suffix}.log"
+        )
+        header = (
+            "tool=execute_code_stdout\n"
+            f"turn={turn_index}\n"
+            f"tool_index={tool_index}\n"
+            f"description={description or 'execute_code_stdout'}\n"
+            f"chars={len(stdout)}\n"
+            "-----\n"
+        )
+        file_path.write_text(header + stdout, encoding="utf-8")
+        return file_path
+
+    @staticmethod
+    def _log_tool_debug_output(
+        *,
+        tool_name: str,
+        output: str,
+        turn_index: int,
+        tool_index: int,
+        path: Optional[Path] = None,
+        chunk_size: int = 4000,
+    ) -> None:
+        if not output:
+            return
+        total_chunks = max(1, (len(output) + chunk_size - 1) // chunk_size)
+        logger.info(
+            "%s_result_saved turn=%d tool_index=%d chars=%d path=%s chunks=%d",
+            tool_name,
+            turn_index,
+            tool_index,
+            len(output),
+            str(path) if path is not None else "",
+            total_chunks,
+        )
+        for chunk_idx, start in enumerate(range(0, len(output), chunk_size), start=1):
+            chunk = output[start : start + chunk_size]
+            logger.info(
+                "%s_result_chunk turn=%d tool_index=%d chunk=%d/%d path=%s\n%s",
+                tool_name,
+                turn_index,
+                tool_index,
+                chunk_idx,
+                total_chunks,
+                str(path) if path is not None else "",
+                chunk,
+            )
+
+    @staticmethod
+    def _log_execute_code_source(
+        *,
+        code: str,
+        turn_index: int,
+        tool_index: int,
+        path: Optional[Path] = None,
+        chunk_size: int = 4000,
+    ) -> None:
+        if not code:
+            return
+        total_chunks = max(1, (len(code) + chunk_size - 1) // chunk_size)
+        logger.info(
+            "execute_code_source_saved turn=%d tool_index=%d chars=%d path=%s chunks=%d",
+            turn_index,
+            tool_index,
+            len(code),
+            str(path) if path is not None else "",
+            total_chunks,
+        )
+        for chunk_idx, start in enumerate(range(0, len(code), chunk_size), start=1):
+            chunk = code[start : start + chunk_size]
+            logger.info(
+                "execute_code_source_chunk turn=%d tool_index=%d chunk=%d/%d path=%s\n%s",
+                turn_index,
+                tool_index,
+                chunk_idx,
+                total_chunks,
+                str(path) if path is not None else "",
+                chunk,
+            )
+
+    @staticmethod
+    def _log_execute_code_stdout(
+        *,
+        stdout: str,
+        turn_index: int,
+        tool_index: int,
+        path: Optional[Path] = None,
+        chunk_size: int = 4000,
+    ) -> None:
+        if not stdout:
+            return
+        total_chunks = max(1, (len(stdout) + chunk_size - 1) // chunk_size)
+        logger.info(
+            "execute_code_stdout_saved turn=%d tool_index=%d chars=%d path=%s chunks=%d",
+            turn_index,
+            tool_index,
+            len(stdout),
+            str(path) if path is not None else "",
+            total_chunks,
+        )
+        for chunk_idx, start in enumerate(range(0, len(stdout), chunk_size), start=1):
+            chunk = stdout[start : start + chunk_size]
+            logger.info(
+                "execute_code_stdout_chunk turn=%d tool_index=%d chunk=%d/%d path=%s\n%s",
+                turn_index,
+                tool_index,
+                chunk_idx,
+                total_chunks,
+                str(path) if path is not None else "",
+                chunk,
+            )
 
     # ------------------------------------------------------------------
     # Main loop
@@ -1167,11 +1383,15 @@ class TurnController:
                         tc = sc.tool_call
                         canonical = sc.canonical_name
                         tool_step_id = _step_ids[call_idx]
+                        tool_index = sc.index + 1
 
-                        if canonical not in {
-                            "finish", "TaskGet", "TaskList",
-                            "TaskOutput", "ToolSearch",
-                        }:
+                        debug_tool_output = None
+                        if (
+                            canonical != "finish"
+                            and FollowUpGate.tool_counts_as_meaningful_progress(
+                                canonical or tc.name
+                            )
+                        ):
                             meaningful_tool_call_seen = True
 
                         if (
@@ -1184,26 +1404,69 @@ class TurnController:
                             tool_output = result.get(
                                 "output", "Code executed."
                             )
+                            debug_tool_output = result.get(
+                                "debug_output", tool_output
+                            )
                             if canonical == "execute_code":
                                 code = tc.arguments.get("code", "")
+                                stdout_text = str(result.get("stdout", "") or "")
+                                description = tc.arguments.get(
+                                    "description", "Code executed"
+                                )
                                 recorder.add_step(
                                     "code",
                                     name=canonical,
-                                    summary=tc.arguments.get(
-                                        "description", "Code executed"
-                                    ),
+                                    summary=description,
                                     data={"code": code},
                                 )
                                 recorder.add_artifact(
                                     "code",
-                                    label=tc.arguments.get(
-                                        "description", "execute_code"
-                                    ),
+                                    label=description,
+                                )
+                                print(
+                                    "      \u2705 "
+                                    + description
+                                )
+                                code_path = self._persist_execute_code_source(
+                                    code,
+                                    turn_index=turn + 1,
+                                    tool_index=tool_index,
+                                    description=description,
+                                )
+                                self._log_execute_code_source(
+                                    code=code,
+                                    turn_index=turn + 1,
+                                    tool_index=tool_index,
+                                    path=code_path,
+                                )
+                                stdout_path = self._persist_execute_code_stdout(
+                                    stdout_text,
+                                    turn_index=turn + 1,
+                                    tool_index=tool_index,
+                                    description=description,
+                                )
+                                self._log_execute_code_stdout(
+                                    stdout=stdout_text,
+                                    turn_index=turn + 1,
+                                    tool_index=tool_index,
+                                    path=stdout_path,
+                                )
+                                debug_path = self._persist_tool_debug_output(
+                                    canonical,
+                                    str(debug_tool_output or tool_output),
+                                    turn_index=turn + 1,
+                                    tool_index=tool_index,
+                                    description=description,
+                                )
+                                self._log_tool_debug_output(
+                                    tool_name=canonical,
+                                    output=str(debug_tool_output or tool_output),
+                                    turn_index=turn + 1,
+                                    tool_index=tool_index,
+                                    path=debug_path,
                                 )
                                 await emitter.execution_completed(
-                                    tc.arguments.get(
-                                        "description", "Code executed"
-                                    ),
+                                    description,
                                     turn_id=recorder.trace.turn_id,
                                     trace_id=recorder.trace.trace_id,
                                     session_id=recorder.trace.session_id,
@@ -1272,6 +1535,9 @@ class TurnController:
                         else:
                             tool_output = str(result)
 
+                        if debug_tool_output is None:
+                            debug_tool_output = tool_output
+
                         # Tier-driven truncation via budget manager
                         meta = self._tool_runtime.registry.get(
                             canonical
@@ -1289,6 +1555,21 @@ class TurnController:
                             tool_output,
                             content_key=canonical or tc.name,
                             tier=output_tier,
+                        )
+
+                        await emit(
+                            build_stream_event(
+                                "tool_result",
+                                {
+                                    "name": canonical or tc.name,
+                                    "output": tool_output,
+                                },
+                                turn_id=recorder.trace.turn_id,
+                                trace_id=recorder.trace.trace_id,
+                                step_id=tool_step_id,
+                                session_id=recorder.trace.session_id,
+                                category="tool",
+                            )
                         )
 
                         try:

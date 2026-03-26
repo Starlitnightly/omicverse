@@ -437,11 +437,11 @@ class AgentBridge:
 
     @staticmethod
     def _candidate_dirs(roots: List[Path]) -> List[Path]:
-        """Return unique existing directories to scan (root + root/output + root/figures)."""
+        """Return unique existing directories to scan for generated artifacts."""
         dirs: List[Path] = []
         seen: Set[Path] = set()
         for root in roots:
-            for d in (root, root / "output", root / "figures"):
+            for d in (root, root / "output", root / "outputs", root / "figures"):
                 try:
                     rd = d.resolve()
                 except Exception:

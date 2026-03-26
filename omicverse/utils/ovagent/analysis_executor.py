@@ -182,6 +182,49 @@ class AnalysisExecutor:
     def __init__(self, ctx: "AgentContext") -> None:
         self._ctx = ctx
 
+    def _figure_autosave_dir(self) -> Optional[Path]:
+        fs_ctx = getattr(self._ctx, "_filesystem_context", None)
+        if fs_ctx is None:
+            return None
+        workspace_dir = getattr(fs_ctx, "workspace_dir", None)
+        if workspace_dir is None:
+            return None
+        return Path(workspace_dir) / "figures"
+
+    def _inject_figure_autosave(self, code: str) -> str:
+        figure_dir = self._figure_autosave_dir()
+        if figure_dir is None:
+            return code
+
+        safe_dir = json.dumps(str(figure_dir))
+        prelude = (
+            "from pathlib import Path as _ov_fig_path\n"
+            "import matplotlib.pyplot as _ov_fig_plt\n"
+            f"_ov_fig_dir = _ov_fig_path({safe_dir})\n"
+            "_ov_fig_dir.mkdir(parents=True, exist_ok=True)\n"
+            "for _ov_fig_num in list(_ov_fig_plt.get_fignums()):\n"
+            "    try:\n"
+            "        _ov_fig_plt.close(_ov_fig_num)\n"
+            "    except Exception:\n"
+            "        pass\n"
+        )
+        epilogue = (
+            "\nimport time as _ov_fig_time\n"
+            "import matplotlib.pyplot as _ov_fig_plt\n"
+            "_ov_fig_nums = list(_ov_fig_plt.get_fignums())\n"
+            "for _ov_fig_idx, _ov_fig_num in enumerate(_ov_fig_nums, start=1):\n"
+            "    try:\n"
+            "        _ov_fig = _ov_fig_plt.figure(_ov_fig_num)\n"
+            "        _ov_fig.savefig(\n"
+            "            _ov_fig_dir / f'auto_figure_{int(_ov_fig_time.time() * 1000)}_{_ov_fig_idx:02d}.png',\n"
+            "            dpi=200,\n"
+            "            bbox_inches='tight',\n"
+            "        )\n"
+            "    except Exception as _ov_fig_exc:\n"
+            "        print(f'[ovagent autosave warning] {_ov_fig_exc}')\n"
+        )
+        return prelude + "\n" + code + "\n" + epilogue
+
     # -- prerequisite checks ------------------------------------------------
 
     def check_code_prerequisites(self, code: str, adata: Any) -> str:
@@ -496,6 +539,7 @@ class AnalysisExecutor:
     def execute_generated_code(
         self, code: str, adata: Any, capture_stdout: bool = False
     ) -> Any:
+        code = self._inject_figure_autosave(code)
         # --- Pre-execution security scan ---
         try:
             violations = self._ctx._security_scanner.scan(code)
