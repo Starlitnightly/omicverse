@@ -112,6 +112,7 @@ from ._cluster import cluster,LDA_topic,filtered,refine_label
 from ._venn import venny4py
 from ._lsi import Array, lsi, tfidf
 from ._neighboors import neighbors,calc_kBET,calc_kSIM
+from ._gene_id_conversion import _infer_species_and_release, convert2gene_symbol, convert2symbol, convert2gene_id, symbol2id
 
 # Import smart_agent module to make it accessible and expose key entrypoints
 # Store verifier with a private name first to ensure reference is preserved
@@ -284,6 +285,11 @@ __all__ = [
     "neighbors",
     "calc_kBET",
     "calc_kSIM",
+    # @ _gene_id_conversion
+    "convert2gene_symbol",
+    "convert2symbol",
+    "convert2gene_id",
+    "symbol2id",
     # @ agent_backend
     "agent_backend",
     "BackendConfig",
