@@ -584,7 +584,12 @@ def symbol2id(
 
     adata.var["symbol"] = adata.var.index.tolist()
 
-    merge_df = adata.var.merge(id_df, left_index=True, right_on="query", how="left")
+    # Drop columns that would collide with id_df during merge (e.g. from a
+    # previous symbol2id call or from concatenating already-converted adatas).
+    _conflict_cols = [c for c in ("gene_id", "converted") if c in adata.var.columns]
+    var_for_merge = adata.var.drop(columns=_conflict_cols)
+
+    merge_df = var_for_merge.merge(id_df, left_index=True, right_on="query", how="left")
     merge_df.index = adata.var.index
 
     converted_mask = merge_df["gene_id"] != merge_df.index
