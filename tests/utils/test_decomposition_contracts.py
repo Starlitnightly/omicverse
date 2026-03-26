@@ -565,30 +565,63 @@ class TestToolRuntimeHandlerRegistry:
 
 
 class TestToolRuntimeExecSeam:
-    """Execution/agent/shell tool methods on ToolRuntime.
+    """Execution/agent/shell tools — extracted to tool_runtime_exec.py."""
 
-    Target: tool_runtime_exec.py
-    """
+    EXEC_HANDLER_FUNCTIONS = {
+        "handle_execute_code",
+        "handle_run_snippet",
+        "handle_bash",
+        "handle_finish",
+        "handle_inspect_data",
+        "handle_search_functions",
+        "handle_tool_search",
+        "handle_agent",
+        "background_bash_worker",
+    }
 
-    EXEC_METHODS = {
-        "_tool_execute_code",
-        "_tool_run_snippet",
-        "_tool_bash",
-        "_tool_finish",
-        "_background_bash_worker",
+    # Thin dispatch wrappers that remain on the facade for input
+    # validation and argument unpacking.
+    DISPATCH_WRAPPERS = {
         "_dispatch_execute_code",
         "_dispatch_run_snippet",
         "_dispatch_agent",
     }
 
-    def test_exec_methods_exist(self):
-        for name in self.EXEC_METHODS:
+    # No full tool implementations remain on the facade.
+    EXEC_METHODS: set = set()
+
+    def test_exec_handlers_exist_in_extracted_module(self):
+        from omicverse.utils.ovagent import tool_runtime_exec
+        for name in self.EXEC_HANDLER_FUNCTIONS:
+            assert hasattr(tool_runtime_exec, name), (
+                f"tool_runtime_exec missing handler '{name}'"
+            )
+            assert callable(getattr(tool_runtime_exec, name))
+
+    def test_dispatch_wrappers_on_facade(self):
+        for name in self.DISPATCH_WRAPPERS:
             assert hasattr(ToolRuntime, name), (
-                f"ToolRuntime missing exec method '{name}'"
+                f"ToolRuntime missing dispatch wrapper '{name}'"
             )
 
     def test_dispatch_agent_is_async(self):
         assert inspect.iscoroutinefunction(ToolRuntime._dispatch_agent)
+
+    def test_handle_agent_is_async(self):
+        from omicverse.utils.ovagent import tool_runtime_exec
+        assert inspect.iscoroutinefunction(tool_runtime_exec.handle_agent)
+
+    def test_exec_methods_removed_from_facade(self):
+        removed = {
+            "_tool_execute_code", "_tool_run_snippet", "_tool_bash",
+            "_tool_finish", "_background_bash_worker",
+            "_tool_inspect_data", "_tool_search_functions",
+            "_tool_tool_search",
+        }
+        for name in removed:
+            assert not hasattr(ToolRuntime, name), (
+                f"ToolRuntime still has '{name}' — should be extracted"
+            )
 
 
 class TestToolRuntimeIOSeam:
@@ -678,12 +711,10 @@ class TestToolRuntimeWorkspaceSeam:
         "handle_ask_user_question",
     }
 
-    # Core/execution methods that the old workspace seam listed but that
-    # actually stay on the ToolRuntime facade.
+    # The ask-user dispatch wrapper remains on the facade; execution-family
+    # methods that were formerly listed here have been extracted to
+    # tool_runtime_exec.py.
     FACADE_METHODS = {
-        "_tool_tool_search",
-        "_tool_inspect_data",
-        "_tool_search_functions",
         "_dispatch_ask_user_question",
     }
 
@@ -721,15 +752,15 @@ class TestToolRuntimeWorkspaceSeam:
 
 
 class TestToolRuntimeMethodPartition:
-    """All _tool_* methods on ToolRuntime are accounted for.
+    """All _tool_* and _dispatch_* methods on ToolRuntime are accounted for.
 
-    After IO/web/workspace extraction, only execution and core methods
-    remain on the facade.  This test ensures no method is forgotten.
+    After full extraction (IO/web/workspace/exec), only thin dispatch
+    wrappers remain on the facade.  This test ensures no method is forgotten.
     """
 
-    # Methods that remain on the ToolRuntime facade after extraction.
+    # Methods that remain on the ToolRuntime facade after all extraction.
     ALL_FACADE_METHODS = (
-        TestToolRuntimeExecSeam.EXEC_METHODS
+        TestToolRuntimeExecSeam.DISPATCH_WRAPPERS
         | TestToolRuntimeWorkspaceSeam.FACADE_METHODS
     )
 
@@ -1136,8 +1167,8 @@ class TestNoBehaviorChange:
             "event_stream.py", "permission_policy.py", "prompt_builder.py",
             "prompt_templates.py", "protocol.py", "registry_scanner.py",
             "repair_loop.py", "run_store.py", "runtime.py",
-            "tool_runtime_io.py", "tool_runtime_web.py",
-            "tool_runtime_workspace.py",
+            "tool_runtime_exec.py", "tool_runtime_io.py",
+            "tool_runtime_web.py", "tool_runtime_workspace.py",
             "session_context.py", "subagent_controller.py",
             "tool_registry.py", "tool_runtime.py", "tool_scheduler.py",
             "turn_controller.py", "turn_followup.py", "turn_artifacts.py",

@@ -1,16 +1,15 @@
 """ToolRuntime — tool dispatch hub and runtime facade.
 
 Extracted from ``smart_agent.py`` to keep tool handling in one place.
-Concrete handler implementations for IO, web, and workspace tool families
-live in dedicated handler modules:
+Concrete handler implementations live in dedicated handler modules:
 
+- ``tool_runtime_exec``      — execute_code / run_snippet / bash / agent / inspect / search / finish
 - ``tool_runtime_io``        — read / edit / write / glob / grep / notebook
 - ``tool_runtime_web``       — web_fetch / web_search / web_download
 - ``tool_runtime_workspace`` — tasks / plan mode / worktree / skill / MCP
 
-Execution tools (execute_code, run_snippet, bash, agent, inspect_data,
-search_functions, tool_search, finish) remain in this facade until the
-next extraction pass.
+ToolRuntime itself owns runtime state, registry binding, approval
+integration, and dispatch routing.
 """
 
 from __future__ import annotations
@@ -18,12 +17,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
-import subprocess
-import time
-import traceback
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from ..harness.runtime_state import runtime_state
 from ..harness.tool_catalog import (
@@ -34,7 +28,7 @@ from ..harness.tool_catalog import (
 )
 from ..._registry import _global_registry
 
-from . import tool_runtime_io, tool_runtime_web, tool_runtime_workspace
+from . import tool_runtime_exec, tool_runtime_io, tool_runtime_web, tool_runtime_workspace
 
 if TYPE_CHECKING:
     from .analysis_executor import AnalysisExecutor
@@ -43,15 +37,6 @@ if TYPE_CHECKING:
     from .tool_registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
-
-
-def _truncate_text(text: str, limit: int) -> str:
-    """Truncate text for LLM-facing tool output while preserving total length."""
-    if limit <= 0 or len(text) <= limit:
-        return text
-    suffix = f"\n... (truncated, total_chars={len(text)})"
-    keep = max(0, limit - len(suffix))
-    return text[:keep] + suffix
 
 
 # Legacy OmicVerse-specific tool schemas that are not part of the
@@ -180,9 +165,12 @@ class ToolRuntime:
     dispatch.  Other modules should call into ``ToolRuntime`` rather than
     duplicating these concerns.
 
-    Concrete handler implementations for IO, web, and workspace tool
-    families are delegated to ``tool_runtime_io``, ``tool_runtime_web``,
-    and ``tool_runtime_workspace`` respectively.
+    Concrete handler implementations are delegated to four handler modules:
+
+    - ``tool_runtime_exec``      — execution, agent, bash, data inspection
+    - ``tool_runtime_io``        — filesystem read/edit/write, glob, grep
+    - ``tool_runtime_web``       — web fetch/search/download
+    - ``tool_runtime_workspace`` — tasks, plan mode, worktree, skill, MCP
 
     Parameters
     ----------
@@ -274,29 +262,30 @@ class ToolRuntime:
         Each handler has the uniform signature
         ``(args: dict, adata: Any, request: str) -> Any``.
 
-        IO, web, and workspace handlers delegate to their extracted
-        modules; execution and core tools are handled inline.
+        All concrete tool implementations live in extracted handler modules;
+        this method wires them into the registry with argument unpacking.
         """
         r = self._registry
         # fmt: off
 
-        # -- Core / execution tools (remain in facade) --
-        r.register_handler("tool_search", lambda a, d, _: self._tool_tool_search(
-            a.get("query", ""), max_results=a.get("max_results", 5)))
-        r.register_handler("bash", lambda a, d, _: self._tool_bash(
+        # -- Execution / core tools (delegated to tool_runtime_exec) --
+        r.register_handler("tool_search", lambda a, d, _: tool_runtime_exec.handle_tool_search(
+            self._ctx, a.get("query", ""), max_results=a.get("max_results", 5)))
+        r.register_handler("bash", lambda a, d, _: tool_runtime_exec.handle_bash(
+            self._ctx, self.tool_blocked_in_plan_mode,
             a.get("command", ""), description=a.get("description", ""),
             timeout=a.get("timeout", 120000),
             run_in_background=bool(a.get("run_in_background", False)),
             dangerouslyDisableSandbox=bool(a.get("dangerouslyDisableSandbox", False))))
-        r.register_handler("inspect_data", lambda a, d, _: self._tool_inspect_data(
+        r.register_handler("inspect_data", lambda a, d, _: tool_runtime_exec.handle_inspect_data(
             d, a.get("aspect", "full")))
         r.register_handler("execute_code", self._dispatch_execute_code)
         r.register_handler("run_snippet", self._dispatch_run_snippet)
-        r.register_handler("search_functions", lambda a, d, _: self._tool_search_functions(
-            a.get("query", "")))
+        r.register_handler("search_functions", lambda a, d, _: tool_runtime_exec.handle_search_functions(
+            self._ctx, a.get("query", "")))
         r.register_handler("agent", self._dispatch_agent)
         r.register_handler("ask_user_question", self._dispatch_ask_user_question)
-        r.register_handler("finish", lambda a, d, _: self._tool_finish(
+        r.register_handler("finish", lambda a, d, _: tool_runtime_exec.handle_finish(
             a.get("summary", "")))
 
         # -- IO tools (delegated to tool_runtime_io) --
@@ -364,7 +353,7 @@ class ToolRuntime:
         # fmt: on
 
     # ------------------------------------------------------------------
-    # Dispatch helpers (validation / async wrappers)
+    # Dispatch helpers (thin validation wrappers)
     # ------------------------------------------------------------------
 
     def _dispatch_execute_code(
@@ -376,7 +365,9 @@ class ToolRuntime:
                 {"error": "execute_code requires a non-empty 'code' argument."},
                 ensure_ascii=False,
             )
-        return self._tool_execute_code(code, args.get("description", ""), adata)
+        return tool_runtime_exec.handle_execute_code(
+            self._ctx, self._executor, code, args.get("description", ""), adata
+        )
 
     def _dispatch_run_snippet(
         self, args: dict, adata: Any, request: str
@@ -387,7 +378,9 @@ class ToolRuntime:
                 {"error": "run_snippet requires a non-empty 'code' argument."},
                 ensure_ascii=False,
             )
-        return self._tool_run_snippet(snippet, adata)
+        return tool_runtime_exec.handle_run_snippet(
+            self._executor, snippet, adata
+        )
 
     async def _dispatch_agent(
         self, args: dict, adata: Any, request: str
@@ -397,24 +390,10 @@ class ToolRuntime:
         )
         task = args.get("task", "")
         context = args.get("context", "")
-        logger.info(
-            "delegation_started agent_type=%s task=%s",
-            agent_type,
-            task[:80],
-        )
         subagent_controller = self._require_subagent_controller()
-        sub_result = await subagent_controller.run_subagent(
-            agent_type=agent_type,
-            task=task,
-            adata=adata,
-            context=context,
+        return await tool_runtime_exec.handle_agent(
+            subagent_controller, agent_type, task, adata, context
         )
-        if agent_type == "execute":
-            return {
-                "adata": sub_result["adata"],
-                "output": sub_result["result"],
-            }
-        return sub_result["result"]
 
     def _dispatch_ask_user_question(
         self, args: dict, adata: Any, request: str
@@ -493,498 +472,3 @@ class ToolRuntime:
         if asyncio.iscoroutine(result):
             result = await result
         return result
-
-    # ------------------------------------------------------------------
-    # OmicVerse data tools (execution family — remain in facade)
-    # ------------------------------------------------------------------
-
-    def _tool_inspect_data(self, adata: Any, aspect: str) -> str:
-        if adata is None:
-            return (
-                "No dataset is loaded. Use web_download to download a "
-                "dataset first, then load it with execute_code."
-            )
-        try:
-            parts: List[str] = []
-            dtype = type(adata).__name__
-            is_mudata = dtype == "MuData"
-
-            if is_mudata and aspect in ("full", "shape"):
-                parts.append("Type: MuData")
-                if hasattr(adata, "mod"):
-                    mod_keys = list(adata.mod.keys())
-                    parts.append(f"Modalities: {mod_keys}")
-                    for mk in mod_keys:
-                        mod = adata.mod[mk]
-                        layers_keys = (
-                            list(mod.layers.keys())
-                            if getattr(mod, "layers", None) is not None
-                            else []
-                        )
-                        parts.append(
-                            f"  {mk}: {mod.shape[0]} cells x "
-                            f"{mod.shape[1]} features, layers={layers_keys}"
-                        )
-                if hasattr(adata, "shape"):
-                    parts.append(
-                        f"Combined shape: {adata.shape[0]} obs x "
-                        f"{adata.shape[1]} vars"
-                    )
-
-            if aspect in ("shape", "full") and not is_mudata:
-                parts.append(
-                    f"Shape: {adata.shape[0]} cells x {adata.shape[1]} genes"
-                )
-            if aspect in ("obs", "full"):
-                cols = list(adata.obs.columns)
-                parts.append(f"obs columns ({len(cols)}): {cols}")
-                try:
-                    parts.append(
-                        f"obs.head(3):\n{adata.obs.head(3).to_string()}"
-                    )
-                except Exception:
-                    pass
-            if aspect in ("var", "full") and not is_mudata:
-                cols = list(adata.var.columns)
-                parts.append(f"var columns ({len(cols)}): {cols}")
-                try:
-                    parts.append(
-                        f"var.head(3):\n{adata.var.head(3).to_string()}"
-                    )
-                except Exception:
-                    pass
-            if aspect in ("obsm", "full"):
-                keys = (
-                    list(adata.obsm.keys()) if hasattr(adata, "obsm") else []
-                )
-                parts.append(f"obsm keys: {keys}")
-                for k in keys:
-                    try:
-                        parts.append(f"  {k}: shape {adata.obsm[k].shape}")
-                    except Exception:
-                        pass
-            if aspect in ("uns", "full"):
-                keys = (
-                    list(adata.uns.keys()) if hasattr(adata, "uns") else []
-                )
-                parts.append(f"uns keys: {keys}")
-            if aspect in ("layers", "full"):
-                layers = getattr(adata, "layers", None)
-                keys = list(layers.keys()) if layers is not None else []
-                parts.append(f"layers: {keys}")
-            return (
-                "\n".join(parts) if parts else f"Unknown aspect: {aspect}"
-            )
-        except Exception as e:
-            return f"Error inspecting data: {e}"
-
-    def _tool_execute_code(
-        self, code: str, description: str, adata: Any
-    ) -> dict:
-        from .analysis_executor import ProactiveCodeTransformer
-        from .repair_loop import ExecutionRepairLoop
-
-        code = ProactiveCodeTransformer().transform(code)
-        if getattr(self._ctx, "_code_only_mode", False):
-            capture = getattr(self._ctx, "_capture_code_only_snippet", None)
-            if callable(capture):
-                capture(code, description=description)
-            return {
-                "adata": adata,
-                "output": (
-                    "CODE ONLY MODE: captured generated Python code without "
-                    "executing it."
-                ),
-            }
-
-        prereq_warnings = self._executor.check_code_prerequisites(code, adata)
-
-        self._executor._notebook_fallback_error = None
-
-        # --- Structured self-healing loop ---
-        repair_loop = ExecutionRepairLoop(self._executor, max_retries=3)
-        extract_code_fn = getattr(self._ctx, "_extract_python_code", None)
-
-        import asyncio as _asyncio
-
-        try:
-            loop = _asyncio.get_running_loop()
-        except RuntimeError:
-            loop = None
-
-        if loop and loop.is_running():
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                repair_result = pool.submit(
-                    _asyncio.run,
-                    repair_loop.run(code, adata, phase="execution",
-                                   extract_code_fn=extract_code_fn),
-                ).result()
-        else:
-            repair_result = _asyncio.run(
-                repair_loop.run(code, adata, phase="execution",
-                               extract_code_fn=extract_code_fn)
-            )
-
-        if repair_result.success:
-            result = repair_result.exec_result
-            stdout = result.get("stdout", "") if isinstance(result, dict) else ""
-            result_adata = (
-                result.get("adata", adata)
-                if isinstance(result, dict)
-                else (result if result is not None else adata)
-            )
-
-            output_parts: List[str] = []
-            debug_output_parts: List[str] = []
-            notebook_err = getattr(
-                self._executor, "_notebook_fallback_error", None
-            )
-            if notebook_err:
-                notebook_msg = (
-                    f"WARNING: notebook session execution failed with error:\n{notebook_err}\n"
-                    f"Fell back to in-process execution. Please fix the code to avoid this error."
-                )
-                output_parts.append(notebook_msg)
-                debug_output_parts.append(notebook_msg)
-
-            # Annotate recovered attempts
-            if len(repair_result.attempts) > 1:
-                strategies = [
-                    a.strategy for a in repair_result.attempts if not a.success
-                ]
-                recovery_msg = (
-                    f"RECOVERED after {len(repair_result.attempts)} attempt(s) "
-                    f"(strategies: {', '.join(strategies)})"
-                )
-                output_parts.append(recovery_msg)
-                debug_output_parts.append(recovery_msg)
-
-            if prereq_warnings:
-                warning_msg = f"PREREQUISITE WARNINGS: {prereq_warnings}"
-                output_parts.append(warning_msg)
-                debug_output_parts.append(warning_msg)
-            if stdout.strip():
-                output_parts.append(
-                    f"stdout:\n{_truncate_text(stdout, 3000)}"
-                )
-                debug_output_parts.append(f"stdout:\n{stdout}")
-            try:
-                result_msg = (
-                    f"Result adata shape: {result_adata.shape[0]} cells x "
-                    f"{result_adata.shape[1]} features"
-                )
-                output_parts.append(result_msg)
-                debug_output_parts.append(result_msg)
-            except Exception:
-                result_msg = f"Result type: {type(result_adata).__name__}"
-                output_parts.append(result_msg)
-                debug_output_parts.append(result_msg)
-
-            llm_output = (
-                "\n".join(output_parts)
-                if output_parts
-                else "Code executed successfully (no output)."
-            )
-            debug_output = (
-                "\n".join(debug_output_parts)
-                if debug_output_parts
-                else "Code executed successfully (no output)."
-            )
-            return {
-                "adata": result_adata,
-                "output": llm_output,
-                "debug_output": debug_output,
-                "stdout": stdout,
-            }
-
-        # All repair attempts failed — return structured diagnostic
-        envelope = repair_result.final_envelope
-        if envelope is not None:
-            error_output = (
-                f"ERROR: {envelope.exception}: {envelope.summary}\n\n"
-                f"Phase: {envelope.phase}\n"
-                f"Attempts: {envelope.retry_count + 1}/{repair_loop.max_retries + 1}\n"
-                f"Traceback (last {len(envelope.traceback_excerpt)} chars):\n"
-                f"{envelope.traceback_excerpt}"
-            )
-            if envelope.repair_hints:
-                error_output += (
-                    "\nRepair hints:\n"
-                    + "\n".join(f"  - {h}" for h in envelope.repair_hints)
-                )
-        else:
-            error_output = "ERROR: execution failed with no diagnostic envelope"
-
-        debug_error_output = error_output
-        if prereq_warnings:
-            error_output = (
-                f"PREREQUISITE WARNINGS: {prereq_warnings}\n\n"
-                f"{error_output}"
-            )
-            debug_error_output = (
-                f"PREREQUISITE WARNINGS: {prereq_warnings}\n\n"
-                f"{debug_error_output}"
-            )
-        return {
-            "adata": adata,
-            "output": error_output,
-            "debug_output": debug_error_output,
-            "stdout": "",
-        }
-
-    def _tool_run_snippet(self, code: str, adata: Any) -> str:
-        """Read-only snippet — no adata copy, no serialisation round-trip."""
-        try:
-            return self._executor.execute_snippet_readonly(code, adata)
-        except Exception as e:
-            return f"ERROR: {e}"
-
-    def _tool_search_functions(self, query: str) -> str:
-        query = (query or "").strip()
-        if not query:
-            return "Please provide a non-empty function search query."
-
-        matches: List[Dict[str, Any]] = []
-        seen_full_names: set[str] = set()
-
-        def _extend(entries: List[Dict[str, Any]]) -> None:
-            for entry in entries or []:
-                full_name = str(
-                    entry.get("full_name")
-                    or entry.get("short_name")
-                    or entry.get("name")
-                    or ""
-                )
-                if not full_name or full_name in seen_full_names:
-                    continue
-                seen_full_names.add(full_name)
-                matches.append(entry)
-
-        try:
-            runtime_matches = list(_global_registry.find(query))
-        except Exception:
-            runtime_matches = []
-        _extend(runtime_matches)
-
-        static_search = getattr(self._ctx, "_collect_static_registry_entries", None)
-        if callable(static_search):
-            try:
-                static_matches = list(static_search(query, max_entries=20))
-            except TypeError:
-                static_matches = list(static_search(query))
-            except Exception:
-                static_matches = []
-            _extend(static_matches)
-
-        if not matches:
-            return f"No functions found matching '{query}'. Try broader keywords."
-
-        results: List[str] = []
-        for m in matches[:20]:
-            fname = m.get("full_name", m.get("short_name", ""))
-            sig = m.get("signature", "")
-            desc = m.get("description", "")[:300]
-
-            entry_text = f"  {fname}({sig})\n    {desc}"
-
-            branch_parameter = m.get("branch_parameter")
-            branch_value = m.get("branch_value")
-            if branch_parameter and branch_value:
-                entry_text += f"\n    Branch: {branch_parameter}='{branch_value}'"
-
-            prereqs = m.get("prerequisites", {})
-            req_funcs = prereqs.get("functions", [])
-            if req_funcs:
-                entry_text += "\n    Must run first: " + ", ".join(req_funcs)
-
-            requires = m.get("requires", {})
-            if requires:
-                req_items = [
-                    f"{k}['{v}']"
-                    for k, vals in requires.items()
-                    for v in vals
-                ]
-                entry_text += "\n    Requires: " + ", ".join(req_items)
-
-            produces = m.get("produces", {})
-            if produces:
-                prod_items = [
-                    f"{k}['{v}']"
-                    for k, vals in produces.items()
-                    for v in vals
-                ]
-                entry_text += "\n    Produces: " + ", ".join(prod_items)
-
-            examples = m.get("examples", [])
-            code_examples = [
-                ex
-                for ex in examples
-                if ex.strip().startswith(("ov.", "sc."))
-            ]
-            if code_examples:
-                entry_text += "\n    Example: " + code_examples[0]
-            elif examples:
-                entry_text += "\n    Example: " + examples[0]
-
-            results.append(entry_text)
-            if len(results) >= 10:
-                break
-
-        return (
-            f"Found {len(results)} matching functions:\n"
-            + "\n".join(results)
-        )
-
-    # ------------------------------------------------------------------
-    # Claude-style tool helpers (execution family — remain in facade)
-    # ------------------------------------------------------------------
-
-    def _tool_tool_search(self, query: str, max_results: int = 5) -> str:
-        session_id = self._ctx._get_runtime_session_id()
-        payload = resolve_tool_search(
-            query,
-            loaded_tools=runtime_state.get_loaded_tools(session_id),
-            max_results=max_results,
-        )
-        selected = payload.get("selected_tools", [])
-        loaded_tools: tuple = ()
-        if selected:
-            loaded_tools = runtime_state.load_tools(session_id, selected)
-        payload["loaded_tools"] = list(
-            runtime_state.get_loaded_tools(session_id)
-        )
-        payload["newly_loaded"] = list(loaded_tools)
-        return json.dumps(payload, ensure_ascii=False, indent=2)
-
-    # ------------------------------------------------------------------
-    # Bash (execution family — remains in facade)
-    # ------------------------------------------------------------------
-
-    def _background_bash_worker(
-        self,
-        task_id: str,
-        *,
-        command: str,
-        cwd: str,
-        timeout_ms: int,
-    ) -> None:
-        session_id = self._ctx._get_runtime_session_id()
-        proc = subprocess.Popen(
-            ["bash", "-lc", command],
-            cwd=cwd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-        )
-        runtime_state.bind_process(session_id, task_id, proc)
-        assert proc.stdout is not None
-        start = time.time()
-        for line in proc.stdout:
-            runtime_state.append_task_output(
-                session_id, task_id, line.rstrip("\n")
-            )
-            if time.time() - start > timeout_ms / 1000:
-                proc.terminate()
-                runtime_state.update_task(
-                    session_id,
-                    task_id,
-                    status="failed",
-                    summary="Background command timed out",
-                )
-                return
-        return_code = proc.wait()
-        status = "completed" if return_code == 0 else "failed"
-        runtime_state.update_task(
-            session_id,
-            task_id,
-            status=status,
-            summary=f"Exit code {return_code}",
-        )
-
-    def _tool_bash(
-        self,
-        command: str,
-        description: str = "",
-        timeout: int = 120000,
-        run_in_background: bool = False,
-        dangerouslyDisableSandbox: bool = False,
-    ) -> str:
-        self._ctx._ensure_server_tool_mode("Bash")
-        if self.tool_blocked_in_plan_mode("Bash"):
-            return "Bash is blocked while the session is in plan mode."
-        reason = description or f"Run shell command: {command[:120]}"
-        self._ctx._request_tool_approval(
-            "Bash",
-            reason=reason,
-            payload={
-                "command": command,
-                "dangerouslyDisableSandbox": dangerouslyDisableSandbox,
-            },
-        )
-        cwd = self._ctx._refresh_runtime_working_directory()
-        if run_in_background:
-            task = runtime_state.create_task(
-                self._ctx._get_runtime_session_id(),
-                title=description or command[:80],
-                description=command,
-                kind="background_command",
-                status="in_progress",
-                background=True,
-                tool_name="Bash",
-                metadata={"cwd": cwd, "command": command},
-            )
-            proc = subprocess.Popen(
-                ["bash", "-lc", command],
-                cwd=cwd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            runtime_state.attach_background_process(
-                self._ctx._get_runtime_session_id(),
-                task.task_id,
-                proc,
-            )
-            return json.dumps(
-                {
-                    "task_id": task.task_id,
-                    "status": "in_progress",
-                    "cwd": cwd,
-                    "command": command,
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
-
-        proc_result = subprocess.run(
-            ["bash", "-lc", command],
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            timeout=max(1, int(timeout)) / 1000,
-            check=False,
-        )
-        output = (proc_result.stdout or "") + (
-            (proc_result.stderr or "") if proc_result.stderr else ""
-        )
-        return json.dumps(
-            {
-                "cwd": cwd,
-                "command": command,
-                "returncode": proc_result.returncode,
-                "stdout": proc_result.stdout,
-                "stderr": proc_result.stderr,
-                "output": output.strip(),
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-
-    # ------------------------------------------------------------------
-    # Terminal tools
-    # ------------------------------------------------------------------
-
-    def _tool_finish(self, summary: str) -> dict:
-        """Return the terminal finish payload."""
-        return {"finished": True, "summary": summary}

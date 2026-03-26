@@ -56,16 +56,17 @@ class TestNotebookFallbackErrorReporting(unittest.TestCase):
 
     def _make_tool_runtime(self):
         from omicverse.utils.ovagent.tool_runtime import ToolRuntime
+        from omicverse.utils.ovagent import tool_runtime_exec
         ctx = _make_mock_ctx()
         executor = _make_mock_executor(ctx)
         rt = ToolRuntime(ctx=ctx, executor=executor)
-        return rt, ctx, executor
+        return rt, ctx, executor, tool_runtime_exec
 
     # ------------------------------------------------------------------
     # 1. Happy path: notebook succeeds — no error in output
     # ------------------------------------------------------------------
     def test_no_error_when_execution_succeeds(self):
-        rt, ctx, executor = self._make_tool_runtime()
+        rt, ctx, executor, exec_mod = self._make_tool_runtime()
         import anndata
         import numpy as np
         adata = anndata.AnnData(np.zeros((5, 3)))
@@ -77,7 +78,7 @@ class TestNotebookFallbackErrorReporting(unittest.TestCase):
         }
         executor._notebook_fallback_error = None  # no error
 
-        result = rt._tool_execute_code("x = 1", "simple assignment", adata)
+        result = exec_mod.handle_execute_code(ctx, executor, "x = 1", "simple assignment", adata)
 
         self.assertIsInstance(result, dict)
         self.assertNotIn("WARNING", result["output"])
@@ -88,7 +89,7 @@ class TestNotebookFallbackErrorReporting(unittest.TestCase):
     # 2. Notebook fails → fallback → error IS reported in output
     # ------------------------------------------------------------------
     def test_error_reported_when_notebook_fallback_occurs(self):
-        rt, ctx, executor = self._make_tool_runtime()
+        rt, ctx, executor, exec_mod = self._make_tool_runtime()
         import anndata
         import numpy as np
         adata = anndata.AnnData(np.zeros((5, 3)))
@@ -104,7 +105,8 @@ class TestNotebookFallbackErrorReporting(unittest.TestCase):
 
         executor.execute_generated_code.side_effect = fake_execute
 
-        result = rt._tool_execute_code(
+        result = exec_mod.handle_execute_code(
+            ctx, executor,
             "ov.pl.embedding(adata, figsize=(6,6))",  # bad kwarg
             "plot embedding",
             adata,
@@ -154,7 +156,7 @@ class TestNotebookFallbackErrorReporting(unittest.TestCase):
     # 4. Prereq warnings appear in output alongside normal stdout
     # ------------------------------------------------------------------
     def test_prereq_warnings_included_in_output(self):
-        rt, ctx, executor = self._make_tool_runtime()
+        rt, ctx, executor, exec_mod = self._make_tool_runtime()
         import anndata, numpy as np
         adata = anndata.AnnData(np.zeros((5, 3)))
 
@@ -165,7 +167,9 @@ class TestNotebookFallbackErrorReporting(unittest.TestCase):
         }
         executor._notebook_fallback_error = None
 
-        result = rt._tool_execute_code("ov.pp.normalize(adata)", "normalize", adata)
+        result = exec_mod.handle_execute_code(
+            ctx, executor, "ov.pp.normalize(adata)", "normalize", adata
+        )
 
         output = result["output"]
         print(f"  output snippet: {output[:300]}")
@@ -178,7 +182,7 @@ class TestNotebookFallbackErrorReporting(unittest.TestCase):
     # 5. Both notebook error AND prereq warning appear together
     # ------------------------------------------------------------------
     def test_notebook_error_and_prereq_warning_combined(self):
-        rt, ctx, executor = self._make_tool_runtime()
+        rt, ctx, executor, exec_mod = self._make_tool_runtime()
         import anndata, numpy as np
         adata = anndata.AnnData(np.zeros((5, 3)))
 
@@ -191,7 +195,9 @@ class TestNotebookFallbackErrorReporting(unittest.TestCase):
 
         executor.execute_generated_code.side_effect = fake_execute
 
-        result = rt._tool_execute_code("bad_code()", "bad call", adata)
+        result = exec_mod.handle_execute_code(
+            ctx, executor, "bad_code()", "bad call", adata
+        )
         output = result["output"]
         print(f"  output snippet: {output[:400]}")
         self.assertIn("WARNING", output)
