@@ -1084,7 +1084,8 @@ class TestNoBehaviorChange:
             "repair_loop.py", "run_store.py", "runtime.py",
             "session_context.py", "subagent_controller.py",
             "tool_registry.py", "tool_runtime.py", "tool_scheduler.py",
-            "turn_controller.py", "workflow.py",
+            "turn_controller.py", "turn_followup.py", "turn_artifacts.py",
+            "workflow.py",
         }
         actual = {
             f.name for f in OVAGENT_DIR.iterdir()

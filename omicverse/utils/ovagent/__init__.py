@@ -56,6 +56,7 @@ from .tool_scheduler import (
 )
 from .event_stream import RuntimeEventEmitter
 from .turn_controller import TurnController, FollowUpGate
+from .turn_followup import ConvergenceMonitor
 from .session_context import SessionService, ContextService
 from .registry_scanner import RegistryScanner
 from .auth import (
@@ -89,6 +90,7 @@ __all__ = [
     "CompactionCheckpoint",
     "ContextBudgetManager",
     "ContextService",
+    "ConvergenceMonitor",
     "DEFAULT_MAX_RETRIES",
     "ExecutionBatch",
     "ExecutionRepairLoop",
