@@ -66,6 +66,8 @@ utils_pkg.agent_backend = agent_backend_module
 
 OmicVerseLLMBackend = agent_backend_module.OmicVerseLLMBackend
 Usage = agent_backend_module.Usage
+# After decomposition, urllib_request lives in the OpenAI helper module
+_oai_module = getattr(agent_backend_module, '_oai', agent_backend_module)
 
 for name, module in _ORIGINAL_MODULES.items():
     if module is None:
@@ -177,7 +179,7 @@ class TestOpenAIUsageTracking:
 
         # Mock urlopen
         mock_urlopen = Mock(return_value=mock_response)
-        monkeypatch.setattr(agent_backend_module.urllib_request, 'urlopen', mock_urlopen)
+        monkeypatch.setattr(_oai_module.urllib_request, 'urlopen', mock_urlopen)
 
         # Mock ModelConfig
         monkeypatch.setattr(
@@ -335,7 +337,7 @@ class TestResponsesAPIUsageTracking:
 
         # Mock urlopen
         mock_urlopen = Mock(return_value=mock_response)
-        monkeypatch.setattr(agent_backend_module.urllib_request, 'urlopen', mock_urlopen)
+        monkeypatch.setattr(_oai_module.urllib_request, 'urlopen', mock_urlopen)
 
         # Mock ModelConfig
         monkeypatch.setattr(
