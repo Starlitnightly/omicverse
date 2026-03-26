@@ -8,8 +8,29 @@ import random
 from matplotlib.collections import LineCollection
 from matplotlib.patches import FancyArrowPatch
 
-from ..single import cpdb_exact_target,cpdb_exact_source
 from ._cpdbviz import CellChatViz
+
+
+def cpdb_exact_target(means, target_cells):
+    import re
+    t_dict = []
+    for t in target_cells:
+        escaped_str = re.escape('|' + t)
+        target_names = means.columns[means.columns.str.contains(escaped_str)].tolist()
+        t_dict += target_names
+    target_sub = means[means.columns[:10].tolist() + t_dict]
+    return target_sub
+
+
+def cpdb_exact_source(means, source_cells):
+    import re
+    t_dict = []
+    for t in source_cells:
+        escaped_str = re.escape(t + '|')
+        source_names = means.columns[means.columns.str.contains(escaped_str)].tolist()
+        t_dict += source_names
+    source_sub = means[means.columns[:10].tolist() + t_dict]
+    return source_sub
 from ._palette import palette_28,palette_56,palette_112
 
 def cpdb_network(adata:anndata.AnnData,interaction_edges:pd.DataFrame,

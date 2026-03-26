@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .config import config_exists, default_auth_path, default_config_path, load_auth, load_config, save_config
+from .gemini_cli_oauth import GeminiCliOAuthError, GeminiCliOAuthManager
 from .model_registry import iter_known_provider_env_vars, provider_env_vars, provider_from_model
 from .openai_oauth import OPENAI_CODEX_BASE_URL, OpenAIOAuthManager, OpenAIOAuthError
 
@@ -112,7 +113,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--auth-mode",
         default=None,
         dest="auth_mode",
-        choices=["environment", "openai_oauth", "openai_codex", "openai_api_key", "saved_api_key", "no_auth"],
+        choices=["environment", "openai_oauth", "openai_codex", "openai_api_key", "saved_api_key", "google_oauth", "gemini_cli_oauth", "no_auth"],
         help="Authentication mode for saved Jarvis config",
     )
     parser.add_argument(
@@ -248,6 +249,15 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Force a fresh OpenAI Codex OAuth login before starting. "
             "Use this to switch to a different Codex account."
+        ),
+    )
+    gw_group.add_argument(
+        "--gemini-cli-login",
+        action="store_true",
+        dest="gemini_cli_login",
+        help=(
+            "Force a fresh Gemini CLI OAuth login before starting. "
+            "Use this to switch to a different Google account."
         ),
     )
     # ── Daemon control (claw daemon) ──────────────────────────────────────
@@ -597,6 +607,17 @@ def _resolve_api_key(
             raise RuntimeError(f"Failed to load saved OpenAI auth: {exc}") from exc
         return api_key
 
+    if normalized_mode in {"google_oauth", "gemini_cli_oauth"}:
+        try:
+            manager = GeminiCliOAuthManager(auth_path)
+            api_key = manager.build_api_key_payload(
+                refresh_if_needed=True,
+                import_if_missing=True,
+            )
+        except GeminiCliOAuthError as exc:
+            raise RuntimeError(f"Failed to load saved Gemini CLI auth: {exc}") from exc
+        return api_key
+
     if normalized_mode == "saved_api_key":
         return _resolve_saved_api_key(provider, auth_path)
 
@@ -786,6 +807,24 @@ def main(argv: Optional[List[str]] = None) -> int:
             save_config(config, config_path)
         except OpenAIOAuthError as exc:
             print(f"ERROR: Codex login failed: {exc}", file=sys.stderr)
+            return 1
+
+    if getattr(args, "gemini_cli_login", False):
+        print("Starting Gemini CLI OAuth login...")
+        try:
+            auth_manager = GeminiCliOAuthManager(auth_path)
+            auth_manager.login(
+                prompt_for_redirect=lambda auth_url: (
+                    print(f"\nAuthorization URL:\n  {auth_url}\n"),
+                    input("Paste the callback URL (or code): "),
+                )[-1],
+            )
+            print("Gemini CLI login successful.")
+            config["auth_mode"] = "gemini_cli_oauth"
+            config["llm_provider"] = "google"
+            save_config(config, config_path)
+        except GeminiCliOAuthError as exc:
+            print(f"ERROR: Gemini CLI login failed: {exc}", file=sys.stderr)
             return 1
 
     channel = _resolve_value(args.channel, config.get("channel"), "telegram")
