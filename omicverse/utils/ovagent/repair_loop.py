@@ -297,8 +297,9 @@ class ExecutionRepairLoop:
                 )
 
         if extract_code_fn is None:
-            ctx = self._executor._ctx
-            extract_code_fn = getattr(ctx, "_extract_python_code", None)
+            ctx = getattr(self._executor, "_ctx", None)
+            if ctx is not None:
+                extract_code_fn = getattr(ctx, "_extract_python_code", None)
 
         attempts: List[RepairAttempt] = []
         current_code = code
