@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Coroutine, List, Optional, Sequence, Tuple
 
 from .tool_registry import ParallelClass, ToolRegistry
@@ -236,12 +236,21 @@ async def execute_batch(
         return []
 
     if batch.parallel and len(batch.calls) > 1:
-        # Concurrent execution with deterministic result ordering
+        # Concurrent execution with deterministic result ordering.
+        # return_exceptions=True ensures all tasks run to completion even if
+        # one fails, rather than cancelling remaining tasks on first exception.
         async def _run(sc: ScheduledCall) -> Tuple[int, Any]:
             result = await dispatch_fn(sc)
             return (sc.index, result)
 
-        pairs = await asyncio.gather(*[_run(sc) for sc in batch.calls])
+        raw = await asyncio.gather(
+            *[_run(sc) for sc in batch.calls], return_exceptions=True
+        )
+        pairs: List[Tuple[int, Any]] = []
+        for item in raw:
+            if isinstance(item, BaseException):
+                raise item
+            pairs.append(item)  # type: ignore[arg-type]
         # Sort by original index to guarantee deterministic ordering
         return sorted(pairs, key=lambda p: p[0])
 

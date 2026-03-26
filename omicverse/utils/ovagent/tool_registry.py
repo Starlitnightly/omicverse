@@ -86,7 +86,7 @@ class ToolMetadata:
     isolation_mode: IsolationMode
     is_async: bool = False
     definition: Optional[ToolDefinition] = None
-    legacy_schema: Optional[Dict[str, Any]] = field(default=None, hash=False)
+    legacy_schema: Optional[Dict[str, Any]] = field(default=None, hash=False, compare=False)
     pre_exec_hook: Optional[str] = None
     post_exec_hook: Optional[str] = None
     normalize_result_hook: Optional[str] = None

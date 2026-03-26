@@ -330,19 +330,26 @@ class ContextBudgetManager:
         # Convert token limit back to approximate char budget
         # Use 4 chars/token as inverse of our estimator
         char_budget = policy.max_tokens * 4
+        suffix_len = len(policy.suffix)
+
+        # Guard: if budget is too small to fit even the suffix, return the suffix.
+        if char_budget <= suffix_len:
+            return policy.suffix[:char_budget] if char_budget > 0 else ""
 
         if policy.strategy == "head":
             # Keep the tail
-            suffix_len = len(policy.suffix)
-            return policy.suffix + content[-(char_budget - suffix_len):]
+            tail_chars = char_budget - suffix_len
+            return policy.suffix + content[-tail_chars:]
 
         if policy.strategy == "middle":
             # Keep head + tail, drop middle
-            half = (char_budget - len(policy.suffix)) // 2
+            half = max((char_budget - suffix_len) // 2, 0)
+            if half == 0:
+                return policy.suffix
             return content[:half] + policy.suffix + content[-half:]
 
         # Default: "tail" strategy — keep head, truncate tail
-        keep = char_budget - len(policy.suffix)
+        keep = max(char_budget - suffix_len, 0)
         return content[:keep] + policy.suffix
 
     # -- compaction checkpoints ---------------------------------------------

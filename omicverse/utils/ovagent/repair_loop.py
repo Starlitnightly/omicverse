@@ -303,6 +303,7 @@ class ExecutionRepairLoop:
 
         attempts: List[RepairAttempt] = []
         current_code = code
+        current_strategy = "passthrough"
         dataset_ctx = build_dataset_context(adata)
 
         for attempt_num in range(self._max_retries + 1):
@@ -311,7 +312,7 @@ class ExecutionRepairLoop:
                 result = exec_fn(current_code, adata)
                 attempts.append(RepairAttempt(
                     attempt=attempt_num,
-                    strategy="passthrough" if attempt_num == 0 else attempts[-1].strategy if attempts else "passthrough",
+                    strategy=current_strategy,
                     code=current_code,
                     success=True,
                 ))
@@ -370,6 +371,7 @@ class ExecutionRepairLoop:
                         envelope=envelope,
                     ))
                     current_code = guardrail_code
+                    current_strategy = "guardrail"
                     continue
 
                 # --- Stage 2: LLM-guided repair ---
@@ -388,6 +390,7 @@ class ExecutionRepairLoop:
                         envelope=envelope,
                     ))
                     current_code = llm_code
+                    current_strategy = "llm"
                     continue
 
                 # Neither guardrail nor LLM could produce new code — mark
@@ -433,8 +436,8 @@ class ExecutionRepairLoop:
             if diagnosed and extract_code_fn is not None:
                 try:
                     return extract_code_fn(diagnosed)
-                except Exception:
-                    # extract_code_fn may itself fail; fall back to raw diagnosed
+                except Exception as exc:
+                    logger.warning("extract_code_fn failed: %s", exc)
                     return diagnosed
             return diagnosed
         except Exception as exc:

@@ -16,7 +16,6 @@ from typing import TYPE_CHECKING, Any, List, Optional
 from .prompt_templates import (
     CODE_ONLY_MODE,
     PromptOverlay,
-    PromptTemplateEngine,
     build_agentic_engine,
     build_subagent_engine,
 )
@@ -110,9 +109,9 @@ class PromptBuilder:
         raise ValueError("Unknown subagent type: " + agent_type)
 
     def build_subagent_user_message(self, task: str, adata: Any) -> str:
-        msg = "Task: " + task + "\n\n"
+        msg = f"Task: {task}\n\n"
         if adata is not None and hasattr(adata, "shape"):
-            msg += "Dataset: " + str(adata.shape[0]) + " cells x " + str(adata.shape[1]) + " genes\n"
+            msg += f"Dataset: {adata.shape[0]} cells x {adata.shape[1]} genes\n"
         return msg
 
     # -- main agentic prompt ------------------------------------------------

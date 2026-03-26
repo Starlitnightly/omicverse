@@ -27,8 +27,20 @@ import pytest
 # Guard
 # ---------------------------------------------------------------------------
 
+def _is_truthy_env(var_name: str) -> bool:
+    """Return True only if the env var is set to a common truthy value.
+
+    Accepts: "1", "true", "yes", "on" (case-insensitive, with optional
+    surrounding whitespace).  Avoids false positives from "0" or "false".
+    """
+    value = os.environ.get(var_name)
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 pytestmark = pytest.mark.skipif(
-    not os.environ.get("OV_AGENT_RUN_HARNESS_TESTS"),
+    not _is_truthy_env("OV_AGENT_RUN_HARNESS_TESTS"),
     reason="harness tests disabled",
 )
 

@@ -119,10 +119,11 @@ class PermissionPolicy:
                 reason="tool is in the explicit deny list",
             )
 
-        # 2. Allowlist restriction
-        if self._allowed_tools is not None and tool_name not in self._allowed_tools:
-            canonical = self._registry.resolve_name(tool_name)
-            if not canonical or canonical not in self._allowed_tools:
+        # 2. Allowlist restriction — resolve aliases before checking so that an
+        # aliased name whose canonical is in the allowlist is not incorrectly denied.
+        canonical_name = self._registry.resolve_name(tool_name) or tool_name
+        if self._allowed_tools is not None:
+            if tool_name not in self._allowed_tools and canonical_name not in self._allowed_tools:
                 return PermissionDecision(
                     verdict=PermissionVerdict.deny,
                     tool_name=tool_name,

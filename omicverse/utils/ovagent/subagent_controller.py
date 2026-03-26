@@ -31,7 +31,6 @@ from .context_budget import (
 from .permission_policy import (
     PermissionDecision,
     PermissionPolicy,
-    PermissionVerdict,
     create_subagent_policy,
 )
 from .tool_registry import OutputTier
@@ -240,7 +239,14 @@ class SubagentController:
 
             if response.raw_message:
                 if isinstance(response.raw_message, list):
-                    messages.extend(response.raw_message)
+                    for msg in response.raw_message:
+                        if isinstance(msg, dict):
+                            messages.append(msg)
+                        else:
+                            logger.warning(
+                                "subagent: skipping non-dict raw_message element type=%s",
+                                type(msg).__name__,
+                            )
                 else:
                     messages.append(response.raw_message)
             elif response.content:
