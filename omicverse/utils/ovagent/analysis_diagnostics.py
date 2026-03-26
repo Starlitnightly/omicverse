@@ -153,17 +153,39 @@ def apply_execution_error_fix(
 # Package management
 # ---------------------------------------------------------------------------
 
+_VALID_PACKAGE_NAME_RE = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$")
+
+
+def _is_valid_package_name(name: str) -> bool:
+    """Check that *name* looks like a legitimate Python/pip package name.
+
+    Rejects names containing shell metacharacters, path separators, flags
+    (leading ``-``), or whitespace to prevent command-injection via
+    crafted error messages.
+    """
+    if not name or len(name) > 128:
+        return False
+    return _VALID_PACKAGE_NAME_RE.match(name) is not None
+
+
 def extract_package_name(error_msg: str) -> Optional[str]:
     """Extract the missing package name from a ModuleNotFoundError message."""
     m = re.search(r"No module named ['\"]([^'\"]+)['\"]", str(error_msg))
     if m:
-        return m.group(1).split(".")[0]
+        candidate = m.group(1).split(".")[0]
+        if _is_valid_package_name(candidate):
+            return candidate
+        logger.warning("Extracted package name %r failed validation — skipping", candidate)
     return None
 
 
 def auto_install_package(ctx: "AgentContext", package_name: str) -> bool:
     """Auto-install a missing package via pip if allowed by config."""
     import subprocess as _subprocess
+
+    if not _is_valid_package_name(package_name):
+        logger.warning("Package name %r failed validation - skipping auto-install", package_name)
+        return False
 
     cfg = ctx._config
     blocklist = ["os", "sys", "subprocess", "shutil", "signal", "ctypes"]
@@ -175,6 +197,9 @@ def auto_install_package(ctx: "AgentContext", package_name: str) -> bool:
         return False
 
     pip_name = _PACKAGE_ALIASES.get(package_name, package_name)
+    if not _is_valid_package_name(pip_name):
+        logger.warning("Resolved pip name %r failed validation - skipping auto-install", pip_name)
+        return False
     print(f"   📦 Auto-installing missing package: {pip_name}")
 
     try:
