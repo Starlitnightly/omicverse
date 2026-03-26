@@ -411,9 +411,17 @@ async def _stream_anthropic(backend, user_prompt: str):
 
 async def _stream_gemini(backend, user_prompt: str):
     """Stream responses from Google Gemini models with retry on session creation."""
+    import asyncio as _asyncio
+    from .agent_backend_gemini import _gemini_uses_oauth_bearer, _chat_via_gemini_rest
+
     api_key = backend._resolve_api_key()
     if not api_key:
         raise RuntimeError("Missing GOOGLE_API_KEY for Gemini provider")
+    if _gemini_uses_oauth_bearer(api_key):
+        result = await _asyncio.to_thread(_chat_via_gemini_rest, backend, user_prompt, api_key)
+        if result:
+            yield result
+        return
 
     try:
         import google.generativeai as genai  # type: ignore

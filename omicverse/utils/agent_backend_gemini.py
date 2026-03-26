@@ -4,12 +4,50 @@ Internal module — import from ``omicverse.utils.agent_backend`` instead.
 """
 from __future__ import annotations
 
+import json
 import logging
+import ssl
 from typing import Any, Dict, List, Optional
+from urllib import request as urllib_request
+from urllib.error import HTTPError
+from urllib.parse import quote
 
-from .agent_backend_common import Usage, ToolCall, ChatResponse, _coerce_int, _compute_total
+from .agent_backend_common import (
+    Usage, ToolCall, ChatResponse,
+    _coerce_int, _compute_total, _request_timeout_seconds,
+)
+from .model_config import get_provider
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Gemini CLI OAuth constants
+# ---------------------------------------------------------------------------
+
+_GOOGLE_GEMINI_CLI_BASE_URL = "https://cloudcode-pa.googleapis.com"
+_GOOGLE_GEMINI_CLI_UNSUPPORTED_SCHEMA_KEYS = {
+    "default",
+    "patternProperties",
+    "additionalProperties",
+    "$schema",
+    "$id",
+    "$ref",
+    "$defs",
+    "definitions",
+    "examples",
+    "minLength",
+    "maxLength",
+    "minimum",
+    "maximum",
+    "multipleOf",
+    "pattern",
+    "format",
+    "minItems",
+    "maxItems",
+    "uniqueItems",
+    "minProperties",
+    "maxProperties",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -67,10 +105,31 @@ def _messages_to_gemini_contents(messages: List[Dict]) -> List[Any]:
 
         content = m.get("content", "")
         if isinstance(content, str):
-            contents.append(genai.protos.Content(
-                role=gemini_role,
-                parts=[genai.protos.Part(text=content)],
-            ))
+            parts = []
+            if content:
+                parts.append(genai.protos.Part(text=content))
+            if role == "assistant":
+                for tool_call in m.get("tool_calls") or []:
+                    function = dict(tool_call.get("function") or {})
+                    arguments = function.get("arguments")
+                    if isinstance(arguments, str):
+                        try:
+                            arguments = json.loads(arguments)
+                        except Exception:
+                            arguments = {"raw": arguments}
+                    if not isinstance(arguments, dict):
+                        arguments = {}
+                    parts.append(genai.protos.Part(
+                        function_call=genai.protos.FunctionCall(
+                            name=function.get("name", tool_call.get("name", "unknown")),
+                            args=arguments,
+                        )
+                    ))
+            if parts:
+                contents.append(genai.protos.Content(
+                    role=gemini_role,
+                    parts=parts,
+                ))
         elif isinstance(content, list):
             # Anthropic-style tool_result content blocks
             parts = []
@@ -114,6 +173,8 @@ def _chat_via_gemini(backend, user_prompt: str) -> str:
     api_key = backend._resolve_api_key()
     if not api_key:
         raise RuntimeError("Missing GOOGLE_API_KEY for Gemini provider")
+    if _gemini_uses_oauth_bearer(api_key):
+        return _chat_via_gemini_rest(backend, user_prompt, api_key)
     try:
         import google.generativeai as genai  # type: ignore
 
@@ -188,6 +249,9 @@ def _chat_tools_gemini(
     api_key = backend._resolve_api_key()
     if not api_key:
         raise RuntimeError("Missing GOOGLE_API_KEY for Gemini provider")
+
+    if _gemini_uses_oauth_bearer(api_key):
+        return _chat_tools_gemini_rest(backend, messages, tools, tool_choice, api_key)
 
     try:
         import google.generativeai as genai  # type: ignore
@@ -268,7 +332,21 @@ def _chat_tools_gemini(
                 tool_calls=tc_list,
                 stop_reason=stop,
                 usage=usage_obj,
-                raw_message=None,  # Gemini history managed separately
+                raw_message={
+                    "role": "assistant",
+                    "content": content,
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.name,
+                                "arguments": json.dumps(tc.arguments),
+                            },
+                        }
+                        for tc in tc_list
+                    ],
+                } if (content or tc_list) else None,
             )
 
         return backend._retry(_make_call)
@@ -277,3 +355,407 @@ def _chat_tools_gemini(
         raise RuntimeError(
             "google-generativeai package not installed. Install it for tool-calling support."
         )
+
+
+# ---------------------------------------------------------------------------
+# Gemini CLI OAuth bearer helpers
+# ---------------------------------------------------------------------------
+
+def _gemini_uses_oauth_bearer(api_key: str) -> bool:
+    """Check if the API key is a JSON OAuth bearer token payload."""
+    text = str(api_key or "")
+    if not text.startswith("{"):
+        return False
+    try:
+        payload = json.loads(text)
+    except Exception:
+        return False
+    token = str((payload or {}).get("token") or "").strip() if isinstance(payload, dict) else ""
+    return bool(token)
+
+
+def _gemini_auth_headers(api_key: str) -> Dict[str, str]:
+    """Build auth headers: OAuth bearer if JSON payload, else x-goog-api-key."""
+    text = str(api_key or "")
+    if text.startswith("{"):
+        try:
+            payload = json.loads(text)
+        except Exception:
+            payload = None
+        if isinstance(payload, dict):
+            token = str(payload.get("token") or "").strip()
+            if token:
+                return {
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                }
+    return {
+        "x-goog-api-key": text,
+        "Content-Type": "application/json",
+    }
+
+
+def _gemini_oauth_payload(api_key: str) -> Optional[Dict[str, str]]:
+    """Extract OAuth token and project ID from a JSON API key payload."""
+    text = str(api_key or "")
+    if not text.startswith("{"):
+        return None
+    try:
+        payload = json.loads(text)
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    token = str(payload.get("token") or "").strip()
+    project_id = str(payload.get("projectId") or payload.get("project_id") or "").strip()
+    if not token:
+        return None
+    return {
+        "token": token,
+        "projectId": project_id,
+    }
+
+
+def _gemini_base_url(backend) -> str:
+    """Resolve the Gemini REST base URL from config or provider defaults."""
+    info = get_provider(backend.config.provider)
+    return str(
+        backend.config.endpoint
+        or (info.base_url if info else "https://generativelanguage.googleapis.com/v1beta")
+    ).rstrip("/")
+
+
+def _gemini_generate_content_url(backend) -> str:
+    return f"{_gemini_base_url(backend)}/models/{quote(backend._wire_model_name(), safe='')}:generateContent"
+
+
+def _gemini_cli_base_url(backend) -> str:
+    endpoint = str(backend.config.endpoint or "").strip().rstrip("/")
+    return endpoint or _GOOGLE_GEMINI_CLI_BASE_URL
+
+
+def _gemini_cli_generate_content_url(backend, stream: bool = False) -> str:
+    suffix = ":streamGenerateContent?alt=sse" if stream else ":generateContent"
+    return f"{_gemini_cli_base_url(backend)}/v1internal{suffix}"
+
+
+def _gemini_function_response_payload(result: Any) -> Dict[str, Any]:
+    """Normalize a tool result into a Gemini-compatible function response dict."""
+    if isinstance(result, dict):
+        return result
+    if isinstance(result, list):
+        return {"output": result}
+    if isinstance(result, str):
+        stripped = result.strip()
+        if stripped:
+            try:
+                parsed = json.loads(stripped)
+            except Exception:
+                parsed = None
+            if isinstance(parsed, dict):
+                return parsed
+            if isinstance(parsed, list):
+                return {"output": parsed}
+        return {"output": result}
+    return {"output": result}
+
+
+def _clean_schema_for_gemini_cli(schema: Any) -> Any:
+    """Strip unsupported JSON Schema keys for the Gemini CLI REST API."""
+    if isinstance(schema, list):
+        return [_clean_schema_for_gemini_cli(item) for item in schema]
+    if not isinstance(schema, dict):
+        return schema
+
+    cleaned: Dict[str, Any] = {}
+    for key, value in schema.items():
+        if key in _GOOGLE_GEMINI_CLI_UNSUPPORTED_SCHEMA_KEYS:
+            continue
+        if key in {"anyOf", "oneOf"} and isinstance(value, list):
+            preferred = None
+            for item in value:
+                if isinstance(item, dict) and item.get("type") == "array":
+                    preferred = item
+                    break
+            if preferred is not None:
+                merged = dict(preferred)
+                if schema.get("description") and not merged.get("description"):
+                    merged["description"] = schema.get("description")
+                return _clean_schema_for_gemini_cli(merged)
+            continue
+        cleaned_value = _clean_schema_for_gemini_cli(value)
+        if key == "type" and isinstance(cleaned_value, str):
+            cleaned_value = cleaned_value.upper()
+        cleaned[key] = cleaned_value
+    return cleaned
+
+
+def _messages_to_gemini_rest_contents(backend, messages: List[Dict]) -> List[Dict[str, Any]]:
+    """Convert OpenAI-style messages to Gemini REST JSON contents."""
+    contents: List[Dict[str, Any]] = []
+    for message in messages:
+        role = str(message.get("role") or "user")
+        if role == "system":
+            continue
+        parts: List[Dict[str, Any]] = []
+        content = message.get("content", "")
+        if isinstance(content, str) and content:
+            parts.append({"text": content})
+        elif isinstance(content, list):
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") == "text" and block.get("text"):
+                    parts.append({"text": block.get("text", "")})
+                elif block.get("type") == "tool_result":
+                    parts.append({
+                        "functionResponse": {
+                            "name": block.get("name", "unknown"),
+                            "response": _gemini_function_response_payload(block.get("content", "")),
+                        }
+                    })
+        elif isinstance(content, dict) and content:
+            parts.append({"text": json.dumps(content, ensure_ascii=False)})
+
+        if role == "assistant":
+            for tool_call in message.get("tool_calls") or []:
+                if not isinstance(tool_call, dict):
+                    continue
+                function = dict(tool_call.get("function") or {})
+                arguments = function.get("arguments")
+                if isinstance(arguments, str):
+                    try:
+                        arguments = json.loads(arguments)
+                    except Exception:
+                        arguments = {"raw": arguments}
+                if not isinstance(arguments, dict):
+                    arguments = {}
+                parts.append({
+                    "functionCall": {
+                        "name": function.get("name", tool_call.get("name", "unknown")),
+                        "args": arguments,
+                    }
+                })
+        elif role == "tool":
+            parts = [{
+                "functionResponse": {
+                    "name": message.get("name", "unknown"),
+                    "response": _gemini_function_response_payload(message.get("content", "")),
+                }
+            }]
+
+        if parts:
+            contents.append({
+                "role": "model" if role == "assistant" else "user",
+                "parts": parts,
+            })
+    return contents
+
+
+def _gemini_rest_generation_config(backend) -> Dict[str, Any]:
+    return {
+        "temperature": backend.config.temperature,
+        "maxOutputTokens": backend.config.max_tokens,
+    }
+
+
+def _gemini_rest_request(backend, body: Dict[str, Any], api_key: str) -> Dict[str, Any]:
+    """Send a generateContent request to the standard Gemini REST endpoint."""
+    url = _gemini_generate_content_url(backend)
+    headers = _gemini_auth_headers(api_key)
+    data = json.dumps(body).encode("utf-8")
+    req = urllib_request.Request(url, data=data, headers=headers, method="POST")
+    ctx = ssl.create_default_context()
+    with urllib_request.urlopen(req, context=ctx, timeout=_request_timeout_seconds()) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _gemini_cli_request(backend, body: Dict[str, Any], api_key: str) -> Dict[str, Any]:
+    """Send a generateContent request to the Gemini CLI internal endpoint."""
+    oauth = _gemini_oauth_payload(api_key)
+    if not oauth:
+        raise RuntimeError("Gemini CLI OAuth payload is missing bearer token")
+    url = _gemini_cli_generate_content_url(backend)
+    data = json.dumps(body).encode("utf-8")
+    headers = {
+        "Authorization": f"Bearer {oauth['token']}",
+        "Content-Type": "application/json",
+        "User-Agent": "GeminiCLI/v23.5.0 (darwin; arm64) google-api-nodejs-client/9.15.1",
+        "x-goog-api-client": "gl-python/omicverse",
+        "Accept": "application/json",
+    }
+    req = urllib_request.Request(url, data=data, headers=headers, method="POST")
+    ctx = ssl.create_default_context()
+    try:
+        with urllib_request.urlopen(req, context=ctx, timeout=_request_timeout_seconds()) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except HTTPError as exc:
+        body_text = ""
+        try:
+            body_text = exc.read().decode("utf-8", errors="ignore").strip()
+        except Exception:
+            body_text = ""
+        detail = body_text[:2000] if body_text else str(exc)
+        raise RuntimeError(
+            f"Gemini CLI generateContent failed: HTTP {exc.code}: {detail}"
+        ) from exc
+
+
+def _capture_gemini_usage(backend, payload: Dict[str, Any]) -> Optional[Usage]:
+    """Extract usage metadata from a Gemini REST response payload."""
+    response_payload = payload.get("response") if isinstance(payload.get("response"), dict) else payload
+    usage_data = response_payload.get("usageMetadata")
+    if not isinstance(usage_data, dict):
+        return None
+    input_tokens = _coerce_int(usage_data.get("promptTokenCount"))
+    output_tokens = _coerce_int(usage_data.get("candidatesTokenCount"))
+    total_tokens = _compute_total(
+        input_tokens,
+        output_tokens,
+        _coerce_int(usage_data.get("totalTokenCount")),
+    )
+    if total_tokens is None:
+        return None
+    usage = Usage(
+        input_tokens=input_tokens or 0,
+        output_tokens=output_tokens or 0,
+        total_tokens=total_tokens,
+        model=backend.config.model,
+        provider=backend.config.provider,
+    )
+    backend.last_usage = usage
+    return usage
+
+
+def _extract_gemini_text_and_tool_calls(payload: Dict[str, Any]):
+    """Extract text, tool calls, raw_message, and stop reason from a Gemini REST response."""
+    response_payload = payload.get("response") if isinstance(payload.get("response"), dict) else payload
+    candidates = response_payload.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        raise RuntimeError(f"No Gemini candidates returned: {response_payload}")
+
+    candidate = candidates[0] if isinstance(candidates[0], dict) else {}
+    content = candidate.get("content")
+    parts = list((content or {}).get("parts") or []) if isinstance(content, dict) else []
+    text_parts: List[str] = []
+    tool_calls: List[ToolCall] = []
+    for part in parts:
+        if not isinstance(part, dict):
+            continue
+        text = part.get("text")
+        if isinstance(text, str) and text:
+            text_parts.append(text)
+        function_call = part.get("functionCall")
+        if isinstance(function_call, dict):
+            name = str(function_call.get("name") or "unknown").strip() or "unknown"
+            args = function_call.get("args")
+            if not isinstance(args, dict):
+                args = {}
+            tool_calls.append(ToolCall(
+                id=f"gemini_{name}_{len(tool_calls) + 1}",
+                name=name,
+                arguments=args,
+            ))
+
+    stop_reason = "tool_use" if tool_calls else "end_turn"
+    finish_reason = str(candidate.get("finishReason") or "").upper()
+    if finish_reason == "MAX_TOKENS":
+        stop_reason = "max_tokens"
+    content_text = "\n".join(text_parts).strip() or None
+    raw_message = {
+        "role": "assistant",
+        "content": content_text,
+        "tool_calls": [
+            {
+                "id": tc.id,
+                "type": "function",
+                "function": {
+                    "name": tc.name,
+                    "arguments": json.dumps(tc.arguments),
+                },
+            }
+            for tc in tool_calls
+        ],
+    } if (content_text or tool_calls) else None
+    return content_text, tool_calls, raw_message, stop_reason
+
+
+# ---------------------------------------------------------------------------
+# Gemini CLI REST chat methods
+# ---------------------------------------------------------------------------
+
+def _chat_tools_gemini_rest(
+    backend,
+    messages: List[Dict],
+    tools: Optional[List[Dict]],
+    tool_choice: Optional[str],
+    api_key: str,
+) -> ChatResponse:
+    """Multi-turn chat via Gemini CLI REST API with function calling support."""
+    body: Dict[str, Any] = {
+        "model": backend._wire_model_name(),
+        "request": {
+            "contents": _messages_to_gemini_rest_contents(backend, messages),
+            "generationConfig": _gemini_rest_generation_config(backend),
+        },
+    }
+    oauth = _gemini_oauth_payload(api_key) or {}
+    if oauth.get("projectId"):
+        body["project"] = oauth["projectId"]
+    if backend.config.system_prompt:
+        body["request"]["systemInstruction"] = {
+            "role": "system",
+            "parts": [{"text": backend.config.system_prompt}],
+        }
+    if tools:
+        body["request"]["tools"] = [{
+            "functionDeclarations": [
+                {
+                    "name": tool["name"],
+                    "description": tool.get("description", ""),
+                    "parameters": _clean_schema_for_gemini_cli(tool.get("parameters", {}) or {}),
+                }
+                for tool in tools
+            ]
+        }]
+
+    def _make_call() -> ChatResponse:
+        payload = _gemini_cli_request(backend, body, api_key)
+        usage = _capture_gemini_usage(backend, payload)
+        content, tool_calls, raw_message, stop_reason = _extract_gemini_text_and_tool_calls(payload)
+        return ChatResponse(
+            content=content,
+            tool_calls=tool_calls,
+            stop_reason=stop_reason,
+            usage=usage,
+            raw_message=raw_message,
+        )
+
+    return backend._retry(_make_call)
+
+
+def _chat_via_gemini_rest(backend, user_prompt: str, api_key: str) -> str:
+    """Single-turn chat via Gemini CLI REST API (no tool calling)."""
+    body: Dict[str, Any] = {
+        "model": backend._wire_model_name(),
+        "request": {
+            "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
+            "generationConfig": _gemini_rest_generation_config(backend),
+        },
+    }
+    oauth = _gemini_oauth_payload(api_key) or {}
+    if oauth.get("projectId"):
+        body["project"] = oauth["projectId"]
+    if backend.config.system_prompt:
+        body["request"]["systemInstruction"] = {
+            "role": "system",
+            "parts": [{"text": backend.config.system_prompt}],
+        }
+
+    def _make_call() -> str:
+        payload = _gemini_cli_request(backend, body, api_key)
+        _capture_gemini_usage(backend, payload)
+        content, _tool_calls, _raw_message, _stop_reason = _extract_gemini_text_and_tool_calls(payload)
+        return content or ""
+
+    return backend._retry(_make_call)
