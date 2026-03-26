@@ -1163,6 +1163,8 @@ class TestNoBehaviorChange:
         """No new .py files added to ovagent/ by this task."""
         known_modules = {
             "__init__.py", "analysis_executor.py", "auth.py",
+            "analysis_transformer.py", "analysis_diagnostics.py",
+            "analysis_sandbox.py",
             "bootstrap.py", "codegen_pipeline.py", "context_budget.py",
             "event_stream.py", "permission_policy.py", "prompt_builder.py",
             "prompt_templates.py", "protocol.py", "registry_scanner.py",
