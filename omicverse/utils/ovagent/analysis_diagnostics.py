@@ -188,9 +188,10 @@ def auto_install_package(ctx: "AgentContext", package_name: str) -> bool:
         return False
 
     cfg = ctx._config
-    blocklist = ["os", "sys", "subprocess", "shutil", "signal", "ctypes"]
+    _ALWAYS_BLOCKED = {"os", "sys", "subprocess", "shutil", "signal", "ctypes"}
+    blocklist = set(_ALWAYS_BLOCKED)
     if cfg and hasattr(cfg, "execution"):
-        blocklist = cfg.execution.package_blocklist
+        blocklist = _ALWAYS_BLOCKED | set(cfg.execution.package_blocklist)
 
     if package_name in blocklist:
         logger.warning("Package %r is on the blocklist - skipping auto-install", package_name)

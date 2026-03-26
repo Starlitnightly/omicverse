@@ -447,6 +447,45 @@ def process_context_directives(
         logger.debug("Error processing context directives: %s", e)
 
 
+def _safe_resolve_expr(value_expr: str, local_vars: Dict[str, Any]) -> Any:
+    """Resolve *value_expr* without unconstrained ``eval``.
+
+    Supported forms (in priority order):
+    1. Direct name lookup in *local_vars* (e.g. ``my_var``).
+    2. Dotted attribute access on a local variable (e.g. ``adata.shape``).
+    3. Python literal values via ``ast.literal_eval`` (strings, numbers,
+       lists, dicts, tuples, booleans, ``None``).
+    4. Fallback: return *value_expr* as a plain string.
+    """
+    import ast as _ast
+
+    # 1. Direct name lookup
+    if value_expr in local_vars:
+        return local_vars[value_expr]
+
+    # 2. Dotted attribute access: ``name.attr1.attr2``
+    parts = value_expr.split(".")
+    if len(parts) > 1 and all(p.isidentifier() for p in parts):
+        root = parts[0]
+        if root in local_vars:
+            obj = local_vars[root]
+            try:
+                for attr in parts[1:]:
+                    obj = getattr(obj, attr)
+                return obj
+            except (AttributeError, TypeError):
+                pass
+
+    # 3. Literal value (string, number, list, dict, tuple, bool, None)
+    try:
+        return _ast.literal_eval(value_expr)
+    except (ValueError, SyntaxError):
+        pass
+
+    # 4. Fallback: return the raw string
+    return value_expr
+
+
 def _handle_context_write(
     ctx: "AgentContext", directive: str, local_vars: Dict[str, Any],
 ) -> None:
@@ -459,13 +498,7 @@ def _handle_context_write(
             key, value_expr = content.split(" -> ", 1)
             key = key.strip()
             value_expr = value_expr.strip()
-            try:
-                if value_expr in local_vars:
-                    value = local_vars[value_expr]
-                else:
-                    value = eval(value_expr, {"__builtins__": {}}, local_vars)
-            except Exception:
-                value = value_expr
+            value = _safe_resolve_expr(value_expr, local_vars)
             category = "notes"
             if any(kw in key.lower() for kw in ["result", "stats", "metrics", "output"]):
                 category = "results"
