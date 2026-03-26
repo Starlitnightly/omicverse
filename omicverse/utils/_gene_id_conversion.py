@@ -77,6 +77,36 @@ def _infer_species_and_release(input_names: List[str]) -> str:
     return "human"
 
 
+def _validate_database(data, species: str) -> bool:
+    """Check that the local Ensembl database is indexed and not corrupted.
+
+    Runs a single test query against a known gene ID for the given species.
+    Returns ``True`` if the database is healthy, ``False`` otherwise.
+    """
+    test_gene_ids = {
+        'human':     'ENSG00000141510',
+        'mouse':     'ENSMUSG00000059552',
+        'rat':       'ENSRNOG00000019450',
+        'zebrafish': 'ENSDARG00000035559',
+        'chicken':   'ENSGALG00000000003',
+        'dog':       'ENSCAFG00000000002',
+        'pig':       'ENSSSCG00000000018',
+        'cow':       'ENSBTAG00000000011',
+        'macaque':   'ENSMMUG00000000018',
+    }
+    test_id = test_gene_ids.get(species)
+    if not test_id:
+        return True
+    try:
+        gene = data.gene_by_id(test_id)
+        if '"' in gene.gene_id:
+            print("Database contains corrupted data (quoted gene IDs). Rebuilding...")
+            return False
+        return True
+    except Exception:
+        return False
+
+
 @register_function(
     aliases=["ensembl_to_symbol", "ens2symbol", "基因ID转符号"],
     category="utils",
@@ -154,30 +184,6 @@ def convert2gene_symbol(
 
     data = EnsemblRelease(ensembl_release, species=species)
 
-    def _validate_database(data, species):
-        test_gene_ids = {
-            'human':     'ENSG00000141510',
-            'mouse':     'ENSMUSG00000059552',
-            'rat':       'ENSRNOG00000019450',
-            'zebrafish': 'ENSDARG00000035559',
-            'chicken':   'ENSGALG00000000003',
-            'dog':       'ENSCAFG00000000002',
-            'pig':       'ENSSSCG00000000018',
-            'cow':       'ENSBTAG00000000011',
-            'macaque':   'ENSMMUG00000000018',
-        }
-        test_id = test_gene_ids.get(species)
-        if not test_id:
-            return True
-        try:
-            gene = data.gene_by_id(test_id)
-            if '"' in gene.gene_id:
-                print("Database contains corrupted data (quoted gene IDs). Rebuilding...")
-                return False
-            return True
-        except Exception:
-            return False
-
     needs_rebuild = force_rebuild
     try:
         _ = data.db
@@ -191,10 +197,12 @@ def convert2gene_symbol(
             print(f"Force rebuilding database for release {ensembl_release} ({species})...")
         else:
             print(f"Release {ensembl_release} ({species}) not found locally or corrupted.")
-        print("Downloading and indexing... (This may take several minutes)")
         try:
+            print(f"Downloading Ensembl release {ensembl_release} ({species})... (this may take several minutes)")
             data.download()
+            print(f"Download complete. Indexing database...")
             data.index(overwrite=True)
+            print(f"Database ready: {data.db.local_db_path}")
         except Exception as e:
             raise ValueError(
                 f"Failed to setup Ensembl DB: {e}.\n"
@@ -444,6 +452,8 @@ def convert2gene_id(
     needs_rebuild = force_rebuild
     try:
         _ = data.db
+        if not needs_rebuild and not _validate_database(data, species):
+            needs_rebuild = True
     except Exception:
         needs_rebuild = True
 
@@ -451,11 +461,13 @@ def convert2gene_id(
         if force_rebuild:
             print(f"Force rebuilding database for release {ensembl_release} ({species})...")
         else:
-            print(f"Release {ensembl_release} ({species}) not found locally.")
-        print("Downloading and indexing... (This may take several minutes)")
+            print(f"Release {ensembl_release} ({species}) not found locally or not indexed.")
         try:
+            print(f"Downloading Ensembl release {ensembl_release} ({species})... (this may take several minutes)")
             data.download()
+            print(f"Download complete. Indexing database...")
             data.index(overwrite=True)
+            print(f"Database ready: {data.db.local_db_path}")
         except Exception as e:
             raise ValueError(
                 f"Failed to setup Ensembl DB: {e}.\n"

@@ -196,8 +196,7 @@ class TestConvert2GeneSymbol:
         mock.download = MagicMock()
         mock.index = MagicMock()
         mock.gene_by_id.side_effect = ValueError("not found")
-        # db access raises so needs_rebuild triggers
-        type(mock).db = property(fget=lambda self: (_ for _ in ()).throw(Exception("no db")))
+        mock.db = MagicMock()
         MockER.return_value = mock
 
         convert2gene_symbol(["ENSG00000141510"], species="human", force_rebuild=True)
