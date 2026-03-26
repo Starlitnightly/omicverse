@@ -18,6 +18,57 @@ Harness validation is executed only on the Taiwan server.
 - web bridge compatibility tests
 - cleanup report generation tests
 - targeted runtime trace tests
+- **E2E PBMC pipeline validation** (`tests/utils/test_e2e_pbmc_validation.py`)
+
+## E2E PBMC Pipeline Validation
+
+The E2E validation suite exercises the full OVAgent runtime stack through a
+realistic PBMC single-cell analysis scenario.  It uses staged mock LLM
+responses to drive the real subsystem instances without requiring API keys
+or heavy optional dependencies.
+
+### What it validates
+
+| Subsystem | Exercised? |
+|-----------|-----------|
+| TurnController (agentic loop) | Yes |
+| ToolRuntime (dispatch) | Yes |
+| ToolScheduler (batching) | Yes |
+| ContextBudgetManager | Yes |
+| PermissionPolicy | Yes |
+| ExecutionRepairLoop | Yes |
+| RuntimeEventEmitter | Yes |
+| ToolRegistry | Yes |
+| PromptBuilder | Yes |
+| FollowUpGate (recovery) | Yes |
+
+### Prerequisites
+
+All satisfied by `pip install -e ".[tests]"`:
+- pytest >= 7.0
+- numpy (for mock AnnData matrix)
+- No LLM API key required (staged mock LLM)
+- No scanpy required (lightweight MockAnnData)
+
+### How to run
+
+```bash
+pytest -q tests/utils/test_e2e_pbmc_validation.py
+```
+
+The aggregate test (`TestE2EAggregateReport::test_aggregate_e2e_validation`)
+outputs a structured JSON report to stdout that can be captured as a
+server-validation artifact.
+
+### Pipeline stages
+
+1. **QC** — filter cells by gene count threshold
+2. **Preprocessing** — log-normalization + 2000 HVG selection
+3. **Clustering** — Leiden cluster assignment
+4. **Finish** — summary report
+
+Each stage is dispatched as an `execute_code` tool call through the real
+TurnController -> ToolScheduler -> ToolRuntime -> ExecutionRepairLoop path.
 
 ## Harness CLI Commands
 

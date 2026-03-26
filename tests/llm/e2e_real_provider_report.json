@@ -1,0 +1,154 @@
+{
+  "report_type": "e2e_real_provider_validation",
+  "started_at": "2026-03-26T04:10:16.906136+00:00",
+  "finished_at": "2026-03-26T04:11:51.280160+00:00",
+  "final_status": "passed",
+  "relay": {
+    "base_url": "http://8.130.53.188:3000/v1",
+    "masked_key": "sk-...nVUl",
+    "ok": true,
+    "model_count": 29,
+    "latency_ms": 1232.7,
+    "sample_models": [
+      "gpt-5.1-codex",
+      "gpt-5.3-codex(xhigh)",
+      "GLM-5",
+      "claude-haiku-4-5",
+      "gpt-5.2(medium)",
+      "claude-opus-4-6-thinking"
+    ]
+  },
+  "agent": {},
+  "dataset": {
+    "n_obs": 2700,
+    "n_vars": 32738
+  },
+  "steps": [
+    {
+      "name": "agent_init",
+      "status": "passed",
+      "duration_s": 4.4,
+      "detail": {
+        "model": "gpt-5.2"
+      }
+    },
+    {
+      "name": "pbmc_qc_real_llm",
+      "status": "passed",
+      "duration_s": 88.66,
+      "detail": {
+        "duration_s": 88.66,
+        "run_trace": {
+          "available": true,
+          "trace_id": "trace_f24cd004c841",
+          "turn_id": "turn_61217b330a50",
+          "model": "gpt-5.2",
+          "provider": "openai",
+          "status": "success",
+          "result_summary": "Computed PBMC QC metrics (total_counts, n_genes_by_counts, pct_counts_mt) with scanpy; flagged mitochondrial genes in adata.var['mt']; filtered cells with min_genes=200 (0 removed; final shape unchanged at 2700\u00d732738). Saved provenance artifacts: summary.md, bundle.json, trace_linkage.",
+          "usage": {
+            "input_tokens": 34663,
+            "output_tokens": 122,
+            "total_tokens": 34785,
+            "model": "gpt-5.2",
+            "provider": "openai"
+          },
+          "usage_breakdown": {},
+          "loaded_tools": [
+            "Agent",
+            "AskUserQuestion",
+            "Bash",
+            "Read",
+            "Skill",
+            "ToolSearch",
+            "WebFetch",
+            "WebSearch"
+          ],
+          "step_count": 9,
+          "steps": [
+            {
+              "step_type": "tool_call",
+              "name": "inspect_data",
+              "status": "completed",
+              "latency_ms": null,
+              "output_summary": ""
+            },
+            {
+              "step_type": "tool_call",
+              "name": "execute_code",
+              "status": "completed",
+              "latency_ms": null,
+              "output_summary": ""
+            },
+            {
+              "step_type": "code",
+              "name": "execute_code",
+              "status": "completed",
+              "latency_ms": null,
+              "output_summary": ""
+            },
+            {
+              "step_type": "result",
+              "name": "execute_code",
+              "status": "completed",
+              "latency_ms": null,
+              "output_summary": ""
+            },
+            {
+              "step_type": "tool_call",
+              "name": "ToolSearch",
+              "status": "completed",
+              "latency_ms": null,
+              "output_summary": ""
+            },
+            {
+              "step_type": "tool_call",
+              "name": "ToolSearch",
+              "status": "completed",
+              "latency_ms": null,
+              "output_summary": ""
+            },
+            {
+              "step_type": "tool_call",
+              "name": "Bash",
+              "status": "completed",
+              "latency_ms": null,
+              "output_summary": ""
+            },
+            {
+              "step_type": "tool_call",
+              "name": "finish",
+              "status": "completed",
+              "latency_ms": null,
+              "output_summary": ""
+            },
+            {
+              "step_type": "done",
+              "name": "finish",
+              "status": "completed",
+              "latency_ms": null,
+              "output_summary": ""
+            }
+          ],
+          "adata_shape": null,
+          "started_at": 1774498222.6189141,
+          "finished_at": 1774498311.277965
+        },
+        "token_usage": {
+          "last_usage": "Usage(input_tokens=34663, output_tokens=122, total_tokens=34785, model='gpt-5.2', provider='openai')",
+          "last_usage_breakdown": {
+            "generation": null,
+            "reflection": [],
+            "review": [],
+            "total": null
+          }
+        },
+        "result_shape": [
+          2700,
+          32738
+        ]
+      }
+    }
+  ],
+  "error_detail": null
+}
