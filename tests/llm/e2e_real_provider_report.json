@@ -4,8 +4,6 @@
   "finished_at": "2026-03-26T10:02:28.647082+00:00",
   "final_status": "passed",
   "relay": {
-    "base_url": "http://8.130.53.188:3000/v1",
-    "masked_key": "sk-...nVUl",
     "ok": true,
     "model_count": 29,
     "latency_ms": 479.7,
