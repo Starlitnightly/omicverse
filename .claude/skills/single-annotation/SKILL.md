@@ -17,7 +17,7 @@ Use this skill to reproduce and adapt the single-cell annotation playbook captur
 
 2. **MetaTiME tumour microenvironment states**
    - *Data requirements*: Batched TME AnnData with an scVI latent embedding. The tutorial uses `TiME_adata_scvi.h5ad` from Figshare (`https://figshare.com/ndownloader/files/41440050`). If starting from counts, run scVI (`scvi.model.SCVI`) first to populate `adata.obsm['X_scVI']`.
-   - *Preprocessing & model fit*: Optionally subset to non-malignant cells via `adata.obs['isTME']`. Rebuild neighbors on the latent representation (`sc.pp.neighbors(adata, use_rep="X_scVI")`) and embed with pymde (`adata.obsm['X_mde'] = ov.utils.mde(...)`). Initialise `TiME_object = ov.single.MetaTiME(adata, mode='table')` and, if finer granularity is desired, over-cluster with `TiME_object.overcluster(resolution=8, clustercol='overcluster')`.
+   - *Preprocessing & model fit*: Optionally subset to non-malignant cells via `adata.obs['isTME']`. Rebuild neighbors on the latent representation (`sc.pp.neighbors(adata, use_rep="X_scVI")`) and embed with umap (`adata.obsm['X_umap'] = ov.pp.umap(...)`). Initialise `TiME_object = ov.single.MetaTiME(adata, mode='table')` and, if finer granularity is desired, over-cluster with `TiME_object.overcluster(resolution=8, clustercol='overcluster')`.
    - *Inference & interpretation*: Run `TiME_object.predictTiME(save_obs_name='MetaTiME')` to assign minor states and `Major_MetaTiME`. Visualise using `TiME_object.plot` or `sc.pl.embedding`. Interpret the outputs by comparing cluster-level distributions and confirming that MetaTiME and Major_MetaTiME columns align with expected niches.
 
 3. **CellVote consensus labelling**

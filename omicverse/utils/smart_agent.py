@@ -138,6 +138,11 @@ from .skill_registry import (
 # Filesystem context management
 from .filesystem_context import FilesystemContextManager
 from ..jarvis.config import load_auth
+from ..jarvis.gemini_cli_oauth import (
+    GOOGLE_CODE_ASSIST_ENDPOINT_PROD,
+    GeminiCliOAuthError,
+    GeminiCliOAuthManager,
+)
 from ..jarvis.openai_oauth import OPENAI_CODEX_BASE_URL, OpenAIOAuthManager
 
 
@@ -169,6 +174,8 @@ def _normalize_auth_mode(auth_mode: Optional[str]) -> str:
         return "saved_api_key"
     if auth_mode == "openai_codex":
         return "openai_oauth"
+    if auth_mode in {"google_oauth", "gemini_cli_oauth"}:
+        return str(auth_mode)
     return str(auth_mode or "environment")
 
 
@@ -202,6 +209,18 @@ def _is_custom_openai_endpoint(endpoint: Optional[str]) -> bool:
     }
 
 
+def _looks_like_openai_endpoint(endpoint: Optional[str]) -> bool:
+    normalized = str(endpoint or "").strip().rstrip("/").lower()
+    if not normalized:
+        return False
+    return (
+        normalized == _LEGACY_OPENAI_CODEX_BASE_URL
+        or normalized == OPENAI_CODEX_BASE_URL
+        or "api.openai.com" in normalized
+        or "chatgpt.com/backend-api" in normalized
+    )
+
+
 def _extract_openai_codex_account_id(token: Optional[str]) -> str:
     try:
         return OmicVerseLLMBackend._extract_openai_codex_account_id(str(token or ""))
@@ -229,6 +248,7 @@ def _resolve_agent_llm_credentials(
     api_key: Optional[str],
     endpoint: Optional[str],
     auth_mode: Optional[str],
+    auth_provider: Optional[str],
     auth_file: Optional[Union[str, Path]],
 ) -> Tuple[str, Optional[str], Optional[str], str]:
     """Resolve model/auth settings, including OpenAI Codex OAuth fallback."""
@@ -240,8 +260,42 @@ def _resolve_agent_llm_credentials(
     api_key_source = "explicit" if resolved_api_key else None
     resolved_endpoint = endpoint
     resolved_auth_path = Path(auth_file).expanduser() if auth_file else None
+    normalized_auth_provider = str(auth_provider or "").strip().lower() or "codex"
 
     provider = ModelConfig.get_provider_from_model(normalized_model or resolved_model, resolved_endpoint)
+    wants_gemini_cli_oauth = provider == "google" and (
+        normalized_mode in {"google_oauth", "gemini_cli_oauth"}
+        or (normalized_mode == "openai_oauth" and normalized_auth_provider == "gemini_cli")
+    )
+    if wants_gemini_cli_oauth:
+        manager = GeminiCliOAuthManager(resolved_auth_path)
+        try:
+            payload = manager.build_api_key_payload(
+                refresh_if_needed=True,
+                import_if_missing=True,
+            )
+        except GeminiCliOAuthError as exc:
+            raise ValueError(
+                "Failed to load saved Gemini CLI OAuth credentials. "
+                "This is an unofficial integration; some users report account restrictions. "
+                "Use at your own risk."
+            ) from exc
+        if not payload:
+            raise ValueError(
+                "No saved Gemini CLI OAuth login found. Complete Gemini CLI OAuth first. "
+                "This is an unofficial integration; some users report account restrictions. "
+                "Use at your own risk."
+            )
+        resolved_api_key = payload
+        if (
+            not resolved_endpoint
+            or _looks_like_openai_endpoint(resolved_endpoint)
+            or "generativelanguage.googleapis.com" in str(resolved_endpoint)
+        ):
+            resolved_endpoint = GOOGLE_CODE_ASSIST_ENDPOINT_PROD
+        api_key_source = "gemini_cli_oauth"
+        return resolved_model, resolved_api_key, resolved_endpoint, "gemini_cli_oauth"
+
     wants_codex_oauth = provider == "openai" and (
         normalized_mode == "openai_oauth"
         or _is_explicit_openai_oauth_model(normalized_model)
@@ -341,7 +395,7 @@ class OmicVerseAgent:
             self._codegen_pipeline = pipeline
         return pipeline
 
-    def __init__(self, model: str = "gpt-5.2", api_key: Optional[str] = None, endpoint: Optional[str] = None, auth_mode: str = "environment", auth_file: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, approval_mode: str = "never", agent_mode: str = "agentic", max_agent_turns: int = 15, security_level: Optional[str] = None, *, config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True):
+    def __init__(self, model: str = "gpt-5.2", api_key: Optional[str] = None, endpoint: Optional[str] = None, auth_mode: str = "environment", auth_provider: Optional[str] = None, auth_file: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, approval_mode: str = "never", agent_mode: str = "agentic", max_agent_turns: int = 15, security_level: Optional[str] = None, *, config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True):
         """
         Initialize the OmicVerse Smart Agent.
 
@@ -355,6 +409,8 @@ class OmicVerseAgent:
             Custom API endpoint. If not provided, will use default for the provider
         auth_mode : str, optional
             Authentication mode. Use ``"openai_oauth"`` to reuse Jarvis/Codex login state.
+        auth_provider : str, optional
+            OAuth provider identifier. Currently only ``"codex"`` is supported.
         auth_file : str, optional
             Path to the saved Jarvis auth file. Defaults to ``~/.ovjarvis/auth.json``.
         enable_reflection : bool, optional
@@ -410,6 +466,7 @@ class OmicVerseAgent:
                 api_key=api_key,
                 endpoint=endpoint,
                 auth_mode=auth_mode,
+                auth_provider=auth_provider,
                 auth_file=auth_file,
                 enable_reflection=enable_reflection,
                 reflection_iterations=reflection_iterations,
@@ -446,6 +503,7 @@ class OmicVerseAgent:
             api_key=llm_cfg.api_key,
             endpoint=llm_cfg.endpoint,
             auth_mode=llm_cfg.auth_mode,
+            auth_provider=llm_cfg.auth_provider,
             auth_file=llm_cfg.auth_file,
         )
         llm_cfg.model = model
@@ -456,6 +514,7 @@ class OmicVerseAgent:
         api_key = llm_cfg.api_key
         endpoint = llm_cfg.endpoint
         self.auth_mode = llm_cfg.auth_mode
+        self.auth_provider = llm_cfg.auth_provider
         self.auth_file = str(llm_cfg.auth_file) if llm_cfg.auth_file else None
         
         # When using a custom endpoint (proxy), keep the model name as-is.
@@ -1502,7 +1561,31 @@ def list_supported_models(show_all: bool = False) -> str:
     """
     return ModelConfig.list_supported_models(show_all)
 
-def Agent(model: str = "gpt-5.2", api_key: Optional[str] = None, endpoint: Optional[str] = None, auth_mode: str = "environment", auth_file: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, approval_mode: str = "never", agent_mode: str = "agentic", max_agent_turns: int = 15, security_level: Optional[str] = None, *, config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True) -> OmicVerseAgent:
+def Agent(
+    model: str = "gpt-5.2", 
+    api_key: Optional[str] = None, 
+    endpoint: Optional[str] = None, 
+    auth_mode: str = "environment", 
+    auth_provider: Optional[str] = None,
+    auth_file: Optional[str] = None, 
+    enable_reflection: bool = True, 
+    reflection_iterations: int = 1, 
+    enable_result_review: bool = True, 
+    use_notebook_execution: bool = True, 
+    max_prompts_per_session: int = 5, 
+    notebook_storage_dir: Optional[str] = None, 
+    keep_execution_notebooks: bool = True, 
+    notebook_timeout: int = 600, 
+    strict_kernel_validation: bool = True, 
+    enable_filesystem_context: bool = True, 
+    context_storage_dir: Optional[str] = None, 
+    approval_mode: str = "never", agent_mode: str = "agentic", 
+    max_agent_turns: int = 15, 
+    security_level: Optional[str] = None, *, 
+    config: Optional[AgentConfig] = None, 
+    reporter: Optional[Reporter] = None, 
+    verbose: bool = True
+) -> OmicVerseAgent:
     """
     Create an OmicVerse Smart Agent instance.
 
@@ -1519,6 +1602,8 @@ def Agent(model: str = "gpt-5.2", api_key: Optional[str] = None, endpoint: Optio
         Custom API endpoint. If not provided, will use default for the provider
     auth_mode : str, optional
         Authentication mode. Use ``"openai_oauth"`` to reuse saved Jarvis/Codex login state.
+    auth_provider : str, optional
+        OAuth provider identifier. Currently only ``"codex"`` is supported.
     auth_file : str, optional
         Path to the saved Jarvis auth file. Defaults to ``~/.ovjarvis/auth.json``.
     enable_reflection : bool, optional
@@ -1594,6 +1679,7 @@ def Agent(model: str = "gpt-5.2", api_key: Optional[str] = None, endpoint: Optio
         api_key=api_key,
         endpoint=endpoint,
         auth_mode=auth_mode,
+        auth_provider=auth_provider,
         auth_file=auth_file,
         enable_reflection=enable_reflection,
         reflection_iterations=reflection_iterations,

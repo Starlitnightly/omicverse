@@ -67,6 +67,10 @@ from .agent_backend_common import (  # noqa: F401 — public re-exports
 from . import agent_backend_openai as _oai
 from . import agent_backend_anthropic as _ant
 from . import agent_backend_gemini as _gem
+from .agent_backend_gemini import (  # noqa: F401 — public re-exports
+    _GOOGLE_GEMINI_CLI_BASE_URL,
+    _GOOGLE_GEMINI_CLI_UNSUPPORTED_SCHEMA_KEYS,
+)
 from . import agent_backend_dashscope as _ds
 from . import agent_backend_streaming as _stream
 
@@ -521,6 +525,64 @@ class OmicVerseLLMBackend:
 
     def _chat_tools_gemini(self, messages, tools, tool_choice):
         return _gem._chat_tools_gemini(self, messages, tools, tool_choice)
+
+    # --- Gemini CLI OAuth helpers ---
+    @staticmethod
+    def _gemini_uses_oauth_bearer(api_key):
+        return _gem._gemini_uses_oauth_bearer(api_key)
+
+    @staticmethod
+    def _gemini_auth_headers(api_key):
+        return _gem._gemini_auth_headers(api_key)
+
+    @staticmethod
+    def _gemini_oauth_payload(api_key):
+        return _gem._gemini_oauth_payload(api_key)
+
+    def _gemini_base_url(self):
+        return _gem._gemini_base_url(self)
+
+    def _gemini_generate_content_url(self):
+        return _gem._gemini_generate_content_url(self)
+
+    def _gemini_cli_base_url(self):
+        return _gem._gemini_cli_base_url(self)
+
+    def _gemini_cli_generate_content_url(self, stream=False):
+        return _gem._gemini_cli_generate_content_url(self, stream=stream)
+
+    @staticmethod
+    def _gemini_function_response_payload(result):
+        return _gem._gemini_function_response_payload(result)
+
+    @staticmethod
+    def _clean_schema_for_gemini_cli(schema):
+        return _gem._clean_schema_for_gemini_cli(schema)
+
+    def _messages_to_gemini_rest_contents(self, messages):
+        return _gem._messages_to_gemini_rest_contents(self, messages)
+
+    def _gemini_rest_generation_config(self):
+        return _gem._gemini_rest_generation_config(self)
+
+    def _gemini_rest_request(self, body, api_key):
+        return _gem._gemini_rest_request(self, body, api_key)
+
+    def _gemini_cli_request(self, body, api_key):
+        return _gem._gemini_cli_request(self, body, api_key)
+
+    def _capture_gemini_usage(self, payload):
+        return _gem._capture_gemini_usage(self, payload)
+
+    @staticmethod
+    def _extract_gemini_text_and_tool_calls(payload):
+        return _gem._extract_gemini_text_and_tool_calls(payload)
+
+    def _chat_tools_gemini_rest(self, messages, tools, tool_choice, api_key):
+        return _gem._chat_tools_gemini_rest(self, messages, tools, tool_choice, api_key)
+
+    def _chat_via_gemini_rest(self, user_prompt, api_key):
+        return _gem._chat_via_gemini_rest(self, user_prompt, api_key)
 
     # --- DashScope ---
     def _chat_via_dashscope(self, user_prompt):

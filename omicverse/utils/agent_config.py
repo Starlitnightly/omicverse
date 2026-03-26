@@ -30,6 +30,7 @@ class LLMConfig:
     api_key: Optional[str] = None
     endpoint: Optional[str] = None
     auth_mode: str = "environment"
+    auth_provider: Optional[str] = None
     auth_file: Optional[Path] = None
     reasoning_effort: str = "high"  # "low" | "medium" | "high" for GPT-5
 
@@ -167,6 +168,7 @@ class AgentConfig:
                 api_key=kw.get("api_key"),
                 endpoint=kw.get("endpoint"),
                 auth_mode=kw.get("auth_mode", "environment"),
+                auth_provider=kw.get("auth_provider"),
                 auth_file=Path(kw["auth_file"]).expanduser() if kw.get("auth_file") else None,
             ),
             reflection=ReflectionConfig(

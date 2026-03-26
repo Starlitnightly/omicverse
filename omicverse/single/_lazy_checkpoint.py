@@ -11,7 +11,6 @@ import scanpy as sc
 
 from .._settings import add_reference, settings
 from ..pp import (
-    mde,
     neighbors,
     pca,
     preprocess,
@@ -71,16 +70,6 @@ def lazy_checkpoint(
         os.makedirs(checkpoint_dir, exist_ok=True)
 
     # Step 0: Initial setup and package checking
-    if mode == "cpu-gpu-mixed":
-        try:
-            import pymde
-        except:
-            print("❌ pymde package not found, we will install it now")
-            import pip
-
-            pip.main(["install", "pymde"])
-            import pymde
-
     try:
         import louvain
     except:
@@ -488,21 +477,12 @@ def lazy_checkpoint(
         print(f"Automatic clustering using sccaf")
         print(f"Dimensionality using: {method_test}")
 
-        # MDE computation - memory intensive!
-        print("🔧 Computing MDE embedding...")
-        mde(
-            adata,
-            embedding_dim=2,
-            n_neighbors=15,
-            basis="X_mde",
-            n_pcs=30,
-            use_rep=adata.uns["bench_best_res"],
-        )
-
         # Recompute neighbors for clustering
         neighbors(
             adata=adata, n_neighbors=15, use_rep=adata.uns["bench_best_res"], n_pcs=30
         )
+        print("🔧 Computing UMAP embedding...")
+        umap(adata)
 
         # Pre-clustering
         print(f"Automatic clustering using leiden for preprocessed")
@@ -525,7 +505,7 @@ def lazy_checkpoint(
                         classifier="RF",
                         n_jobs=4,
                         use=adata.uns["bench_best_res"],
-                        basis="X_mde",
+                        basis="X_umap",
                         method="leiden",
                         prefix="L1",
                         plot=True,

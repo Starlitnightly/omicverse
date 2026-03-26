@@ -10,7 +10,6 @@ from typing import Sequence, Type
 
 import numpy as np
 import pandas as pd
-from boltons.iterutils import chunked
 from tqdm import tqdm
 from ..ctxcore.recovery import enrichment4cells
 
@@ -114,6 +113,7 @@ def aucell4r(
     auc_threshold: float = 0.05,
     noweights: bool = False,
     normalize: bool = False,
+    # boltons imported lazily below
     num_workers: int = cpu_count(),
 ) -> pd.DataFrame:
     """
@@ -165,6 +165,7 @@ def aucell4r(
             signatures = list(map(lambda m: m.noweights(), signatures))
 
         # Do the analysis in separate child processes.
+        from boltons.iterutils import chunked
         chunk_size = ceil(float(len(signatures)) / num_workers)
         processes = [
             Process(
