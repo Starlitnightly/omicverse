@@ -6,6 +6,7 @@ All tool handler methods follow the pattern ``_tool_<name>(self, ...)``.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import mimetypes
@@ -28,7 +29,9 @@ from ..._registry import _global_registry
 
 if TYPE_CHECKING:
     from .analysis_executor import AnalysisExecutor
+    from .permission_policy import PermissionPolicy
     from .protocol import AgentContext
+    from .tool_registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -177,9 +180,13 @@ class ToolRuntime:
     """
 
     def __init__(self, ctx: "AgentContext", executor: "AnalysisExecutor") -> None:
+        from .tool_registry import build_default_registry
+
         self._ctx = ctx
         self._executor = executor
         self._subagent_controller: Any = None  # late-bound
+        self._registry: "ToolRegistry" = build_default_registry()
+        self._bind_handlers()
 
     def set_subagent_controller(self, controller: Any) -> None:
         """Late-bind the subagent controller to avoid circular deps."""
@@ -192,6 +199,11 @@ class ToolRuntime:
                 "Subagent controller is not initialized; Agent delegation is unavailable."
             )
         return self._subagent_controller
+
+    @property
+    def registry(self) -> "ToolRegistry":
+        """The tool registry backing this runtime's dispatch."""
+        return self._registry
 
     # ------------------------------------------------------------------
     # Tool facade — visibility, plan-mode gating, loaded-tool tracking
@@ -240,203 +252,217 @@ class ToolRuntime:
         return tool_name in {"execute_code", "web_download"}
 
     # ------------------------------------------------------------------
+    # Registry-driven handler bindings
+    # ------------------------------------------------------------------
+
+    def _bind_handlers(self) -> None:
+        """Bind handler callables to the registry for all registered tools.
+
+        Each handler has the uniform signature
+        ``(args: dict, adata: Any, request: str) -> Any``.
+        """
+        r = self._registry
+        # fmt: off
+        r.register_handler("tool_search", lambda a, d, _: self._tool_tool_search(
+            a.get("query", ""), max_results=a.get("max_results", 5)))
+        r.register_handler("bash", lambda a, d, _: self._tool_bash(
+            a.get("command", ""), description=a.get("description", ""),
+            timeout=a.get("timeout", 120000),
+            run_in_background=bool(a.get("run_in_background", False)),
+            dangerouslyDisableSandbox=bool(a.get("dangerouslyDisableSandbox", False))))
+        r.register_handler("read", lambda a, d, _: self._tool_read(
+            a.get("file_path", ""), offset=a.get("offset", 0),
+            limit=a.get("limit", 2000), pages=a.get("pages", "")))
+        r.register_handler("edit", lambda a, d, _: self._tool_edit(
+            a.get("file_path", ""), a.get("old_string", ""),
+            a.get("new_string", ""), replace_all=bool(a.get("replace_all", False))))
+        r.register_handler("write", lambda a, d, _: self._tool_write(
+            a.get("file_path", ""), a.get("content", "")))
+        r.register_handler("glob", lambda a, d, _: self._tool_glob(
+            a.get("pattern", ""), root=a.get("root", ""),
+            max_results=a.get("max_results", 200)))
+        r.register_handler("grep", lambda a, d, _: self._tool_grep(
+            a.get("pattern", ""), root=a.get("root", ""),
+            glob=a.get("glob", ""), max_results=a.get("max_results", 200)))
+        r.register_handler("notebook_edit", lambda a, d, _: self._tool_notebook_edit(
+            a.get("file_path", ""), cell_index=a.get("cell_index", 0),
+            source=a.get("source", ""), cell_type=a.get("cell_type", "")))
+        r.register_handler("inspect_data", lambda a, d, _: self._tool_inspect_data(
+            d, a.get("aspect", "full")))
+        r.register_handler("execute_code", self._dispatch_execute_code)
+        r.register_handler("run_snippet", self._dispatch_run_snippet)
+        r.register_handler("search_functions", lambda a, d, _: self._tool_search_functions(
+            a.get("query", "")))
+        r.register_handler("agent", self._dispatch_agent)
+        r.register_handler("ask_user_question", self._dispatch_ask_user_question)
+        r.register_handler("task_create", lambda a, d, _: self._tool_create_task(
+            a.get("title", ""), description=a.get("description", ""),
+            status=a.get("status", "pending")))
+        r.register_handler("task_get", lambda a, d, _: self._tool_get_task(
+            a.get("task_id", "")))
+        r.register_handler("task_list", lambda a, d, _: self._tool_list_tasks(
+            status=a.get("status", "")))
+        r.register_handler("task_output", lambda a, d, _: self._tool_task_output(
+            a.get("task_id", ""), offset=a.get("offset", 0),
+            limit=a.get("limit", 200)))
+        r.register_handler("task_stop", lambda a, d, _: self._tool_task_stop(
+            a.get("task_id", "")))
+        r.register_handler("task_update", lambda a, d, _: self._tool_task_update(
+            a.get("task_id", ""), a.get("status", ""),
+            summary=a.get("summary", "")))
+        r.register_handler("enter_plan_mode", lambda a, d, _: self._tool_enter_plan_mode(
+            reason=a.get("reason", "")))
+        r.register_handler("exit_plan_mode", lambda a, d, _: self._tool_exit_plan_mode(
+            summary=a.get("summary", "")))
+        r.register_handler("enter_worktree", lambda a, d, _: self._tool_enter_worktree(
+            branch_name=a.get("branch_name", ""),
+            path=a.get("path", ""), base_ref=a.get("base_ref", "HEAD")))
+        r.register_handler("skill", lambda a, d, _: self._tool_skill(
+            a.get("query", ""), mode=a.get("mode", "search")))
+        r.register_handler("web_fetch", lambda a, d, _: self._tool_web_fetch(
+            a.get("url", ""), prompt=a.get("prompt")))
+        r.register_handler("web_search", lambda a, d, _: self._tool_web_search(
+            a.get("query", ""), num_results=a.get("num_results", 5)))
+        r.register_handler("list_mcp_resources", lambda a, d, _: self._tool_list_mcp_resources(
+            server=a.get("server", "")))
+        r.register_handler("read_mcp_resource", lambda a, d, _: self._tool_read_mcp_resource(
+            a.get("server", ""), a.get("uri", "")))
+        r.register_handler("web_download", lambda a, d, _: self._tool_web_download(
+            a.get("url", ""), filename=a.get("filename"),
+            directory=a.get("directory")))
+        r.register_handler("finish", lambda a, d, _: self._tool_finish(
+            a.get("summary", "")))
+        # fmt: on
+
+    # ------------------------------------------------------------------
+    # Dispatch helpers (validation / async wrappers)
+    # ------------------------------------------------------------------
+
+    def _dispatch_execute_code(
+        self, args: dict, adata: Any, request: str
+    ) -> Any:
+        code = args.get("code", "")
+        if not code or not code.strip():
+            return json.dumps(
+                {"error": "execute_code requires a non-empty 'code' argument."},
+                ensure_ascii=False,
+            )
+        return self._tool_execute_code(code, args.get("description", ""), adata)
+
+    def _dispatch_run_snippet(
+        self, args: dict, adata: Any, request: str
+    ) -> Any:
+        snippet = args.get("code", "")
+        if not snippet or not snippet.strip():
+            return json.dumps(
+                {"error": "run_snippet requires a non-empty 'code' argument."},
+                ensure_ascii=False,
+            )
+        return self._tool_run_snippet(snippet, adata)
+
+    async def _dispatch_agent(
+        self, args: dict, adata: Any, request: str
+    ) -> Any:
+        agent_type = args.get(
+            "subagent_type", args.get("agent_type", "explore")
+        )
+        task = args.get("task", "")
+        context = args.get("context", "")
+        logger.info(
+            "delegation_started agent_type=%s task=%s",
+            agent_type,
+            task[:80],
+        )
+        subagent_controller = self._require_subagent_controller()
+        sub_result = await subagent_controller.run_subagent(
+            agent_type=agent_type,
+            task=task,
+            adata=adata,
+            context=context,
+        )
+        if agent_type == "execute":
+            return {
+                "adata": sub_result["adata"],
+                "output": sub_result["result"],
+            }
+        return sub_result["result"]
+
+    def _dispatch_ask_user_question(
+        self, args: dict, adata: Any, request: str
+    ) -> Any:
+        question = args.get("question", "") or args.get("prompt", "")
+        if not question:
+            return json.dumps(
+                {"error": "AskUserQuestion requires a non-empty 'question' argument."},
+                ensure_ascii=False,
+            )
+        return self._tool_ask_user_question(
+            question,
+            header=args.get("header", ""),
+            options=args.get("options", []),
+        )
+
+    # ------------------------------------------------------------------
     # Dispatch
     # ------------------------------------------------------------------
 
     async def dispatch_tool(
-        self, tool_call: Any, current_adata: Any, request: str
+        self,
+        tool_call: Any,
+        current_adata: Any,
+        request: str,
+        *,
+        permission_policy: Optional["PermissionPolicy"] = None,
     ) -> Any:
-        """Dispatch a tool call and return the result."""
-        name = normalize_tool_name(tool_call.name)
+        """Dispatch a tool call through the registry and return the result.
+
+        Resolution flow:
+        1. Resolve the tool name via the registry (handles canonical names,
+           catalog aliases, legacy aliases, and case normalization).
+        2. Check the optional *permission_policy* (deny → immediate return).
+        3. Check plan-mode blocking for the resolved canonical name.
+        4. Look up the bound handler callable.
+        5. Call the handler with ``(args, adata, request)`` and await if async.
+
+        Parameters
+        ----------
+        permission_policy : PermissionPolicy, optional
+            When provided, the tool is checked against the policy before
+            dispatch.  Denied tools return an error message immediately
+            without executing.  This is used by subagent isolation to
+            enforce scoped tool restrictions.
+        """
+        raw_name = tool_call.name
         args = tool_call.arguments
 
-        if self.tool_blocked_in_plan_mode(name):
-            return f"{name} is blocked because the session is currently in plan mode."
+        # Registry-driven name resolution (delegates to catalog for aliases)
+        canonical = self._registry.resolve_name(raw_name)
+        if not canonical:
+            # Fallback through catalog normalization for edge cases
+            canonical = normalize_tool_name(raw_name)
 
-        if name == "ToolSearch":
-            return self._tool_tool_search(
-                args.get("query", ""),
-                max_results=args.get("max_results", 5),
-            )
-        elif name == "Bash":
-            return self._tool_bash(
-                args.get("command", ""),
-                description=args.get("description", ""),
-                timeout=args.get("timeout", 120000),
-                run_in_background=bool(args.get("run_in_background", False)),
-                dangerouslyDisableSandbox=bool(
-                    args.get("dangerouslyDisableSandbox", False)
-                ),
-            )
-        elif name == "Read":
-            return self._tool_read(
-                args.get("file_path", ""),
-                offset=args.get("offset", 0),
-                limit=args.get("limit", 2000),
-                pages=args.get("pages", ""),
-            )
-        elif name == "Edit":
-            return self._tool_edit(
-                args.get("file_path", ""),
-                args.get("old_string", ""),
-                args.get("new_string", ""),
-                replace_all=bool(args.get("replace_all", False)),
-            )
-        elif name == "Write":
-            return self._tool_write(
-                args.get("file_path", ""),
-                args.get("content", ""),
-            )
-        elif name == "Glob":
-            return self._tool_glob(
-                args.get("pattern", ""),
-                root=args.get("root", ""),
-                max_results=args.get("max_results", 200),
-            )
-        elif name == "Grep":
-            return self._tool_grep(
-                args.get("pattern", ""),
-                root=args.get("root", ""),
-                glob=args.get("glob", ""),
-                max_results=args.get("max_results", 200),
-            )
-        elif name == "NotebookEdit":
-            return self._tool_notebook_edit(
-                args.get("file_path", ""),
-                cell_index=args.get("cell_index", 0),
-                source=args.get("source", ""),
-                cell_type=args.get("cell_type", ""),
-            )
-        elif name == "inspect_data":
-            return self._tool_inspect_data(
-                current_adata, args.get("aspect", "full")
-            )
-        elif name == "execute_code":
-            code = args.get("code", "")
-            if not code or not code.strip():
-                return json.dumps(
-                    {"error": "execute_code requires a non-empty 'code' argument."},
-                    ensure_ascii=False,
+        # Permission policy check (when provided by caller)
+        if permission_policy is not None:
+            decision = permission_policy.check(canonical)
+            if decision.is_denied:
+                return (
+                    f"Permission denied for {canonical}: {decision.reason}"
                 )
-            return self._tool_execute_code(
-                code,
-                args.get("description", ""),
-                current_adata,
+
+        if self.tool_blocked_in_plan_mode(canonical):
+            return (
+                f"{canonical} is blocked because the session is "
+                "currently in plan mode."
             )
-        elif name == "run_snippet":
-            snippet = args.get("code", "")
-            if not snippet or not snippet.strip():
-                return json.dumps(
-                    {"error": "run_snippet requires a non-empty 'code' argument."},
-                    ensure_ascii=False,
-                )
-            return self._tool_run_snippet(snippet, current_adata)
-        elif name == "search_functions":
-            return self._tool_search_functions(args.get("query", ""))
-        elif name == "search_skills":
-            return self._tool_search_skills(args.get("query", ""))
-        elif name == "Agent":
-            agent_type = args.get(
-                "subagent_type", args.get("agent_type", "explore")
-            )
-            task = args.get("task", "")
-            context = args.get("context", "")
-            print(
-                f"   -> Delegating to {agent_type} subagent: {task[:80]}..."
-            )
-            subagent_controller = self._require_subagent_controller()
-            sub_result = await subagent_controller.run_subagent(
-                agent_type=agent_type,
-                task=task,
-                adata=current_adata,
-                context=context,
-            )
-            if agent_type == "execute":
-                return {
-                    "adata": sub_result["adata"],
-                    "output": sub_result["result"],
-                }
-            return sub_result["result"]
-        elif name == "AskUserQuestion":
-            question = args.get("question", "") or args.get("prompt", "")
-            if not question:
-                return json.dumps(
-                    {"error": "AskUserQuestion requires a non-empty 'question' argument."},
-                    ensure_ascii=False,
-                )
-            return self._tool_ask_user_question(
-                question,
-                header=args.get("header", ""),
-                options=args.get("options", []),
-            )
-        elif name == "TaskCreate":
-            return self._tool_create_task(
-                args.get("title", ""),
-                description=args.get("description", ""),
-                status=args.get("status", "pending"),
-            )
-        elif name == "TaskGet":
-            return self._tool_get_task(args.get("task_id", ""))
-        elif name == "TaskList":
-            return self._tool_list_tasks(status=args.get("status", ""))
-        elif name == "TaskOutput":
-            return self._tool_task_output(
-                args.get("task_id", ""),
-                offset=args.get("offset", 0),
-                limit=args.get("limit", 200),
-            )
-        elif name == "TaskStop":
-            return self._tool_task_stop(args.get("task_id", ""))
-        elif name == "TaskUpdate":
-            return self._tool_task_update(
-                args.get("task_id", ""),
-                args.get("status", ""),
-                summary=args.get("summary", ""),
-            )
-        elif name == "EnterPlanMode":
-            return self._tool_enter_plan_mode(reason=args.get("reason", ""))
-        elif name == "ExitPlanMode":
-            return self._tool_exit_plan_mode(summary=args.get("summary", ""))
-        elif name == "EnterWorktree":
-            return self._tool_enter_worktree(
-                branch_name=args.get("branch_name", ""),
-                path=args.get("path", ""),
-                base_ref=args.get("base_ref", "HEAD"),
-            )
-        elif name == "Skill":
-            return self._tool_skill(
-                args.get("query", ""),
-                mode=args.get("mode", "search"),
-            )
-        elif name == "WebFetch":
-            return self._tool_web_fetch(
-                args.get("url", ""),
-                prompt=args.get("prompt"),
-            )
-        elif name == "WebSearch":
-            return self._tool_web_search(
-                args.get("query", ""),
-                num_results=args.get("num_results", 5),
-            )
-        elif name == "ListMcpResourcesTool":
-            return self._tool_list_mcp_resources(
-                server=args.get("server", "")
-            )
-        elif name == "ReadMcpResourceTool":
-            return self._tool_read_mcp_resource(
-                args.get("server", ""),
-                args.get("uri", ""),
-            )
-        elif name == "web_download":
-            return self._tool_web_download(
-                args.get("url", ""),
-                filename=args.get("filename"),
-                directory=args.get("directory"),
-            )
-        elif name == "finish":
-            return {"finished": True, "summary": args.get("summary", "")}
-        else:
-            return f"Unknown tool: {name}"
+
+        handler = self._registry.get_handler(canonical)
+        if handler is None:
+            return f"Unknown tool: {raw_name}"
+
+        result = handler(args, current_adata, request)
+        if asyncio.iscoroutine(result):
+            result = await result
+        return result
 
     # ------------------------------------------------------------------
     # OmicVerse data tools
@@ -526,6 +552,7 @@ class ToolRuntime:
         self, code: str, description: str, adata: Any
     ) -> dict:
         from .analysis_executor import ProactiveCodeTransformer
+        from .repair_loop import ExecutionRepairLoop
 
         code = ProactiveCodeTransformer().transform(code)
         if getattr(self._ctx, "_code_only_mode", False):
@@ -543,16 +570,46 @@ class ToolRuntime:
         prereq_warnings = self._executor.check_code_prerequisites(code, adata)
 
         self._executor._notebook_fallback_error = None
+
+        # --- Structured self-healing loop ---
+        repair_loop = ExecutionRepairLoop(self._executor, max_retries=3)
+        extract_code_fn = getattr(self._ctx, "_extract_python_code", None)
+
+        import asyncio as _asyncio
+
         try:
-            result = self._executor.execute_generated_code(
-                code, adata, capture_stdout=True
+            loop = _asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                repair_result = pool.submit(
+                    _asyncio.run,
+                    repair_loop.run(code, adata, phase="execution",
+                                   extract_code_fn=extract_code_fn),
+                ).result()
+        else:
+            repair_result = _asyncio.run(
+                repair_loop.run(code, adata, phase="execution",
+                               extract_code_fn=extract_code_fn)
             )
+
+        if repair_result.success:
+            result = repair_result.exec_result
             stdout = result.get("stdout", "") if isinstance(result, dict) else ""
-            result_adata = result.get("adata", adata) if isinstance(result, dict) else (result if result is not None else adata)
+            result_adata = (
+                result.get("adata", adata)
+                if isinstance(result, dict)
+                else (result if result is not None else adata)
+            )
 
             output_parts: List[str] = []
             debug_output_parts: List[str] = []
-            notebook_err = getattr(self._executor, "_notebook_fallback_error", None)
+            notebook_err = getattr(
+                self._executor, "_notebook_fallback_error", None
+            )
             if notebook_err:
                 notebook_msg = (
                     f"WARNING: notebook session execution failed with error:\n{notebook_err}\n"
@@ -560,6 +617,19 @@ class ToolRuntime:
                 )
                 output_parts.append(notebook_msg)
                 debug_output_parts.append(notebook_msg)
+
+            # Annotate recovered attempts
+            if len(repair_result.attempts) > 1:
+                strategies = [
+                    a.strategy for a in repair_result.attempts if not a.success
+                ]
+                recovery_msg = (
+                    f"RECOVERED after {len(repair_result.attempts)} attempt(s) "
+                    f"(strategies: {', '.join(strategies)})"
+                )
+                output_parts.append(recovery_msg)
+                debug_output_parts.append(recovery_msg)
+
             if prereq_warnings:
                 warning_msg = f"PREREQUISITE WARNINGS: {prereq_warnings}"
                 output_parts.append(warning_msg)
@@ -597,70 +667,41 @@ class ToolRuntime:
                 "debug_output": debug_output,
                 "stdout": stdout,
             }
-        except Exception as e:
-            original_error = str(e)
-            tb_str = traceback.format_exc()
 
-            fixed_code = self._executor.apply_execution_error_fix(
-                code, original_error
-            )
-            if fixed_code:
-                try:
-                    result = self._executor.execute_generated_code(
-                        fixed_code, adata, capture_stdout=True
-                    )
-                    stdout = result.get("stdout", "")
-                    result_adata = result.get("adata", adata)
-                    output_parts = [
-                        f"RECOVERED (pattern fix): {original_error}"
-                    ]
-                    debug_output_parts = list(output_parts)
-                    if stdout.strip():
-                        output_parts.append(
-                            f"stdout:\n{_truncate_text(stdout, 3000)}"
-                        )
-                        debug_output_parts.append(f"stdout:\n{stdout}")
-                    try:
-                        result_msg = (
-                            f"Result adata shape: "
-                            f"{result_adata.shape[0]} cells x "
-                            f"{result_adata.shape[1]} features"
-                        )
-                        output_parts.append(result_msg)
-                        debug_output_parts.append(result_msg)
-                    except Exception:
-                        result_msg = f"Result type: {type(result_adata).__name__}"
-                        output_parts.append(result_msg)
-                        debug_output_parts.append(result_msg)
-                    return {
-                        "adata": result_adata,
-                        "output": "\n".join(output_parts),
-                        "debug_output": "\n".join(debug_output_parts),
-                        "stdout": stdout,
-                    }
-                except Exception:
-                    pass
-
+        # All repair attempts failed — return structured diagnostic
+        envelope = repair_result.final_envelope
+        if envelope is not None:
             error_output = (
-                f"ERROR: {e}\n\nTraceback (last 2000 chars):\n"
-                f"{tb_str[-2000:]}"
+                f"ERROR: {envelope.exception}: {envelope.summary}\n\n"
+                f"Phase: {envelope.phase}\n"
+                f"Attempts: {envelope.retry_count + 1}/{repair_loop.max_retries + 1}\n"
+                f"Traceback (last {len(envelope.traceback_excerpt)} chars):\n"
+                f"{envelope.traceback_excerpt}"
             )
-            debug_error_output = f"ERROR: {e}\n\nTraceback:\n{tb_str}"
-            if prereq_warnings:
-                error_output = (
-                    f"PREREQUISITE WARNINGS: {prereq_warnings}\n\n"
-                    f"{error_output}"
+            if envelope.repair_hints:
+                error_output += (
+                    "\nRepair hints:\n"
+                    + "\n".join(f"  - {h}" for h in envelope.repair_hints)
                 )
-                debug_error_output = (
-                    f"PREREQUISITE WARNINGS: {prereq_warnings}\n\n"
-                    f"{debug_error_output}"
-                )
-            return {
-                "adata": adata,
-                "output": error_output,
-                "debug_output": debug_error_output,
-                "stdout": "",
-            }
+        else:
+            error_output = "ERROR: execution failed with no diagnostic envelope"
+
+        debug_error_output = error_output
+        if prereq_warnings:
+            error_output = (
+                f"PREREQUISITE WARNINGS: {prereq_warnings}\n\n"
+                f"{error_output}"
+            )
+            debug_error_output = (
+                f"PREREQUISITE WARNINGS: {prereq_warnings}\n\n"
+                f"{debug_error_output}"
+            )
+        return {
+            "adata": adata,
+            "output": error_output,
+            "debug_output": debug_error_output,
+            "stdout": "",
+        }
 
     def _tool_run_snippet(self, code: str, adata: Any) -> str:
         """Read-only snippet — no adata copy, no serialisation round-trip."""
@@ -1740,3 +1781,11 @@ class ToolRuntime:
             ensure_ascii=False,
             indent=2,
         )
+
+    # ------------------------------------------------------------------
+    # Terminal tools
+    # ------------------------------------------------------------------
+
+    def _tool_finish(self, summary: str) -> dict:
+        """Return the terminal finish payload."""
+        return {"finished": True, "summary": summary}
