@@ -248,8 +248,8 @@ class TestClawCompatibility:
         assert agent._code_only_captured_code == "original"
 
     def test_tool_runtime_code_only_capture_uses_pipeline(self):
-        """ToolRuntime._tool_execute_code captures via agent._capture_code_only_snippet."""
-        runtime = ToolRuntime.__new__(ToolRuntime)
+        """handle_execute_code captures via ctx._capture_code_only_snippet."""
+        from omicverse.utils.ovagent.tool_runtime_exec import handle_execute_code
         captured = {}
 
         class _Ctx:
@@ -266,10 +266,8 @@ class TestClawCompatibility:
             def execute_generated_code(self, code, adata, capture_stdout=True):
                 raise AssertionError("should not execute in code-only mode")
 
-        runtime._ctx = _Ctx()
-        runtime._executor = _Executor()
-
-        result = runtime._tool_execute_code(
+        result = handle_execute_code(
+            _Ctx(), _Executor(),
             "import omicverse as ov\nov.pp.pca(adata)", "pca", None
         )
 

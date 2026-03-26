@@ -246,7 +246,7 @@ def test_generate_code_async_reuses_agentic_loop_and_captures_execute_code():
 
 
 def test_tool_execute_code_in_code_only_mode_captures_without_execution():
-    runtime = ToolRuntime.__new__(ToolRuntime)
+    from omicverse.utils.ovagent.tool_runtime_exec import handle_execute_code
     captured = {}
 
     class _Ctx:
@@ -263,10 +263,10 @@ def test_tool_execute_code_in_code_only_mode_captures_without_execution():
         def execute_generated_code(self, code, adata, capture_stdout=True):
             raise AssertionError("should not execute code in code-only mode")
 
-    runtime._ctx = _Ctx()
-    runtime._executor = _Executor()
-
-    result = runtime._tool_execute_code("import omicverse as ov\nov.pp.pca(adata)", "pca", None)
+    result = handle_execute_code(
+        _Ctx(), _Executor(),
+        "import omicverse as ov\nov.pp.pca(adata)", "pca", None,
+    )
 
     assert "captured generated Python code" in result["output"]
     assert captured["description"] == "pca"

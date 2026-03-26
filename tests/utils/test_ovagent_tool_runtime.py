@@ -12,6 +12,7 @@ from omicverse.utils.ovagent.tool_runtime import (
 )
 from omicverse.utils.ovagent.protocol import AgentContext
 from omicverse.utils.ovagent import tool_runtime as tool_runtime_module
+from omicverse.utils.ovagent import tool_runtime_exec as tool_runtime_exec_module
 from omicverse.utils.harness.runtime_state import runtime_state
 from omicverse.utils.harness.tool_catalog import (
     get_default_loaded_tool_names,
@@ -169,19 +170,20 @@ class _DummyCtx:
 
 
 def test_tool_search_functions_falls_back_to_static_registry(monkeypatch):
-    runtime = ToolRuntime(_DummyCtx(), _DummyExecutor())
+    from omicverse.utils.ovagent import tool_runtime_exec
+    ctx = _DummyCtx()
     fake_registry = SimpleNamespace(find=lambda query: [])
 
-    monkeypatch.setattr(tool_runtime_module, "_global_registry", fake_registry)
+    monkeypatch.setattr(tool_runtime_exec, "_global_registry", fake_registry)
 
-    result = runtime._tool_search_functions("dynamo")
+    result = tool_runtime_exec.handle_search_functions(ctx, "dynamo")
 
     assert "omicverse.single.Velo.cal_velocity[method=dynamo]" in result
     assert "Branch: method='dynamo'" in result
 
 
 def test_execute_code_returns_full_debug_output_but_truncated_llm_output():
-    runtime = ToolRuntime.__new__(ToolRuntime)
+    from omicverse.utils.ovagent import tool_runtime_exec
 
     class _Ctx:
         _code_only_mode = False
@@ -203,10 +205,12 @@ def test_execute_code_returns_full_debug_output_but_truncated_llm_output():
                 "stdout": "A" * 3500,
             }
 
-    runtime._ctx = _Ctx()
-    runtime._executor = _Executor()
+    ctx = _Ctx()
+    executor = _Executor()
 
-    result = runtime._tool_execute_code("print('x')", "debug stdout", None)
+    result = tool_runtime_exec.handle_execute_code(
+        ctx, executor, "print('x')", "debug stdout", None
+    )
 
     assert "stdout:\n" in result["output"]
     assert "truncated, total_chars=3500" in result["output"]
@@ -364,13 +368,14 @@ class TestDeferredToolLoading:
     """Deferred loading semantics are preserved through ToolRuntime."""
 
     def test_tool_search_loads_selected_tools(self):
+        from omicverse.utils.ovagent.tool_runtime_exec import handle_tool_search
         ctx = _DummyCtx()
         rt = ToolRuntime(ctx, _DummyExecutor())
         # Before search — only default loaded tools
         initial_loaded = set(rt.get_loaded_tool_names())
 
-        # Search for "Edit" tool
-        result_json = rt._tool_tool_search("select:Edit")
+        # Search for "Edit" tool via extracted handler
+        result_json = handle_tool_search(ctx, "select:Edit")
         result = json.loads(result_json)
 
         assert "Edit" in result.get("selected_tools", [])
@@ -378,11 +383,12 @@ class TestDeferredToolLoading:
         assert "Edit" in new_loaded
 
     def test_visible_schemas_include_newly_loaded(self):
+        from omicverse.utils.ovagent.tool_runtime_exec import handle_tool_search
         ctx = _DummyCtx()
         rt = ToolRuntime(ctx, _DummyExecutor())
 
-        # Load "Edit" tool
-        rt._tool_tool_search("select:Edit")
+        # Load "Edit" tool via extracted handler
+        handle_tool_search(ctx, "select:Edit")
         tools = rt.get_visible_agent_tools()
         names = {t["name"] for t in tools}
         assert "Edit" in names
@@ -575,7 +581,7 @@ class TestRegistryDrivenDispatch:
     def test_dispatch_search_functions_via_registry(self, monkeypatch):
         rt = self._make_rt()
         fake_registry = SimpleNamespace(find=lambda query: [])
-        monkeypatch.setattr(tool_runtime_module, "_global_registry", fake_registry)
+        monkeypatch.setattr(tool_runtime_exec_module, "_global_registry", fake_registry)
         tc = SimpleNamespace(
             name="search_functions", arguments={"query": "dynamo"}
         )
@@ -602,3 +608,137 @@ class TestRegistryDrivenDispatch:
             if handler is not None:
                 bound_keys.add(meta.handler_key)
         assert bound_keys == rt.registry.handler_keys()
+
+
+# -----------------------------------------------------------------------
+# Task-043: Extracted exec handler regression tests
+# -----------------------------------------------------------------------
+
+
+class TestExtractedExecHandlers:
+    """Verify tool_runtime_exec handler functions match prior facade behavior."""
+
+    def test_handle_inspect_data_no_dataset(self):
+        from omicverse.utils.ovagent.tool_runtime_exec import handle_inspect_data
+        result = handle_inspect_data(None, "full")
+        assert "No dataset" in result
+
+    def test_handle_inspect_data_shape(self):
+        from omicverse.utils.ovagent.tool_runtime_exec import handle_inspect_data
+
+        class FakeAdata:
+            shape = (100, 50)
+            obs = SimpleNamespace(columns=["a", "b"])
+            var = SimpleNamespace(columns=["g1", "g2"])
+            uns = SimpleNamespace(keys=lambda: [])
+            obsm = SimpleNamespace(keys=lambda: [])
+            layers = None
+
+        result = handle_inspect_data(FakeAdata(), "shape")
+        assert "100 cells" in result
+        assert "50 genes" in result
+
+    def test_handle_finish(self):
+        from omicverse.utils.ovagent.tool_runtime_exec import handle_finish
+        result = handle_finish("all done")
+        assert result == {"finished": True, "summary": "all done"}
+
+    def test_handle_run_snippet_error(self):
+        from omicverse.utils.ovagent.tool_runtime_exec import handle_run_snippet
+
+        class BadExecutor:
+            def execute_snippet_readonly(self, code, adata):
+                raise ValueError("boom")
+
+        result = handle_run_snippet(BadExecutor(), "bad()", None)
+        assert "ERROR" in result
+        assert "boom" in result
+
+    def test_handle_tool_search(self):
+        from omicverse.utils.ovagent.tool_runtime_exec import handle_tool_search
+        ctx = _DummyCtx()
+        result_json = handle_tool_search(ctx, "select:Edit")
+        result = json.loads(result_json)
+        assert "Edit" in result.get("selected_tools", [])
+
+    def test_handle_search_functions_empty_query(self):
+        from omicverse.utils.ovagent.tool_runtime_exec import handle_search_functions
+        ctx = _DummyCtx()
+        result = handle_search_functions(ctx, "")
+        assert "non-empty" in result
+
+    def test_truncate_text_helper(self):
+        from omicverse.utils.ovagent.tool_runtime_exec import _truncate_text
+        short = "hello"
+        assert _truncate_text(short, 100) == short
+        long_text = "A" * 200
+        truncated = _truncate_text(long_text, 50)
+        assert "truncated" in truncated
+        assert len(truncated) <= 50 + 10  # small overshoot from suffix
+
+    def test_dispatch_execute_code_empty_via_facade(self):
+        """Empty code still returns error JSON through the facade dispatch."""
+        ctx = _DummyCtx()
+        rt = ToolRuntime(ctx, _DummyExecutor())
+        tc = SimpleNamespace(
+            name="execute_code", arguments={"code": "", "description": ""}
+        )
+        result = asyncio.run(rt.dispatch_tool(tc, None, "test"))
+        parsed = json.loads(result)
+        assert "error" in parsed
+
+    def test_dispatch_run_snippet_empty_via_facade(self):
+        """Empty snippet still returns error JSON through the facade dispatch."""
+        ctx = _DummyCtx()
+        rt = ToolRuntime(ctx, _DummyExecutor())
+        tc = SimpleNamespace(name="run_snippet", arguments={"code": "  "})
+        result = asyncio.run(rt.dispatch_tool(tc, None, "test"))
+        parsed = json.loads(result)
+        assert "error" in parsed
+
+    def test_dispatch_agent_via_facade_without_controller(self):
+        """Agent dispatch raises RuntimeError without controller."""
+        ctx = _DummyCtx()
+        rt = ToolRuntime(ctx, _DummyExecutor())
+        tc = SimpleNamespace(
+            name="Agent",
+            arguments={"agent_type": "explore", "task": "test"},
+        )
+        with pytest.raises(RuntimeError, match="Subagent controller"):
+            asyncio.run(rt.dispatch_tool(tc, None, "test"))
+
+    def test_dispatch_finish_via_facade(self):
+        """Finish handler returns correct payload through facade."""
+        ctx = _DummyCtx()
+        rt = ToolRuntime(ctx, _DummyExecutor())
+        tc = SimpleNamespace(name="finish", arguments={"summary": "done"})
+        result = asyncio.run(rt.dispatch_tool(tc, None, "test"))
+        assert result == {"finished": True, "summary": "done"}
+
+    def test_dispatch_inspect_data_via_facade(self):
+        """inspect_data handler returns no-dataset message through facade."""
+        ctx = _DummyCtx()
+        rt = ToolRuntime(ctx, _DummyExecutor())
+        tc = SimpleNamespace(name="inspect_data", arguments={"aspect": "shape"})
+        result = asyncio.run(rt.dispatch_tool(tc, None, "test"))
+        assert "No dataset" in result
+
+    def test_exec_module_has_all_expected_handlers(self):
+        """tool_runtime_exec exposes all expected handler functions."""
+        from omicverse.utils.ovagent import tool_runtime_exec
+        expected = {
+            "handle_execute_code", "handle_run_snippet", "handle_bash",
+            "handle_finish", "handle_inspect_data", "handle_search_functions",
+            "handle_tool_search", "handle_agent", "background_bash_worker",
+        }
+        for name in expected:
+            assert hasattr(tool_runtime_exec, name), (
+                f"tool_runtime_exec missing '{name}'"
+            )
+            assert callable(getattr(tool_runtime_exec, name))
+
+    def test_handle_agent_is_coroutine_function(self):
+        """handle_agent must be async."""
+        from omicverse.utils.ovagent.tool_runtime_exec import handle_agent
+        import inspect
+        assert inspect.iscoroutinefunction(handle_agent)
