@@ -95,7 +95,6 @@ full = [
   "ete3",
   "scvi-tools",
   #"celloracle",
-  "pymde",
   'torchdr',
   'memento-de',
 

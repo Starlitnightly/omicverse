@@ -1421,8 +1421,7 @@ def umap(adata, **kwargs):
             print_gpu_usage_color()
             from ._umap import umap as _umap
             _umap(adata,method='pumap', **kwargs)
-            add_reference(adata,'pymde','UMAP with pymde')
-            add_reference(adata,'umap','UMAP with pymde')
+            add_reference(adata,'umap','UMAP with pumap')
         else:
             try:
                 print(f"{EMOJI['gpu']} Using RAPIDS GPU UMAP...")

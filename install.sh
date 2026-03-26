@@ -587,12 +587,12 @@ if maybe_ask_yes_no "Install full bio packages?"; then
   echo ""
   echo "    ── Visualization & embedding ──"
   pip_install_pkg \
-    fa2-modified pymde toytree arviz ete3 torchdr
+    fa2-modified toytree arviz ete3 torchdr
 
   echo ""
   echo "    ── Perturbation & deep learning ──"
   pip_install_pkg \
-    pertpy einops tensorboard wandb
+    pertpy einops tensorboard
 
   echo ""
   echo "    ── General utilities ──"

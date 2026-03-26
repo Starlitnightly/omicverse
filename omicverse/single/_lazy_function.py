@@ -7,7 +7,6 @@ from ..pp import (
     neighbors,
     umap,
     tsne,
-    mde,
 )
 import scanpy as sc
 import numpy as np
@@ -71,18 +70,6 @@ def lazy(
     """
     mode = settings.mode
     print(f"🔧 The mode of lazy is {mode}")
-    if mode == "cpu-gpu-mixed":
-        try:
-            import pymde
-        except:
-            print("❌ pymde package not found, we will install it now")
-            import pip
-
-            pip.main(["install", "pymde"])
-            import pymde
-    else:
-        pass
-
     # step 0: check packages:
     try:
         import louvain
@@ -367,17 +354,10 @@ def lazy(
         method_test = adata.uns["bench_best_res"]
         print(f"Automatic clustering using sccaf")
         print(f"Dimensionality using :{method_test}")
-        mde(
-            adata,
-            embedding_dim=2,
-            n_neighbors=15,
-            basis="X_mde",
-            n_pcs=30,
-            use_rep=adata.uns["bench_best_res"],
-        )
         neighbors(
             adata=adata, n_neighbors=15, use_rep=adata.uns["bench_best_res"], n_pcs=30
         )
+        umap(adata)
         # 预聚类
         print(f"Automatic clustering using leiden for preprocessed")
         sc.tl.leiden(adata, resolution=1.5, key_added="leiden_r1.5")
@@ -398,7 +378,7 @@ def lazy(
                     classifier="RF",
                     n_jobs=4,
                     use=adata.uns["bench_best_res"],
-                    basis="X_mde",
+                    basis="X_umap",
                     method="leiden",
                     prefix="L1",
                     plot=True,
