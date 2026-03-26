@@ -5,7 +5,6 @@ Public consumers should continue to import from ``omicverse.utils.agent_backend`
 """
 from __future__ import annotations
 
-import atexit as _atexit
 import concurrent.futures as _cf
 import logging
 import os
@@ -78,14 +77,30 @@ _STREAM_DISPATCH = {
 # ---------------------------------------------------------------------------
 
 _SHARED_EXECUTOR: Optional[_cf.ThreadPoolExecutor] = None
+_EXECUTOR_ATEXIT_REGISTERED: bool = False
+
+
+def _shutdown_shared_executor() -> None:
+    """Shut down the current shared executor at interpreter exit."""
+    global _SHARED_EXECUTOR
+    exc = _SHARED_EXECUTOR
+    if exc is not None:
+        try:
+            exc.shutdown(wait=False)
+        except Exception:
+            pass
+
 
 def _get_shared_executor() -> _cf.ThreadPoolExecutor:
-    global _SHARED_EXECUTOR
-    if _SHARED_EXECUTOR is None or _SHARED_EXECUTOR._shutdown:
+    global _SHARED_EXECUTOR, _EXECUTOR_ATEXIT_REGISTERED
+    if _SHARED_EXECUTOR is None:
         _SHARED_EXECUTOR = _cf.ThreadPoolExecutor(
             max_workers=4, thread_name_prefix="ovagent-stream",
         )
-        _atexit.register(_SHARED_EXECUTOR.shutdown, wait=False)
+        if not _EXECUTOR_ATEXIT_REGISTERED:
+            import atexit
+            atexit.register(_shutdown_shared_executor)
+            _EXECUTOR_ATEXIT_REGISTERED = True
     return _SHARED_EXECUTOR
 
 
