@@ -971,9 +971,8 @@ class TurnController:
                                     "code",
                                     label=description,
                                 )
-                                print(
-                                    "      \u2705 "
-                                    + description
+                                logger.info(
+                                    "\u2705 %s", description
                                 )
                                 code_path = self._persist_execute_code_source(
                                     code,
