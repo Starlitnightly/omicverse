@@ -215,5 +215,138 @@ class GeminiCliRuntimeTests(unittest.TestCase):
         self.assertNotIn("default", schema["properties"]["code"])
 
 
+    # ------------------------------------------------------------------
+    # P1 bug-fix coverage: collision-safe IDs and empty-candidate handling
+    # ------------------------------------------------------------------
+
+    def test_gemini_rest_tool_call_ids_are_collision_safe(self) -> None:
+        """Tool-call IDs from _extract_gemini_text_and_tool_calls use UUIDs,
+        not sequential counters, and must not collide across calls."""
+        from omicverse.utils.agent_backend_gemini import _extract_gemini_text_and_tool_calls
+
+        payload = {
+            "candidates": [{
+                "content": {
+                    "parts": [
+                        {"functionCall": {"name": "tool_a", "args": {}}},
+                        {"functionCall": {"name": "tool_a", "args": {}}},
+                    ]
+                },
+                "finishReason": "STOP",
+            }]
+        }
+        _, tc1, _, _ = _extract_gemini_text_and_tool_calls(payload)
+        _, tc2, _, _ = _extract_gemini_text_and_tool_calls(payload)
+
+        # Within a single call, two tool calls with the same name get distinct IDs
+        self.assertNotEqual(tc1[0].id, tc1[1].id)
+        # Across calls, IDs must differ (no sequential-counter reuse)
+        all_ids = {tc.id for tc in tc1} | {tc.id for tc in tc2}
+        self.assertEqual(len(all_ids), 4)
+        # IDs must not use sequential suffixes like _1, _2
+        for tc in tc1 + tc2:
+            suffix = tc.id.rsplit("_", 1)[-1]
+            self.assertFalse(suffix.isdigit(), f"ID {tc.id} uses sequential counter")
+
+    def test_gemini_sdk_tool_call_ids_are_collision_safe(self) -> None:
+        """Tool-call IDs from _chat_tools_gemini (SDK path) use UUIDs."""
+        backend = OmicVerseLLMBackend(
+            system_prompt="system",
+            model="gemini-2.5-flash",
+            api_key="test-key-non-oauth",
+        )
+
+        mock_fc1 = mock.MagicMock()
+        mock_fc1.name = "run_code"
+        mock_fc1.args = {"code": "1+1"}
+
+        mock_fc2 = mock.MagicMock()
+        mock_fc2.name = "run_code"
+        mock_fc2.args = {"code": "2+2"}
+
+        mock_part1 = mock.MagicMock()
+        mock_part1.text = ""
+        mock_part1.function_call = mock_fc1
+
+        mock_part2 = mock.MagicMock()
+        mock_part2.text = ""
+        mock_part2.function_call = mock_fc2
+
+        mock_content = mock.MagicMock()
+        mock_content.parts = [mock_part1, mock_part2]
+
+        mock_candidate = mock.MagicMock()
+        mock_candidate.content = mock_content
+
+        mock_resp = mock.MagicMock()
+        mock_resp.candidates = [mock_candidate]
+        mock_resp.usage_metadata = None
+
+        mock_genai = mock.MagicMock()
+        mock_model_instance = mock.MagicMock()
+        mock_model_instance.generate_content.return_value = mock_resp
+        mock_genai.GenerativeModel.return_value = mock_model_instance
+
+        # Link mock_google.generativeai to mock_genai so import resolves correctly
+        mock_google = mock.MagicMock()
+        mock_google.generativeai = mock_genai
+
+        with mock.patch.dict("sys.modules", {"google.generativeai": mock_genai, "google": mock_google}):
+            response = backend._chat_tools_gemini(
+                messages=[{"role": "user", "content": "run"}],
+                tools=[{"name": "run_code", "description": "run", "parameters": {"type": "object", "properties": {"code": {"type": "string"}}}}],
+                tool_choice="auto",
+            )
+
+        self.assertEqual(len(response.tool_calls), 2)
+        self.assertNotEqual(response.tool_calls[0].id, response.tool_calls[1].id)
+        for tc in response.tool_calls:
+            suffix = tc.id.rsplit("_", 1)[-1]
+            self.assertFalse(suffix.isdigit(), f"ID {tc.id} uses sequential counter")
+
+    def test_gemini_rest_empty_candidates_returns_gracefully(self) -> None:
+        """Empty Gemini candidate list must not crash — returns empty content."""
+        from omicverse.utils.agent_backend_gemini import _extract_gemini_text_and_tool_calls
+
+        # Empty candidates list
+        content, tcs, raw, stop = _extract_gemini_text_and_tool_calls({"candidates": []})
+        self.assertIsNone(content)
+        self.assertEqual(tcs, [])
+        self.assertIsNone(raw)
+        self.assertEqual(stop, "end_turn")
+
+        # Missing candidates key
+        content, tcs, raw, stop = _extract_gemini_text_and_tool_calls({})
+        self.assertIsNone(content)
+        self.assertEqual(tcs, [])
+
+        # candidates is None
+        content, tcs, raw, stop = _extract_gemini_text_and_tool_calls({"candidates": None})
+        self.assertIsNone(content)
+        self.assertEqual(tcs, [])
+
+    def test_chat_tools_gemini_rest_empty_candidates_no_crash(self) -> None:
+        """_chat_tools_gemini_rest returns empty ChatResponse on empty candidates."""
+        backend = OmicVerseLLMBackend(
+            system_prompt="system",
+            model="gemini-2.5-flash",
+            api_key='{"token":"oauth-token","projectId":"demo"}',
+        )
+
+        with mock.patch(
+            "omicverse.utils.agent_backend_gemini._gemini_cli_request",
+            return_value={"response": {"candidates": []}},
+        ):
+            response = backend._chat_tools_gemini(
+                messages=[{"role": "user", "content": "hi"}],
+                tools=[{"name": "t", "description": "d", "parameters": {}}],
+                tool_choice="auto",
+            )
+
+        self.assertIsNone(response.content)
+        self.assertEqual(response.tool_calls, [])
+        self.assertEqual(response.stop_reason, "end_turn")
+
+
 if __name__ == "__main__":
     unittest.main()

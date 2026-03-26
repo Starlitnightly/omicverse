@@ -313,6 +313,115 @@ class TestFacadeIsThin:
 
 
 # ===================================================================
+# SECTION 3b: MULTIVI.train monkey-patch cleanup (P1 bug-fix)
+# ===================================================================
+
+
+class TestScviShimCleanup:
+    """_apply_scvi_shims must not leave MULTIVI.train globally patched."""
+
+    def test_undo_scvi_shims_restores_original(self):
+        """_undo_scvi_shims reverses the monkey-patch."""
+        from unittest.mock import MagicMock, patch
+        import sys
+
+        # Create a fake scvi.model.MULTIVI with a real .train
+        fake_multivi = type("MULTIVI", (), {"train": lambda self: "original"})()
+        original_train = type(fake_multivi).train
+
+        fake_scvi_model = MagicMock()
+        fake_scvi_model.MULTIVI = type(fake_multivi)
+
+        fake_scvi = MagicMock()
+        fake_scvi.model = fake_scvi_model
+
+        with patch.dict(sys.modules, {
+            "scvi": fake_scvi,
+            "scvi.model": fake_scvi_model,
+        }):
+            # Apply the shim
+            from omicverse.utils.ovagent.analysis_sandbox import build_sandbox_globals
+            # Trigger shim by calling _apply_scvi_shims indirectly
+            # (it's nested inside build_sandbox_globals, so we test via the
+            #  limited_import path)
+            ctx = _MinimalCtx()
+            g = build_sandbox_globals(ctx)
+            # Simulate importing scvi through the sandbox import
+            limited_import = g["__builtins__"]["__import__"]
+            limited_import("scvi", {}, {}, (), 0)
+
+            # Verify train was patched
+            assert getattr(type(fake_multivi).train, "_ovbench_patched", False)
+            assert hasattr(type(fake_multivi).train, "_ovbench_original")
+
+            # Now undo
+            from omicverse.utils.ovagent.analysis_sandbox import _undo_scvi_shims
+            _undo_scvi_shims()
+
+            # Verify train is restored
+            assert not getattr(type(fake_multivi).train, "_ovbench_patched", False)
+
+    def test_undo_scvi_shims_noop_when_not_patched(self):
+        """_undo_scvi_shims is safe to call when scvi is not available."""
+        from omicverse.utils.ovagent.analysis_sandbox import _undo_scvi_shims
+        # Should not raise even when scvi is not installed
+        _undo_scvi_shims()
+
+    def test_execute_generated_code_cleans_up_shims(self):
+        """execute_generated_code calls _undo_scvi_shims after exec."""
+        from unittest.mock import patch as mock_patch, MagicMock
+        from omicverse.utils.ovagent.analysis_sandbox import execute_generated_code
+
+        ctx = _MinimalCtx()
+        # Configure security scanner to allow execution through
+        ctx._security_scanner.scan.return_value = []
+        ctx._security_scanner.has_critical.return_value = False
+
+        mock_adata = MagicMock()
+        mock_adata.obs_names = []
+        mock_adata.var_names = []
+        mock_adata.var = None
+        mock_adata.obs = MagicMock()
+        mock_adata.obs.columns = []
+        mock_adata.raw = None
+
+        undo_called = {"count": 0}
+
+        def tracking_undo():
+            undo_called["count"] += 1
+
+        with mock_patch(
+            "omicverse.utils.ovagent.analysis_sandbox._undo_scvi_shims",
+            side_effect=tracking_undo,
+        ):
+            try:
+                execute_generated_code(ctx, "x = 1", mock_adata)
+            except Exception:
+                pass  # Don't care about exec details, just cleanup
+
+        assert undo_called["count"] >= 1, "_undo_scvi_shims was not called after exec"
+
+    def test_execute_snippet_readonly_cleans_up_shims(self):
+        """execute_snippet_readonly calls _undo_scvi_shims after exec."""
+        from unittest.mock import patch as mock_patch
+        from omicverse.utils.ovagent.analysis_sandbox import execute_snippet_readonly
+
+        ctx = _MinimalCtx()
+        undo_called = {"count": 0}
+
+        def tracking_undo():
+            undo_called["count"] += 1
+
+        with mock_patch(
+            "omicverse.utils.ovagent.analysis_sandbox._undo_scvi_shims",
+            side_effect=tracking_undo,
+        ):
+            execute_snippet_readonly(ctx, "x = 1", None)
+
+        assert undo_called["count"] >= 1, "_undo_scvi_shims was not called after snippet exec"
+
+
+# ===================================================================
 # SECTION 4: Public API inventory (must match decomposition contracts)
 # ===================================================================
 
