@@ -156,6 +156,8 @@ def execute_snippet_readonly(ctx: "AgentContext", code: str, adata: Any) -> str:
             exec(compiled, sandbox_globals, sandbox_locals)  # noqa: S102
     except Exception as e:
         return f"ERROR: {e}"
+    finally:
+        _undo_scvi_shims()
     out = buf.getvalue()
     return out if out.strip() else "(no stdout output)"
 
@@ -339,15 +341,18 @@ def execute_generated_code(
     stdout_buffer = _io.StringIO() if capture_stdout else None
 
     with ctx._temporary_api_keys():
-        if capture_stdout:
-            old_stdout = sys.stdout
-            sys.stdout = stdout_buffer  # type: ignore[assignment]
-            try:
+        try:
+            if capture_stdout:
+                old_stdout = sys.stdout
+                sys.stdout = stdout_buffer  # type: ignore[assignment]
+                try:
+                    exec(compiled, sandbox_globals, sandbox_locals)
+                finally:
+                    sys.stdout = old_stdout
+            else:
                 exec(compiled, sandbox_globals, sandbox_locals)
-            finally:
-                sys.stdout = old_stdout
-        else:
-            exec(compiled, sandbox_globals, sandbox_locals)
+        finally:
+            _undo_scvi_shims()
 
     result_adata = sandbox_locals.get("adata", adata)
     normalize_doublet_obs(result_adata)
@@ -576,6 +581,22 @@ def _make_workspace_open(ctx: "AgentContext"):
     return _workspace_open
 
 
+def _undo_scvi_shims() -> None:
+    """Restore MULTIVI.train to its original un-patched state.
+
+    Called after sandbox execution to prevent the monkey-patch from
+    persisting globally across runs.
+    """
+    try:
+        from scvi.model import MULTIVI
+    except Exception:
+        return
+    train_fn = getattr(MULTIVI, "train", None)
+    orig = getattr(train_fn, "_ovbench_original", None)
+    if orig is not None:
+        MULTIVI.train = orig  # type: ignore[assignment]
+
+
 def build_sandbox_globals(ctx: "AgentContext") -> Dict[str, Any]:
     """Construct the restricted namespace for agent code execution."""
     allowed_builtins = [
@@ -646,6 +667,7 @@ def build_sandbox_globals(ctx: "AgentContext") -> Dict[str, Any]:
             return orig_train(self_m, *args, **kwargs)
 
         _train_wrapper._ovbench_patched = True  # type: ignore[attr-defined]
+        _train_wrapper._ovbench_original = orig_train  # type: ignore[attr-defined]
         MULTIVI.train = _train_wrapper  # type: ignore[assignment]
 
     def limited_import(name, globals=None, locals=None, fromlist=(), level=0):

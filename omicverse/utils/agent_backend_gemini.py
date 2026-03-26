@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import logging
 import ssl
+import uuid
 from typing import Any, Dict, List, Optional
 from urllib import request as urllib_request
 from urllib.error import HTTPError
@@ -319,7 +320,7 @@ def _chat_tools_gemini(
                     if hasattr(part, 'function_call') and part.function_call:
                         fc = part.function_call
                         tc_list.append(ToolCall(
-                            id=f"gemini_{fc.name}_{id(fc)}",
+                            id=f"gemini_{fc.name}_{uuid.uuid4().hex[:12]}",
                             name=fc.name,
                             arguments=dict(fc.args) if fc.args else {},
                         ))
@@ -632,7 +633,8 @@ def _extract_gemini_text_and_tool_calls(payload: Dict[str, Any]):
     response_payload = payload.get("response") if isinstance(payload.get("response"), dict) else payload
     candidates = response_payload.get("candidates")
     if not isinstance(candidates, list) or not candidates:
-        raise RuntimeError(f"No Gemini candidates returned: {response_payload}")
+        logger.warning("No Gemini candidates returned: %s", response_payload)
+        return None, [], None, "end_turn"
 
     candidate = candidates[0] if isinstance(candidates[0], dict) else {}
     content = candidate.get("content")
@@ -652,7 +654,7 @@ def _extract_gemini_text_and_tool_calls(payload: Dict[str, Any]):
             if not isinstance(args, dict):
                 args = {}
             tool_calls.append(ToolCall(
-                id=f"gemini_{name}_{len(tool_calls) + 1}",
+                id=f"gemini_{name}_{uuid.uuid4().hex[:12]}",
                 name=name,
                 arguments=args,
             ))

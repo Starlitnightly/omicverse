@@ -35,6 +35,10 @@ async def _run_generator_in_thread(backend, generator_func):
     2. Pushing chunks to an async queue
     3. Yielding chunks from the queue
 
+    The implementation guards against event-loop shutdown: if the loop closes
+    before the sentinel ``None`` can be delivered, the consumer detects thread
+    completion via the ``future`` and exits instead of blocking forever.
+
     Parameters
     ----------
     backend : OmicVerseLLMBackend
@@ -59,19 +63,38 @@ async def _run_generator_in_thread(backend, generator_func):
     def _run_stream():
         try:
             for item in generator_func():
-                asyncio.run_coroutine_threadsafe(queue.put(item), loop)
+                try:
+                    asyncio.run_coroutine_threadsafe(queue.put(item), loop)
+                except RuntimeError:
+                    # Event loop is shutting down — stop producing.
+                    break
         except Exception as exc:
             exception_holder.append(exc)
         finally:
-            asyncio.run_coroutine_threadsafe(queue.put(None), loop)
+            try:
+                asyncio.run_coroutine_threadsafe(queue.put(None), loop)
+            except RuntimeError:
+                pass  # Loop closed; consumer will exit via future.done()
 
     # Start streaming in background thread (shared executor — P3-1)
     executor = _get_shared_executor()
     future = executor.submit(_run_stream)
 
-    # Yield chunks as they arrive
+    # Yield chunks as they arrive.  A short timeout lets us detect thread
+    # death even when the sentinel was not delivered.
     while True:
-        chunk = await queue.get()
+        try:
+            chunk = await asyncio.wait_for(queue.get(), timeout=1.0)
+        except asyncio.TimeoutError:
+            if future.done():
+                # Thread finished without delivering sentinel — drain & exit.
+                while not queue.empty():
+                    remaining = queue.get_nowait()
+                    if remaining is None:
+                        break
+                    yield remaining
+                break
+            continue
         if chunk is None:
             break
         yield chunk
