@@ -12,7 +12,6 @@ from __future__ import annotations
 import importlib
 import importlib.machinery
 import os
-import re
 import sys
 import tempfile
 import types
@@ -64,31 +63,23 @@ class TestEndpointRedaction:
     def test_redacts_full_url(self):
         from omicverse.utils.agent_backend_openai import _redact_url
         result = _redact_url("https://api.openai.com/v1/chat/completions")
-        assert "api.openai.com" in result
-        assert "/v1/chat/completions" not in result
-        assert result.endswith("/...")
+        # Exact equality avoids CodeQL incomplete-URL-substring-sanitization pattern
+        assert result == "https://api.openai.com/..."
 
     def test_redacts_custom_port(self):
         from omicverse.utils.agent_backend_openai import _redact_url
         result = _redact_url("http://my-server.example.com:8443/secret-path/v1")
-        assert "my-server.example.com" in result
-        assert "8443" not in result
-        assert "secret-path" not in result
+        assert result == "http://my-server.example.com/..."
 
     def test_redacts_localhost(self):
         from omicverse.utils.agent_backend_openai import _redact_url
         result = _redact_url("http://localhost:11434/v1")
-        assert "localhost" in result
-        assert "11434" not in result
+        assert result == "http://localhost/..."
 
     def test_redacts_empty_or_none(self):
         from omicverse.utils.agent_backend_openai import _redact_url
-        # Empty/None should produce a safe, non-revealing placeholder
-        result_empty = _redact_url("")
-        result_none = _redact_url(None)  # type: ignore[arg-type]
-        for result in (result_empty, result_none):
-            # Must not contain real paths, ports, or secrets
-            assert "/" not in result.split("//", 1)[-1].rstrip("/...") or "unknown" in result
+        assert _redact_url("") == "https://unknown/..."
+        assert _redact_url(None) == "https://unknown/..."  # type: ignore[arg-type]
 
     def test_connection_error_redacted(self):
         """_wrap_openai_connection_error must not expose raw endpoint."""
@@ -96,12 +87,15 @@ class TestEndpointRedaction:
 
         backend = MagicMock()
         exc = ConnectionRefusedError("Connection refused")
-        secret_url = "https://secret-host.internal:9999/private/v1"
-        err = _wrap_openai_connection_error(backend, exc, secret_url)
+        err = _wrap_openai_connection_error(
+            backend, exc, "https://secret-host.internal:9999/private/v1",
+        )
         msg = str(err)
-        assert "9999" not in msg
-        assert "/private/v1" not in msg
-        assert "secret-host.internal" in msg  # host is kept for debugging
+        # Full message equality — verifies port/path redaction without substring hostname check
+        assert msg == (
+            "OpenAI-compatible connection failed for"
+            " https://secret-host.internal/...: Connection refused"
+        )
 
     def test_ollama_connection_error_redacted(self):
         """Ollama connection error must not expose raw endpoint path."""
@@ -111,8 +105,11 @@ class TestEndpointRedaction:
         exc = ConnectionRefusedError("Connection refused")
         err = _wrap_openai_connection_error(backend, exc, "http://localhost:11434/v1")
         msg = str(err)
-        assert "11434" not in msg
-        assert "Ollama" in msg
+        # Full message equality — verifies port redaction and Ollama detection
+        assert msg == (
+            "Could not connect to Ollama at http://localhost/...."
+            " Start the Ollama server and verify the model is installed."
+        )
 
 
 # ===================================================================
