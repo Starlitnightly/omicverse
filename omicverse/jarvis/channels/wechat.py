@@ -37,6 +37,7 @@ except ImportError:  # pragma: no cover
 
 from ..agent_bridge import AgentBridge
 from .._bridge_session import resolve_bridge_session_id
+from ..channel_media import build_channel_request, prepare_channel_delivery_figures
 from ..config import default_state_dir
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from ..media_ingest import (
@@ -53,19 +54,6 @@ logger.setLevel(logging.INFO)
 _DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com"
 _CDN_BASE_URL = "https://novac2c.cdn.weixin.qq.com/c2c"
 
-_WECHAT_CHANNEL_HINT = """\
-[Channel: WeChat — image and text delivery rules]
-1. To produce a figure/plot: write and execute Python code that creates a matplotlib \
-figure (e.g. sc.pl.umap, sc.pl.violin, plt.plot). End the cell with plt.show() or \
-plt.savefig("output.png"). The gateway captures every matplotlib figure created during \
-code execution and sends it as a WeChat image message automatically — you do NOT need \
-to do anything else.
-2. NEVER provide image download links, sandbox:// paths, or Markdown image syntax. \
-Any link you output will NOT be visible in WeChat.
-3. After code runs, reply in plain text only: briefly describe what was plotted. \
-No Markdown tables, fences, bold, or hyperlinks.
-4. Never narrate your own tool usage ("I called finish", "mandatory tool call", etc.).\
-"""
 _DEFAULT_LONG_POLL_TIMEOUT_MS = 35_000
 _DEFAULT_API_TIMEOUT_MS = 15_000
 _MAX_TEXT = 3800
@@ -1037,6 +1025,7 @@ class WeChatJarvisBot:
                 pass
         if result.usage is not None:
             session.last_usage = result.usage
+        delivery_figures = prepare_channel_delivery_figures(session, result.figures)
         try:
             adata = session.adata
             adata_info = f"{adata.n_obs:,} cells x {adata.n_vars:,} genes" if adata is not None else ""
@@ -1078,8 +1067,8 @@ class WeChatJarvisBot:
             for chunk in _text_chunks(report):
                 await self._send_session_text(session_key, chunk)
 
-        if result.figures:
-            await self._send_figures(session_key, result.figures)
+        if delivery_figures:
+            await self._send_figures(session_key, delivery_figures)
         if result.artifacts:
             await self._send_session_text(
                 session_key,
@@ -1102,23 +1091,7 @@ class WeChatJarvisBot:
             await self._send_session_text(session_key, chunk)
 
     def _build_full_request(self, session: Any, text: str) -> str:
-        ctx_parts: List[str] = []
-        try:
-            agents_md = session.get_agents_md()
-            if agents_md:
-                ctx_parts.append(f"[User instructions]\n{agents_md}")
-        except Exception:
-            pass
-        try:
-            memory_ctx = session.get_memory_context()
-            if memory_ctx:
-                ctx_parts.append(f"[Analysis history]\n{memory_ctx}")
-        except Exception:
-            pass
-        # Channel hint goes last so task context takes priority over delivery rules.
-        ctx_parts.append(_WECHAT_CHANNEL_HINT)
-        ctx_parts.append(f"[Current request]\n{text}")
-        return "\n\n".join(ctx_parts)
+        return build_channel_request(session, text, channel_label="WeChat")
 
     @staticmethod
     def _command_parts(text: str) -> tuple[str, str]:

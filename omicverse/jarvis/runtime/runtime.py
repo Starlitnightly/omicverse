@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 import logging
 import time
 from typing import Any, Awaitable, Callable, List, Optional, Protocol
 
 from ..agent_bridge import AgentRunResult
 from .._bridge_session import resolve_bridge_session_id
+from ..channel_media import build_channel_request, prepare_channel_delivery_figures
 from .execution_adapter import ExecutionAdapter, ExecutionCallbacks
 from .models import (
     ConversationRoute,
@@ -259,6 +261,10 @@ class MessageRuntime:
             raise
 
         self._persist_result(session=session, user_text=user_text, result=result)
+        delivery_result = replace(
+            result,
+            figures=prepare_channel_delivery_figures(session, result.figures),
+        )
 
         # When no LLM text was streamed (e.g. agent called finish() directly
         # without a preceding text-only turn), fall back to result.summary so
@@ -283,9 +289,9 @@ class MessageRuntime:
             await self._deliver(self._presenter.analysis_error(route, result.error))
             return
 
-        has_media = bool(result.figures)
-        has_reports = bool(result.reports)
-        has_artifacts = bool(result.artifacts)
+        has_media = bool(delivery_result.figures)
+        has_reports = bool(delivery_result.reports)
+        has_artifacts = bool(delivery_result.artifacts)
         if has_media or has_reports or has_artifacts:
             event = self._presenter.analysis_status(
                 route,
@@ -301,7 +307,7 @@ class MessageRuntime:
             session=session,
             user_text=user_text,
             llm_text=effective_llm_text,
-            result=result,
+            result=delivery_result,
         ):
             await self._deliver(event)
 
@@ -393,22 +399,7 @@ class MessageRuntime:
 
     @staticmethod
     def build_full_request(session: Any, text: str) -> str:
-        ctx_parts: List[str] = []
-        try:
-            agents_md = session.get_agents_md()
-            if agents_md:
-                ctx_parts.append(f"[User instructions]\n{agents_md}")
-        except Exception:
-            pass
-        try:
-            memory_ctx = session.get_memory_context()
-            if memory_ctx:
-                ctx_parts.append(f"[Analysis history]\n{memory_ctx}")
-        except Exception:
-            pass
-        if not ctx_parts:
-            return text
-        return "\n\n".join(ctx_parts) + f"\n\n[Current request]\n{text}"
+        return build_channel_request(session, text, channel_label="Mobile channel")
 
     @staticmethod
     def _persist_result(*, session: Any, user_text: str, result: AgentRunResult) -> None:

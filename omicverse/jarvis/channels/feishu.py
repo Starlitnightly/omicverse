@@ -31,6 +31,7 @@ import requests
 
 from ..agent_bridge import AgentBridge
 from .._bridge_session import resolve_bridge_session_id
+from ..channel_media import build_channel_request, prepare_channel_delivery_figures
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from ..model_help import render_model_help
 from ..runtime import ConversationRoute
@@ -630,24 +631,7 @@ class FeishuRuntime:
         return t.strip()
 
     def _build_full_request(self, session: Any, text: str) -> str:
-        """Build context-injected request (AGENTS.md + memory + current request)."""
-        ctx_parts: List[str] = []
-        try:
-            agents_md = session.get_agents_md()
-            if agents_md:
-                ctx_parts.append(f"[User instructions]\n{agents_md}")
-        except Exception:
-            pass
-        try:
-            memory_ctx = session.get_memory_context()
-            if memory_ctx:
-                ctx_parts.append(f"[Analysis history]\n{memory_ctx}")
-        except Exception:
-            pass
-        return (
-            "\n\n".join(ctx_parts) + f"\n\n[Current request]\n{text}"
-            if ctx_parts else text
-        )
+        return build_channel_request(session, text, channel_label="Feishu")
 
     async def _spawn_analysis(
         self, chat_id: str, route: str, session: Any, user_text: str
@@ -979,6 +963,7 @@ class FeishuRuntime:
                 pass
         if result.usage is not None:
             session.last_usage = result.usage
+        delivery_figures = prepare_channel_delivery_figures(session, result.figures)
         try:
             a = session.adata
             adata_info = f"{a.n_obs:,} cells × {a.n_vars:,} genes" if a is not None else ""
@@ -1040,7 +1025,7 @@ class FeishuRuntime:
                 for chunk in self._text_chunks(rep):
                     await asyncio.to_thread(self._client.send_text, chat_id, chunk)
 
-        for i, fig in enumerate(list(result.figures or []), start=1):
+        for i, fig in enumerate(delivery_figures, start=1):
             try:
                 await asyncio.to_thread(
                     self._client.send_image_bytes, chat_id, fig, f"figure_{i}.png"
