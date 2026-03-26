@@ -158,6 +158,7 @@ def test_prepare_channel_delivery_figures_saves_workspace_png_and_keeps_latest(t
     assert selected == [b"latest-figure"]
     assert "[Channel: Feishu" in request
     assert "figures/<descriptive_name>.png" in request
+    assert "show=False before saving" in request
     assert "newest PNG" in request
     assert "[Current request]\n请画一个UMAP图" in request
 
@@ -200,4 +201,5 @@ async def test_message_runtime_routes_only_latest_workspace_figure(tmp_path: Pat
     assert any(event.kind == "status" for event in delivered)
     assert "[Channel:" in adapter.requests[0]["request"]
     assert "figures/<descriptive_name>.png" in adapter.requests[0]["request"]
+    assert "show=False before saving" in adapter.requests[0]["request"]
     assert "newest PNG" in adapter.requests[0]["request"]
