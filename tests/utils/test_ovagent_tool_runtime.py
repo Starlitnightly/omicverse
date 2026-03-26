@@ -180,6 +180,37 @@ def test_tool_search_functions_falls_back_to_static_registry(monkeypatch):
     assert "Branch: method='dynamo'" in result
 
 
+def test_execute_code_returns_full_debug_output_but_truncated_llm_output():
+    runtime = ToolRuntime.__new__(ToolRuntime)
+
+    class _Executor:
+        _notebook_fallback_error = None
+
+        def check_code_prerequisites(self, code, adata):
+            return ""
+
+        def execute_generated_code(self, code, adata, capture_stdout=True):
+            return {
+                "adata": adata,
+                "stdout": "A" * 3500,
+            }
+
+    class _Ctx:
+        _code_only_mode = False
+
+    runtime._ctx = _Ctx()
+    runtime._executor = _Executor()
+
+    result = runtime._tool_execute_code("print('x')", "debug stdout", None)
+
+    assert "stdout:\n" in result["output"]
+    assert "truncated, total_chars=3500" in result["output"]
+    assert len(result["debug_output"]) > len(result["output"])
+    assert "A" * 3200 in result["debug_output"]
+    assert "truncated, total_chars=3500" not in result["debug_output"]
+    assert result["stdout"] == "A" * 3500
+
+
 # -----------------------------------------------------------------------
 # Task-005: Tool facade consolidation tests
 # -----------------------------------------------------------------------

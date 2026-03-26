@@ -33,6 +33,15 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _truncate_text(text: str, limit: int) -> str:
+    """Truncate text for LLM-facing tool output while preserving total length."""
+    if limit <= 0 or len(text) <= limit:
+        return text
+    suffix = f"\n... (truncated, total_chars={len(text)})"
+    keep = max(0, limit - len(suffix))
+    return text[:keep] + suffix
+
+
 # Legacy OmicVerse-specific tool schemas that are not part of the
 # Claude-style tool catalog but must still be exposed to the LLM.
 LEGACY_AGENT_TOOLS: list[dict[str, Any]] = [
@@ -542,35 +551,51 @@ class ToolRuntime:
             result_adata = result.get("adata", adata) if isinstance(result, dict) else (result if result is not None else adata)
 
             output_parts: List[str] = []
+            debug_output_parts: List[str] = []
             notebook_err = getattr(self._executor, "_notebook_fallback_error", None)
             if notebook_err:
-                output_parts.append(
+                notebook_msg = (
                     f"WARNING: notebook session execution failed with error:\n{notebook_err}\n"
                     f"Fell back to in-process execution. Please fix the code to avoid this error."
                 )
+                output_parts.append(notebook_msg)
+                debug_output_parts.append(notebook_msg)
             if prereq_warnings:
-                output_parts.append(
-                    f"PREREQUISITE WARNINGS: {prereq_warnings}"
-                )
+                warning_msg = f"PREREQUISITE WARNINGS: {prereq_warnings}"
+                output_parts.append(warning_msg)
+                debug_output_parts.append(warning_msg)
             if stdout.strip():
-                output_parts.append(f"stdout:\n{stdout[:3000]}")
-            try:
                 output_parts.append(
+                    f"stdout:\n{_truncate_text(stdout, 3000)}"
+                )
+                debug_output_parts.append(f"stdout:\n{stdout}")
+            try:
+                result_msg = (
                     f"Result adata shape: {result_adata.shape[0]} cells x "
                     f"{result_adata.shape[1]} features"
                 )
+                output_parts.append(result_msg)
+                debug_output_parts.append(result_msg)
             except Exception:
-                output_parts.append(
-                    f"Result type: {type(result_adata).__name__}"
-                )
+                result_msg = f"Result type: {type(result_adata).__name__}"
+                output_parts.append(result_msg)
+                debug_output_parts.append(result_msg)
 
+            llm_output = (
+                "\n".join(output_parts)
+                if output_parts
+                else "Code executed successfully (no output)."
+            )
+            debug_output = (
+                "\n".join(debug_output_parts)
+                if debug_output_parts
+                else "Code executed successfully (no output)."
+            )
             return {
                 "adata": result_adata,
-                "output": (
-                    "\n".join(output_parts)
-                    if output_parts
-                    else "Code executed successfully (no output)."
-                ),
+                "output": llm_output,
+                "debug_output": debug_output,
+                "stdout": stdout,
             }
         except Exception as e:
             original_error = str(e)
@@ -589,21 +614,29 @@ class ToolRuntime:
                     output_parts = [
                         f"RECOVERED (pattern fix): {original_error}"
                     ]
+                    debug_output_parts = list(output_parts)
                     if stdout.strip():
-                        output_parts.append(f"stdout:\n{stdout[:3000]}")
-                    try:
                         output_parts.append(
+                            f"stdout:\n{_truncate_text(stdout, 3000)}"
+                        )
+                        debug_output_parts.append(f"stdout:\n{stdout}")
+                    try:
+                        result_msg = (
                             f"Result adata shape: "
                             f"{result_adata.shape[0]} cells x "
                             f"{result_adata.shape[1]} features"
                         )
+                        output_parts.append(result_msg)
+                        debug_output_parts.append(result_msg)
                     except Exception:
-                        output_parts.append(
-                            f"Result type: {type(result_adata).__name__}"
-                        )
+                        result_msg = f"Result type: {type(result_adata).__name__}"
+                        output_parts.append(result_msg)
+                        debug_output_parts.append(result_msg)
                     return {
                         "adata": result_adata,
                         "output": "\n".join(output_parts),
+                        "debug_output": "\n".join(debug_output_parts),
+                        "stdout": stdout,
                     }
                 except Exception:
                     pass
@@ -612,12 +645,22 @@ class ToolRuntime:
                 f"ERROR: {e}\n\nTraceback (last 2000 chars):\n"
                 f"{tb_str[-2000:]}"
             )
+            debug_error_output = f"ERROR: {e}\n\nTraceback:\n{tb_str}"
             if prereq_warnings:
                 error_output = (
                     f"PREREQUISITE WARNINGS: {prereq_warnings}\n\n"
                     f"{error_output}"
                 )
-            return {"adata": adata, "output": error_output}
+                debug_error_output = (
+                    f"PREREQUISITE WARNINGS: {prereq_warnings}\n\n"
+                    f"{debug_error_output}"
+                )
+            return {
+                "adata": adata,
+                "output": error_output,
+                "debug_output": debug_error_output,
+                "stdout": "",
+            }
 
     def _tool_run_snippet(self, code: str, adata: Any) -> str:
         """Read-only snippet — no adata copy, no serialisation round-trip."""
