@@ -214,6 +214,15 @@ class RuntimeEventEmitter:
             batch_id,
             parallel,
         )
+        await self.emit(
+            "tool_dispatched",
+            {"name": name, "batch_id": batch_id, "parallel": parallel},
+            step_id=step_id,
+            turn_id=turn_id,
+            trace_id=trace_id,
+            session_id=session_id,
+            category="tool_dispatch",
+        )
 
     async def tool_completed(
         self,
@@ -233,6 +242,15 @@ class RuntimeEventEmitter:
             status,
             description[:120] if description else "-",
         )
+        await self.emit(
+            "tool_completed",
+            {"name": name, "status": status},
+            step_id=step_id,
+            turn_id=turn_id,
+            trace_id=trace_id,
+            session_id=session_id,
+            category="tool_dispatch",
+        )
 
     async def execution_completed(
         self,
@@ -244,6 +262,14 @@ class RuntimeEventEmitter:
     ) -> None:
         """Emit an execute_code completion event."""
         logger.info("execution_completed description=%s", description[:120])
+        await self.emit(
+            "execution_completed",
+            description,
+            turn_id=turn_id,
+            trace_id=trace_id,
+            session_id=session_id,
+            category="tool_dispatch",
+        )
 
     async def delegation_completed(
         self,
@@ -260,6 +286,14 @@ class RuntimeEventEmitter:
             agent_type,
             task[:80] if task else "-",
         )
+        await self.emit(
+            "delegation_completed",
+            {"agent_type": agent_type, "task": task[:80] if task else ""},
+            turn_id=turn_id,
+            trace_id=trace_id,
+            session_id=session_id,
+            category="subagent_lifecycle",
+        )
 
     async def task_finished(
         self,
@@ -271,6 +305,14 @@ class RuntimeEventEmitter:
     ) -> None:
         """Emit a task-finished event."""
         logger.info("task_finished summary=%s", summary[:120])
+        await self.emit(
+            "done",
+            summary,
+            turn_id=turn_id,
+            trace_id=trace_id,
+            session_id=session_id,
+            category="lifecycle",
+        )
 
     # ------------------------------------------------------------------
     # Convenience methods — subagent lifecycle
@@ -282,12 +324,17 @@ class RuntimeEventEmitter:
         turn: int,
         max_turns: int,
     ) -> None:
-        """Log a subagent turn progression."""
+        """Emit a subagent turn progression event."""
         logger.info(
             "subagent_turn agent_type=%s turn=%d/%d",
             agent_type,
             turn + 1,
             max_turns,
+        )
+        await self.emit(
+            "status",
+            {"agent_type": agent_type, "turn": turn + 1, "max_turns": max_turns},
+            category="subagent_lifecycle",
         )
 
     async def subagent_tool(
@@ -296,12 +343,17 @@ class RuntimeEventEmitter:
         tool_name: str,
         arguments: dict[str, Any],
     ) -> None:
-        """Log a subagent tool dispatch."""
+        """Emit a subagent tool dispatch event."""
         logger.info(
             "subagent_tool agent_type=%s tool=%s args=[%s]",
             agent_type,
             tool_name,
             ", ".join(f"{k}=" for k in arguments),
+        )
+        await self.emit(
+            "tool_dispatched",
+            {"agent_type": agent_type, "name": tool_name},
+            category="subagent_lifecycle",
         )
 
     async def subagent_finished(
@@ -309,11 +361,16 @@ class RuntimeEventEmitter:
         agent_type: str,
         summary: str,
     ) -> None:
-        """Log subagent completion."""
+        """Emit a subagent completion event."""
         logger.info(
             "subagent_finished agent_type=%s summary=%s",
             agent_type,
             summary[:120],
+        )
+        await self.emit(
+            "done",
+            {"agent_type": agent_type, "summary": summary[:120]},
+            category="subagent_lifecycle",
         )
 
     # ------------------------------------------------------------------
@@ -336,10 +393,18 @@ class RuntimeEventEmitter:
         trace_id: str = "",
         session_id: str = "",
     ) -> None:
-        """Log an assistant text response (no tool calls)."""
+        """Emit an assistant text response event (no tool calls)."""
         logger.info(
             "agent_response content=%s",
             content[:200] if content else "-",
+        )
+        await self.emit(
+            "text",
+            content,
+            turn_id=turn_id,
+            trace_id=trace_id,
+            session_id=session_id,
+            category="turn_lifecycle",
         )
 
 
