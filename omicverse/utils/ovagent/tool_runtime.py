@@ -573,6 +573,7 @@ class ToolRuntime:
 
         # --- Structured self-healing loop ---
         repair_loop = ExecutionRepairLoop(self._executor, max_retries=3)
+        extract_code_fn = getattr(self._ctx, "_extract_python_code", None)
 
         import asyncio as _asyncio
 
@@ -586,11 +587,13 @@ class ToolRuntime:
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                 repair_result = pool.submit(
                     _asyncio.run,
-                    repair_loop.run(code, adata, phase="execution"),
+                    repair_loop.run(code, adata, phase="execution",
+                                   extract_code_fn=extract_code_fn),
                 ).result()
         else:
             repair_result = _asyncio.run(
-                repair_loop.run(code, adata, phase="execution")
+                repair_loop.run(code, adata, phase="execution",
+                               extract_code_fn=extract_code_fn)
             )
 
         if repair_result.success:
