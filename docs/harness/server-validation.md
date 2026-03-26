@@ -70,6 +70,53 @@ server-validation artifact.
 Each stage is dispatched as an `execute_code` tool call through the real
 TurnController -> ToolScheduler -> ToolRuntime -> ExecutionRepairLoop path.
 
+## Real-Provider E2E Validation
+
+The real-provider E2E suite (`tests/llm/test_e2e_real_provider.py`) exercises
+the full OVAgent stack against a live LLM relay endpoint, proving that agent
+initialization, tool-planning, code-execution, and reporting work through the
+actual agent/runtime path with real API calls.
+
+### What it validates (beyond mock E2E)
+
+| Aspect | Coverage |
+|--------|----------|
+| Real LLM relay connectivity | /models endpoint probe |
+| Agent init with live credentials | Provider resolution, endpoint binding |
+| PBMC QC through real LLM | Tool dispatch, code execution, result capture |
+| Run trace evidence | trace_id, turn_id, step_count, token usage |
+| Decomposed runtime facades | TurnController, ToolRuntime, AnalysisExecutor |
+
+### Prerequisites
+
+- `OV_AGENT_E2E_REAL_PROVIDER=1` environment variable
+- `OV_AGENT_CREDENTIAL_FILE` pointing to a valid credential file
+- Network access to the relay endpoint
+- `scanpy` installed for PBMC3k dataset loading
+
+### How to run
+
+```bash
+OV_AGENT_E2E_REAL_PROVIDER=1 \
+OV_AGENT_CREDENTIAL_FILE=/path/to/adpwt.txt \
+python -m pytest -xvs tests/llm/test_e2e_real_provider.py
+```
+
+Or standalone:
+
+```bash
+OV_AGENT_E2E_REAL_PROVIDER=1 python tests/llm/test_e2e_real_provider.py
+```
+
+### Validation history
+
+| Date | Baseline | Status | Trace ID | Duration |
+|------|----------|--------|----------|----------|
+| 2026-03-26 04:10 UTC | pre-decomposition | passed | trace_f24cd004c841 | 88.7s |
+| 2026-03-26 10:01 UTC | post-decomposition (task-040..047) | passed | trace_2c0ff9c53d5f | 77.8s |
+
+Reports are persisted at `tests/llm/e2e_real_provider_report.json`.
+
 ## Harness CLI Commands
 
 All of the following are server-only:

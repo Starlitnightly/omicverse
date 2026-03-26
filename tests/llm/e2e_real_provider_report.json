@@ -1,14 +1,14 @@
 {
   "report_type": "e2e_real_provider_validation",
-  "started_at": "2026-03-26T04:10:16.906136+00:00",
-  "finished_at": "2026-03-26T04:11:51.280160+00:00",
+  "started_at": "2026-03-26T10:00:57.841589+00:00",
+  "finished_at": "2026-03-26T10:02:28.647082+00:00",
   "final_status": "passed",
   "relay": {
     "base_url": "http://8.130.53.188:3000/v1",
     "masked_key": "sk-...nVUl",
     "ok": true,
     "model_count": 29,
-    "latency_ms": 1232.7,
+    "latency_ms": 479.7,
     "sample_models": [
       "gpt-5.1-codex",
       "gpt-5.3-codex(xhigh)",
@@ -27,7 +27,7 @@
     {
       "name": "agent_init",
       "status": "passed",
-      "duration_s": 4.4,
+      "duration_s": 6.41,
       "detail": {
         "model": "gpt-5.2"
       }
@@ -35,21 +35,21 @@
     {
       "name": "pbmc_qc_real_llm",
       "status": "passed",
-      "duration_s": 88.66,
+      "duration_s": 77.81,
       "detail": {
-        "duration_s": 88.66,
+        "duration_s": 77.81,
         "run_trace": {
           "available": true,
-          "trace_id": "trace_f24cd004c841",
-          "turn_id": "turn_61217b330a50",
+          "trace_id": "trace_2c0ff9c53d5f",
+          "turn_id": "turn_83c0d52ccdde",
           "model": "gpt-5.2",
           "provider": "openai",
           "status": "success",
-          "result_summary": "Computed PBMC QC metrics (total_counts, n_genes_by_counts, pct_counts_mt) with scanpy; flagged mitochondrial genes in adata.var['mt']; filtered cells with min_genes=200 (0 removed; final shape unchanged at 2700\u00d732738). Saved provenance artifacts: summary.md, bundle.json, trace_linkage.",
+          "result_summary": "- Inspected dataset structure:\n  - `adata.shape`: **2700 cells \u00d7 32738 genes**\n  - `adata.obs`: **empty** (no columns initially)\n  - `adata.var` columns: `['gene_ids']`\n  - No `layers`, no `obsm`\n\n- Performed QC (Scanpy):\n  - Ran `sc.pp.calculate_qc_metrics(adata, inplace=True)` to add standard QC f",
           "usage": {
-            "input_tokens": 34663,
-            "output_tokens": 122,
-            "total_tokens": 34785,
+            "input_tokens": 32887,
+            "output_tokens": 395,
+            "total_tokens": 33282,
             "model": "gpt-5.2",
             "provider": "openai"
           },
@@ -64,7 +64,7 @@
             "WebFetch",
             "WebSearch"
           ],
-          "step_count": 9,
+          "step_count": 5,
           "steps": [
             {
               "step_type": "tool_call",
@@ -95,47 +95,19 @@
               "output_summary": ""
             },
             {
-              "step_type": "tool_call",
-              "name": "ToolSearch",
-              "status": "completed",
-              "latency_ms": null,
-              "output_summary": ""
-            },
-            {
-              "step_type": "tool_call",
-              "name": "ToolSearch",
-              "status": "completed",
-              "latency_ms": null,
-              "output_summary": ""
-            },
-            {
-              "step_type": "tool_call",
-              "name": "Bash",
-              "status": "completed",
-              "latency_ms": null,
-              "output_summary": ""
-            },
-            {
-              "step_type": "tool_call",
-              "name": "finish",
-              "status": "completed",
-              "latency_ms": null,
-              "output_summary": ""
-            },
-            {
-              "step_type": "done",
-              "name": "finish",
+              "step_type": "llm_chunk",
+              "name": "",
               "status": "completed",
               "latency_ms": null,
               "output_summary": ""
             }
           ],
           "adata_shape": null,
-          "started_at": 1774498222.6189141,
-          "finished_at": 1774498311.277965
+          "started_at": 1774519270.8564293,
+          "finished_at": 1774519348.6415973
         },
         "token_usage": {
-          "last_usage": "Usage(input_tokens=34663, output_tokens=122, total_tokens=34785, model='gpt-5.2', provider='openai')",
+          "last_usage": "Usage(input_tokens=32887, output_tokens=395, total_tokens=33282, model='gpt-5.2', provider='openai')",
           "last_usage_breakdown": {
             "generation": null,
             "reflection": [],
