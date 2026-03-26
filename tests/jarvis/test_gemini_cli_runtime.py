@@ -68,9 +68,8 @@ class GeminiCliRuntimeTests(unittest.TestCase):
             api_key='{"token":"oauth-token","projectId":"demo"}',
         )
 
-        with mock.patch.object(
-            backend,
-            "_gemini_cli_request",
+        with mock.patch(
+            "omicverse.utils.agent_backend_gemini._gemini_cli_request",
             return_value={
                 "response": {
                     "candidates": [
@@ -102,9 +101,8 @@ class GeminiCliRuntimeTests(unittest.TestCase):
             api_key='{"token":"oauth-token","projectId":"demo"}',
         )
 
-        with mock.patch.object(
-            backend,
-            "_gemini_cli_request",
+        with mock.patch(
+            "omicverse.utils.agent_backend_gemini._gemini_cli_request",
             return_value={
                 "response": {
                     "candidates": [
@@ -158,9 +156,8 @@ class GeminiCliRuntimeTests(unittest.TestCase):
             endpoint="https://cloudcode-pa.googleapis.com",
         )
 
-        with mock.patch.object(
-            backend,
-            "_gemini_cli_request",
+        with mock.patch(
+            "omicverse.utils.agent_backend_gemini._gemini_cli_request",
             return_value={
                 "response": {
                     "candidates": [
@@ -172,7 +169,8 @@ class GeminiCliRuntimeTests(unittest.TestCase):
             result = backend._chat_via_gemini("hello")
 
         self.assertEqual(result, "cloudcode ok")
-        payload = cli_request.call_args.args[0]
+        # Module-level fn signature: _gemini_cli_request(backend, body, api_key)
+        payload = cli_request.call_args.args[1]
         self.assertEqual(payload["model"], "gemini-2.5-flash")
         self.assertEqual(payload["project"], "demo-project")
         self.assertEqual(payload["request"]["systemInstruction"]["role"], "system")
@@ -185,9 +183,8 @@ class GeminiCliRuntimeTests(unittest.TestCase):
             endpoint="https://cloudcode-pa.googleapis.com",
         )
 
-        with mock.patch.object(
-            backend,
-            "_gemini_cli_request",
+        with mock.patch(
+            "omicverse.utils.agent_backend_gemini._gemini_cli_request",
             return_value={"response": {"candidates": [{"content": {"parts": [{"text": "ok"}]}}]}},
         ) as cli_request:
             backend._chat_tools_gemini(
@@ -208,7 +205,8 @@ class GeminiCliRuntimeTests(unittest.TestCase):
                 tool_choice="required",
             )
 
-        payload = cli_request.call_args.args[0]
+        # Module-level fn signature: _gemini_cli_request(backend, body, api_key)
+        payload = cli_request.call_args.args[1]
         self.assertNotIn("toolConfig", payload["request"])
         schema = payload["request"]["tools"][0]["functionDeclarations"][0]["parameters"]
         self.assertEqual(schema["type"], "OBJECT")

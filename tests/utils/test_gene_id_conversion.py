@@ -18,6 +18,7 @@ from omicverse.utils._gene_id_conversion import (
     convert2symbol,
     convert2gene_id,
     symbol2id,
+    EnsemblRelease as _EnsemblRelease,
 )
 
 
@@ -433,6 +434,7 @@ class TestRegistry:
 # ---------------------------------------------------------------------------
 
 @pytest.mark.integration
+@pytest.mark.skipif(_EnsemblRelease is None, reason="pyensembl not available (missing datacache/typechecks)")
 class TestIntegration:
     """
     These tests hit the real pyensembl database.
