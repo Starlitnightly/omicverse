@@ -516,6 +516,66 @@ def _parse_plan_step(step_text: str) -> Optional[Dict[str, Any]]:
 # Sandbox globals
 # ---------------------------------------------------------------------------
 
+def _make_workspace_open(ctx: "AgentContext"):
+    """Return a ``open()`` wrapper that constrains file access to the workspace.
+
+    Allowed roots:
+    - The agent workspace directory (from ``ctx._filesystem_context``)
+    - The current working directory
+    - The system temp directory (``/tmp`` or platform equivalent)
+    - The ``genesets`` sub-directory (used by OmicVerse pathway helpers)
+
+    Relative paths are resolved against the current working directory so
+    existing agent code that does ``open("output.csv", "w")`` keeps working.
+    """
+    import tempfile
+
+    _builtin_open = builtins.open
+
+    def _allowed_roots():
+        roots = []
+        # Workspace dir from filesystem context
+        fs_ctx = getattr(ctx, "_filesystem_context", None)
+        if fs_ctx is not None:
+            ws = getattr(fs_ctx, "workspace_dir", None)
+            if ws is not None:
+                roots.append(Path(ws).resolve())
+        # Current working directory
+        try:
+            roots.append(Path.cwd().resolve())
+        except Exception:
+            pass
+        # System temp directory
+        try:
+            roots.append(Path(tempfile.gettempdir()).resolve())
+        except Exception:
+            pass
+        return roots
+
+    def _workspace_open(file, mode="r", *args, **kwargs):
+        # Resolve the target path
+        try:
+            target = Path(str(file)).resolve()
+        except Exception:
+            target = None
+
+        if target is not None:
+            roots = _allowed_roots()
+            if roots:
+                allowed = any(
+                    target == root or str(target).startswith(str(root) + os.sep)
+                    for root in roots
+                )
+                if not allowed:
+                    raise PermissionError(
+                        f"Sandbox file access denied: path is outside the workspace boundary."
+                    )
+
+        return _builtin_open(file, mode, *args, **kwargs)
+
+    return _workspace_open
+
+
 def build_sandbox_globals(ctx: "AgentContext") -> Dict[str, Any]:
     """Construct the restricted namespace for agent code execution."""
     allowed_builtins = [
@@ -523,7 +583,6 @@ def build_sandbox_globals(ctx: "AgentContext") -> Dict[str, Any]:
         "float", "int", "isinstance", "iter", "len", "list", "map",
         "max", "min", "next", "pow", "print", "range", "round", "set",
         "sorted", "str", "sum", "tuple", "zip", "filter", "type",
-        "open",
         "hasattr", "getattr", "setattr",
         "ImportError", "AttributeError", "IndexError",
         "FileNotFoundError", "OSError", "Exception", "ValueError",
@@ -533,6 +592,7 @@ def build_sandbox_globals(ctx: "AgentContext") -> Dict[str, Any]:
         allowed_builtins.extend(["locals", "globals"])
 
     safe_builtins = {name: getattr(builtins, name) for name in allowed_builtins if hasattr(builtins, name)}
+    safe_builtins["open"] = _make_workspace_open(ctx)
     allowed_modules: Dict[str, Any] = {}
     deny_roots = {
         "subprocess", "socket", "ssl", "urllib", "http",

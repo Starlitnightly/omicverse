@@ -32,6 +32,27 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# URL redaction helper
+# ---------------------------------------------------------------------------
+
+def _redact_url(url: str) -> str:
+    """Redact an endpoint URL to scheme + host, hiding path/port details.
+
+    Keeps enough context for debugging (provider identity) while stripping
+    path segments and query strings that may contain secrets or
+    environment-specific information.
+    """
+    from urllib.parse import urlparse
+    try:
+        parsed = urlparse(str(url or ""))
+        host = parsed.hostname or "unknown"
+        scheme = parsed.scheme or "https"
+        return f"{scheme}://{host}/..."
+    except Exception:
+        return "<redacted>"
+
+
+# ---------------------------------------------------------------------------
 # OpenAI parameter / error adaptation helpers
 # ---------------------------------------------------------------------------
 
@@ -133,7 +154,7 @@ def _call_openai_chat_with_adaptation(
             "openai_chat_retry_adapted model=%s provider=%s endpoint=%s changes=%s",
             backend.config.model,
             backend.config.provider,
-            base_url,
+            _redact_url(base_url),
             change_summary,
         )
         return request_fn(retried_kwargs)
@@ -210,9 +231,9 @@ def _wrap_openai_connection_error(backend, exc: Exception, base_url: str) -> Run
         return RuntimeError(str(exc))
     if _is_ollama_endpoint(base_url):
         return RuntimeError(
-            f"Could not connect to Ollama at {base_url}. Start the Ollama server and verify the model is installed."
+            f"Could not connect to Ollama at {_redact_url(base_url)}. Start the Ollama server and verify the model is installed."
         )
-    return RuntimeError(f"OpenAI-compatible connection failed for {base_url}: {exc}")
+    return RuntimeError(f"OpenAI-compatible connection failed for {_redact_url(base_url)}: {exc}")
 
 
 # ---------------------------------------------------------------------------
@@ -509,7 +530,7 @@ def _call_openai_codex_responses(
     logger.info(
         "openai_codex_responses_start model=%s endpoint=%s tool_choice=%s messages=%d tools=%d timeout_s=%.1f",
         backend.config.model,
-        url,
+        _redact_url(url),
         tool_choice or "none",
         len(messages),
         len(tools or []),
@@ -1273,7 +1294,7 @@ def _chat_tools_openai(
                     "openai_tool_chat_start model=%s provider=%s endpoint=%s tool_choice=%s messages=%d tools=%d timeout_s=%.1f",
                     backend.config.model,
                     backend.config.provider,
-                    base_url,
+                    _redact_url(base_url),
                     kwargs.get("tool_choice", "none"),
                     len(messages),
                     len(tools or []),
@@ -1415,7 +1436,7 @@ def _chat_tools_openai_responses(
                 "openai_responses_tool_chat_start model=%s provider=%s endpoint=%s tool_choice=%s messages=%d tools=%d timeout_s=%.1f",
                 backend.config.model,
                 backend.config.provider,
-                base_url,
+                _redact_url(base_url),
                 kwargs.get("tool_choice", "none"),
                 len(messages),
                 len(tools or []),
