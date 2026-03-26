@@ -81,14 +81,21 @@ def collect_api_key_env(
     if not api_key:
         return {}
 
+    try:
+        normalized_model = ModelConfig.normalize_model_id(model)
+    except Exception:
+        normalized_model = model
+
     env_mapping: Dict[str, str] = {}
-    required_key = PROVIDER_API_KEYS.get(model)
+    required_key = PROVIDER_API_KEYS.get(normalized_model)
     if required_key:
         env_mapping[required_key] = api_key
 
-    provider = ModelConfig.get_provider_from_model(model, endpoint)
+    provider = ModelConfig.get_provider_from_model(normalized_model, endpoint)
     if provider == "openai":
         env_mapping.setdefault("OPENAI_API_KEY", api_key)
+    elif provider == "google":
+        env_mapping.setdefault("GOOGLE_API_KEY", api_key)
 
     return env_mapping
 

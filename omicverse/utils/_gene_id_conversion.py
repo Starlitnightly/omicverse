@@ -257,6 +257,7 @@ def convert2gene_symbol(
     var_pd = pd.DataFrame.from_dict(results, orient='index', columns=['symbol'])
     var_pd.index.name = 'query'
     var_pd['_score'] = 1.0
+    var_pd['converted'] = var_pd['symbol'] != var_pd.index
 
     print(f"Conversion finished. Found {found_count}/{len(unique_ids)} symbols.")
     return var_pd
@@ -354,6 +355,10 @@ def convert2symbol(
         else:
             valid_ind = np.arange(len(merge_df))
 
+        merge_df['converted'] = False
+        merge_df.iloc[valid_ind, merge_df.columns.get_loc('converted')] = (
+            merge_df.iloc[valid_ind]['symbol'] != merge_df.iloc[valid_ind]['query']
+        )
         adata.var = merge_df
 
         if subset is True:
@@ -369,6 +374,10 @@ def convert2symbol(
             adata._inplace_subset_var(adata.var_names.notnull())
 
     return adata
+
+
+#: Alias for :func:`convert2symbol`.
+id2symbol = convert2symbol
 
 
 @register_function(
@@ -497,6 +506,7 @@ def convert2gene_id(
 
     var_pd = pd.Series(results, name="gene_id").to_frame()
     var_pd.index.name = "query"
+    var_pd['converted'] = var_pd['gene_id'] != var_pd.index
 
     print(f"Conversion finished. Found {found_count}/{len(unique_symbols)} Ensembl IDs.")
     return var_pd
@@ -579,6 +589,7 @@ def symbol2id(
 
     converted_mask = merge_df["gene_id"] != merge_df.index
     valid_ind = np.where(converted_mask)[0]
+    merge_df['converted'] = converted_mask
 
     adata.var = merge_df
 
