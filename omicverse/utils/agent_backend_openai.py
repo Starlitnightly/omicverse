@@ -187,7 +187,7 @@ def _decode_openai_codex_jwt(token: str) -> Dict[str, Any]:
     try:
         raw = base64.urlsafe_b64decode(payload.encode("ascii"))
         data = json.loads(raw.decode("utf-8"))
-    except ValueError:
+    except (ValueError, UnicodeDecodeError):
         logger.debug("decode_openai_codex_jwt_failed token_len=%d", len(str(token or "")))
         return {}
     return data if isinstance(data, dict) else {}

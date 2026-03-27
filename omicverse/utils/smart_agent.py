@@ -1523,16 +1523,21 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
     # ===================================================================
 
     def __del__(self):
-        """Cleanup on agent deletion."""
+        """Cleanup on agent deletion.
+
+        Uses broad ``except Exception`` to avoid surfacing teardown noise —
+        __del__ runs in unpredictable interpreter states where any subsystem
+        may already be partially torn down.
+        """
         if hasattr(self, '_notebook_executor') and self._notebook_executor:
             try:
                 self._notebook_executor.shutdown()
-            except (RuntimeError, OSError, TypeError, AttributeError):
+            except Exception:
                 pass
         if hasattr(self, '_filesystem_context') and self._filesystem_context:
             try:
                 self._filesystem_context.cleanup_session(keep_summary=True)
-            except (RuntimeError, OSError, TypeError, AttributeError):
+            except Exception:
                 pass
 
 
