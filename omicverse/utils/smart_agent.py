@@ -197,7 +197,8 @@ def _normalize_model_for_routing(model: str) -> str:
         return normalized
     try:
         return ModelConfig.normalize_model_id(normalized)
-    except Exception:
+    except (AttributeError, KeyError, ValueError, TypeError) as exc:
+        logger.debug("_normalize_model_for_routing fallback for %r: %s", normalized, exc)
         return normalized
 
 
@@ -224,7 +225,8 @@ def _looks_like_openai_endpoint(endpoint: Optional[str]) -> bool:
 def _extract_openai_codex_account_id(token: Optional[str]) -> str:
     try:
         return OmicVerseLLMBackend._extract_openai_codex_account_id(str(token or ""))
-    except Exception:
+    except (ValueError, TypeError, KeyError, IndexError, AttributeError) as exc:
+        logger.debug("_extract_openai_codex_account_id fallback: %s", exc)
         return ""
 
 
@@ -526,8 +528,8 @@ class OmicVerseAgent:
             original_model = model
             try:
                 model = ModelConfig.normalize_model_id(model)  # type: ignore[attr-defined]
-            except Exception:
-                # Older ModelConfig without normalization: proceed as-is
+            except (AttributeError, KeyError, ValueError, TypeError) as exc:
+                logger.debug("Model ID normalization fallback for %r: %s", model, exc)
                 model = model
             if model != original_model:
                 print(f"   📝 Model ID normalized: {original_model} → {model}")
@@ -582,7 +584,7 @@ class OmicVerseAgent:
             self._managed_api_env = _collect_api_key_env(
                 self.model, self.endpoint, api_key,
             )
-        except Exception as exc:  # pragma: no cover - defensive logging
+        except (KeyError, ValueError, TypeError, OSError) as exc:  # pragma: no cover - defensive logging
             logger.warning("Failed to collect API key environment variables: %s", exc)
             self._managed_api_env = {}
 
@@ -1220,8 +1222,8 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
                 matched_slugs = json.loads(json_match.group(0))
                 return [slug for slug in matched_slugs if slug in self.skill_registry.skill_metadata]
             return []
-        except Exception as exc:
-            logger.warning(f"LLM skill matching failed: {exc}")
+        except (RuntimeError, ValueError, TypeError, KeyError, OSError, json.JSONDecodeError) as exc:
+            logger.warning("LLM skill matching failed: %s", exc)
             return []
 
     def _format_skill_guidance(self, matches: List[SkillMatch]) -> str:
@@ -1521,7 +1523,12 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
     # ===================================================================
 
     def __del__(self):
-        """Cleanup on agent deletion."""
+        """Cleanup on agent deletion.
+
+        Uses broad ``except Exception`` to avoid surfacing teardown noise —
+        __del__ runs in unpredictable interpreter states where any subsystem
+        may already be partially torn down.
+        """
         if hasattr(self, '_notebook_executor') and self._notebook_executor:
             try:
                 self._notebook_executor.shutdown()

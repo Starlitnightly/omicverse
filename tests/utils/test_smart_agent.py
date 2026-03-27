@@ -304,6 +304,8 @@ def test_static_registry_scanner_indexes_dynamo_method_branch():
     reason="Loop retry regression is validated only in the Taiwan harness environment.",
 )
 def test_agentic_loop_retries_after_text_only_promise_until_tool_call():
+    from omicverse.utils.ovagent.turn_controller import TurnController
+
     agent = OmicVerseAgent.__new__(OmicVerseAgent)
     agent.model = "claude-opus-4-6-thinking"
     agent.provider = "anthropic"
@@ -313,6 +315,8 @@ def test_agentic_loop_retries_after_text_only_promise_until_tool_call():
     agent._context_compactor = None
     agent._session_history = None
     agent._last_run_trace = None
+    agent._ov_runtime = None
+    agent._active_run_id = None
     agent.skill_registry = None
     agent._config = SimpleNamespace(
         execution=SimpleNamespace(max_agent_turns=4),
@@ -333,6 +337,8 @@ def test_agentic_loop_retries_after_text_only_promise_until_tool_call():
     )
 
     chat_calls = []
+    dispatch_log = []
+
     responses = [
         SimpleNamespace(
             content="Let me first fetch the GEO page to understand this dataset and find the download links.",
@@ -369,6 +375,7 @@ def test_agentic_loop_retries_after_text_only_promise_until_tool_call():
     class _FakeLLM:
         def __init__(self, staged_responses):
             self._responses = list(staged_responses)
+            self.config = SimpleNamespace(model="claude-opus-4-6-thinking", provider="anthropic")
 
         async def chat(self, messages, tools=None, tool_choice=None):
             chat_calls.append({"tool_choice": tool_choice, "message_count": len(messages)})
@@ -378,17 +385,34 @@ def test_agentic_loop_retries_after_text_only_promise_until_tool_call():
 
     agent._llm = _FakeLLM(responses)
 
-    dispatch_log = []
+    # Minimal prompt builder for TurnController
+    class _FakePromptBuilder:
+        def build_agentic_system_prompt(self):
+            return "You are a test agent."
+        def build_initial_user_message(self, request, adata, extra_content=None):
+            return request
 
-    async def _fake_dispatch(self, tool_call, current_adata, request):
-        dispatch_log.append(tool_call.name)
-        if tool_call.name == "WebFetch":
-            return "Content from GEO page"
-        if tool_call.name == "finish":
-            return {"finished": True, "summary": tool_call.arguments.get("summary", "")}
-        return "ok"
+    # Minimal tool registry and runtime for TurnController
+    class _FakeToolRegistry:
+        def resolve_name(self, name):
+            return name
+        def get(self, name):
+            return None
 
-    agent._dispatch_tool = MethodType(_fake_dispatch, agent)
+    class _FakeToolRuntime:
+        def __init__(self):
+            self.registry = _FakeToolRegistry()
+        async def dispatch_tool(self, tool_call, current_adata, request, **kw):
+            dispatch_log.append(tool_call.name)
+            if tool_call.name == "WebFetch":
+                return "Content from GEO page"
+            if tool_call.name == "finish":
+                return {"finished": True, "summary": tool_call.arguments.get("summary", "")}
+            return "ok"
+
+    agent._turn_controller = TurnController(
+        agent, _FakePromptBuilder(), _FakeToolRuntime(),
+    )
 
     async def _run():
         result = await agent._run_agentic_loop(
