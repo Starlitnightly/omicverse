@@ -1,0 +1,124 @@
+{
+  "report_type": "e2e_real_provider_validation",
+  "started_at": "2026-03-26T10:00:57.841589+00:00",
+  "finished_at": "2026-03-26T10:02:28.647082+00:00",
+  "final_status": "passed",
+  "relay": {
+    "ok": true,
+    "model_count": 29,
+    "latency_ms": 479.7,
+    "sample_models": [
+      "gpt-5.1-codex",
+      "gpt-5.3-codex(xhigh)",
+      "GLM-5",
+      "claude-haiku-4-5",
+      "gpt-5.2(medium)",
+      "claude-opus-4-6-thinking"
+    ]
+  },
+  "agent": {},
+  "dataset": {
+    "n_obs": 2700,
+    "n_vars": 32738
+  },
+  "steps": [
+    {
+      "name": "agent_init",
+      "status": "passed",
+      "duration_s": 6.41,
+      "detail": {
+        "model": "gpt-5.2"
+      }
+    },
+    {
+      "name": "pbmc_qc_real_llm",
+      "status": "passed",
+      "duration_s": 77.81,
+      "detail": {
+        "duration_s": 77.81,
+        "run_trace": {
+          "available": true,
+          "trace_id": "trace_2c0ff9c53d5f",
+          "turn_id": "turn_83c0d52ccdde",
+          "model": "gpt-5.2",
+          "provider": "openai",
+          "status": "success",
+          "result_summary": "- Inspected dataset structure:\n  - `adata.shape`: **2700 cells \u00d7 32738 genes**\n  - `adata.obs`: **empty** (no columns initially)\n  - `adata.var` columns: `['gene_ids']`\n  - No `layers`, no `obsm`\n\n- Performed QC (Scanpy):\n  - Ran `sc.pp.calculate_qc_metrics(adata, inplace=True)` to add standard QC f",
+          "usage": {
+            "input_tokens": 32887,
+            "output_tokens": 395,
+            "total_tokens": 33282,
+            "model": "gpt-5.2",
+            "provider": "openai"
+          },
+          "usage_breakdown": {},
+          "loaded_tools": [
+            "Agent",
+            "AskUserQuestion",
+            "Bash",
+            "Read",
+            "Skill",
+            "ToolSearch",
+            "WebFetch",
+            "WebSearch"
+          ],
+          "step_count": 5,
+          "steps": [
+            {
+              "step_type": "tool_call",
+              "name": "inspect_data",
+              "status": "completed",
+              "latency_ms": null,
+              "output_summary": ""
+            },
+            {
+              "step_type": "tool_call",
+              "name": "execute_code",
+              "status": "completed",
+              "latency_ms": null,
+              "output_summary": ""
+            },
+            {
+              "step_type": "code",
+              "name": "execute_code",
+              "status": "completed",
+              "latency_ms": null,
+              "output_summary": ""
+            },
+            {
+              "step_type": "result",
+              "name": "execute_code",
+              "status": "completed",
+              "latency_ms": null,
+              "output_summary": ""
+            },
+            {
+              "step_type": "llm_chunk",
+              "name": "",
+              "status": "completed",
+              "latency_ms": null,
+              "output_summary": ""
+            }
+          ],
+          "adata_shape": null,
+          "started_at": 1774519270.8564293,
+          "finished_at": 1774519348.6415973
+        },
+        "token_usage": {
+          "last_usage": "Usage(input_tokens=32887, output_tokens=395, total_tokens=33282, model='gpt-5.2', provider='openai')",
+          "last_usage_breakdown": {
+            "generation": null,
+            "reflection": [],
+            "review": [],
+            "total": null
+          }
+        },
+        "result_shape": [
+          2700,
+          32738
+        ]
+      }
+    }
+  ],
+  "error_detail": null
+}

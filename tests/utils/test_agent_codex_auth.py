@@ -88,6 +88,7 @@ def test_resolve_agent_llm_credentials_uses_saved_codex_auth(monkeypatch):
         api_key=None,
         endpoint=None,
         auth_mode="openai_oauth",
+        auth_provider=None,
         auth_file=None,
     )
 
@@ -112,6 +113,7 @@ def test_resolve_agent_llm_credentials_auto_enables_codex_oauth(monkeypatch):
         api_key=None,
         endpoint=None,
         auth_mode="environment",
+        auth_provider=None,
         auth_file=None,
     )
 
@@ -136,6 +138,7 @@ def test_resolve_agent_llm_credentials_auto_enables_codex_oauth_for_alias(monkey
         api_key=None,
         endpoint=None,
         auth_mode="environment",
+        auth_provider=None,
         auth_file=None,
     )
 
@@ -157,6 +160,7 @@ def test_resolve_agent_llm_credentials_keeps_standard_openai_path(monkeypatch):
         api_key="api-key",
         endpoint=None,
         auth_mode="environment",
+        auth_provider=None,
         auth_file=None,
     )
 
@@ -181,6 +185,7 @@ def test_resolve_agent_llm_credentials_keeps_supported_oauth_chat_models(monkeyp
         api_key=None,
         endpoint=None,
         auth_mode="openai_oauth",
+        auth_provider=None,
         auth_file=None,
     )
 
@@ -205,6 +210,7 @@ def test_resolve_agent_llm_credentials_normalizes_supported_oauth_alias(monkeypa
         api_key=None,
         endpoint=None,
         auth_mode="openai_oauth",
+        auth_provider=None,
         auth_file=None,
     )
 
@@ -221,6 +227,7 @@ def test_resolve_agent_llm_credentials_rejects_standard_api_key_for_codex():
             api_key="sk-test",
             endpoint=None,
             auth_mode="openai_oauth",
+            auth_provider=None,
             auth_file=None,
         )
 
@@ -245,6 +252,7 @@ def test_resolve_agent_llm_credentials_falls_back_when_saved_api_key_is_not_oaut
         api_key=None,
         endpoint=None,
         auth_mode="saved_api_key",
+        auth_provider=None,
         auth_file=None,
     )
 
@@ -270,5 +278,6 @@ def test_resolve_agent_llm_credentials_errors_without_saved_login(monkeypatch):
             api_key=None,
             endpoint=None,
             auth_mode="openai_oauth",
+            auth_provider=None,
             auth_file=None,
         )

@@ -3,6 +3,10 @@
 Extracted from ``smart_agent.py``.  The TurnController owns the main
 turn-by-turn loop (LLM call → tool dispatch → result append → repeat)
 including stall detection, cancellation, and conversation logging.
+
+Policy helpers (FollowUpGate, ConvergenceMonitor) and artifact persistence
+helpers are imported from ``turn_followup`` and ``turn_artifacts`` respectively
+and re-exported here for backward compatibility.
 """
 
 from __future__ import annotations
@@ -11,7 +15,6 @@ import asyncio
 import json
 import logging
 import os
-import re
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
@@ -33,312 +36,26 @@ from .event_stream import RuntimeEventEmitter
 from .tool_registry import OutputTier
 from .tool_scheduler import ToolScheduler, execute_batch, ScheduledCall
 
+# --- Extracted helpers (re-exported for backward compatibility) ---
+from .turn_followup import FollowUpGate, ConvergenceMonitor  # noqa: F401
+from .turn_artifacts import (
+    persist_harness_history,
+    save_conversation_log,
+    slugify_for_filename,
+    persist_tool_debug_output,
+    persist_execute_code_source,
+    persist_execute_code_stdout,
+    log_tool_debug_output,
+    log_execute_code_source,
+    log_execute_code_stdout,
+)
+
 if TYPE_CHECKING:
     from .prompt_builder import PromptBuilder
     from .protocol import AgentContext
     from .tool_runtime import ToolRuntime
 
 logger = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# Follow-up gate helper
-# ---------------------------------------------------------------------------
-
-class FollowUpGate:
-    """Stateless helpers for the follow-up / retry heuristic."""
-
-    NON_COMPLETING_TOOLS = frozenset({
-        "inspectdata",
-        "runsnippet",
-        "searchfunctions",
-        "searchskills",
-        "toolsearch",
-        "read",
-        "glob",
-        "grep",
-        "ls",
-        "taskget",
-        "tasklist",
-        "taskoutput",
-        "enterplanmode",
-        "exitplanmode",
-    })
-
-    URL_PATTERN = re.compile(r"https?://|www\.", re.IGNORECASE)
-    ACTION_REQUEST_PATTERN = re.compile(
-        r"\b(analy[sz]e|download|fetch|get|open|read|inspect|load|run|"
-        r"execute|search|lookup|look up|find|process|parse|clone|fix|"
-        r"edit|write|plot|draw|figure|visuali[sz]e|visualization|"
-        r"chart|graph|image|png|umap|tsne|heatmap|send)\b",
-        re.IGNORECASE,
-    )
-    PROMISSORY_PATTERN = re.compile(
-        r"\b(let me|i(?:'ll| will| can)|going to|start by|"
-        r"first(?:,)?\s+i(?:'ll| will)|can continue\?|"
-        r"could continue\?|re-?start)\b",
-        re.IGNORECASE,
-    )
-    BLOCKER_PATTERN = re.compile(
-        r"\b(can(?:not|'t)|unable|failed|error|need your|"
-        r"please provide|approval required|missing|not installed|"
-        r"permission denied)\b",
-        re.IGNORECASE,
-    )
-    RESULT_PATTERN = re.compile(
-        r"\b(found|fetched|downloaded|loaded|read|parsed|"
-        r"here (?:is|are)|summary|supplementary|links?)\b",
-        re.IGNORECASE,
-    )
-
-    @classmethod
-    def request_requires_tool_action(
-        cls, request: str, adata: Any
-    ) -> bool:
-        text = (request or "").strip()
-        if not text:
-            return False
-        if cls.URL_PATTERN.search(text):
-            return True
-        if adata is not None:
-            return True
-        lowered = text.lower()
-        if any(
-            marker in lowered
-            for marker in (
-                "\u6570\u636e", "dataset", "\u4e0b\u8f7d",
-                "\u5206\u6790", "\u5904\u7406", "\u8bfb\u53d6",
-                "\u6253\u5f00", "\u641c\u7d22", "\u7ed8\u56fe",
-                "\u753b\u56fe", "\u56fe", "\u56fe\u7247",
-                "\u53d1\u56fe", "\u53d1\u9001", "umap",
-            )
-        ):
-            return True
-        return bool(cls.ACTION_REQUEST_PATTERN.search(text))
-
-    @classmethod
-    def response_is_promissory(cls, content: str) -> bool:
-        text = (content or "").strip()
-        if not text:
-            return False
-        if cls.PROMISSORY_PATTERN.search(text):
-            return True
-        chinese_markers = (
-            "\u6211\u5148", "\u8ba9\u6211", "\u6211\u4f1a",
-            "\u6211\u5c06", "\u5148\u83b7\u53d6",
-            "\u5148\u4e0b\u8f7d", "\u5148\u8bfb\u53d6",
-            "\u5148\u53bb", "\u73b0\u5728\u5f00\u59cb",
-            "\u91cd\u65b0\u5f00\u59cb",
-            "\u53ef\u4ee5\u7ee7\u7eed\u5417",
-            "\u7ee7\u7eed\u5417",
-        )
-        lowered = text.lower()
-        return (
-            any(marker in text for marker in chinese_markers)
-            or lowered.startswith("okay, i")
-        )
-
-    @classmethod
-    def select_tool_choice(
-        cls,
-        *,
-        request: str,
-        adata: Any,
-        turn_index: int,
-        had_meaningful_tool_call: bool,
-        forced_retry: bool,
-    ) -> str:
-        if forced_retry:
-            return "required"
-        if (
-            turn_index == 0
-            and not had_meaningful_tool_call
-            and cls.request_requires_tool_action(request, adata)
-        ):
-            return "required"
-        return "auto"
-
-    @classmethod
-    def should_continue_after_text(
-        cls,
-        *,
-        request: str,
-        response_content: str,
-        adata: Any,
-        had_meaningful_tool_call: bool,
-    ) -> bool:
-        text = (response_content or "").strip()
-        if not text:
-            return False
-        if had_meaningful_tool_call:
-            return False
-        if cls.BLOCKER_PATTERN.search(text):
-            return False
-        needs_action = cls.request_requires_tool_action(request, adata)
-        if cls.response_is_promissory(text) and needs_action:
-            # Only follow up when there is actually a task to execute.
-            # Pure offers like "I can help you" without actionable context
-            # should not trigger a forced tool-call turn.
-            return True
-        if needs_action and not cls.RESULT_PATTERN.search(text):
-            return True
-        return False
-
-    @classmethod
-    def build_no_tool_follow_up(
-        cls,
-        request: str,
-        *,
-        retry_count: int = 0,
-        max_retries: int = 2,
-    ) -> str:
-        if retry_count >= max_retries - 1:
-            base = (
-                "IMPORTANT: You MUST call a tool in this response. "
-                "Do NOT respond with text only. Use one of your available "
-                "tools now. If you cannot proceed, call the 'finish' tool "
-                "with a summary of what went wrong."
-            )
-        else:
-            base = (
-                "Do not describe future actions without taking them. "
-                "Either call the appropriate tool now or provide the "
-                "final answer only if the task is already complete."
-            )
-        if cls.URL_PATTERN.search(request or ""):
-            return (
-                base
-                + " The user provided a URL, so fetch it in this turn "
-                "with `WebFetch`/`web_fetch` before continuing."
-            )
-        return base
-
-    @classmethod
-    def tool_counts_as_meaningful_progress(cls, tool_name: str) -> bool:
-        canonical = normalize_tool_name(tool_name) or tool_name or ""
-        key = str(canonical).replace("_", "").lower()
-        return key not in cls.NON_COMPLETING_TOOLS
-
-
-# ---------------------------------------------------------------------------
-# Convergence monitor — soft steering for read-only tool plateaus
-# ---------------------------------------------------------------------------
-
-class ConvergenceMonitor:
-    """Detect read-only-tool plateaus and inject escalating steering messages.
-
-    Fires when the LLM calls only read-only tools (run_snippet, inspect_data,
-    search_functions, search_skills) for several consecutive turns without
-    ever using execute_code, and the output contract still has unproduced
-    artifacts.
-    """
-
-    READ_ONLY_TOOLS = frozenset({
-        "run_snippet", "inspect_data", "search_functions",
-        "search_skills", "RunSnippet", "InspectData",
-        "SearchFunctions", "SearchSkills",
-    })
-    ARTIFACT_TOOLS = frozenset({
-        "execute_code", "ExecuteCode",
-    })
-    THRESHOLD = 2
-    ESCALATION_LEVELS = 3
-
-    def __init__(self, initial_prompt: str):
-        self._consecutive_readonly = 0
-        self._execute_code_seen = False
-        self._escalation = 0
-        self._force_execute_next = False
-        self._required_artifacts = self._parse_output_contract(
-            initial_prompt
-        )
-
-    @staticmethod
-    def _parse_output_contract(prompt: str) -> List[str]:
-        """Extract artifact IDs from the OUTPUT CONTRACT block."""
-        artifacts: List[str] = []
-        in_contract = False
-        for line in prompt.split("\n"):
-            if "OUTPUT CONTRACT" in line:
-                in_contract = True
-                continue
-            if in_contract:
-                stripped = line.strip()
-                if stripped.startswith("* "):
-                    part = stripped[2:].split(":")[0].strip()
-                    if part:
-                        artifacts.append(part)
-                elif (
-                    stripped
-                    and not stripped.startswith("-")
-                    and not stripped.startswith("*")
-                ):
-                    in_contract = False
-        return artifacts
-
-    def record_turn(self, tool_names: List[str]) -> None:
-        """Call after each turn's tool dispatch completes."""
-        normalized = {
-            normalize_tool_name(n) or n for n in tool_names
-        }
-        if normalized & self.ARTIFACT_TOOLS:
-            self._execute_code_seen = True
-            self._consecutive_readonly = 0
-            return
-        if normalized and normalized <= self.READ_ONLY_TOOLS:
-            self._consecutive_readonly += 1
-        else:
-            self._consecutive_readonly = 0
-
-    def should_inject(self) -> bool:
-        """True when steering message should be injected."""
-        if self._execute_code_seen:
-            return False
-        if not self._required_artifacts:
-            return False
-        if self._consecutive_readonly < self.THRESHOLD:
-            return False
-        if self._escalation >= self.ESCALATION_LEVELS:
-            return False
-        return True
-
-    def should_force_tool_choice(self) -> bool:
-        """True when tool_choice should be forced to 'required'."""
-        if self._execute_code_seen:
-            return False
-        return self._force_execute_next
-
-    def build_steering_message(self) -> str:
-        """Return escalating steering text. Advances escalation level."""
-        self._escalation += 1
-        artifacts_str = ", ".join(self._required_artifacts)
-        if self._escalation == 1:
-            return (
-                "You have been exploring for several turns. The task "
-                f"requires producing these artifacts: [{artifacts_str}]. "
-                "You have enough context now. Call execute_code() with "
-                "the full analysis pipeline to generate these outputs. "
-                "Do NOT call run_snippet again — it cannot save files."
-            )
-        if self._escalation == 2:
-            return (
-                "IMPORTANT: You have explored extensively but have not "
-                "produced any required artifacts yet. The output "
-                f"contract requires: [{artifacts_str}]. Use "
-                "execute_code() NOW to generate these files. "
-                "run_snippet is read-only and CANNOT save files or "
-                "produce artifacts. Only execute_code() can do that."
-            )
-        # Level 3: set force flag for tool_choice override
-        self._force_execute_next = True
-        return (
-            "URGENT: No artifacts have been produced. The task WILL "
-            "FAIL unless you call execute_code() immediately to "
-            f"create: [{artifacts_str}]. You MUST call execute_code "
-            "with complete code that imports all needed libraries, "
-            "processes the data, and saves every required output file. "
-            "Do NOT call run_snippet or inspect_data."
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -432,111 +149,20 @@ class TurnController:
                     }
                 )
 
+    # --- Backward-compatible delegation to turn_artifacts helpers ---
+
     def _persist_harness_history(self, request: str) -> None:
         """Persist the latest trace into session history when enabled."""
-        ctx = self._ctx
-        if ctx._session_history is None or ctx._last_run_trace is None:
-            return
-
-        trace = ctx._last_run_trace
-
-        def _step_type(step):
-            return (
-                step.get("step_type")
-                if isinstance(step, dict)
-                else step.step_type
-            )
-
-        def _step_name(step):
-            return (
-                step.get("name") if isinstance(step, dict) else step.name
-            )
-
-        def _step_data(step):
-            return (
-                step.get("data", {})
-                if isinstance(step, dict)
-                else step.data
-            )
-
-        generated_code = "\n\n".join(
-            _step_data(step).get("code", "")
-            for step in trace.steps
-            if _step_type(step) == "code"
-            and _step_data(step).get("code")
-        )
-        tool_names = [
-            _step_name(step)
-            for step in trace.steps
-            if _step_type(step) == "tool_call" and _step_name(step)
-        ]
-        artifact_refs = [
-            (
-                artifact.to_dict()
-                if hasattr(artifact, "to_dict")
-                else dict(artifact)
-            )
-            for artifact in trace.artifacts
-        ]
-        ctx._session_history.append(
-            HistoryEntry(
-                session_id=(
-                    trace.session_id or ctx._get_harness_session_id()
-                ),
-                timestamp=trace.finished_at or trace.started_at,
-                request=request,
-                trace_id=trace.trace_id,
-                generated_code=generated_code,
-                result_summary=trace.result_summary,
-                tool_names=tool_names,
-                artifact_refs=artifact_refs,
-                usage=(
-                    trace.usage
-                    or coerce_usage_payload(ctx.last_usage)
-                ),
-                usage_breakdown=ctx.last_usage_breakdown,
-                success=trace.status == "success",
-            )
-        )
+        persist_harness_history(self._ctx, request)
 
     @staticmethod
     def _save_conversation_log(messages: list) -> None:
         """Save the full conversation to a JSON file for debugging."""
-        log_dir = os.environ.get("OV_AGENT_LOG_DIR")
-        if not log_dir:
-            return
-        try:
-            import datetime as _dt
-            from pathlib import Path
-
-            log_path = Path(log_dir)
-            log_path.mkdir(parents=True, exist_ok=True)
-            ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-            out_file = log_path / f"agent_conversation_{ts}.json"
-
-            def _safe(obj):
-                if isinstance(obj, (str, int, float, bool, type(None))):
-                    return obj
-                if isinstance(obj, (list, tuple)):
-                    return [_safe(v) for v in obj]
-                if isinstance(obj, dict):
-                    return {k: _safe(v) for k, v in obj.items()}
-                return repr(obj)
-
-            out_file.write_text(
-                json.dumps(_safe(messages), indent=2, ensure_ascii=False)
-            )
-            logger.info("conversation_log_saved path=%s", out_file)
-        except Exception as exc:
-            logger.debug("Failed to save conversation log: %s", exc)
+        save_conversation_log(messages)
 
     @staticmethod
     def _slugify_for_filename(text: str, *, max_len: int = 48) -> str:
-        cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", (text or "").strip())
-        cleaned = cleaned.strip("._-")
-        if not cleaned:
-            return "tool"
-        return cleaned[:max_len]
+        return slugify_for_filename(text, max_len=max_len)
 
     def _persist_tool_debug_output(
         self,
@@ -547,26 +173,14 @@ class TurnController:
         tool_index: int,
         description: str = "",
     ) -> Optional[Path]:
-        fs_ctx = getattr(self._ctx, "_filesystem_context", None)
-        workspace_dir = getattr(fs_ctx, "workspace_dir", None)
-        if workspace_dir is None or not output:
-            return None
-        results_dir = Path(workspace_dir) / "results"
-        results_dir.mkdir(parents=True, exist_ok=True)
-        suffix = self._slugify_for_filename(description or tool_name)
-        file_path = results_dir / (
-            f"{tool_name}_turn_{turn_index:02d}_tool_{tool_index:02d}_{suffix}.log"
+        return persist_tool_debug_output(
+            self._ctx,
+            tool_name,
+            output,
+            turn_index=turn_index,
+            tool_index=tool_index,
+            description=description,
         )
-        header = (
-            f"tool={tool_name}\n"
-            f"turn={turn_index}\n"
-            f"tool_index={tool_index}\n"
-            f"description={description or tool_name}\n"
-            f"chars={len(output)}\n"
-            "-----\n"
-        )
-        file_path.write_text(header + output, encoding="utf-8")
-        return file_path
 
     def _persist_execute_code_source(
         self,
@@ -576,18 +190,13 @@ class TurnController:
         tool_index: int,
         description: str = "",
     ) -> Optional[Path]:
-        fs_ctx = getattr(self._ctx, "_filesystem_context", None)
-        workspace_dir = getattr(fs_ctx, "workspace_dir", None)
-        if workspace_dir is None or not code:
-            return None
-        results_dir = Path(workspace_dir) / "results"
-        results_dir.mkdir(parents=True, exist_ok=True)
-        suffix = self._slugify_for_filename(description or "execute_code")
-        file_path = results_dir / (
-            f"execute_code_turn_{turn_index:02d}_tool_{tool_index:02d}_{suffix}.py"
+        return persist_execute_code_source(
+            self._ctx,
+            code,
+            turn_index=turn_index,
+            tool_index=tool_index,
+            description=description,
         )
-        file_path.write_text(code, encoding="utf-8")
-        return file_path
 
     def _persist_execute_code_stdout(
         self,
@@ -597,28 +206,13 @@ class TurnController:
         tool_index: int,
         description: str = "",
     ) -> Optional[Path]:
-        if not stdout:
-            return None
-        fs_ctx = getattr(self._ctx, "_filesystem_context", None)
-        workspace_dir = getattr(fs_ctx, "workspace_dir", None)
-        if workspace_dir is None:
-            return None
-        results_dir = Path(workspace_dir) / "results"
-        results_dir.mkdir(parents=True, exist_ok=True)
-        suffix = self._slugify_for_filename(description or "execute_code_stdout")
-        file_path = results_dir / (
-            f"execute_code_stdout_turn_{turn_index:02d}_tool_{tool_index:02d}_{suffix}.log"
+        return persist_execute_code_stdout(
+            self._ctx,
+            stdout,
+            turn_index=turn_index,
+            tool_index=tool_index,
+            description=description,
         )
-        header = (
-            "tool=execute_code_stdout\n"
-            f"turn={turn_index}\n"
-            f"tool_index={tool_index}\n"
-            f"description={description or 'execute_code_stdout'}\n"
-            f"chars={len(stdout)}\n"
-            "-----\n"
-        )
-        file_path.write_text(header + stdout, encoding="utf-8")
-        return file_path
 
     @staticmethod
     def _log_tool_debug_output(
@@ -630,30 +224,14 @@ class TurnController:
         path: Optional[Path] = None,
         chunk_size: int = 4000,
     ) -> None:
-        if not output:
-            return
-        total_chunks = max(1, (len(output) + chunk_size - 1) // chunk_size)
-        logger.info(
-            "%s_result_saved turn=%d tool_index=%d chars=%d path=%s chunks=%d",
-            tool_name,
-            turn_index,
-            tool_index,
-            len(output),
-            str(path) if path is not None else "",
-            total_chunks,
+        log_tool_debug_output(
+            tool_name=tool_name,
+            output=output,
+            turn_index=turn_index,
+            tool_index=tool_index,
+            path=path,
+            chunk_size=chunk_size,
         )
-        for chunk_idx, start in enumerate(range(0, len(output), chunk_size), start=1):
-            chunk = output[start : start + chunk_size]
-            logger.info(
-                "%s_result_chunk turn=%d tool_index=%d chunk=%d/%d path=%s\n%s",
-                tool_name,
-                turn_index,
-                tool_index,
-                chunk_idx,
-                total_chunks,
-                str(path) if path is not None else "",
-                chunk,
-            )
 
     @staticmethod
     def _log_execute_code_source(
@@ -664,28 +242,13 @@ class TurnController:
         path: Optional[Path] = None,
         chunk_size: int = 4000,
     ) -> None:
-        if not code:
-            return
-        total_chunks = max(1, (len(code) + chunk_size - 1) // chunk_size)
-        logger.info(
-            "execute_code_source_saved turn=%d tool_index=%d chars=%d path=%s chunks=%d",
-            turn_index,
-            tool_index,
-            len(code),
-            str(path) if path is not None else "",
-            total_chunks,
+        log_execute_code_source(
+            code=code,
+            turn_index=turn_index,
+            tool_index=tool_index,
+            path=path,
+            chunk_size=chunk_size,
         )
-        for chunk_idx, start in enumerate(range(0, len(code), chunk_size), start=1):
-            chunk = code[start : start + chunk_size]
-            logger.info(
-                "execute_code_source_chunk turn=%d tool_index=%d chunk=%d/%d path=%s\n%s",
-                turn_index,
-                tool_index,
-                chunk_idx,
-                total_chunks,
-                str(path) if path is not None else "",
-                chunk,
-            )
 
     @staticmethod
     def _log_execute_code_stdout(
@@ -696,28 +259,13 @@ class TurnController:
         path: Optional[Path] = None,
         chunk_size: int = 4000,
     ) -> None:
-        if not stdout:
-            return
-        total_chunks = max(1, (len(stdout) + chunk_size - 1) // chunk_size)
-        logger.info(
-            "execute_code_stdout_saved turn=%d tool_index=%d chars=%d path=%s chunks=%d",
-            turn_index,
-            tool_index,
-            len(stdout),
-            str(path) if path is not None else "",
-            total_chunks,
+        log_execute_code_stdout(
+            stdout=stdout,
+            turn_index=turn_index,
+            tool_index=tool_index,
+            path=path,
+            chunk_size=chunk_size,
         )
-        for chunk_idx, start in enumerate(range(0, len(stdout), chunk_size), start=1):
-            chunk = stdout[start : start + chunk_size]
-            logger.info(
-                "execute_code_stdout_chunk turn=%d tool_index=%d chunk=%d/%d path=%s\n%s",
-                turn_index,
-                tool_index,
-                chunk_idx,
-                total_chunks,
-                str(path) if path is not None else "",
-                chunk,
-            )
 
     # ------------------------------------------------------------------
     # Main loop
@@ -1423,9 +971,8 @@ class TurnController:
                                     "code",
                                     label=description,
                                 )
-                                print(
-                                    "      \u2705 "
-                                    + description
+                                logger.info(
+                                    "\u2705 %s", description
                                 )
                                 code_path = self._persist_execute_code_source(
                                     code,
