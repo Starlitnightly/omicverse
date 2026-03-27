@@ -17,6 +17,7 @@ Contract
 
 from __future__ import annotations
 
+import logging
 import re
 import time
 from dataclasses import dataclass, field
@@ -24,6 +25,8 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from .tool_registry import OutputTier
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -52,15 +55,106 @@ def estimate_tokens(text: str) -> int:
 # ---------------------------------------------------------------------------
 
 MODEL_CONTEXT_WINDOWS: Dict[str, int] = {
+    # -- OpenAI ---------------------------------------------------------------
     "gpt-4o": 128_000,
+    "gpt-4o-2024-05-13": 128_000,
     "gpt-4o-mini": 128_000,
+    "gpt-4.1": 1_047_576,
+    "gpt-4.1-mini": 1_047_576,
+    "gpt-4.1-nano": 1_047_576,
     "gpt-5": 256_000,
     "gpt-5-mini": 128_000,
-    "gemini/gemini-2.5-flash": 1_000_000,
-    "gemini/gemini-2.5-pro": 1_000_000,
-    "anthropic/claude-sonnet-4-20250514": 200_000,
+    "gpt-5-nano": 128_000,
+    "gpt-5-chat-latest": 256_000,
+    "gpt-5.1": 256_000,
+    "gpt-5.1-codex": 256_000,
+    "gpt-5.1-codex-mini": 128_000,
+    "gpt-5.1-codex-max": 256_000,
+    "gpt-5.2": 256_000,
+    "gpt-5.2-codex": 256_000,
+    "gpt-5.3-codex": 256_000,
+    "gpt-5.3-codex-spark": 256_000,
+    "gpt-5.4": 256_000,
+    "gpt-5.4-mini": 128_000,
+    "gpt-5.4-pro": 256_000,
+    "o1": 200_000,
+    "o1-pro": 200_000,
+    "o1-mini": 128_000,
+    "o3": 200_000,
+    "o3-mini": 200_000,
+    "o3-pro": 200_000,
+    "o4-mini": 200_000,
+    # -- Anthropic ------------------------------------------------------------
+    "anthropic/claude-opus-4-6-20260201": 200_000,
+    "anthropic/claude-sonnet-4-6-20260201": 200_000,
+    "anthropic/claude-haiku-4-5-20251001": 200_000,
+    "anthropic/claude-opus-4-1-20250805": 200_000,
     "anthropic/claude-opus-4-20250514": 200_000,
+    "anthropic/claude-sonnet-4-20250514": 200_000,
+    "anthropic/claude-3-7-sonnet-20250219": 200_000,
+    "anthropic/claude-3-5-haiku-20241022": 200_000,
+    "anthropic/claude-3-opus-20240229": 200_000,
+    "anthropic/claude-3-sonnet-20240229": 200_000,
+    "anthropic/claude-3-haiku-20240307": 200_000,
+    # -- Google Gemini --------------------------------------------------------
+    "gemini/gemini-3-pro-preview": 1_000_000,
+    "gemini/gemini-3-flash-preview": 1_000_000,
+    "gemini/gemini-2.5-pro": 1_000_000,
+    "gemini/gemini-2.5-flash": 1_000_000,
+    "gemini/gemini-2.0-pro": 1_000_000,
+    "gemini/gemini-2.0-flash": 1_000_000,
+    "gemini/gemini-pro": 1_000_000,
+    # -- DeepSeek -------------------------------------------------------------
     "deepseek/deepseek-chat": 64_000,
+    "deepseek/deepseek-reasoner": 64_000,
+    # -- Qwen (DashScope) -----------------------------------------------------
+    "qwq-plus": 128_000,
+    "qwen-max": 128_000,
+    "qwen-max-latest": 128_000,
+    "qwen-plus": 128_000,
+    "qwen-turbo": 128_000,
+    # -- Moonshot / Kimi ------------------------------------------------------
+    "moonshot/kimi-k2.5": 128_000,
+    "moonshot/kimi-k2-0711-preview": 128_000,
+    "moonshot/kimi-k2-turbo-preview": 128_000,
+    "moonshot/kimi-latest": 128_000,
+    "moonshot/moonshot-v1-8k": 8_000,
+    "moonshot/moonshot-v1-32k": 32_000,
+    "moonshot/moonshot-v1-128k": 128_000,
+    # -- MiniMax --------------------------------------------------------------
+    "minimax/MiniMax-M2.1": 1_000_000,
+    "minimax/MiniMax-M2.1-lightning": 1_000_000,
+    "minimax/MiniMax-VL-01": 128_000,
+    # -- Together AI ----------------------------------------------------------
+    "together/zai-org/GLM-4.7": 128_000,
+    "together/moonshotai/Kimi-K2.5": 128_000,
+    "together/deepseek-ai/DeepSeek-V3.1": 128_000,
+    "together/deepseek-ai/DeepSeek-R1": 128_000,
+    # -- xAI / Grok -----------------------------------------------------------
+    "xai/grok-beta": 128_000,
+    "xai/grok-2": 128_000,
+    "xai/grok-4": 128_000,
+    "xai/grok-4-fast-non-reasoning": 128_000,
+    "xai/grok-4-fast-reasoning": 128_000,
+    # -- Qianfan --------------------------------------------------------------
+    "qianfan/deepseek-v3.2": 128_000,
+    "qianfan/ernie-5.0-thinking-preview": 128_000,
+    # -- Xiaomi ---------------------------------------------------------------
+    "xiaomi/mimo-v2-flash": 128_000,
+    # -- Synthetic (HuggingFace hosted) ---------------------------------------
+    "synthetic/hf:MiniMaxAI/MiniMax-M2.1": 1_000_000,
+    "synthetic/hf:moonshotai/Kimi-K2.5": 128_000,
+    "synthetic/hf:zai-org/GLM-4.5": 128_000,
+    "synthetic/hf:deepseek-ai/DeepSeek-V3.2": 128_000,
+    # -- Zhipu / GLM ----------------------------------------------------------
+    "zhipu/glm-4.5": 128_000,
+    "zhipu/glm-4.5-air": 128_000,
+    "zhipu/glm-4.5-flash": 128_000,
+    "zhipu/glm-4.5v": 128_000,
+    "zhipu/glm-4": 128_000,
+    "zhipu/glm-4-plus": 128_000,
+    "zhipu/glm-4-air": 128_000,
+    "zhipu/glm-4-flash": 128_000,
 }
 
 _DEFAULT_CONTEXT_WINDOW = 32_000
@@ -68,7 +162,16 @@ _DEFAULT_CONTEXT_WINDOW = 32_000
 
 def get_context_window(model: str) -> int:
     """Return context window size for *model*, falling back to default."""
-    return MODEL_CONTEXT_WINDOWS.get(model, _DEFAULT_CONTEXT_WINDOW)
+    window = MODEL_CONTEXT_WINDOWS.get(model)
+    if window is not None:
+        return window
+    logger.debug(
+        "Unknown model %r not in MODEL_CONTEXT_WINDOWS; "
+        "falling back to default context window (%d tokens)",
+        model,
+        _DEFAULT_CONTEXT_WINDOW,
+    )
+    return _DEFAULT_CONTEXT_WINDOW
 
 
 # ---------------------------------------------------------------------------
