@@ -173,7 +173,17 @@ class OmicVerseLLMBackend:
             )
 
         # Many provider SDKs are synchronous; use a thread to avoid blocking the loop
-        result = await asyncio.to_thread(self._run_sync, user_prompt)
+        timeout = _request_timeout_seconds()
+        try:
+            result = await asyncio.wait_for(
+                asyncio.to_thread(self._run_sync, user_prompt),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError:
+            raise TimeoutError(
+                f"LLM request timed out after {timeout}s "
+                f"(model={self.config.model}, provider={self.config.provider})"
+            )
         # Ensure downstream always receives a string
         text = "" if result is None else str(result)
         return text
@@ -240,9 +250,17 @@ class OmicVerseLLMBackend:
             Structured response with content and/or tool_calls.
         """
         self.last_usage = None
-        result = await asyncio.to_thread(
-            self._chat_sync, messages, tools, tool_choice
-        )
+        timeout = _request_timeout_seconds()
+        try:
+            result = await asyncio.wait_for(
+                asyncio.to_thread(self._chat_sync, messages, tools, tool_choice),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError:
+            raise TimeoutError(
+                f"LLM chat request timed out after {timeout}s "
+                f"(model={self.config.model}, provider={self.config.provider})"
+            )
         return result
 
     # -----------------------------------------------------------------
@@ -254,8 +272,8 @@ class OmicVerseLLMBackend:
         model = self.config.model
         try:
             model = ModelConfig.normalize_model_id(model)
-        except Exception:
-            pass
+        except (AttributeError, KeyError, ValueError, TypeError) as exc:
+            logger.debug("normalize_model_id fallback for %r: %s", model, exc)
 
         for prefix in (
             "openai/", "google/", "anthropic/", "gemini/", "deepseek/",
