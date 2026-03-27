@@ -69,7 +69,7 @@ _STREAM_DISPATCH = {
     WireAPI.ANTHROPIC_MESSAGES: "_stream_anthropic",
     WireAPI.GEMINI_GENERATE:    "_stream_gemini",
     WireAPI.DASHSCOPE:          "_stream_dashscope",
-    # LOCAL handled specially (non-streaming fallback)
+    WireAPI.LOCAL:              "_run_python_local",
 }
 
 # ---------------------------------------------------------------------------
@@ -87,8 +87,8 @@ def _shutdown_shared_executor() -> None:
     if exc is not None:
         try:
             exc.shutdown(wait=False)
-        except Exception:
-            pass
+        except (RuntimeError, OSError) as shutdown_exc:
+            logger.debug("Shared executor shutdown error (ignored): %s", shutdown_exc)
 
 
 def _get_shared_executor() -> _cf.ThreadPoolExecutor:
@@ -180,7 +180,8 @@ def _coerce_int(value: Any) -> Optional[int]:
             return int(value)
         if isinstance(value, str) and value.isdigit():
             return int(value)
-    except Exception:
+    except (ValueError, TypeError, AttributeError) as exc:
+        logger.debug("_coerce_int fallback for %r: %s", value, exc)
         return None
     return None
 

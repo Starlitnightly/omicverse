@@ -48,7 +48,8 @@ def _redact_url(url: str) -> str:
         host = parsed.hostname or "unknown"
         scheme = parsed.scheme or "https"
         return f"{scheme}://{host}/..."
-    except Exception:
+    except (ValueError, TypeError) as exc:
+        logger.debug("URL redaction fallback: %s", exc)
         return "<redacted>"
 
 
@@ -87,8 +88,8 @@ def _extract_openai_error_text(backend, exc: Exception) -> str:
             body = exc.read().decode("utf-8", errors="ignore").strip()
             if body:
                 return body
-        except Exception:
-            pass
+        except (OSError, AttributeError) as read_exc:
+            logger.debug("Could not read HTTPError body: %s", read_exc)
     text = str(exc or "").strip()
     if text:
         return text
@@ -186,7 +187,8 @@ def _decode_openai_codex_jwt(token: str) -> Dict[str, Any]:
     try:
         raw = base64.urlsafe_b64decode(payload.encode("ascii"))
         data = json.loads(raw.decode("utf-8"))
-    except Exception:
+    except (json.JSONDecodeError, ValueError, UnicodeDecodeError) as exc:
+        logger.debug("JWT payload decode failed: %s", exc)
         return {}
     return data if isinstance(data, dict) else {}
 
@@ -210,7 +212,8 @@ def _openai_codex_user_agent() -> str:
         release = platform.release() or "unknown"
         machine = platform.machine() or "unknown"
         return f"pi ({system} {release}; {machine})"
-    except Exception:
+    except (AttributeError, OSError) as exc:
+        logger.debug("Platform detection fallback: %s", exc)
         return "pi (python)"
 
 
@@ -632,7 +635,8 @@ def _build_chat_response_from_responses_payload(backend, payload: Dict[str, Any]
     content = ""
     try:
         content = _extract_responses_text_from_dict(payload)
-    except Exception:
+    except (KeyError, TypeError, AttributeError) as exc:
+        logger.debug("Responses text extraction fallback to items: %s", exc)
         content = _extract_responses_text_from_items(output_items)
 
     usage_obj = None
@@ -769,8 +773,8 @@ def _chat_via_openai_compatible(backend, user_prompt: str) -> str:
             warnings.warn(
                 f"OpenAI SDK call failed ({type(exc).__name__}: {exc}), trying HTTP fallback"
             )
-        except Exception:
-            pass
+        except (TypeError, RuntimeError) as warn_exc:
+            logger.debug("Warning emission suppressed: %s", warn_exc)
         return _chat_via_openai_http(backend, base_url, api_key, user_prompt)
 
 
@@ -941,7 +945,8 @@ def _chat_via_openai_responses(backend, base_url: str, api_key: str, user_prompt
                     output_text = output_text()
                 except TypeError:
                     pass
-                except Exception:
+                except (AttributeError, RuntimeError) as exc:
+                    logger.debug("output_text() call failed: %s", exc)
                     output_text = None
             if isinstance(output_text, str) and output_text:
                 logger.debug(f"✓ Extracted via output_text (length: {len(output_text)} chars)")
@@ -1053,8 +1058,8 @@ def _chat_via_openai_responses(backend, base_url: str, api_key: str, user_prompt
             warnings.warn(
                 f"OpenAI Responses API SDK call failed ({type(exc).__name__}: {exc}), trying HTTP fallback"
             )
-        except Exception:
-            pass
+        except (TypeError, RuntimeError) as warn_exc:
+            logger.debug("Warning emission suppressed: %s", warn_exc)
         return _chat_via_openai_responses_http(backend, base_url, api_key, user_prompt)
 
 
@@ -1222,22 +1227,23 @@ def _chat_via_openai_responses_http(backend, base_url: str, api_key: str, user_p
                         raise RuntimeError(
                             f"Unexpected Responses API response format (alt). Payload (first 500 chars): {payload_str}"
                         )
-                except Exception:
+                except (json.JSONDecodeError, KeyError, TypeError, RuntimeError) as parse_exc:
                     # Fall through to include original error details below
-                    pass
+                    logger.debug("Responses error parsing fell through: %s", parse_exc)
             # Include response body snippet in error message
             try:
                 # Some environments require reading from exc.fp
                 try:
                     raw = exc.read()
-                except Exception:
+                except (OSError, AttributeError) as read_exc:
+                    logger.debug("exc.read() failed, trying fp fallback: %s", read_exc)
                     raw = getattr(getattr(exc, 'fp', None), 'read', lambda: b'')()
                 error_body = (raw or b"").decode("utf-8", errors="ignore")[:500]
                 raise RuntimeError(
                     f"OpenAI Responses API HTTP {exc.code} error: {exc.reason}. "
                     f"Response body (first 500 chars): {error_body}"
                 ) from exc
-            except Exception:
+            except (OSError, AttributeError, RuntimeError):
                 raise RuntimeError(
                     f"OpenAI Responses API HTTP {exc.code} error: {exc.reason}"
                 ) from exc

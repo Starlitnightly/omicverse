@@ -86,7 +86,8 @@ def _json_schema_to_gemini_schema(schema: Dict) -> Any:
             properties=props,
             required=required,
         )
-    except Exception:
+    except (KeyError, AttributeError, TypeError) as exc:
+        logger.debug("Gemini schema conversion failed: %s", exc)
         return None
 
 
@@ -116,7 +117,8 @@ def _messages_to_gemini_contents(messages: List[Dict]) -> List[Any]:
                     if isinstance(arguments, str):
                         try:
                             arguments = json.loads(arguments)
-                        except Exception:
+                        except (json.JSONDecodeError, ValueError, TypeError) as exc:
+                            logger.debug("Gemini function args JSON parse fallback: %s", exc)
                             arguments = {"raw": arguments}
                     if not isinstance(arguments, dict):
                         arguments = {}
@@ -217,7 +219,8 @@ def _chat_via_gemini(backend, user_prompt: str) -> str:
             text = ""
             try:
                 text = getattr(resp, "text", "") or ""
-            except Exception:
+            except (AttributeError, TypeError, ValueError) as exc:
+                logger.debug("Gemini response text extraction fallback: %s", exc)
                 text = ""
             if not text and getattr(resp, "candidates", None):
                 for cand in resp.candidates or []:
@@ -369,7 +372,8 @@ def _gemini_uses_oauth_bearer(api_key: str) -> bool:
         return False
     try:
         payload = json.loads(text)
-    except Exception:
+    except (json.JSONDecodeError, ValueError) as exc:
+        logger.debug("Gemini OAuth JSON parse failed: %s", exc)
         return False
     token = str((payload or {}).get("token") or "").strip() if isinstance(payload, dict) else ""
     return bool(token)
@@ -381,7 +385,8 @@ def _gemini_auth_headers(api_key: str) -> Dict[str, str]:
     if text.startswith("{"):
         try:
             payload = json.loads(text)
-        except Exception:
+        except (json.JSONDecodeError, ValueError) as exc:
+            logger.debug("Gemini auth header JSON parse failed: %s", exc)
             payload = None
         if isinstance(payload, dict):
             token = str(payload.get("token") or "").strip()
@@ -403,7 +408,8 @@ def _gemini_oauth_payload(api_key: str) -> Optional[Dict[str, str]]:
         return None
     try:
         payload = json.loads(text)
-    except Exception:
+    except (json.JSONDecodeError, ValueError) as exc:
+        logger.debug("Gemini OAuth payload JSON parse failed: %s", exc)
         return None
     if not isinstance(payload, dict):
         return None
@@ -451,7 +457,8 @@ def _gemini_function_response_payload(result: Any) -> Dict[str, Any]:
         if stripped:
             try:
                 parsed = json.loads(stripped)
-            except Exception:
+            except (json.JSONDecodeError, ValueError, TypeError) as exc:
+                logger.debug("Gemini function response JSON parse fallback: %s", exc)
                 parsed = None
             if isinstance(parsed, dict):
                 return parsed
@@ -527,7 +534,8 @@ def _messages_to_gemini_rest_contents(backend, messages: List[Dict]) -> List[Dic
                 if isinstance(arguments, str):
                     try:
                         arguments = json.loads(arguments)
-                    except Exception:
+                    except (json.JSONDecodeError, ValueError, TypeError) as exc:
+                        logger.debug("Gemini REST tool args JSON parse fallback: %s", exc)
                         arguments = {"raw": arguments}
                 if not isinstance(arguments, dict):
                     arguments = {}
@@ -594,7 +602,8 @@ def _gemini_cli_request(backend, body: Dict[str, Any], api_key: str) -> Dict[str
         body_text = ""
         try:
             body_text = exc.read().decode("utf-8", errors="ignore").strip()
-        except Exception:
+        except (OSError, AttributeError) as read_exc:
+            logger.debug("Gemini HTTPError body read failed: %s", read_exc)
             body_text = ""
         detail = body_text[:2000] if body_text else str(exc)
         raise RuntimeError(

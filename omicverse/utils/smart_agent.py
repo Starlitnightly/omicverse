@@ -197,7 +197,8 @@ def _normalize_model_for_routing(model: str) -> str:
         return normalized
     try:
         return ModelConfig.normalize_model_id(normalized)
-    except Exception:
+    except (ValueError, AttributeError, KeyError) as exc:
+        logger.debug("Model normalization fallback for %r: %s", normalized, exc)
         return normalized
 
 
@@ -224,7 +225,8 @@ def _looks_like_openai_endpoint(endpoint: Optional[str]) -> bool:
 def _extract_openai_codex_account_id(token: Optional[str]) -> str:
     try:
         return OmicVerseLLMBackend._extract_openai_codex_account_id(str(token or ""))
-    except Exception:
+    except (AttributeError, IndexError, ValueError, KeyError) as exc:
+        logger.debug("Codex account ID extraction failed: %s", exc)
         return ""
 
 
@@ -526,9 +528,8 @@ class OmicVerseAgent:
             original_model = model
             try:
                 model = ModelConfig.normalize_model_id(model)  # type: ignore[attr-defined]
-            except Exception:
-                # Older ModelConfig without normalization: proceed as-is
-                model = model
+            except (ValueError, AttributeError, KeyError) as exc:
+                logger.debug("Model ID normalization skipped (backward compat): %s", exc)
             if model != original_model:
                 print(f"   📝 Model ID normalized: {original_model} → {model}")
 

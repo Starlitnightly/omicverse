@@ -173,7 +173,11 @@ class OmicVerseLLMBackend:
             )
 
         # Many provider SDKs are synchronous; use a thread to avoid blocking the loop
-        result = await asyncio.to_thread(self._run_sync, user_prompt)
+        timeout = _request_timeout_seconds()
+        result = await asyncio.wait_for(
+            asyncio.to_thread(self._run_sync, user_prompt),
+            timeout=timeout,
+        )
         # Ensure downstream always receives a string
         text = "" if result is None else str(result)
         return text
@@ -240,8 +244,10 @@ class OmicVerseLLMBackend:
             Structured response with content and/or tool_calls.
         """
         self.last_usage = None
-        result = await asyncio.to_thread(
-            self._chat_sync, messages, tools, tool_choice
+        timeout = _request_timeout_seconds()
+        result = await asyncio.wait_for(
+            asyncio.to_thread(self._chat_sync, messages, tools, tool_choice),
+            timeout=timeout,
         )
         return result
 
@@ -254,8 +260,8 @@ class OmicVerseLLMBackend:
         model = self.config.model
         try:
             model = ModelConfig.normalize_model_id(model)
-        except Exception:
-            pass
+        except (ValueError, AttributeError, KeyError) as exc:
+            logger.debug("Model ID normalization skipped for %r: %s", model, exc)
 
         for prefix in (
             "openai/", "google/", "anthropic/", "gemini/", "deepseek/",
