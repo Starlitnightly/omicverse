@@ -46,7 +46,7 @@ class TestTimeoutEnforcement:
         backend = _make_backend(monkeypatch)
 
         def _slow_sync(prompt):
-            time.sleep(5)
+            time.sleep(0.5)
             return "too late"
 
         monkeypatch.setattr(backend, "_run_sync", _slow_sync)
@@ -64,7 +64,7 @@ class TestTimeoutEnforcement:
         backend = _make_backend(monkeypatch)
 
         def _slow_chat_sync(messages, tools, tool_choice):
-            time.sleep(5)
+            time.sleep(0.5)
 
         monkeypatch.setattr(backend, "_chat_sync", _slow_chat_sync)
         monkeypatch.setattr(
@@ -114,7 +114,7 @@ class TestTimeoutEnforcement:
         """TimeoutError message includes model and provider for diagnostics."""
         backend = _make_backend(monkeypatch, model="test-model", provider="test-prov")
 
-        monkeypatch.setattr(backend, "_run_sync", lambda p: time.sleep(5))
+        monkeypatch.setattr(backend, "_run_sync", lambda p: time.sleep(0.5))
         monkeypatch.setattr(
             "omicverse.utils.agent_backend._request_timeout_seconds",
             lambda: 0.1,

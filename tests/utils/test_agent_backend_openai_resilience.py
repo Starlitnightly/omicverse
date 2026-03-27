@@ -228,6 +228,17 @@ class TestDecodeOpenaiCodexJwt:
         result = _decode_openai_codex_jwt(token)
         assert result == {}
 
+    def test_malformed_utf8_payload_returns_empty(self, caplog):
+        """UnicodeDecodeError from invalid UTF-8 bytes is swallowed and logged."""
+        # Build a payload segment whose base64-decoded bytes are not valid UTF-8
+        invalid_utf8 = bytes([0x80, 0x81, 0xFE, 0xFF])
+        encoded = base64.urlsafe_b64encode(invalid_utf8).decode().rstrip("=")
+        token = f"header.{encoded}.signature"
+        with caplog.at_level(logging.DEBUG, logger=_OAI_LOGGER):
+            result = _decode_openai_codex_jwt(token)
+        assert result == {}
+        assert any("decode_openai_codex_jwt_failed" in r.message for r in caplog.records)
+
 
 # ===========================================================================
 # 4. Platform fallback
