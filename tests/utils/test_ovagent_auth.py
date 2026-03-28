@@ -184,6 +184,38 @@ class TestTemporaryApiKeys:
 
         assert os.environ["__OV_TEST_KEY__"] == "original"
 
+    def test_cleanup_on_exception_during_yield(self, monkeypatch):
+        """Keys are cleaned up even when the with-block raises."""
+        monkeypatch.delenv("__OV_TEST_KEY__", raising=False)
+        mapping = {"__OV_TEST_KEY__": "secret-value"}
+
+        with pytest.raises(RuntimeError):
+            with temporary_api_keys(mapping):
+                assert os.environ["__OV_TEST_KEY__"] == "secret-value"
+                raise RuntimeError("inner error")
+
+        assert "__OV_TEST_KEY__" not in os.environ
+
+    def test_exposure_window_bounded_by_context(self, monkeypatch):
+        """Keys are only visible inside the with-block, not after."""
+        monkeypatch.delenv("__OV_TEST_KEY__", raising=False)
+        mapping = {"__OV_TEST_KEY__": "visible-during-context"}
+
+        visible_inside = None
+        with temporary_api_keys(mapping):
+            visible_inside = os.environ.get("__OV_TEST_KEY__")
+        visible_after = os.environ.get("__OV_TEST_KEY__")
+
+        assert visible_inside == "visible-during-context"
+        assert visible_after is None
+
+    def test_docstring_documents_exposure_tradeoff(self):
+        """The docstring explicitly documents the environment-exposure tradeoff."""
+        doc = temporary_api_keys.__doc__ or ""
+        assert "exposure" in doc.lower()
+        assert "tradeoff" in doc.lower() or "trade-off" in doc.lower()
+        assert "finally" in doc.lower()
+
 
 # ===================================================================
 # Moved helper functions
@@ -510,6 +542,6 @@ class TestAgentFactory:
         import inspect
         Agent = smart_agent_module.Agent
         sig = inspect.signature(Agent)
-        # The thin wrapper uses *args, **kwargs
         params = list(sig.parameters.keys())
-        assert "args" in params or "kwargs" in params
+        # After task-033, Agent() mirrors the explicit OmicVerseAgent.__init__ signature
+        assert "model" in params

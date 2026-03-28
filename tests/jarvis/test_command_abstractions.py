@@ -154,6 +154,34 @@ class TestGatherStatus:
         info = gather_status(session, session_manager=sm)
         assert info.kernel_name is None
 
+    def test_logs_debug_on_kernel_status_failure(self, caplog) -> None:
+        """kernel_status() failure produces a debug log, not silent swallow."""
+        import logging
+
+        session = SimpleNamespace(
+            adata=None,
+            user_id="u1",
+            kernel_status=lambda: (_ for _ in ()).throw(RuntimeError("ks-fail")),
+            agent=SimpleNamespace(workspace_dir="/w"),
+        )
+        with caplog.at_level(logging.DEBUG, logger="omicverse.jarvis.channels.channel_core"):
+            info = gather_status(session)
+        assert info.prompt_count is None
+        assert any("kernel_status" in r.message for r in caplog.records)
+
+    def test_logs_debug_on_get_active_kernel_failure(self, caplog) -> None:
+        """get_active_kernel failure produces a debug log."""
+        import logging
+
+        session = _make_session()
+        sm = SimpleNamespace(
+            get_active_kernel=lambda uid: (_ for _ in ()).throw(RuntimeError("kern-err"))
+        )
+        with caplog.at_level(logging.DEBUG, logger="omicverse.jarvis.channels.channel_core"):
+            info = gather_status(session, session_manager=sm)
+        assert info.kernel_name is None
+        assert any("get_active_kernel" in r.message for r in caplog.records)
+
 
 # ── format_status_plain ─────────────────────────────────────────────────────
 

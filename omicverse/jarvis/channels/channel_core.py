@@ -11,6 +11,7 @@ is identical regardless of transport.
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 import time
 from dataclasses import dataclass, field
@@ -21,6 +22,8 @@ from ..agent_bridge import AgentBridge
 from .._bridge_session import resolve_bridge_session_id
 from ..channel_media import build_channel_request, prepare_channel_delivery_figures
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
+
+logger = logging.getLogger(__name__)
 
 
 # ── Shared dataclass ─────────────────────────────────────────────────────────
@@ -71,7 +74,7 @@ def strip_local_paths(text: str) -> str:
     """Remove local filesystem path references from agent output text."""
     t = text or ""
     t = re.sub(r"`[^`\n]*(?:/[^`\n]*){2,}`", "", t)
-    t = re.sub(r"/(?:Users|home|tmp|var|opt|root|data|mnt|private)/\S+", "", t)
+    t = re.sub(r"/(?:Users|home|tmp|private|root)/\S+", "", t)
     t = re.sub(r"~[/\\]\S+", "", t)
     t = re.sub(
         rf"\.?/?(?:\w[\w/-]*/)+\w[\w.-]*\.(?:{_ARTIFACT_EXTS})",
@@ -146,7 +149,7 @@ def notify_turn_complete(
             kwargs["figures"] = figures
         web_bridge.on_turn_complete_simple(**kwargs)
     except Exception:
-        pass
+        logger.debug("notify_turn_complete: web bridge callback failed", exc_info=True)
 
 
 # ── Result processing ────────────────────────────────────────────────────────
@@ -167,7 +170,7 @@ def process_result_state(
             session.save_adata()
             session.prompt_count += 1
         except Exception:
-            pass
+            logger.debug("process_result_state: save_adata/prompt_count update failed", exc_info=True)
     if result.usage is not None:
         session.last_usage = result.usage
     delivery_figures = prepare_channel_delivery_figures(session, result.figures)
@@ -179,6 +182,7 @@ def process_result_state(
             else ""
         )
     except Exception:
+        logger.debug("process_result_state: adata info extraction failed", exc_info=True)
         adata_info = ""
     try:
         session.append_memory_log(
@@ -187,7 +191,7 @@ def process_result_state(
             adata_info=adata_info,
         )
     except Exception:
-        pass
+        logger.debug("process_result_state: append_memory_log failed", exc_info=True)
     return delivery_figures, adata_info
 
 
@@ -286,12 +290,12 @@ def gather_status(
         try:
             info.obs_columns = list(a.obs.columns[:8])
         except Exception:
-            pass
+            logger.debug("gather_status: obs columns extraction failed", exc_info=True)
     if session_manager is not None:
         try:
             info.kernel_name = session_manager.get_active_kernel(session.user_id)
         except Exception:
-            pass
+            logger.debug("gather_status: get_active_kernel failed", exc_info=True)
     try:
         kst = session.kernel_status()
         if kst:
@@ -299,11 +303,11 @@ def gather_status(
             info.max_prompts = kst.get("max_prompts", "?")
             info.session_id = kst.get("session_id")
     except Exception:
-        pass
+        logger.debug("gather_status: kernel_status retrieval failed", exc_info=True)
     try:
         info.workspace_path = str(session.agent.workspace_dir)
     except Exception:
-        pass
+        logger.debug("gather_status: workspace_path extraction failed", exc_info=True)
     return info
 
 
