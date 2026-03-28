@@ -723,3 +723,203 @@ def test_generate_code_sync_delegates_to_async():
     assert len(calls) == 1
     assert calls[0]["request"] == "build a plot"
     assert calls[0]["max_functions"] == 5
+
+
+# -----------------------------------------------------------------------
+# Task-027 (reconciled task-013): Codegen / tool-dispatch facade extraction
+# -----------------------------------------------------------------------
+
+from omicverse.utils.ovagent.codegen_tool_facade import CodegenToolDispatchFacadeMixin
+
+
+def test_codegen_tool_facade_mixin_is_base_of_agent():
+    """AC-001.1: OmicVerseAgent inherits from CodegenToolDispatchFacadeMixin."""
+    assert issubclass(OmicVerseAgent, CodegenToolDispatchFacadeMixin)
+
+
+def test_codegen_delegates_available_on_agent_via_mixin():
+    """AC-001.1: Codegen delegate methods resolve via mixin, not on OmicVerseAgent body."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    # These methods should be inherited from the mixin
+    codegen_methods = [
+        "_extract_python_code",
+        "_normalize_registry_entry_for_codegen",
+        "_capture_code_only_snippet",
+        "_select_codegen_skill_matches",
+        "_format_registry_context_for_codegen",
+        "_format_prerequisites_for_codegen_entry",
+        "_build_code_generation_system_prompt",
+        "_build_code_generation_user_prompt",
+        "_contains_forbidden_scanpy_usage",
+        "_rewrite_scanpy_calls_with_registry",
+        "_rewrite_code_without_scanpy",
+        "_review_generated_code_lightweight",
+        "_build_code_only_agentic_request",
+        "_generate_code_via_agentic_loop",
+        "_gather_code_candidates",
+        "_looks_like_python",
+        "_extract_inline_python",
+        "_normalize_code_candidate",
+        "_extract_python_code_strict",
+        "_review_result",
+        "_reflect_on_code",
+        "_detect_direct_python_request",
+        "_merge_usage_stats",
+    ]
+    for name in codegen_methods:
+        assert hasattr(agent, name), f"Missing codegen delegate: {name}"
+        # Verify the method is defined on the mixin, not directly on OmicVerseAgent
+        assert name in CodegenToolDispatchFacadeMixin.__dict__, (
+            f"{name} should be defined on CodegenToolDispatchFacadeMixin, not OmicVerseAgent"
+        )
+
+
+def test_tool_dispatch_delegates_available_on_agent_via_mixin():
+    """AC-001.1: Tool dispatch delegate methods resolve via mixin."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    tool_methods = [
+        "_get_visible_agent_tools",
+        "_get_loaded_tool_names",
+        "_tool_blocked_in_plan_mode",
+        "_dispatch_tool",
+    ]
+    for name in tool_methods:
+        assert hasattr(agent, name), f"Missing tool delegate: {name}"
+        assert name in CodegenToolDispatchFacadeMixin.__dict__, (
+            f"{name} should be defined on CodegenToolDispatchFacadeMixin"
+        )
+
+
+def test_analysis_executor_delegates_available_on_agent_via_mixin():
+    """AC-001.1: Analysis executor delegate methods resolve via mixin."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    executor_methods = [
+        "_check_code_prerequisites",
+        "_apply_execution_error_fix",
+        "_extract_package_name",
+        "_auto_install_package",
+        "_diagnose_error_with_llm",
+        "_validate_outputs",
+        "_generate_completion_code",
+        "_request_approval",
+        "_execute_generated_code",
+        "_normalize_doublet_obs",
+        "_process_context_directives",
+        "_build_sandbox_globals",
+    ]
+    for name in executor_methods:
+        assert hasattr(agent, name), f"Missing executor delegate: {name}"
+        assert name in CodegenToolDispatchFacadeMixin.__dict__, (
+            f"{name} should be defined on CodegenToolDispatchFacadeMixin"
+        )
+
+
+def test_followup_gate_delegates_available_on_agent_via_mixin():
+    """AC-001.1: FollowUp gate delegate methods resolve via mixin."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    gate_methods = [
+        "_request_requires_tool_action",
+        "_response_is_promissory",
+        "_select_agent_tool_choice",
+    ]
+    for name in gate_methods:
+        assert hasattr(agent, name), f"Missing gate delegate: {name}"
+        assert name in CodegenToolDispatchFacadeMixin.__dict__, (
+            f"{name} should be defined on CodegenToolDispatchFacadeMixin"
+        )
+
+
+def test_registry_scanner_delegates_available_on_agent_via_mixin():
+    """AC-001.1: Registry scanner delegate methods resolve via mixin."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    scanner_methods = [
+        "_load_static_registry_entries",
+        "_collect_relevant_registry_entries",
+        "_collect_static_registry_entries",
+        "_score_registry_entry_for_codegen",
+    ]
+    for name in scanner_methods:
+        assert hasattr(agent, name), f"Missing scanner delegate: {name}"
+        assert name in CodegenToolDispatchFacadeMixin.__dict__, (
+            f"{name} should be defined on CodegenToolDispatchFacadeMixin"
+        )
+
+
+def test_extract_python_code_behavioral_equivalence():
+    """AC-001.2: _extract_python_code still works identically through mixin path."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    response = """Here is the code:
+```python
+import omicverse as ov
+ov.pp.qc(adata)
+```
+"""
+    code = agent._extract_python_code(response)
+    assert "ov.pp.qc" in code
+    # Verify AST-valid
+    ast.parse(code)
+
+
+def test_codegen_lazy_property_via_mixin():
+    """AC-001.2: _codegen lazy property works through mixin for __new__ instances."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    # The _codegen property should lazily create a CodegenPipeline
+    pipeline = agent._codegen
+    from omicverse.utils.ovagent.codegen_pipeline import CodegenPipeline
+    assert isinstance(pipeline, CodegenPipeline)
+    # Second access should return same instance
+    assert agent._codegen is pipeline
+
+
+def test_scanner_lazy_property_via_mixin():
+    """AC-001.2: _scanner lazy property works through mixin for __new__ instances."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    scanner = agent._scanner
+    from omicverse.utils.ovagent.registry_scanner import RegistryScanner
+    assert isinstance(scanner, RegistryScanner)
+    assert agent._scanner is scanner
+
+
+def test_followup_gate_behavioral_equivalence():
+    """AC-001.2: Follow-up gate methods produce identical results through mixin."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    # These methods are stateless -- verify they work through the mixin path
+    assert agent._request_requires_tool_action(
+        "https://example.com\nanalyze this", None
+    ) is True
+    assert agent._response_is_promissory(
+        "Let me first fetch the page to understand."
+    ) is True
+    assert agent._select_agent_tool_choice(
+        request="https://example.com\nanalyze",
+        adata=None,
+        turn_index=0,
+        had_meaningful_tool_call=False,
+        forced_retry=False,
+    ) == "required"
+
+
+def test_no_provider_logic_in_facade_mixin():
+    """AC-001.5: Mixin does not import or reference provider-specific modules."""
+    import inspect
+    source = inspect.getsource(CodegenToolDispatchFacadeMixin)
+    # Should not contain provider-specific references
+    for provider_term in ["openai", "anthropic", "google", "bedrock", "groq"]:
+        assert provider_term not in source.lower(), (
+            f"Provider logic '{provider_term}' found in CodegenToolDispatchFacadeMixin"
+        )
+
+
+def test_mixin_methods_not_duplicated_on_agent_class():
+    """AC-001.1: Extracted methods should NOT be redefined on OmicVerseAgent itself."""
+    # Get methods defined directly on OmicVerseAgent (not inherited),
+    # excluding standard Python dunder attributes that every class has.
+    dunder_ignore = {"__module__", "__doc__", "__dict__", "__weakref__",
+                     "__firstlineno__", "__static_attributes__", "__qualname__"}
+    agent_own_methods = set(OmicVerseAgent.__dict__.keys()) - dunder_ignore
+    mixin_methods = set(CodegenToolDispatchFacadeMixin.__dict__.keys()) - dunder_ignore
+    # No overlap means no duplication
+    overlap = agent_own_methods & mixin_methods
+    assert not overlap, (
+        f"These methods are duplicated on both OmicVerseAgent and the mixin: {overlap}"
+    )
