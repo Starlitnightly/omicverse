@@ -37,8 +37,8 @@ def _parse_scalar(value: str) -> Any:
     if re.fullmatch(r"-?\d+", raw):
         try:
             return int(raw)
-        except ValueError:
-            pass
+        except ValueError as exc:
+            logger.debug("Integer parse fallback for %r: %s", raw, exc)
     if raw.startswith("[") and raw.endswith("]"):
         inner = raw[1:-1].strip()
         if not inner:
