@@ -927,3 +927,140 @@ class TestPandasEvalClassification:
         assert len(violations) == 1
         assert violations[0].category == "dangerous_import"
         assert violations[0].severity == "critical"
+
+
+# ===================================================================
+# 12. SafeOsProxy metadata escape closure (task-041)
+# ===================================================================
+
+
+class TestSafeOsProxyMetadataEscape:
+    """Proxy metadata paths (__dict__, vars, dir) must not expose the real os
+    module or any callable escape back to unrestricted os behaviour.
+
+    These tests are regression guards for the escape vector identified in
+    PR #603 review comment issuecomment-4148009652 item 1: a prior fix
+    (task-039) added __getattr__ allowlisting but left _real_os recoverable
+    through proxy.__dict__.
+    """
+
+    @pytest.fixture
+    def proxy(self) -> SafeOsProxy:
+        return SafeOsProxy()
+
+    # -- __dict__ must not contain _real_os or the real os module ----------
+
+    def test_dict_does_not_contain_real_os_key(self, proxy: SafeOsProxy):
+        """proxy.__dict__ must not have a '_real_os' entry."""
+        assert "_real_os" not in proxy.__dict__
+
+    def test_dict_values_do_not_contain_os_module(self, proxy: SafeOsProxy):
+        """No value in proxy.__dict__ should be the real os module."""
+        import types as _t
+        for key, val in proxy.__dict__.items():
+            if isinstance(val, _t.ModuleType) and val is not os.path:
+                assert val is not os, (
+                    f"proxy.__dict__[{key!r}] is the real os module"
+                )
+
+    def test_vars_does_not_expose_real_os(self, proxy: SafeOsProxy):
+        """vars(proxy) must not contain a reference to the real os module."""
+        assert "_real_os" not in vars(proxy)
+        for key, val in vars(proxy).items():
+            if key == "path":
+                continue
+            assert val is not os, (
+                f"vars(proxy)[{key!r}] is the real os module"
+            )
+
+    # -- recovery via dict should not yield blocked operations ------------
+
+    def test_dict_recovery_cannot_reach_system(self, proxy: SafeOsProxy):
+        """Even iterating all dict values, os.system must not be reachable."""
+        for val in proxy.__dict__.values():
+            assert not (callable(val) and getattr(val, "__name__", "") == "system")
+            if hasattr(val, "system"):
+                # os.path doesn't have 'system', but guard generically
+                with pytest.raises((SecurityViolationError, AttributeError)):
+                    val.system("echo pwned")
+
+    # -- dir() should only show safe names --------------------------------
+
+    def test_dir_does_not_include_real_os(self, proxy: SafeOsProxy):
+        assert "_real_os" not in dir(proxy)
+
+    def test_dir_only_shows_safe_attrs(self, proxy: SafeOsProxy):
+        listed = set(dir(proxy))
+        assert "path" in listed
+        # None of the blocked attrs should appear in dir()
+        for blocked in SafeOsProxy._BLOCKED_ATTRS:
+            assert blocked not in listed, f"{blocked!r} leaked into dir(proxy)"
+
+    # -- allowlist model: unknown attrs should be denied ------------------
+
+    def test_unknown_attr_denied(self, proxy: SafeOsProxy):
+        """Attributes not in the safe allowlist should raise AttributeError."""
+        with pytest.raises(AttributeError, match="sandbox"):
+            proxy.some_hypothetical_future_os_attr
+
+    # -- existing safe capabilities still work ----------------------------
+
+    def test_getcwd_still_works(self, proxy: SafeOsProxy):
+        assert proxy.getcwd() == os.getcwd()
+
+    def test_listdir_still_works(self, proxy: SafeOsProxy):
+        assert isinstance(proxy.listdir("."), list)
+
+    def test_path_join_still_works(self, proxy: SafeOsProxy):
+        assert proxy.path.join("a", "b") == os.path.join("a", "b")
+
+    def test_sep_still_works(self, proxy: SafeOsProxy):
+        assert proxy.sep == os.sep
+
+    def test_environ_readable(self, proxy: SafeOsProxy):
+        assert isinstance(proxy.environ, os._Environ)
+
+    def test_makedirs_in_allowlist(self, proxy: SafeOsProxy):
+        """makedirs should be forwarded (caller may still get FS errors)."""
+        fn = proxy.makedirs
+        assert callable(fn)
+
+    # -- blocked operations still raise -----------------------------------
+
+    def test_system_still_blocked(self, proxy: SafeOsProxy):
+        with pytest.raises(SecurityViolationError, match="os.system"):
+            proxy.system("echo pwned")
+
+    def test_remove_still_blocked(self, proxy: SafeOsProxy):
+        with pytest.raises(SecurityViolationError, match="os.remove"):
+            proxy.remove("/tmp/x")
+
+    # -- sandbox globals integration: full chain --------------------------
+
+    def test_sandbox_exec_dict_escape_blocked(self):
+        """Inside build_sandbox_globals, proxy.__dict__ must not leak _real_os."""
+        globs = build_sandbox_globals()
+        loc = {}
+        exec("result = '_real_os' in os.__dict__", globs, loc)
+        assert loc["result"] is False
+
+    def test_sandbox_exec_vars_escape_blocked(self):
+        """vars(os) inside sandbox must not contain _real_os."""
+        globs = build_sandbox_globals()
+        loc = {}
+        exec("result = '_real_os' in vars(os)", globs, loc)
+        assert loc["result"] is False
+
+    def test_sandbox_exec_recover_real_os_impossible(self):
+        """Iterating proxy.__dict__ values must not yield a usable os.system."""
+        globs = build_sandbox_globals()
+        code = (
+            "escaped = False\n"
+            "for v in os.__dict__.values():\n"
+            "    if hasattr(v, 'system') and callable(getattr(v, 'system', None)):\n"
+            "        escaped = True\n"
+            "result = escaped\n"
+        )
+        loc = {}
+        exec(code, globs, loc)
+        assert loc["result"] is False

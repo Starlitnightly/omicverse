@@ -433,6 +433,12 @@ class CodeSecurityScanner:
 # Safe os module proxy
 # ---------------------------------------------------------------------------
 
+# Module-level reference to the real os module.  Intentionally NOT stored on
+# SafeOsProxy instances so that proxy.__dict__ never exposes a path back to
+# unrestricted os behaviour.
+_REAL_OS_MODULE = os
+
+
 class SafeOsProxy(types.ModuleType):
     """Drop-in proxy for the ``os`` module that blocks dangerous operations.
 
@@ -442,6 +448,10 @@ class SafeOsProxy(types.ModuleType):
 
     Blocked operations include shell execution, process management, file
     deletion, permission changes, and environment mutation.
+
+    The proxy uses an **explicit allowlist** model: only attributes listed in
+    ``_SAFE_ATTRS`` are forwarded to the real ``os`` module.  Everything else
+    — including unknown future ``os`` additions — is denied by default.
     """
 
     _BLOCKED_ATTRS: FrozenSet[str] = frozenset({
@@ -465,23 +475,49 @@ class SafeOsProxy(types.ModuleType):
         "putenv", "unsetenv",
     })
 
+    _SAFE_ATTRS: FrozenSet[str] = frozenset({
+        # Directory / file-status operations (read-only or create-only)
+        "getcwd", "listdir", "scandir", "walk",
+        "makedirs", "mkdir",
+        "stat", "lstat", "access",
+        "readlink",
+        # Platform constants
+        "sep", "altsep", "extsep", "linesep", "pathsep",
+        "curdir", "pardir", "devnull", "name",
+        # Environment reading (mutation stays blocked above)
+        "environ", "getenv", "environb", "getenvb",
+        # System info (read-only)
+        "cpu_count", "getpid", "getppid", "uname", "getlogin",
+        # Path encoding helpers
+        "fspath", "fsencode", "fsdecode",
+        # Misc safe
+        "urandom", "strerror", "get_terminal_size",
+    })
+
     def __init__(self) -> None:
         super().__init__("os")
-        self.__dict__["_real_os"] = os
-        # Expose os.path directly — it's entirely safe
+        # Expose os.path directly — it's entirely safe.
+        # NOTE: the real os module is NOT stored on the instance; see
+        # _REAL_OS_MODULE at module scope.
         self.__dict__["path"] = os.path
 
     def __getattr__(self, name: str) -> Any:
+        # Blocked attrs get an explicit, descriptive error.
         if name in self._BLOCKED_ATTRS:
             from .agent_errors import SecurityViolationError
             raise SecurityViolationError(
                 f"os.{name}() is blocked in the OmicVerse agent sandbox. "
                 f"This operation is not needed for bioinformatics analysis."
             )
-        real = self.__dict__.get("_real_os")
-        if real is not None:
-            return getattr(real, name)
-        return getattr(os, name)
+        # Only explicitly safe attrs are forwarded to the real os module.
+        if name in self._SAFE_ATTRS:
+            return getattr(_REAL_OS_MODULE, name)
+        raise AttributeError(
+            f"module 'os' has no attribute '{name}' in the OmicVerse agent sandbox"
+        )
+
+    def __dir__(self) -> List[str]:
+        return sorted(set(self._SAFE_ATTRS) | {"path"})
 
     def __repr__(self) -> str:
         return "<SafeOsProxy: restricted os module for OmicVerse agent>"
