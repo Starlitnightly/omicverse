@@ -8,10 +8,11 @@ compatibility with the original constructor signature.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import copy
+from dataclasses import dataclass, field, fields as dataclass_fields
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from .agent_sandbox import ApprovalMode, SecurityConfig, SecurityLevel
 
@@ -146,6 +147,41 @@ class AgentConfig:
     verbose: bool = True
     history_enabled: bool = False
     history_path: Optional[Path] = None
+    subagent_overrides: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+
+    # --------------- subagent profile resolution ---------------
+
+    def get_subagent_config(self, agent_type: str) -> SubagentConfig:
+        """Return a ``SubagentConfig`` for *agent_type*, merging any overrides.
+
+        Defaults come from the module-level ``SUBAGENT_CONFIGS`` dict.
+        If ``self.subagent_overrides`` contains an entry for *agent_type*,
+        its key/value pairs are applied on top of a shallow copy of the
+        default, so callers need only specify the fields they want to change.
+
+        Raises
+        ------
+        KeyError
+            If *agent_type* is not a recognised subagent profile.
+        ValueError
+            If an override key does not match any ``SubagentConfig`` field.
+        """
+        if agent_type not in SUBAGENT_CONFIGS:
+            raise KeyError(f"Unknown subagent type: {agent_type!r}")
+
+        base = copy.copy(SUBAGENT_CONFIGS[agent_type])
+        overrides = self.subagent_overrides.get(agent_type, {})
+
+        valid_fields = {f.name for f in dataclass_fields(SubagentConfig)}
+        for key, value in overrides.items():
+            if key not in valid_fields:
+                raise ValueError(
+                    f"Unknown SubagentConfig field: {key!r}. "
+                    f"Valid fields: {sorted(valid_fields)}"
+                )
+            setattr(base, key, value)
+
+        return base
 
     # --------------- backward-compat factory ---------------
 
@@ -207,6 +243,7 @@ class AgentConfig:
                 enable_mcp_registry=kw.get("enable_mcp_registry", True),
             ),
             security=cls._build_security_config(kw, approval_raw),
+            subagent_overrides=kw.get("subagent_overrides", {}),
         )
 
     @staticmethod
