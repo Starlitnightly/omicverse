@@ -317,4 +317,11 @@ __all__ = [
     "make_turn_id",
     # @ verifier
     "verifier",
+    # @ agent_errors — public compatibility shims and error hierarchy
+    "OVAgentError",
+    "WorkflowNeedsFallback",
+    "ProviderError",
+    "ConfigError",
+    "ExecutionError",
+    "SandboxDeniedError",
 ]
