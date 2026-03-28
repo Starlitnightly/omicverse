@@ -138,6 +138,26 @@ class TestAgentFactory:
             f"init has {set(init_params) - set(factory_params)}"
         )
 
+    def test_agent_factory_defaults_match_init(self):
+        """Agent() default values are derived from __init__ and always match."""
+        factory_sig = inspect.signature(Agent)
+        init_sig = inspect.signature(OmicVerseAgent.__init__)
+        for name, param in factory_sig.parameters.items():
+            init_param = init_sig.parameters[name]
+            assert param.default == init_param.default, (
+                f"Default mismatch for {name!r}: "
+                f"factory={param.default!r}, init={init_param.default!r}"
+            )
+
+    def test_init_defaults_dict_covers_all_params(self):
+        """_INIT_DEFAULTS is populated and covers every constructor parameter."""
+        defaults = smart_agent_module._INIT_DEFAULTS
+        init_sig = inspect.signature(OmicVerseAgent.__init__)
+        init_param_names = {
+            name for name in init_sig.parameters if name != "self"
+        }
+        assert set(defaults.keys()) == init_param_names
+
     def test_agent_is_in_module_all(self):
         """Agent, OmicVerseAgent, list_supported_models are in __all__."""
         all_exports = smart_agent_module.__all__
