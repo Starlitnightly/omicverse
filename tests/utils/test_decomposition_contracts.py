@@ -143,17 +143,8 @@ class _MinimalCtx:
     def _get_runtime_session_id(self):
         return self._web_session_id or "default"
 
-    def _get_visible_agent_tools(self, *, allowed_names=None):
-        return []
-
-    def _get_loaded_tool_names(self):
-        return []
-
     def _refresh_runtime_working_directory(self):
         return "."
-
-    def _tool_blocked_in_plan_mode(self, tool_name):
-        return False
 
     def _detect_repo_root(self, cwd=None):
         return None
@@ -172,27 +163,6 @@ class _MinimalCtx:
 
     def _load_skill_guidance(self, slug):
         return ""
-
-    def _gather_code_candidates(self, text):
-        return [text]
-
-    def _normalize_code_candidate(self, code):
-        return code
-
-    def _collect_static_registry_entries(self, query, max_entries=20):
-        return []
-
-    def _collect_runtime_registry_entries(self, query, max_entries=20):
-        return []
-
-    def _review_generated_code_lightweight(self, request, code, entries):
-        return code
-
-    def _contains_forbidden_scanpy_usage(self, code):
-        return False
-
-    def _rewrite_scanpy_calls_with_registry(self, code, entries):
-        return code
 
     def _build_agentic_system_prompt(self):
         return "You are a test agent."

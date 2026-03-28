@@ -485,7 +485,7 @@ class OmicVerseAgent(CodegenToolDispatchFacadeMixin, SessionContextFacadeMixin):
 
     def _get_registry_stats(self) -> dict:
         """Get statistics about the function registry."""
-        static_entries = self._load_static_registry_entries()
+        static_entries = self._scanner.load_static_entries()
         unique_functions = set(e['full_name'] for e in static_entries)
         categories = set(e['category'] for e in static_entries)
 
@@ -511,7 +511,7 @@ class OmicVerseAgent(CodegenToolDispatchFacadeMixin, SessionContextFacadeMixin):
         seen: set = set()
 
         # Prefer static entries (always available); fall back to runtime
-        entries = self._load_static_registry_entries()
+        entries = self._scanner.load_static_entries()
         if not entries:
             for entry in getattr(_global_registry, "_registry", {}).values():
                 full_name = entry.get("full_name", "")
@@ -822,7 +822,7 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         self._emit(EventLevel.INFO, f"Processing request: \"{request}\" | Dataset: {dataset_desc}", "execution")
 
         # Direct execution path for explicit Python snippets (no LLM required)
-        direct_code = self._detect_direct_python_request(request)
+        direct_code = self._codegen.detect_direct_python_request(request)
         if direct_code:
             self._emit(EventLevel.INFO, "Direct Python detected → executing without model calls", "execution")
             self.last_usage = None
@@ -830,7 +830,7 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
                 'generation': None, 'reflection': [], 'review': [], 'total': None
             }
             try:
-                result_adata = self._execute_generated_code(direct_code, adata)
+                result_adata = self._analysis_executor.execute_generated_code(direct_code, adata)
                 self._emit(EventLevel.SUCCESS, "Python code executed directly.", "execution")
                 return result_adata
             except Exception as exc:
