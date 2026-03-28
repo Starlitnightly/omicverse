@@ -472,7 +472,7 @@ class OmicVerseAgent(CodegenToolDispatchFacadeMixin, SessionContextFacadeMixin):
                 self, self._prompt_builder, self._tool_runtime,
             )
             self._codegen_pipeline = _CodegenPipeline(self)
-            self._analysis_executor.set_codegen_pipeline(self._codegen_pipeline)
+            self._analysis_executor._set_codegen_pipeline(self._codegen_pipeline)
 
             _emit(EventLevel.SUCCESS, "Smart Agent initialized successfully!", "init")
         except Exception as e:
@@ -815,6 +815,47 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         Overridable at instance level for lightweight test doubles.
         """
         return self._analysis_executor.execute_generated_code(code, adata)
+
+    # =====================================================================
+    # Legacy thin delegation seams (codegen / tool-runtime / code-only)
+    # =====================================================================
+
+    def _extract_python_code(self, response: str) -> str:
+        """Delegate to CodegenPipeline.extract_python_code."""
+        return self._codegen.extract_python_code(response)
+
+    def _extract_python_code_strict(self, response: str) -> str:
+        """Delegate to CodegenPipeline.extract_python_code_strict."""
+        return self._codegen.extract_python_code_strict(response)
+
+    def _normalize_code_candidate(self, code: str) -> str:
+        """Delegate to CodegenPipeline.normalize_code_candidate."""
+        return self._codegen.normalize_code_candidate(code)
+
+    def _gather_code_candidates(self, response: str) -> list:
+        """Delegate to CodegenPipeline.gather_code_candidates."""
+        return self._codegen.gather_code_candidates(response)
+
+    def _looks_like_python(self, text: str) -> bool:
+        """Delegate to CodegenPipeline.looks_like_python."""
+        return self._codegen.looks_like_python(text)
+
+    def _get_visible_agent_tools(self, *, allowed_names=None):
+        """Delegate to ToolRuntime.get_visible_agent_tools."""
+        return self._tool_runtime.get_visible_agent_tools(allowed_names=allowed_names)
+
+    def _tool_blocked_in_plan_mode(self, tool_name: str) -> bool:
+        """Delegate to ToolRuntime.tool_blocked_in_plan_mode."""
+        return self._tool_runtime.tool_blocked_in_plan_mode(tool_name)
+
+    def _capture_code_only_snippet(self, code: str, description: str = "") -> None:
+        """Store code snippet captured during code-only mode."""
+        history = getattr(self, "_code_only_captured_history", None)
+        if history is None:
+            history = []
+            self._code_only_captured_history = history
+        history.append({"code": code, "description": description or ""})
+        self._code_only_captured_code = code
 
     # =====================================================================
     # Public API: run / stream
