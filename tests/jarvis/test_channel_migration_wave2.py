@@ -173,48 +173,51 @@ class TestWeChatUsesSharedAbstractions:
 
 
 class TestFeishuUsesSharedAbstractions:
-    """Verify Feishu imports shared functions from channel_core."""
+    """Verify Feishu uses shared runtime abstractions after migration."""
 
-    def test_feishu_imports_format_analysis_error(self) -> None:
+    def test_feishu_imports_text_chunks(self) -> None:
         from omicverse.jarvis.channels import feishu as mod
-        assert hasattr(mod, "format_analysis_error")
-        assert mod.format_analysis_error is format_analysis_error
-
-    def test_feishu_imports_default_summary(self) -> None:
-        from omicverse.jarvis.channels import feishu as mod
-        assert hasattr(mod, "default_summary")
-        assert mod.default_summary is default_summary
-
-    def test_feishu_imports_format_status_plain(self) -> None:
-        from omicverse.jarvis.channels import feishu as mod
-        assert hasattr(mod, "format_status_plain")
-        assert mod.format_status_plain is format_status_plain
-
-    def test_feishu_imports_running_task(self) -> None:
-        from omicverse.jarvis.channels import feishu as mod
-        assert hasattr(mod, "RunningTask")
-        assert mod.RunningTask is RunningTask
+        assert mod.text_chunks is text_chunks
 
     def test_feishu_imports_gather_status(self) -> None:
         from omicverse.jarvis.channels import feishu as mod
         assert hasattr(mod, "gather_status")
         assert mod.gather_status is gather_status
 
-    def test_feishu_imports_text_chunks(self) -> None:
-        from omicverse.jarvis.channels import feishu as mod
-        assert mod.text_chunks is text_chunks
+    def test_feishu_has_runtime_presenter(self) -> None:
+        """Feishu should define a FeishuRuntimePresenter for the MessageRuntime."""
+        from omicverse.jarvis.channels.feishu import FeishuRuntimePresenter
+        presenter = FeishuRuntimePresenter()
+        for method in ("ack", "draft_open", "draft_update", "final_events"):
+            assert hasattr(presenter, method), f"Missing {method}"
+
+    def test_feishu_has_delivery(self) -> None:
+        """Feishu should define a FeishuDelivery for translating DeliveryEvents."""
+        from omicverse.jarvis.channels.feishu import FeishuDelivery
+        import asyncio
+        assert asyncio.iscoroutinefunction(FeishuDelivery.deliver)
+
+    def test_feishu_runtime_uses_message_runtime(self) -> None:
+        """FeishuRuntime.__init__ should wire up a MessageRuntime."""
+        import inspect
+        from omicverse.jarvis.channels.feishu import FeishuRuntime
+        source = inspect.getsource(FeishuRuntime.__init__)
+        assert "MessageRuntime" in source
+        assert "_message_runtime" in source
+
+    def test_feishu_no_direct_agent_bridge(self) -> None:
+        """FeishuRuntime should not use AgentBridge directly."""
+        import inspect
+        from omicverse.jarvis.channels.feishu import FeishuRuntime
+        source = inspect.getsource(FeishuRuntime)
+        assert "AgentBridge(" not in source
 
 
 # ── iMessage channel uses shared abstractions ───────────────────────────────
 
 
 class TestIMessageUsesSharedAbstractions:
-    """Verify iMessage imports and uses shared channel_core functions."""
-
-    def test_imessage_imports_running_task(self) -> None:
-        from omicverse.jarvis.channels import imessage as mod
-        assert hasattr(mod, "RunningTask")
-        assert mod.RunningTask is RunningTask
+    """Verify iMessage uses shared runtime abstractions after migration."""
 
     def test_imessage_imports_gather_status(self) -> None:
         from omicverse.jarvis.channels import imessage as mod
@@ -231,17 +234,33 @@ class TestIMessageUsesSharedAbstractions:
         assert hasattr(mod, "command_parts")
         assert mod.command_parts is command_parts
 
-    def test_imessage_uses_running_task_in_tasks_dict(self) -> None:
-        """IMessageJarvisBot._tasks should be typed as Dict[str, RunningTask]."""
-        import typing
-        from omicverse.jarvis.channels.imessage import IMessageJarvisBot
-        hints = typing.get_type_hints(IMessageJarvisBot.__init__)
-        # Even if type hints don't propagate at runtime, we can verify via
-        # the annotation on the class attribute or via instance construction.
-        # Alternative: check that the __init__ code creates the right type.
+    def test_imessage_has_runtime_presenter(self) -> None:
+        """iMessage should define IMessageRuntimePresenter for the MessageRuntime."""
+        from omicverse.jarvis.channels.imessage import IMessageRuntimePresenter
+        presenter = IMessageRuntimePresenter()
+        for method in ("ack", "draft_open", "draft_update", "final_events"):
+            assert hasattr(presenter, method), f"Missing {method}"
+
+    def test_imessage_has_delivery(self) -> None:
+        """iMessage should define IMessageDelivery for translating DeliveryEvents."""
+        from omicverse.jarvis.channels.imessage import IMessageDelivery
+        import asyncio
+        assert asyncio.iscoroutinefunction(IMessageDelivery.deliver)
+
+    def test_imessage_uses_message_runtime(self) -> None:
+        """IMessageJarvisBot.__init__ should wire up a MessageRuntime."""
         import inspect
+        from omicverse.jarvis.channels.imessage import IMessageJarvisBot
         source = inspect.getsource(IMessageJarvisBot.__init__)
-        assert "RunningTask" in source
+        assert "MessageRuntime" in source
+        assert "_message_runtime" in source
+
+    def test_imessage_no_direct_agent_bridge(self) -> None:
+        """IMessageJarvisBot should not use AgentBridge directly."""
+        import inspect
+        from omicverse.jarvis.channels.imessage import IMessageJarvisBot
+        source = inspect.getsource(IMessageJarvisBot)
+        assert "AgentBridge(" not in source
 
     def test_imessage_has_status_command(self) -> None:
         """IMessageJarvisBot._handle_command should handle /status."""
@@ -249,6 +268,14 @@ class TestIMessageUsesSharedAbstractions:
         from omicverse.jarvis.channels.imessage import IMessageJarvisBot
         source = inspect.getsource(IMessageJarvisBot._handle_command)
         assert '"/status"' in source or "gather_status" in source
+
+    def test_imessage_has_route_function(self) -> None:
+        """Module-level imessage_route_from_message should exist."""
+        from omicverse.jarvis.channels.imessage import imessage_route_from_message
+        route = imessage_route_from_message({"chat_id": 42, "is_group": False, "sender": "+1"})
+        assert route is not None
+        assert route.channel == "imessage"
+        assert route.scope_id == "42"
 
 
 # ── Cross-channel consistency ───────────────────────────────────────────────
@@ -282,33 +309,21 @@ class TestCrossChannelConsistency:
                 f"It should import from channel_core instead."
             )
 
-    def test_format_analysis_error_used_by_unmigrated_channels(self) -> None:
-        """Feishu and iMessage (not yet on MessageRuntime) still import format_analysis_error."""
-        for name in ("feishu", "imessage"):
-            mod = __import__(f"omicverse.jarvis.channels.{name}", fromlist=[name])
-            assert hasattr(mod, "format_analysis_error"), (
-                f"Channel {name} does not import format_analysis_error"
-            )
-            assert mod.format_analysis_error is format_analysis_error, (
-                f"Channel {name} has a different format_analysis_error"
-            )
-
     def test_migrated_channels_delegate_to_runtime(self) -> None:
-        """QQ and WeChat delegate error formatting to MessageRuntime instead of importing directly."""
-        for name in ("qq", "wechat"):
+        """All wave-2 channels delegate error formatting to MessageRuntime."""
+        for name in ("qq", "wechat", "feishu", "imessage"):
             mod = __import__(f"omicverse.jarvis.channels.{name}", fromlist=[name])
             assert not hasattr(mod, "format_analysis_error"), (
                 f"Channel {name} should not import format_analysis_error directly "
                 f"(handled by MessageRuntime)"
             )
 
-    def test_running_task_used_by_unmigrated_channels(self) -> None:
-        """Feishu and iMessage (not yet on MessageRuntime) still import RunningTask."""
-        for name in ("feishu", "imessage"):
-            mod = __import__(f"omicverse.jarvis.channels.{name}", fromlist=[name])
-            assert hasattr(mod, "RunningTask"), (
-                f"Channel {name} does not import RunningTask"
-            )
-            assert mod.RunningTask is RunningTask, (
-                f"Channel {name} has a different RunningTask"
-            )
+    def test_migrated_channels_use_message_runtime(self) -> None:
+        """Feishu and iMessage should use MessageRuntime (not direct task tracking)."""
+        from omicverse.jarvis.channels.feishu import FeishuRuntimePresenter, FeishuDelivery
+        from omicverse.jarvis.channels.imessage import IMessageRuntimePresenter, IMessageDelivery
+        # Both channels define presenter + delivery classes for the shared runtime
+        assert FeishuRuntimePresenter is not None
+        assert FeishuDelivery is not None
+        assert IMessageRuntimePresenter is not None
+        assert IMessageDelivery is not None
