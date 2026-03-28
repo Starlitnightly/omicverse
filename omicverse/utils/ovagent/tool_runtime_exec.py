@@ -229,7 +229,8 @@ def handle_execute_code(
 
     # --- Structured self-healing loop ---
     repair_loop = ExecutionRepairLoop(executor, max_retries=3)
-    extract_code_fn = getattr(ctx, "_extract_python_code", None)
+    pipeline = getattr(ctx, "_codegen_pipeline", None)
+    extract_code_fn = pipeline.extract_python_code if pipeline is not None else None
 
     import asyncio as _asyncio
 

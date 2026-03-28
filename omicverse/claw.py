@@ -166,12 +166,14 @@ def _print_debug_registry(
         max_entries=max_functions,
     )
 
+    from omicverse.utils.ovagent.registry_scanner import RegistryScanner
+
     print("== Claw Registry Matches ==", file=target)
     if not entries:
         print("(none)", file=target)
     else:
         for entry in entries:
-            normalized = agent._normalize_registry_entry_for_codegen(entry)
+            normalized = RegistryScanner.normalize_entry(entry)
             full_name = normalized.get("full_name", "")
             signature = entry.get("signature", "")
             source = normalized.get("source", "runtime")
