@@ -32,6 +32,7 @@ from .context_budget import (
 )
 from .subagent_controller import SubagentController, SubagentRuntime
 from .repair_loop import (
+    DEFAULT_LLM_TIMEOUT,
     DEFAULT_MAX_RETRIES,
     ExecutionRepairLoop,
     FailureEnvelope,
@@ -92,6 +93,7 @@ __all__ = [
     "ContextBudgetManager",
     "ContextService",
     "ConvergenceMonitor",
+    "DEFAULT_LLM_TIMEOUT",
     "DEFAULT_MAX_RETRIES",
     "ExecutionBatch",
     "ExecutionRepairLoop",

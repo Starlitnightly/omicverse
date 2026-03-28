@@ -68,6 +68,7 @@ sys.modules["omicverse.utils"] = _utils_pkg
 _ov_pkg.utils = _utils_pkg
 
 from omicverse.utils.ovagent.repair_loop import (
+    DEFAULT_LLM_TIMEOUT,
     DEFAULT_MAX_RETRIES,
     ExecutionRepairLoop,
     FailureEnvelope,
@@ -365,7 +366,7 @@ class TestExecutionRepairLoopBounded:
         assert result.attempts[0].strategy == "llm"
 
     def test_max_retries_respected(self):
-        """Loop stops after max_retries even if failures continue."""
+        """Loop runs exactly max_retries execution attempts."""
         executor = _FakeExecutor(
             exec_side_effects=[
                 ValueError("err1"),
@@ -377,20 +378,20 @@ class TestExecutionRepairLoopBounded:
         )
         # Need the guardrail to actually produce different code each time
         call_count = [0]
-        original_fix = executor.apply_execution_error_fix
 
         def varying_fix(code, error_msg):
             call_count[0] += 1
             return f"fixed_v{call_count[0]}"
 
         executor.apply_execution_error_fix = varying_fix
-        loop = ExecutionRepairLoop(executor, max_retries=2)
+        loop = ExecutionRepairLoop(executor, max_retries=3)
         result = _run(loop.run("code", None))
 
         assert result.success is False
         assert result.final_envelope is not None
-        # 1 initial + max_retries = 3 total exec attempts
-        assert len(result.attempts) <= 3
+        # max_retries=3 means exactly 3 execution attempts
+        assert len(result.attempts) == 3
+        assert executor._exec_call_count == 3
 
     def test_no_repair_strategy_exits_early(self):
         """When neither guardrail nor LLM produce new code, loop exits."""
@@ -592,3 +593,198 @@ class TestCustomExecFn:
 
         assert result.success is True
         assert call_log == ["code"]
+
+
+# ===================================================================
+# 9. Retry-count exactness (task-036)
+# ===================================================================
+
+
+class TestRetryBoundExact:
+    """max_retries bounds total execution attempts exactly."""
+
+    def test_max_retries_equals_execution_count(self):
+        """max_retries=N means exactly N execution attempts."""
+        for n in (1, 2, 3, 5):
+            executor = _FakeExecutor(
+                exec_side_effects=[ValueError(f"e{i}") for i in range(n + 5)],
+            )
+            count = [0]
+
+            def varying_fix(code, error_msg, _c=count):
+                _c[0] += 1
+                return f"fixed_{_c[0]}"
+
+            executor.apply_execution_error_fix = varying_fix
+            loop = ExecutionRepairLoop(executor, max_retries=n)
+            result = _run(loop.run("code", None))
+
+            assert result.success is False, f"max_retries={n}"
+            assert executor._exec_call_count == n, (
+                f"max_retries={n}: expected {n} executions, "
+                f"got {executor._exec_call_count}"
+            )
+
+    def test_max_retries_zero_clamped_to_one(self):
+        """max_retries=0 is clamped to 1 so at least one execution occurs."""
+        executor = _FakeExecutor(
+            exec_side_effects=[ValueError("single")],
+        )
+        loop = ExecutionRepairLoop(executor, max_retries=0)
+        assert loop.max_retries == 1
+        result = _run(loop.run("code", None))
+        assert result.success is False
+        assert executor._exec_call_count == 1
+
+    def test_max_retries_one_no_repair(self):
+        """max_retries=1 executes once and returns exhausted without repair."""
+        executor = _FakeExecutor(
+            exec_side_effects=[ValueError("only try")],
+            guardrail_return="should_not_be_used",
+        )
+        loop = ExecutionRepairLoop(executor, max_retries=1)
+        result = _run(loop.run("code", None))
+
+        assert result.success is False
+        assert len(result.attempts) == 1
+        assert result.attempts[0].strategy == "exhausted"
+        assert executor._exec_call_count == 1
+
+    def test_last_attempt_strategy_is_exhausted(self):
+        """The final failing attempt always has strategy='exhausted'."""
+        count = [0]
+
+        def varying_fix(code, error_msg):
+            count[0] += 1
+            return f"v{count[0]}"
+
+        executor = _FakeExecutor(
+            exec_side_effects=[ValueError(f"e{i}") for i in range(10)],
+        )
+        executor.apply_execution_error_fix = varying_fix
+        loop = ExecutionRepairLoop(executor, max_retries=4)
+        result = _run(loop.run("code", None))
+
+        assert result.success is False
+        assert result.attempts[-1].strategy == "exhausted"
+
+
+# ===================================================================
+# 10. LLM timeout handling (task-036)
+# ===================================================================
+
+
+class _HangingExecutor(_FakeExecutor):
+    """Executor whose LLM diagnosis hangs until cancelled."""
+
+    async def diagnose_error_with_llm(self, code, error_msg, traceback_str, adata):
+        await asyncio.sleep(100)
+        return self._llm_return  # pragma: no cover
+
+
+class TestLLMTimeout:
+    """LLM-guided repair is bounded by a configurable timeout."""
+
+    def test_default_llm_timeout(self):
+        assert DEFAULT_LLM_TIMEOUT == 30.0
+
+    def test_llm_timeout_property(self):
+        executor = _FakeExecutor()
+        loop = ExecutionRepairLoop(executor, llm_timeout=10.0)
+        assert loop.llm_timeout == 10.0
+
+    def test_llm_timeout_none_disables(self):
+        executor = _FakeExecutor()
+        loop = ExecutionRepairLoop(executor, llm_timeout=None)
+        assert loop.llm_timeout is None
+
+    def test_timeout_triggers_on_slow_llm(self):
+        """A hanging LLM call is aborted after llm_timeout seconds."""
+        executor = _HangingExecutor(
+            exec_side_effects=[
+                ValueError("err1"),
+                ValueError("err2"),
+            ],
+            guardrail_return=None,
+        )
+        # Very short timeout to keep the test fast
+        loop = ExecutionRepairLoop(executor, max_retries=2, llm_timeout=0.01)
+        result = _run(loop.run("code", None))
+
+        assert result.success is False
+        # First attempt fails, LLM times out → no repair → exits early
+        assert result.final_envelope is not None
+        # The timeout hint should be recorded
+        hints = result.final_envelope.repair_hints
+        timeout_hints = [h for h in hints if "timed out" in h]
+        assert len(timeout_hints) >= 1, (
+            f"Expected timeout hint in {hints}"
+        )
+
+    def test_timeout_hint_includes_duration(self):
+        """Timeout hint includes the configured timeout value."""
+        executor = _HangingExecutor(
+            exec_side_effects=[ValueError("err1")],
+            guardrail_return=None,
+        )
+        loop = ExecutionRepairLoop(executor, max_retries=2, llm_timeout=0.01)
+        result = _run(loop.run("code", None))
+
+        hints = result.final_envelope.repair_hints
+        timeout_hints = [h for h in hints if "timed out" in h]
+        assert any("0.01" in h for h in timeout_hints), (
+            f"Timeout hint should include duration: {timeout_hints}"
+        )
+
+    def test_timeout_distinguishable_from_exhaustion(self):
+        """Timeout and exhaustion produce different repair hint patterns."""
+        # --- Timeout case ---
+        executor_timeout = _HangingExecutor(
+            exec_side_effects=[ValueError("err")],
+            guardrail_return=None,
+        )
+        loop_timeout = ExecutionRepairLoop(
+            executor_timeout, max_retries=2, llm_timeout=0.01,
+        )
+        result_timeout = _run(loop_timeout.run("code", None))
+
+        # --- Exhaustion case ---
+        count = [0]
+
+        def varying_fix(code, error_msg):
+            count[0] += 1
+            return f"v{count[0]}"
+
+        executor_exhaust = _FakeExecutor(
+            exec_side_effects=[ValueError(f"e{i}") for i in range(10)],
+        )
+        executor_exhaust.apply_execution_error_fix = varying_fix
+        loop_exhaust = ExecutionRepairLoop(executor_exhaust, max_retries=2)
+        result_exhaust = _run(loop_exhaust.run("code", None))
+
+        # Both fail but for different reasons
+        assert result_timeout.success is False
+        assert result_exhaust.success is False
+
+        # Timeout produces "timed out" hint; exhaustion does not
+        timeout_hints = result_timeout.final_envelope.repair_hints
+        exhaust_hints = result_exhaust.final_envelope.repair_hints
+        assert any("timed out" in h for h in timeout_hints)
+        assert not any("timed out" in h for h in exhaust_hints)
+
+        # Exhaustion produces "exhausted" strategy on last attempt
+        assert result_exhaust.attempts[-1].strategy == "exhausted"
+
+    def test_timeout_with_none_disables_timeout(self):
+        """llm_timeout=None allows the LLM call to complete without timeout."""
+        executor = _FakeExecutor(
+            exec_side_effects=[
+                ValueError("err"),
+                {"stdout": "ok", "adata": None},
+            ],
+            guardrail_return=None,
+            llm_return="fixed_code",
+        )
+        loop = ExecutionRepairLoop(executor, max_retries=3, llm_timeout=None)
+        result = _run(loop.run("code", None))
+        assert result.success is True
