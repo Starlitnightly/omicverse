@@ -325,15 +325,13 @@ class OmicVerseLLMBackend:
         return None
 
     def _retry(self, func: Callable[..., T], *args, **kwargs) -> T:
-        """Retry *func* using the retry settings from self.config."""
+        """Retry *func* with config retry settings, binding any args into a zero-arg closure."""
         return _retry_with_backoff(
-            func,
+            (lambda: func(*args, **kwargs)) if args or kwargs else func,
             max_attempts=self.config.max_retry_attempts,
             base_delay=self.config.retry_base_delay,
             factor=self.config.retry_backoff_factor,
             jitter=self.config.retry_jitter,
-            *args,
-            **kwargs,
         )
 
     # -----------------------------------------------------------------
@@ -465,6 +463,8 @@ class OmicVerseLLMBackend:
         _real_import = _builtins_mod.__import__
         _os_proxy = SafeOsProxy()
 
+        _RUNTIME_BLOCKED_IMPORTS = frozenset({"importlib", "ctypes", "cffi"})
+
         def _safe_import(name, globals=None, locals=None, fromlist=(), level=0):
             if name == "os":
                 return _os_proxy
@@ -478,6 +478,11 @@ class OmicVerseLLMBackend:
                     return mod
                 # import os.path — return proxy (bound to name 'os')
                 return _os_proxy
+            root = name.split(".")[0]
+            if root in _RUNTIME_BLOCKED_IMPORTS:
+                raise SecurityViolationError(
+                    f"Import of '{name}' is blocked in the sandbox (restricted module: {root})",
+                    violations=[])
             return _real_import(name, globals, locals, fromlist, level)
 
         safe_builtins["__import__"] = _safe_import

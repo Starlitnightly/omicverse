@@ -557,3 +557,83 @@ class TestMultiViolationReport:
             line_numbers.append(num)
 
         assert line_numbers == sorted(line_numbers)
+
+
+# ===================================================================
+#  9. Runtime import blocking (defense-in-depth beyond scanner)
+# ===================================================================
+
+
+class TestRuntimeImportBlocking:
+    """Verify that _run_python_local blocks importlib/ctypes/cffi at runtime
+    via the _safe_import hook, not relying solely on the AST scanner.
+
+    The scanner also catches these imports, so to isolate the runtime layer
+    we monkeypatch the scanner to report no critical violations, letting
+    code reach execution where _safe_import enforces the block.
+    """
+
+    @pytest.fixture
+    def local_backend(self, monkeypatch):
+        from omicverse.utils.agent_backend import OmicVerseLLMBackend
+        from omicverse.utils.model_config import ModelConfig
+        monkeypatch.setattr(
+            ModelConfig, "get_provider_from_model", lambda *a, **kw: "python"
+        )
+        return OmicVerseLLMBackend(
+            system_prompt="test", model="python", api_key=""
+        )
+
+    @pytest.fixture
+    def _bypass_scanner(self, monkeypatch):
+        """Disable the AST scanner so code reaches the runtime import hook."""
+        monkeypatch.setattr(CodeSecurityScanner, "scan", lambda self, code: [])
+        monkeypatch.setattr(CodeSecurityScanner, "has_critical", lambda self, v: False)
+
+    def test_import_importlib_blocked_at_runtime(
+        self, local_backend, _bypass_scanner
+    ):
+        """import importlib must be blocked by _safe_import, not just scanner."""
+        with pytest.raises(RuntimeError, match="blocked.*importlib"):
+            local_backend._run_python_local("import importlib")
+
+    def test_importlib_import_module_blocked(
+        self, local_backend, _bypass_scanner
+    ):
+        """importlib.import_module escape path is blocked at runtime."""
+        with pytest.raises(RuntimeError, match="blocked.*importlib"):
+            local_backend._run_python_local(
+                "import importlib\nimportlib.import_module('subprocess')"
+            )
+
+    def test_from_importlib_import_blocked(
+        self, local_backend, _bypass_scanner
+    ):
+        """from importlib import import_module is blocked at runtime."""
+        with pytest.raises(RuntimeError, match="blocked.*importlib"):
+            local_backend._run_python_local(
+                "from importlib import import_module"
+            )
+
+    def test_import_ctypes_blocked_at_runtime(
+        self, local_backend, _bypass_scanner
+    ):
+        """import ctypes must be blocked at runtime."""
+        with pytest.raises(RuntimeError, match="blocked.*ctypes"):
+            local_backend._run_python_local("import ctypes")
+
+    def test_import_cffi_blocked_at_runtime(
+        self, local_backend, _bypass_scanner
+    ):
+        """import cffi must be blocked at runtime."""
+        with pytest.raises(RuntimeError, match="blocked.*cffi"):
+            local_backend._run_python_local("import cffi")
+
+    def test_safe_imports_still_work(
+        self, local_backend, _bypass_scanner
+    ):
+        """Non-blocked imports (json, etc.) still function with scanner bypassed."""
+        result = local_backend._run_python_local(
+            "import json\nprint(json.dumps({'ok': True}))"
+        )
+        assert '"ok": true' in result

@@ -278,3 +278,15 @@ class TestReturnedConfigIsolation:
         assert a.max_turns == 7
         a.max_turns = 100
         assert b.max_turns == 7
+
+    def test_mutating_mutable_field_does_not_leak(self):
+        """Deep copy ensures mutable list fields are independent across calls."""
+        cfg = AgentConfig()
+        a = cfg.get_subagent_config("explore")
+        original_tools = list(SUBAGENT_CONFIGS["explore"].allowed_tools)
+        a.allowed_tools.append("injected_tool")
+        # Global default must be unchanged
+        assert SUBAGENT_CONFIGS["explore"].allowed_tools == original_tools
+        # A fresh call must also be clean
+        b = cfg.get_subagent_config("explore")
+        assert "injected_tool" not in b.allowed_tools
