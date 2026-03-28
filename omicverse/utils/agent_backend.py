@@ -29,6 +29,7 @@ facade; all other modules are implementation details.
 from __future__ import annotations
 
 import asyncio
+import builtins as _builtins_mod
 import contextlib
 import io
 import json
@@ -607,6 +608,14 @@ class OmicVerseLLMBackend:
         return _ds._chat_via_dashscope(self, user_prompt)
 
     # --- Local Python executor ---
+
+    # Builtins removed from the sandbox to prevent code-evaluation and
+    # unchecked import bypass.  A safe __import__ replacement is injected
+    # separately so that normal ``import`` statements still work.
+    _DENIED_BUILTINS: frozenset = frozenset({
+        "eval", "exec", "compile", "__import__", "breakpoint",
+    })
+
     def _run_python_local(self, user_prompt: str) -> str:
         """Execute Python code locally when provider is set to 'python'."""
 
@@ -625,8 +634,10 @@ class OmicVerseLLMBackend:
         if not code:
             raise ValueError("No Python code provided for execution")
 
-        # Pre-execution security scan
-        from .agent_sandbox import CodeSecurityScanner
+        # Pre-execution security scan — SyntaxError is NOT swallowed so that
+        # callers receive a diagnosable failure instead of silently falling
+        # through to compile().
+        from .agent_sandbox import CodeSecurityScanner, SafeOsProxy
         from .agent_errors import SecurityViolationError
         scanner = CodeSecurityScanner()
         try:
@@ -637,12 +648,45 @@ class OmicVerseLLMBackend:
                     f"Code blocked by security scanner:\n{report}",
                     violations=violations,
                 )
-        except SyntaxError:
-            pass  # Syntax errors handled downstream by compile()
+        except SyntaxError as exc:
+            raise RuntimeError(f"Python execution failed: {exc}") from exc
 
         stdout = io.StringIO()
         stderr = io.StringIO()
-        sandbox_globals: Dict[str, Any] = {"__name__": "__main__"}
+
+        # -- Restricted builtins surface --
+        safe_builtins = {
+            k: v for k, v in vars(_builtins_mod).items()
+            if k not in self._DENIED_BUILTINS
+        }
+
+        # Inject a safe __import__ that returns SafeOsProxy for ``os`` while
+        # delegating all other imports to the real implementation.
+        _real_import = _builtins_mod.__import__
+        _os_proxy = SafeOsProxy()
+
+        def _safe_import(name, globals=None, locals=None, fromlist=(), level=0):
+            if name == "os":
+                return _os_proxy
+            if name.startswith("os."):
+                if fromlist:
+                    # from os.path import join — return the deepest submodule
+                    parts = name.split(".")[1:]
+                    mod = _os_proxy
+                    for part in parts:
+                        mod = getattr(mod, part)
+                    return mod
+                # import os.path — return proxy (bound to name 'os')
+                return _os_proxy
+            return _real_import(name, globals, locals, fromlist, level)
+
+        safe_builtins["__import__"] = _safe_import
+
+        sandbox_globals: Dict[str, Any] = {
+            "__name__": "__main__",
+            "__builtins__": safe_builtins,
+            "os": _os_proxy,
+        }
         sandbox_locals: Dict[str, Any] = {}
 
         try:
