@@ -45,6 +45,8 @@ from .channel_core import (
     process_result_state,
     format_analysis_error,
     default_summary,
+    gather_status,
+    format_status_plain,
 )
 from ..config import default_state_dir
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
@@ -781,22 +783,13 @@ class WeChatJarvisBot:
         route: str,
         context_token: str,
     ) -> None:
-        parts: List[str] = []
         running = self._tasks.get(route)
-        if running and not running.task.done():
-            parts.append(f"当前状态: 运行中\n请求: {running.request[:300]}")
-        else:
-            parts.append("当前状态: 空闲")
-        if session.adata is not None:
-            adata = session.adata
-            parts.append(f"当前数据: {adata.n_obs:,} cells x {adata.n_vars:,} genes")
-        try:
-            workspace = session.agent.workspace_dir
-        except Exception:
-            workspace = None
-        if workspace:
-            parts.append(f"工作区: {workspace}")
-        await self._send_session_text(session_key, "\n".join(parts), context_token=context_token)
+        info = gather_status(
+            session,
+            is_running=bool(running and not running.task.done()),
+            running_request=running.request[:300] if (running and not running.task.done()) else "",
+        )
+        await self._send_session_text(session_key, format_status_plain(info), context_token=context_token)
 
     async def _handle_cancel(self, session_key: SessionKey, route: str, context_token: str) -> None:
         self._pending.pop(route, None)
