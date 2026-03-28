@@ -55,6 +55,8 @@ def _load_smart_agent_module():
 
 
 smart_agent = _load_smart_agent_module()
+# The credential resolver and its dependencies now live in ovagent.auth
+import omicverse.utils.ovagent.auth as _auth_module
 
 
 def _make_oauth_token(account_id: str = "acct_test") -> str:
@@ -81,7 +83,7 @@ def test_resolve_agent_llm_credentials_uses_saved_codex_auth(monkeypatch):
         def ensure_access_token_with_codex_fallback(self, **kwargs):
             return _make_oauth_token()
 
-    monkeypatch.setattr(smart_agent, "OpenAIOAuthManager", DummyManager)
+    monkeypatch.setattr(_auth_module, "OpenAIOAuthManager", DummyManager)
 
     model, api_key, endpoint, auth_mode = smart_agent._resolve_agent_llm_credentials(
         model="gpt-5.2",
@@ -94,7 +96,7 @@ def test_resolve_agent_llm_credentials_uses_saved_codex_auth(monkeypatch):
 
     assert model == "gpt-5.2"
     assert api_key == _make_oauth_token()
-    assert endpoint == smart_agent.OPENAI_CODEX_BASE_URL
+    assert endpoint == _auth_module.OPENAI_CODEX_BASE_URL
     assert auth_mode == "openai_oauth"
 
 
@@ -106,7 +108,7 @@ def test_resolve_agent_llm_credentials_auto_enables_codex_oauth(monkeypatch):
         def ensure_access_token_with_codex_fallback(self, **kwargs):
             return _make_oauth_token("acct_alias")
 
-    monkeypatch.setattr(smart_agent, "OpenAIOAuthManager", DummyManager)
+    monkeypatch.setattr(_auth_module, "OpenAIOAuthManager", DummyManager)
 
     model, api_key, endpoint, auth_mode = smart_agent._resolve_agent_llm_credentials(
         model="gpt-5.3-codex",
@@ -119,7 +121,7 @@ def test_resolve_agent_llm_credentials_auto_enables_codex_oauth(monkeypatch):
 
     assert model == "gpt-5.3-codex"
     assert api_key == _make_oauth_token("acct_alias")
-    assert endpoint == smart_agent.OPENAI_CODEX_BASE_URL
+    assert endpoint == _auth_module.OPENAI_CODEX_BASE_URL
     assert auth_mode == "openai_oauth"
 
 
@@ -131,7 +133,7 @@ def test_resolve_agent_llm_credentials_auto_enables_codex_oauth_for_alias(monkey
         def ensure_access_token_with_codex_fallback(self, **kwargs):
             return _make_oauth_token("acct_alias_auto")
 
-    monkeypatch.setattr(smart_agent, "OpenAIOAuthManager", DummyManager)
+    monkeypatch.setattr(_auth_module, "OpenAIOAuthManager", DummyManager)
 
     model, api_key, endpoint, auth_mode = smart_agent._resolve_agent_llm_credentials(
         model="openai/gpt-5.3-codex",
@@ -144,7 +146,7 @@ def test_resolve_agent_llm_credentials_auto_enables_codex_oauth_for_alias(monkey
 
     assert model == "gpt-5.3-codex"
     assert api_key == _make_oauth_token("acct_alias_auto")
-    assert endpoint == smart_agent.OPENAI_CODEX_BASE_URL
+    assert endpoint == _auth_module.OPENAI_CODEX_BASE_URL
     assert auth_mode == "openai_oauth"
 
 
@@ -153,7 +155,7 @@ def test_resolve_agent_llm_credentials_keeps_standard_openai_path(monkeypatch):
         def __init__(self, auth_path=None):
             raise AssertionError("Codex OAuth manager should not be used for standard OpenAI auth")
 
-    monkeypatch.setattr(smart_agent, "OpenAIOAuthManager", DummyManager)
+    monkeypatch.setattr(_auth_module, "OpenAIOAuthManager", DummyManager)
 
     model, api_key, endpoint, auth_mode = smart_agent._resolve_agent_llm_credentials(
         model="gpt-5.2",
@@ -178,7 +180,7 @@ def test_resolve_agent_llm_credentials_keeps_supported_oauth_chat_models(monkeyp
         def ensure_access_token_with_codex_fallback(self, **kwargs):
             return _make_oauth_token("acct_chat")
 
-    monkeypatch.setattr(smart_agent, "OpenAIOAuthManager", DummyManager)
+    monkeypatch.setattr(_auth_module, "OpenAIOAuthManager", DummyManager)
 
     model, api_key, endpoint, auth_mode = smart_agent._resolve_agent_llm_credentials(
         model="gpt-5.4",
@@ -191,7 +193,7 @@ def test_resolve_agent_llm_credentials_keeps_supported_oauth_chat_models(monkeyp
 
     assert model == "gpt-5.4"
     assert api_key == _make_oauth_token("acct_chat")
-    assert endpoint == smart_agent.OPENAI_CODEX_BASE_URL
+    assert endpoint == _auth_module.OPENAI_CODEX_BASE_URL
     assert auth_mode == "openai_oauth"
 
 
@@ -203,7 +205,7 @@ def test_resolve_agent_llm_credentials_normalizes_supported_oauth_alias(monkeypa
         def ensure_access_token_with_codex_fallback(self, **kwargs):
             return _make_oauth_token("acct_spark")
 
-    monkeypatch.setattr(smart_agent, "OpenAIOAuthManager", DummyManager)
+    monkeypatch.setattr(_auth_module, "OpenAIOAuthManager", DummyManager)
 
     model, api_key, endpoint, auth_mode = smart_agent._resolve_agent_llm_credentials(
         model="openai/gpt-5.3-codex-spark",
@@ -216,7 +218,7 @@ def test_resolve_agent_llm_credentials_normalizes_supported_oauth_alias(monkeypa
 
     assert model == "gpt-5.3-codex-spark"
     assert api_key == _make_oauth_token("acct_spark")
-    assert endpoint == smart_agent.OPENAI_CODEX_BASE_URL
+    assert endpoint == _auth_module.OPENAI_CODEX_BASE_URL
     assert auth_mode == "openai_oauth"
 
 
@@ -241,11 +243,11 @@ def test_resolve_agent_llm_credentials_falls_back_when_saved_api_key_is_not_oaut
             return _make_oauth_token("acct_fallback")
 
     monkeypatch.setattr(
-        smart_agent,
+        _auth_module,
         "_resolve_saved_provider_api_key",
         lambda provider_name, auth_path: "sk-test",
     )
-    monkeypatch.setattr(smart_agent, "OpenAIOAuthManager", DummyManager)
+    monkeypatch.setattr(_auth_module, "OpenAIOAuthManager", DummyManager)
 
     model, api_key, endpoint, auth_mode = smart_agent._resolve_agent_llm_credentials(
         model="gpt-5.3-codex",
@@ -258,7 +260,7 @@ def test_resolve_agent_llm_credentials_falls_back_when_saved_api_key_is_not_oaut
 
     assert model == "gpt-5.3-codex"
     assert api_key == _make_oauth_token("acct_fallback")
-    assert endpoint == smart_agent.OPENAI_CODEX_BASE_URL
+    assert endpoint == _auth_module.OPENAI_CODEX_BASE_URL
     assert auth_mode == "openai_oauth"
 
 
@@ -270,7 +272,7 @@ def test_resolve_agent_llm_credentials_errors_without_saved_login(monkeypatch):
         def ensure_access_token_with_codex_fallback(self, **kwargs):
             return None
 
-    monkeypatch.setattr(smart_agent, "OpenAIOAuthManager", DummyManager)
+    monkeypatch.setattr(_auth_module, "OpenAIOAuthManager", DummyManager)
 
     with pytest.raises(ValueError, match="No saved OpenAI Codex login found"):
         smart_agent._resolve_agent_llm_credentials(
