@@ -76,8 +76,10 @@ def strip_local_paths(text: str) -> str:
     t = re.sub(r"`[^`\n]*(?:/[^`\n]*){2,}`", "", t)
     t = re.sub(r"/(?:Users|home|tmp|private|root)/\S+", "", t)
     t = re.sub(r"~[/\\]\S+", "", t)
+    # Path segments use [^\s/]+ (cannot match '/') so partition with '/'
+    # is unambiguous — no nested-repetition backtracking risk.
     t = re.sub(
-        rf"\.?/?(?:\w[\w/-]*/)+\w[\w.-]*\.(?:{_ARTIFACT_EXTS})",
+        rf"\.?/?[^\s/]+/(?:[^\s/]+/)*[^\s/]*\.(?:{_ARTIFACT_EXTS})(?=\s|$)",
         "",
         t,
         flags=re.IGNORECASE,

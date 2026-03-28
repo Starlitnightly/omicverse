@@ -141,6 +141,51 @@ class TestStripLocalPaths:
         result = strip_local_paths("see /private/var/folders/xx/tmp here")
         assert "/private/" not in result
 
+    # ── ReDoS hardening: adversarial inputs ─────────────────────────────────
+
+    def test_adversarial_many_segments_wrong_ext_no_hang(self) -> None:
+        """Many slash-separated segments with wrong extension must not hang."""
+        import time
+        adversarial = "a/" * 500 + "x.notavalidext"
+        start = time.monotonic()
+        result = strip_local_paths(adversarial)
+        elapsed = time.monotonic() - start
+        assert elapsed < 2.0, f"strip_local_paths took {elapsed:.1f}s on adversarial input"
+        # Wrong extension means no match — text survives
+        assert "notavalidext" in result
+
+    def test_adversarial_deep_path_valid_ext_no_hang(self) -> None:
+        """Deeply nested path with valid extension completes quickly."""
+        import time
+        adversarial = "dir/" * 200 + "file.h5ad rest"
+        start = time.monotonic()
+        result = strip_local_paths(adversarial)
+        elapsed = time.monotonic() - start
+        assert elapsed < 2.0, f"strip_local_paths took {elapsed:.1f}s"
+        # Valid extension path should still be redacted
+        assert "h5ad" not in result
+        assert "rest" in result
+
+    def test_adversarial_no_slash_long_string_no_hang(self) -> None:
+        """Long string with no slashes must not hang."""
+        import time
+        adversarial = "a" * 5000 + ".h5ad"
+        start = time.monotonic()
+        result = strip_local_paths(adversarial)
+        elapsed = time.monotonic() - start
+        assert elapsed < 2.0, f"strip_local_paths took {elapsed:.1f}s"
+        # No slash — not a path, text preserved
+        assert "a" * 100 in result
+
+    def test_adversarial_mixed_nonmatching_no_hang(self) -> None:
+        """Mixed adversarial content with embedded slashes completes quickly."""
+        import time
+        adversarial = ("word/" * 100 + "end ") * 5
+        start = time.monotonic()
+        result = strip_local_paths(adversarial)
+        elapsed = time.monotonic() - start
+        assert elapsed < 2.0, f"strip_local_paths took {elapsed:.1f}s"
+
 
 # ── build_full_request ───────────────────────────────────────────────────────
 
