@@ -495,138 +495,98 @@ class OmicVerseAgent(CodegenToolDispatchFacadeMixin, SessionContextFacadeMixin):
             'category_list': list(categories)
         }
 
-    def _get_available_functions_info(self) -> str:
-        """Get formatted information about all available functions."""
-        functions_info = []
-        processed_functions = set()
-        for entry in _global_registry._registry.values():
-            full_name = entry['full_name']
-            if full_name in processed_functions:
-                continue
-            processed_functions.add(full_name)
-            info = {
-                'name': entry['short_name'],
-                'full_name': entry['full_name'],
-                'description': entry['description'],
-                'aliases': entry['aliases'],
-                'category': entry['category'],
-                'signature': entry['signature'],
-                'examples': entry['examples']
-            }
-            functions_info.append(info)
-        return json.dumps(functions_info, indent=2, ensure_ascii=False)
+    def _get_compact_registry_summary(self) -> str:
+        """Build a compact category-level summary of available functions.
+
+        Instead of dumping every function as JSON, returns a concise
+        overview keyed by domain category with representative names.
+        The LLM is directed to ``search_functions`` for details.
+        """
+        category_map: Dict[str, List[str]] = {}
+        seen: set = set()
+
+        # Prefer static entries (always available); fall back to runtime
+        entries = self._load_static_registry_entries()
+        if not entries:
+            for entry in getattr(_global_registry, "_registry", {}).values():
+                full_name = entry.get("full_name", "")
+                if full_name and full_name not in seen:
+                    seen.add(full_name)
+                    cat = entry.get("category", "other") or "other"
+                    category_map.setdefault(cat, []).append(full_name)
+        else:
+            for entry in entries:
+                full_name = entry.get("full_name", "")
+                if full_name and full_name not in seen:
+                    seen.add(full_name)
+                    cat = entry.get("category", "other") or "other"
+                    category_map.setdefault(cat, []).append(full_name)
+
+        lines: List[str] = []
+        for cat in sorted(category_map):
+            names = category_map[cat]
+            sample = ", ".join(names[:5])
+            suffix = f" (+{len(names) - 5} more)" if len(names) > 5 else ""
+            lines.append(f"- **{cat}** ({len(names)} functions): {sample}{suffix}")
+        return "\n".join(lines) if lines else "No registered functions detected."
 
     def _setup_agent(self):
-        """Setup the internal agent backend with dynamic instructions."""
-        functions_info = self._get_available_functions_info()
+        """Setup the internal agent backend with dynamic instructions.
 
-        instructions = """
-You are an intelligent OmicVerse assistant that can automatically discover and execute functions based on natural language requests.
+        Uses a compact category-level registry summary instead of
+        dumping every function as JSON.  The LLM discovers detailed
+        signatures through the ``search_functions`` tool at runtime.
+        """
+        compact_summary = self._get_compact_registry_summary()
 
-## Available OmicVerse Functions
-
-Here are all the currently registered functions in OmicVerse:
-
-""" + functions_info + """
-
-## Your Task
-
-When given a natural language request and an adata object, you should:
-
-Quick-start examples (non-experts can copy/paste):
-- "basic single-cell QC and clustering" (uses QC → preprocess → neighbors/UMAP → Leiden → markers)
-- "batch integration with harmony on this adata" (uses harmony then neighbors/UMAP/Leiden, use_raw=False)
-- "simple trajectory with DPT, root on paul15_clusters=7MEP, list top genes"
-- "find markers for each Leiden cluster (wilcoxon)".
-- "doublet check and report rate"
-
-1. **Analyze the request** to understand what the user wants to accomplish
-2. **Find the most appropriate function** from the available functions above
-3. **Extract parameters** from the user's request (e.g., "nUMI>500" means min_genes=500)
-4. **Generate and execute Python code** using the appropriate OmicVerse function
-5. **Return the modified adata object**
-
-## Parameter Extraction Rules
-
-Extract parameters dynamically based on patterns in the user request:
-
-- For qc function: Create tresh dict with 'mito_perc', 'nUMIs', 'detected_genes'
-  - "nUMI>X", "umi>X" → tresh={'nUMIs': X, 'detected_genes': 250, 'mito_perc': 0.15}
-  - "mito<X", "mitochondrial<X" → include in tresh dict as 'mito_perc': X
-  - "genes>X" → include in tresh dict as 'detected_genes': X
-  - Always provide complete tresh dict with all three keys
-- "resolution=X" → resolution=X
-- "n_pcs=X", "pca=X" → n_pcs=X
-- "max_value=X" → max_value=X
-- Mode indicators: "seurat", "mads", "pearson" → mode="seurat"
-- Boolean indicators: "no doublets", "skip doublets" → doublets=False
-
-## Code Execution Rules
-
-1. **Always import omicverse as ov** at the start
-2. **Use the exact function signature** from the available functions
-3. **Handle the adata variable** - it will be provided in the context
-4. **Update adata in place** when possible
-5. **Print success messages** and basic info about the result
-
-## Example Workflow
-
-User request: "quality control with nUMI>500, mito<0.2"
-
-1. Find function: Look for functions with aliases containing "qc", "quality", or "质控"
-2. Get function details: Check that qc requires tresh dict with 'mito_perc', 'nUMIs', 'detected_genes'
-3. Extract parameters: nUMI>500 → tresh['nUMIs']=500, mito<0.2 → tresh['mito_perc']=0.2
-4. Generate code:
-   ```python
-   import omicverse as ov
-   # Execute quality control with complete tresh dict
-   adata = ov.pp.qc(adata, tresh={'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250})
-   print("QC completed. Dataset shape: " + str(adata.shape[0]) + " cells × " + str(adata.shape[1]) + " genes")
-   ```
-
-## Important Notes
-
-- Always work with the provided `adata` variable
-- Use the function signatures exactly as shown in the available functions
-- Provide helpful feedback about what was executed
-- Do not create dummy AnnData objects; operate directly on the provided data
-- Prefer `use_raw=False` unless the user explicitly requests raw
-- Handle errors gracefully and suggest alternatives if needed
-
-## CRITICAL CODE PATTERNS - MANDATORY RULES
-
-### Print Statements
-- ALWAYS use string concatenation: `print("Result: " + str(value))`
-- NEVER use f-strings in print statements - they cause format errors
-
-### In-Place Functions (pca, scale, neighbors, leiden, umap, tsne)
-- ALWAYS call without assignment: `ov.pp.pca(adata, n_pcs=50)`
-- NEVER assign result: `adata = ov.pp.pca(adata)` (returns None!)
-- These functions modify adata in-place and return None
-
-### Categorical Column Access
-- ALWAYS check dtype before .cat: `if hasattr(col, 'cat'): col.cat.categories`
-- NEVER assume column is categorical - it may be string or object dtype
-- CORRECT: `adata.obs['col'].value_counts()` (works for any dtype)
-
-### HVG Selection (highly_variable_genes)
-- ALWAYS wrap in try/except with seurat fallback:
-  ```python
-  try:
-      sc.pp.highly_variable_genes(adata, flavor='seurat_v3', n_top_genes=2000)
-  except ValueError:
-      sc.pp.highly_variable_genes(adata, flavor='seurat', n_top_genes=2000)
-  ```
-- NEVER use seurat_v3 without fallback - fails on small datasets
-
-### Batch Column Handling
-- ALWAYS validate batch column before batch operations:
-  ```python
-  if 'batch' in adata.obs.columns:
-      adata.obs['batch'] = adata.obs['batch'].astype(str).fillna('unknown')
-  ```
-- NEVER assume batch column exists or has valid values
-"""
+        instructions = (
+            "You are an intelligent OmicVerse assistant that can automatically "
+            "discover and execute functions based on natural language requests.\n\n"
+            "## OmicVerse Function Registry (compact overview)\n\n"
+            "The following categories of functions are registered.  "
+            "Use the `search_functions` tool to look up signatures, parameters, "
+            "prerequisites, and examples for any function before generating code.\n\n"
+            + compact_summary + "\n\n"
+            "## Your Task\n\n"
+            "When given a natural language request and an adata object, you should:\n\n"
+            "Quick-start examples (non-experts can copy/paste):\n"
+            '- "basic single-cell QC and clustering" (uses QC -> preprocess -> neighbors/UMAP -> Leiden -> markers)\n'
+            '- "batch integration with harmony on this adata" (uses harmony then neighbors/UMAP/Leiden, use_raw=False)\n'
+            '- "simple trajectory with DPT, root on paul15_clusters=7MEP, list top genes"\n'
+            '- "find markers for each Leiden cluster (wilcoxon)"\n'
+            '- "doublet check and report rate"\n\n'
+            "1. **Analyze the request** to understand what the user wants to accomplish\n"
+            "2. **Call `search_functions`** with relevant keywords to find the appropriate function, "
+            "its exact signature, prerequisites, and examples\n"
+            "3. **Extract parameters** from the user's request (e.g., \"nUMI>500\" means min_genes=500)\n"
+            "4. **Generate and execute Python code** using the appropriate OmicVerse function\n"
+            "5. **Return the modified adata object**\n\n"
+            "## Parameter Extraction Rules\n\n"
+            "Extract parameters dynamically based on patterns in the user request:\n\n"
+            "- For qc function: Create tresh dict with 'mito_perc', 'nUMIs', 'detected_genes'\n"
+            "  - \"nUMI>X\", \"umi>X\" -> tresh={'nUMIs': X, 'detected_genes': 250, 'mito_perc': 0.15}\n"
+            "  - \"mito<X\", \"mitochondrial<X\" -> include in tresh dict as 'mito_perc': X\n"
+            "  - \"genes>X\" -> include in tresh dict as 'detected_genes': X\n"
+            "  - Always provide complete tresh dict with all three keys\n"
+            "- \"resolution=X\" -> resolution=X\n"
+            "- \"n_pcs=X\", \"pca=X\" -> n_pcs=X\n"
+            "- \"max_value=X\" -> max_value=X\n"
+            "- Mode indicators: \"seurat\", \"mads\", \"pearson\" -> mode=\"seurat\"\n"
+            "- Boolean indicators: \"no doublets\", \"skip doublets\" -> doublets=False\n\n"
+            "## Code Execution Rules\n\n"
+            "1. **Always import omicverse as ov** at the start\n"
+            "2. **Use the exact function signature** returned by search_functions\n"
+            "3. **Handle the adata variable** - it will be provided in the context\n"
+            "4. **Update adata in place** when possible\n"
+            "5. **Print success messages** and basic info about the result\n\n"
+            "## Important Notes\n\n"
+            "- Always work with the provided `adata` variable\n"
+            "- Use the function signatures exactly as returned by search_functions\n"
+            "- Provide helpful feedback about what was executed\n"
+            "- Do not create dummy AnnData objects; operate directly on the provided data\n"
+            "- Prefer `use_raw=False` unless the user explicitly requests raw\n"
+            "- Handle errors gracefully and suggest alternatives if needed\n\n"
+        ) + _CODE_QUALITY_RULES_EXT
 
         if self._skill_overview_text:
             instructions += (

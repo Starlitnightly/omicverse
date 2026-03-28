@@ -79,7 +79,7 @@ LEGACY_AGENT_TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "search_functions",
-        "description": "Search the OmicVerse function registry.",
+        "description": "Search the OmicVerse function registry by keyword. Returns signatures, parameters, prerequisites, and usage examples. Always call this before generating code to get exact API details.",
         "parameters": {
             "type": "object",
             "properties": {"query": {"type": "string"}},
