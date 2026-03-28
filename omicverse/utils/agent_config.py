@@ -169,7 +169,7 @@ class AgentConfig:
         if agent_type not in SUBAGENT_CONFIGS:
             raise KeyError(f"Unknown subagent type: {agent_type!r}")
 
-        base = copy.copy(SUBAGENT_CONFIGS[agent_type])
+        base = copy.deepcopy(SUBAGENT_CONFIGS[agent_type])
         overrides = self.subagent_overrides.get(agent_type, {})
 
         valid_fields = {f.name for f in dataclass_fields(SubagentConfig)}

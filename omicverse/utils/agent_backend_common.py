@@ -271,46 +271,45 @@ def _should_retry(exc: Exception) -> bool:
 
 def _retry_with_backoff(
     func: Callable[..., T],
-    *args,
     max_attempts: int = 3,
     base_delay: float = 1.0,
     factor: float = 2.0,
     jitter: float = 0.5,
-    **kwargs,
 ) -> T:
-    """Retry a function call with exponential backoff and jitter.
+    """Retry a callable with exponential backoff and jitter.
+
+    *func* must be a **zero-argument** callable (bind any arguments before
+    passing, e.g. via ``lambda`` or ``functools.partial``).  Retry
+    configuration can be passed positionally or by keyword.
 
     Parameters
     ----------
-    func : Callable
-        Function to retry
-    *args
-        Positional arguments forwarded to *func*
+    func : Callable[..., T]
+        Zero-argument callable to retry.
     max_attempts : int
-        Maximum number of attempts (keyword-only, default: 3)
+        Maximum number of attempts (default: 3).
     base_delay : float
-        Base delay in seconds (keyword-only, default: 1.0)
+        Base delay in seconds (default: 1.0).
     factor : float
-        Exponential backoff factor (keyword-only, default: 2.0)
+        Exponential backoff factor (default: 2.0).
     jitter : float
-        Maximum jitter factor as proportion of delay (keyword-only, default: 0.5)
-    **kwargs
-        Keyword arguments forwarded to *func*
+        Maximum jitter factor as proportion of delay (default: 0.5).
 
     Returns
     -------
-    Result of func(*args, **kwargs)
+    T
+        Result of ``func()``.
 
     Raises
     ------
     RuntimeError
-        If all retry attempts are exhausted
+        If all retry attempts are exhausted.
     """
     last_exception = None
 
     for attempt in range(max_attempts):
         try:
-            return func(*args, **kwargs)
+            return func()
         except Exception as exc:
             last_exception = exc
 

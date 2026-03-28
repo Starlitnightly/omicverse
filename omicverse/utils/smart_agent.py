@@ -84,10 +84,9 @@ from .ovagent.auth import (
     collect_api_key_env as _collect_api_key_env,
     temporary_api_keys as _temporary_api_keys_cm,
     display_backend_info as _display_backend_info,
-    resolve_credentials as _resolve_credentials,
+    resolve_credentials as _resolve_agent_llm_credentials,
     # Backward-compat re-exports (moved from this module to ovagent.auth)
     _normalize_model_for_routing,
-    resolve_credentials as _resolve_agent_llm_credentials,
 )
 from .ovagent.bootstrap import (
     format_skill_overview as _format_skill_overview,
@@ -323,7 +322,7 @@ class OmicVerseAgent(CodegenToolDispatchFacadeMixin, SessionContextFacadeMixin):
 
         _emit(EventLevel.INFO, "Initializing OmicVerse Smart Agent (internal backend)...", "init")
         llm_cfg = self._config.llm
-        model, api_key, endpoint, resolved_auth_mode = _resolve_credentials(
+        model, api_key, endpoint, resolved_auth_mode = _resolve_agent_llm_credentials(
             model=llm_cfg.model,
             api_key=llm_cfg.api_key,
             endpoint=llm_cfg.endpoint,

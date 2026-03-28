@@ -111,52 +111,65 @@ class TestExecutorThreadSafety:
 
 
 class TestRetrySignature:
-    """Config params must be keyword-only; *args/**kwargs forward to func."""
+    """_retry_with_backoff accepts a zero-arg callable; config is positional-or-keyword."""
 
-    def test_config_params_are_keyword_only(self):
-        """max_attempts, base_delay, factor, jitter must be keyword-only."""
+    def test_no_varargs_in_signature(self):
+        """The helper must NOT accept *args/**kwargs (prevents silent forwarding)."""
+        from omicverse.utils.agent_backend_common import _retry_with_backoff
+        sig = inspect.signature(_retry_with_backoff)
+        kinds = {p.kind for p in sig.parameters.values()}
+        assert inspect.Parameter.VAR_POSITIONAL not in kinds, (
+            "_retry_with_backoff must not accept *args"
+        )
+        assert inspect.Parameter.VAR_KEYWORD not in kinds, (
+            "_retry_with_backoff must not accept **kwargs"
+        )
+
+    def test_config_params_accept_keyword(self):
+        """max_attempts, base_delay, factor, jitter are accepted as keywords."""
         from omicverse.utils.agent_backend_common import _retry_with_backoff
         sig = inspect.signature(_retry_with_backoff)
         for name in ("max_attempts", "base_delay", "factor", "jitter"):
             param = sig.parameters[name]
-            assert param.kind == inspect.Parameter.KEYWORD_ONLY, (
-                f"{name} should be KEYWORD_ONLY, got {param.kind.name}"
-            )
+            assert param.kind in (
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                inspect.Parameter.KEYWORD_ONLY,
+            ), f"{name} should be callable by keyword, got {param.kind.name}"
 
-    def test_args_forwarded_to_func(self):
-        """Positional args after func are forwarded, not consumed by config."""
+    def test_legacy_positional_config_works(self):
+        """Positional config (old calling convention) is interpreted as config, not forwarded."""
         from omicverse.utils.agent_backend_common import _retry_with_backoff
-        sentinel = object()
+        call_count = 0
 
-        def echo(*args, **kwargs):
-            return args, kwargs
+        def counter():
+            nonlocal call_count
+            call_count += 1
+            return "ok"
 
-        result_args, result_kwargs = _retry_with_backoff(
-            echo, sentinel, "b", max_attempts=1, key="val"
-        )
-        assert result_args == (sentinel, "b")
-        assert result_kwargs == {"key": "val"}
+        # Legacy style: _retry_with_backoff(func, max_attempts)
+        result = _retry_with_backoff(counter, 1)
+        assert result == "ok"
+        assert call_count == 1  # exactly 1 attempt, not forwarded as arg
 
-    def test_kwargs_not_consumed_by_config(self):
-        """Keyword args not matching config params forward to func."""
-        from omicverse.utils.agent_backend_common import _retry_with_backoff
-
-        def capture(**kw):
-            return kw
-
-        result = _retry_with_backoff(capture, max_attempts=1, foo="bar", baz=42)
-        assert result == {"foo": "bar", "baz": 42}
-
-    def test_positional_config_raises_typeerror(self):
-        """Passing config params positionally (old style) now goes to *args."""
+    def test_func_called_with_zero_args(self):
+        """func is called as func() — callers must bind args before passing."""
         from omicverse.utils.agent_backend_common import _retry_with_backoff
 
-        def echo(*args):
-            return args
+        def zero_arg():
+            return "zero"
 
-        # With old signature, 5 would fill max_attempts. Now it goes to *args.
-        result = _retry_with_backoff(echo, 5, max_attempts=1)
-        assert result == (5,)
+        result = _retry_with_backoff(zero_arg, max_attempts=1)
+        assert result == "zero"
+
+    def test_bound_lambda_pattern(self):
+        """Standard pattern: wrap func+args in a lambda before passing."""
+        from omicverse.utils.agent_backend_common import _retry_with_backoff
+
+        def add(a, b):
+            return a + b
+
+        result = _retry_with_backoff(lambda: add(3, 4), max_attempts=1)
+        assert result == 7
 
     def test_retry_still_retries(self):
         """Basic retry behavior is preserved."""
@@ -189,8 +202,8 @@ class TestRetrySignature:
                 always_fail, max_attempts=2, base_delay=0.0, jitter=0.0
             )
 
-    def test_backend_retry_method_compatible(self, monkeypatch):
-        """OmicVerseLLMBackend._retry still works with the new signature."""
+    def test_backend_retry_method_forwards_args(self, monkeypatch):
+        """OmicVerseLLMBackend._retry forwards positional/keyword args to func."""
         from omicverse.utils.agent_backend import OmicVerseLLMBackend
         from omicverse.utils.model_config import ModelConfig
 
@@ -206,6 +219,39 @@ class TestRetrySignature:
 
         result = backend._retry(add, 3, 4)
         assert result == 7
+
+    def test_backend_retry_method_forwards_kwargs(self, monkeypatch):
+        """OmicVerseLLMBackend._retry forwards keyword args to func."""
+        from omicverse.utils.agent_backend import OmicVerseLLMBackend
+        from omicverse.utils.model_config import ModelConfig
+
+        monkeypatch.setattr(
+            ModelConfig, "get_provider_from_model", lambda *a, **kw: "openai"
+        )
+        backend = OmicVerseLLMBackend(
+            system_prompt="test", model="gpt-4o", api_key="k"
+        )
+
+        def greet(name="world"):
+            return f"hello {name}"
+
+        result = backend._retry(greet, name="claude")
+        assert result == "hello claude"
+
+    def test_backend_retry_zero_arg_func(self, monkeypatch):
+        """OmicVerseLLMBackend._retry works with zero-arg callables."""
+        from omicverse.utils.agent_backend import OmicVerseLLMBackend
+        from omicverse.utils.model_config import ModelConfig
+
+        monkeypatch.setattr(
+            ModelConfig, "get_provider_from_model", lambda *a, **kw: "openai"
+        )
+        backend = OmicVerseLLMBackend(
+            system_prompt="test", model="gpt-4o", api_key="k"
+        )
+
+        result = backend._retry(lambda: 42)
+        assert result == 42
 
 
 # ===================================================================
