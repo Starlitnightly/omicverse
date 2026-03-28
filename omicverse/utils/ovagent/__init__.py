@@ -58,6 +58,7 @@ from .event_stream import RuntimeEventEmitter
 from .turn_controller import TurnController, FollowUpGate
 from .turn_followup import ConvergenceMonitor
 from .session_context import SessionService, ContextService
+from .session_facade import SessionContextFacadeMixin
 from .registry_scanner import RegistryScanner
 from .auth import (
     ResolvedBackend,
@@ -109,6 +110,7 @@ __all__ = [
     "RepairResult",
     "ResolvedBackend",
     "RunStore",
+    "SessionContextFacadeMixin",
     "SessionService",
     "SubagentController",
     "SubagentRuntime",
