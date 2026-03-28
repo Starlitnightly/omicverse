@@ -58,12 +58,11 @@ from .channel_core import (
     strip_local_paths,
     text_chunks,
 )
+from ..channel_media import is_image_attachment, prepare_inbound_image, MAX_INBOUND_IMAGES
 from ..media_ingest import (
     PreparedImage,
     build_workspace_note,
     compose_multimodal_user_text,
-    looks_like_image_name,
-    prepare_image_bytes,
 )
 from ..model_help import render_model_help
 
@@ -527,17 +526,13 @@ class QQRuntime:
     def _build_full_request(self, session: Any, text: str) -> str:
         return build_full_request(session, text, channel_label="QQ")
 
-    @staticmethod
-    def _looks_like_image_name(name: str) -> bool:
-        return looks_like_image_name(name)
-
     @classmethod
     def _looks_like_image_url(cls, url: str) -> bool:
         lowered = (url or "").strip().lower()
         if not lowered.startswith(("http://", "https://", "data:")):
             return False
         stem = lowered.split("?", 1)[0]
-        return cls._looks_like_image_name(stem) or any(
+        return is_image_attachment(stem) or any(
             marker in lowered
             for marker in ("/image", "image/", "content-type=image", "qpic.cn")
         )
@@ -582,7 +577,7 @@ class QQRuntime:
             ).strip()
             if not (
                 mime_type.startswith("image/")
-                or cls._looks_like_image_name(filename)
+                or is_image_attachment(filename)
                 or cls._looks_like_image_url(url)
             ):
                 return
@@ -626,14 +621,13 @@ class QQRuntime:
     def _download_inbound_image(
         self,
         candidate: Dict[str, str],
-        target_dir: Path,
+        session: Any,
         index: int,
     ) -> Optional[PreparedImage]:
         url = candidate.get("url", "").strip()
         if not url:
             return None
 
-        target_dir.mkdir(parents=True, exist_ok=True)
         response = None
         errors: List[str] = []
         for headers in ({}, self._client._headers()):
@@ -662,13 +656,12 @@ class QQRuntime:
             or response.headers.get("Content-Type")
             or "application/octet-stream"
         ).split(";", 1)[0].strip()
-        prepared = prepare_image_bytes(
+        prepared = prepare_inbound_image(
             response.content,
-            target_dir=target_dir,
+            workspace_root=session.workspace,
+            channel_name="qq",
             filename=candidate.get("filename") or f"qq_image_{index}",
             mime_type=mime_type,
-            prefix="qq_image",
-            source="qq",
         )
         logger.info(
             "QQ inbound image stored path=%s size=%d",
@@ -686,10 +679,9 @@ class QQRuntime:
         if not candidates:
             return []
 
-        upload_dir = session.workspace / "uploads" / "qq"
         prepared: List[PreparedImage] = []
-        for index, candidate in enumerate(candidates[:4], start=1):
-            downloaded = self._download_inbound_image(candidate, upload_dir, index)
+        for index, candidate in enumerate(candidates[:MAX_INBOUND_IMAGES], start=1):
+            downloaded = self._download_inbound_image(candidate, session, index)
             if downloaded is None:
                 continue
             prepared.append(downloaded)

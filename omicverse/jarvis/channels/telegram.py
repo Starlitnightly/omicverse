@@ -34,7 +34,11 @@ from ..media_ingest import (
     PreparedImage,
     build_workspace_note,
     compose_multimodal_user_text,
-    prepare_image_path,
+)
+from ..channel_media import (
+    inbound_upload_dir,
+    prepare_inbound_image_from_file,
+    MAX_INBOUND_IMAGES,
 )
 from ..runtime import (
     AgentBridgeExecutionAdapter,
@@ -1079,14 +1083,13 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         session: Any,
     ) -> List[PreparedImage]:
         prepared: List[PreparedImage] = []
-        upload_dir = session.workspace_dir / "uploads" / "telegram"
+        upload_dir = inbound_upload_dir(session.workspace_dir, "telegram")
         if getattr(message, "photo", None):
             photo = message.photo[-1]
             tg_file = await bot.get_file(photo.file_id)
             raw_path = upload_dir / f"telegram_photo_{getattr(photo, 'file_unique_id', photo.file_id)}.jpg"
-            raw_path.parent.mkdir(parents=True, exist_ok=True)
             await tg_file.download_to_drive(raw_path)
-            image = prepare_image_path(raw_path, prefix="telegram_image", source="telegram")
+            image = prepare_inbound_image_from_file(raw_path, workspace_root=session.workspace_dir, channel_name="telegram")
             if image.path != raw_path and raw_path.exists():
                 raw_path.unlink(missing_ok=True)
             prepared.append(image)
@@ -1097,19 +1100,13 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         if document is not None and doc_mime.startswith("image/") and not doc_name.lower().endswith(".h5ad"):
             tg_file = await bot.get_file(document.file_id)
             raw_path = upload_dir / (doc_name or f"telegram_image_{document.file_unique_id}")
-            raw_path.parent.mkdir(parents=True, exist_ok=True)
             await tg_file.download_to_drive(raw_path)
-            image = prepare_image_path(
-                raw_path,
-                mime_type=doc_mime,
-                prefix="telegram_image",
-                source="telegram",
-            )
+            image = prepare_inbound_image_from_file(raw_path, workspace_root=session.workspace_dir, channel_name="telegram", mime_type=doc_mime)
             if image.path != raw_path and raw_path.exists():
                 raw_path.unlink(missing_ok=True)
             prepared.append(image)
 
-        return prepared[:4]
+        return prepared[:MAX_INBOUND_IMAGES]
 
     async def _handle_incoming_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         route = telegram_route_from_update(update)
