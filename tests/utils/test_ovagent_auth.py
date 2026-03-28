@@ -66,6 +66,7 @@ from omicverse.utils.ovagent.auth import (
     _normalize_model_for_routing,
     _is_custom_openai_endpoint,
     _looks_like_openai_endpoint,
+    _endpoint_has_hostname,
     _extract_openai_codex_account_id,
     _resolve_saved_provider_api_key,
     OPENAI_CODEX_DEFAULT_MODEL,
@@ -269,6 +270,96 @@ class TestEndpointHelpers:
         assert _looks_like_openai_endpoint("https://api.openai.com/v1") is True
         assert _looks_like_openai_endpoint(None) is False
         assert _looks_like_openai_endpoint("https://my-proxy.com/v1") is False
+
+
+# ===================================================================
+# Hostname validation hardening (CodeQL spoofed-host regression)
+# ===================================================================
+
+class TestEndpointHostnameValidation:
+    """Regression tests for parsed hostname validation.
+
+    Ensures that endpoint trust checks use parsed hostname comparison
+    instead of substring containment, so spoofed hosts like
+    ``api.openai.com.attacker.com`` are rejected.
+    """
+
+    # --- _endpoint_has_hostname helper ---
+
+    def test_endpoint_has_hostname_exact_match(self):
+        assert _endpoint_has_hostname("https://api.openai.com/v1", "api.openai.com") is True
+
+    def test_endpoint_has_hostname_rejects_subdomain_spoof(self):
+        assert _endpoint_has_hostname("https://api.openai.com.attacker.com/v1", "api.openai.com") is False
+
+    def test_endpoint_has_hostname_none_input(self):
+        assert _endpoint_has_hostname(None, "api.openai.com") is False
+
+    def test_endpoint_has_hostname_empty_string(self):
+        assert _endpoint_has_hostname("", "api.openai.com") is False
+
+    # --- _looks_like_openai_endpoint: trusted hosts ---
+
+    def test_openai_trusted_api_endpoint(self):
+        assert _looks_like_openai_endpoint("https://api.openai.com/v1") is True
+
+    def test_openai_trusted_api_endpoint_subpath(self):
+        assert _looks_like_openai_endpoint("https://api.openai.com/v2/chat") is True
+
+    def test_openai_trusted_chatgpt_backend(self):
+        assert _looks_like_openai_endpoint("https://chatgpt.com/backend-api") is True
+
+    def test_openai_trusted_chatgpt_backend_subpath(self):
+        assert _looks_like_openai_endpoint("https://chatgpt.com/backend-api/v1/completions") is True
+
+    def test_openai_legacy_codex_endpoint(self):
+        assert _looks_like_openai_endpoint(_LEGACY_OPENAI_CODEX_BASE_URL) is True
+
+    # --- _looks_like_openai_endpoint: spoofed hosts MUST be rejected ---
+
+    def test_openai_rejects_attacker_subdomain_spoof(self):
+        assert _looks_like_openai_endpoint("https://api.openai.com.attacker.com/v1") is False
+
+    def test_openai_rejects_chatgpt_subdomain_spoof(self):
+        assert _looks_like_openai_endpoint("https://chatgpt.com.attacker.com/backend-api") is False
+
+    def test_openai_rejects_path_injection(self):
+        assert _looks_like_openai_endpoint("https://evil.com/api.openai.com") is False
+
+    def test_openai_rejects_chatgpt_wrong_path(self):
+        """chatgpt.com host but without /backend-api path is not an OpenAI endpoint."""
+        assert _looks_like_openai_endpoint("https://chatgpt.com/other-path") is False
+
+    # --- Gemini hostname validation in _resolve_gemini_cli_oauth ---
+
+    @patch("omicverse.utils.ovagent.auth.GeminiCliOAuthManager")
+    def test_gemini_oauth_rewrites_standard_gemini_endpoint(self, mock_mgr_cls):
+        """Standard generativelanguage.googleapis.com endpoint is rewritten."""
+        mock_mgr = MagicMock()
+        mock_mgr.build_api_key_payload.return_value = "token"
+        mock_mgr_cls.return_value = mock_mgr
+
+        _, _, endpoint, _ = _resolve_gemini_cli_oauth(
+            "gemini-2.5-pro",
+            "https://generativelanguage.googleapis.com/v1beta",
+            None,
+        )
+        assert endpoint != "https://generativelanguage.googleapis.com/v1beta"
+
+    @patch("omicverse.utils.ovagent.auth.GeminiCliOAuthManager")
+    def test_gemini_oauth_rejects_spoofed_gemini_host(self, mock_mgr_cls):
+        """Spoofed generativelanguage.googleapis.com.attacker.com must NOT be rewritten."""
+        mock_mgr = MagicMock()
+        mock_mgr.build_api_key_payload.return_value = "token"
+        mock_mgr_cls.return_value = mock_mgr
+
+        spoofed = "https://generativelanguage.googleapis.com.attacker.com/v1beta"
+        _, _, endpoint, _ = _resolve_gemini_cli_oauth(
+            "gemini-2.5-pro", spoofed, None,
+        )
+        # The spoofed URL must be preserved (not rewritten), since it doesn't
+        # match any trusted hostname.
+        assert endpoint == spoofed
 
 
 # ===================================================================
