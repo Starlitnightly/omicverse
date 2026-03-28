@@ -48,11 +48,11 @@ from .channel_core import (
 )
 from ..config import default_state_dir
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
+from ..channel_media import prepare_inbound_image, MAX_INBOUND_IMAGES
 from ..media_ingest import (
     PreparedImage,
     build_workspace_note,
     compose_multimodal_user_text,
-    prepare_image_bytes,
 )
 from ..model_help import render_model_help
 
@@ -1030,7 +1030,6 @@ class WeChatJarvisBot:
         item_list = raw.get("item_list") or []
         if not isinstance(item_list, list):
             return []
-        upload_dir = session.workspace / "uploads" / "wechat"
         prepared: List[PreparedImage] = []
         for item in item_list:
             if not isinstance(item, dict) or item.get("type") != 2:
@@ -1066,13 +1065,12 @@ class WeChatJarvisBot:
             try:
                 data = await asyncio.to_thread(self._download_inbound_image_bytes, payload, file_name)
                 prepared.append(
-                    prepare_image_bytes(
+                    prepare_inbound_image(
                         data,
-                        target_dir=upload_dir,
+                        workspace_root=session.workspace,
+                        channel_name="wechat",
                         filename=file_name,
                         mime_type=mime_type,
-                        prefix="wechat_image",
-                        source="wechat",
                     )
                 )
             except Exception:
@@ -1081,7 +1079,7 @@ class WeChatJarvisBot:
                     file_key,
                     exc_info=True,
                 )
-            if len(prepared) >= 4:
+            if len(prepared) >= MAX_INBOUND_IMAGES:
                 break
         return prepared
 

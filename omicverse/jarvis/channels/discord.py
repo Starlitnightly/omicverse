@@ -34,12 +34,17 @@ from .channel_core import (
     format_analysis_error,
     default_summary,
 )
+from ..channel_media import (
+    MAX_INBOUND_IMAGES,
+    format_h5ad_load_result,
+    is_image_attachment,
+    load_h5ad_to_session,
+    prepare_inbound_image,
+)
 from ..media_ingest import (
     PreparedImage,
     build_workspace_note,
     compose_multimodal_user_text,
-    looks_like_image_name,
-    prepare_image_bytes,
 )
 from ..model_help import render_model_help
 
@@ -499,23 +504,12 @@ class DiscordJarvisBot:
         await self._send_text(message.channel, "⏳ 正在下载并加载…", reply_to=message)
         try:
             data = await attachment.read()
-            target = session.workspace / filename
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(data)
-            loaded = await asyncio.to_thread(session.load_from_workspace, filename)
-            if loaded is not None:
-                a = loaded
-                await self._send_text(
-                    message.channel,
-                    f"✅ 加载成功\n🔬 {a.n_obs:,} cells × {a.n_vars:,} genes\n📁 {filename}",
-                    reply_to=message,
-                )
-            else:
-                await self._send_text(
-                    message.channel,
-                    f"✅ 已接收 {filename}，但自动加载失败，请检查文件格式。",
-                    reply_to=message,
-                )
+            loaded = await asyncio.to_thread(load_h5ad_to_session, session, data, filename)
+            await self._send_text(
+                message.channel,
+                format_h5ad_load_result(loaded, filename),
+                reply_to=message,
+            )
         except Exception as exc:
             logger.exception("Discord failed to load h5ad attachment")
             await self._send_text(message.channel, f"❌ 文件处理失败: {exc}", reply_to=message)
@@ -524,25 +518,23 @@ class DiscordJarvisBot:
         attachments = list(getattr(message, "attachments", None) or [])
         if not attachments:
             return []
-        upload_dir = session.workspace / "uploads" / "discord"
         prepared: List[PreparedImage] = []
-        for attachment in attachments[:4]:
+        for attachment in attachments[:MAX_INBOUND_IMAGES]:
             filename = getattr(attachment, "filename", None) or ""
             content_type = str(getattr(attachment, "content_type", None) or "").strip().lower()
             if filename.lower().endswith(".h5ad"):
                 continue
-            if not (content_type.startswith("image/") or looks_like_image_name(filename)):
+            if not is_image_attachment(filename, content_type):
                 continue
             try:
                 data = await attachment.read()
                 prepared.append(
-                    prepare_image_bytes(
+                    prepare_inbound_image(
                         data,
-                        target_dir=upload_dir,
-                        filename=filename or "discord_image",
+                        workspace_root=session.workspace,
+                        channel_name="discord",
+                        filename=filename,
                         mime_type=content_type,
-                        prefix="discord_image",
-                        source="discord",
                     )
                 )
             except Exception:

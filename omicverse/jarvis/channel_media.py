@@ -4,6 +4,13 @@ import time
 from pathlib import Path
 from typing import Any, Iterable, List, Optional
 
+from .media_ingest import (
+    PreparedImage,
+    looks_like_image_name,
+    prepare_image_bytes,
+    prepare_image_path,
+)
+
 
 def build_channel_request(session: Any, text: str, *, channel_label: str = "Mobile channel") -> str:
     ctx_parts: List[str] = []
@@ -102,6 +109,109 @@ def _session_workspace(session: Any) -> Optional[Path]:
         return Path(workspace_dir) / "workspace"
     return None
 
+
+# ── Inbound attachment helpers ──────────────────────────────────────────────
+
+MAX_INBOUND_IMAGES: int = 4
+"""Default per-message limit on inbound image attachments."""
+
+
+def is_image_attachment(filename: str, content_type: str = "") -> bool:
+    """Check whether an attachment looks like an image by MIME type or filename."""
+    ct = (content_type or "").strip().lower()
+    if ct.startswith("image/"):
+        return True
+    return looks_like_image_name(filename)
+
+
+def inbound_upload_dir(workspace_root: Any, channel_name: str) -> Path:
+    """Return (and create) the standard upload directory for *channel_name*.
+
+    *workspace_root* is typically ``session.workspace`` or
+    ``session.workspace_dir``; the caller decides which root is appropriate
+    for its channel.
+    """
+    root = Path(workspace_root) if not isinstance(workspace_root, Path) else workspace_root
+    upload_dir = root / "uploads" / channel_name
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    return upload_dir
+
+
+def prepare_inbound_image(
+    data: bytes,
+    *,
+    workspace_root: Any,
+    channel_name: str,
+    filename: str = "",
+    mime_type: str = "",
+) -> PreparedImage:
+    """Normalize raw attachment bytes into a :class:`PreparedImage` on disk.
+
+    Standard pipeline for channels that receive attachment bytes directly
+    (Discord, QQ, WeChat).
+    """
+    upload_dir = inbound_upload_dir(workspace_root, channel_name)
+    return prepare_image_bytes(
+        data,
+        target_dir=upload_dir,
+        filename=filename or f"{channel_name}_image",
+        mime_type=mime_type,
+        prefix=f"{channel_name}_image",
+        source=channel_name,
+    )
+
+
+def prepare_inbound_image_from_file(
+    path: Path,
+    *,
+    workspace_root: Any,
+    channel_name: str,
+    mime_type: str = "",
+) -> PreparedImage:
+    """Normalize a local image file into a :class:`PreparedImage`.
+
+    Standard pipeline for channels that download attachments to a temporary
+    file first (e.g. Telegram).
+    """
+    upload_dir = inbound_upload_dir(workspace_root, channel_name)
+    return prepare_image_path(
+        path,
+        target_dir=upload_dir,
+        mime_type=mime_type,
+        prefix=f"{channel_name}_image",
+        source=channel_name,
+    )
+
+
+# ── H5AD attachment helpers ────────────────────────────────────────────────
+
+def load_h5ad_to_session(session: Any, data: bytes, filename: str) -> Any:
+    """Write raw ``.h5ad`` bytes into the session workspace and load.
+
+    Returns the loaded AnnData object on success, or ``None`` if the session's
+    ``load_from_workspace`` returns ``None``.
+    """
+    workspace = _session_workspace(session)
+    if workspace is None:
+        return None
+    target = workspace / filename
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(data)
+    return session.load_from_workspace(filename)
+
+
+def format_h5ad_load_result(loaded: Any, filename: str) -> str:
+    """Format a human-readable status string after loading an ``.h5ad`` file."""
+    if loaded is not None:
+        return (
+            f"✅ 加载成功\n"
+            f"🔬 {loaded.n_obs:,} cells × {loaded.n_vars:,} genes\n"
+            f"📁 {filename}"
+        )
+    return f"✅ 已接收 {filename}，但自动加载失败，请检查文件格式。"
+
+
+# ── Internal helpers ───────────────────────────────────────────────────────
 
 def _figure_bytes(figure: Any) -> bytes:
     if isinstance(figure, bytes):
