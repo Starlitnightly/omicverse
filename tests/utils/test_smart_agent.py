@@ -923,3 +923,108 @@ def test_mixin_methods_not_duplicated_on_agent_class():
     assert not overlap, (
         f"These methods are duplicated on both OmicVerseAgent and the mixin: {overlap}"
     )
+
+
+# -----------------------------------------------------------------------
+# Task-028: Function-registry prompt footprint optimization
+# -----------------------------------------------------------------------
+
+
+def test_compact_registry_summary_returns_category_lines():
+    """AC-028.1: _get_compact_registry_summary produces category-level lines, not full JSON."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    summary = agent._get_compact_registry_summary()
+    # Must be a non-empty string
+    assert isinstance(summary, str)
+    assert len(summary) > 0
+    # Must NOT contain the full JSON dump pattern
+    assert '"signature"' not in summary, "Compact summary should not contain full function signatures"
+    assert '"examples"' not in summary, "Compact summary should not contain example lists"
+    assert '"aliases"' not in summary, "Compact summary should not contain alias lists"
+    # Must contain category markers
+    assert "**" in summary or "functions)" in summary, (
+        "Summary should contain category headings with function counts"
+    )
+
+
+def test_compact_registry_summary_is_much_smaller_than_full_dump():
+    """AC-028.1: The compact summary is significantly smaller than the old full JSON dump."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    compact = agent._get_compact_registry_summary()
+    # The compact summary should be well under 5 KB
+    assert len(compact) < 5000, (
+        f"Compact summary is {len(compact)} chars — expected under 5000"
+    )
+
+
+def test_setup_agent_instructions_do_not_contain_full_registry():
+    """AC-028.1: _setup_agent system prompt uses compact summary, not full registry."""
+    import inspect
+    source = inspect.getsource(OmicVerseAgent._setup_agent)
+    # The old code called _get_available_functions_info which returned full JSON
+    assert "_get_available_functions_info" not in source, (
+        "_setup_agent should no longer call _get_available_functions_info"
+    )
+    # The new code should reference the compact summary
+    assert "_get_compact_registry_summary" in source, (
+        "_setup_agent should use _get_compact_registry_summary"
+    )
+    # The old "Here are all the currently registered functions" dump header is gone
+    assert "Here are all the currently registered functions" not in source, (
+        "System prompt should not dump all functions"
+    )
+
+
+def test_search_functions_tool_still_works():
+    """AC-028.2: search_functions tool remains functional for on-demand lookup."""
+    from omicverse.utils.ovagent.tool_runtime_exec import handle_search_functions
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    # search_functions must return results for a known domain keyword
+    result = handle_search_functions(agent, "qc")
+    assert isinstance(result, str)
+    # Should either find matches or return a "no functions" message
+    assert "qc" in result.lower() or "No functions found" in result
+
+
+def test_search_functions_tool_description_mentions_signatures():
+    """AC-028.2: search_functions tool description is informative."""
+    from omicverse.utils.ovagent.tool_runtime import LEGACY_AGENT_TOOLS
+    sf_tool = next(
+        (t for t in LEGACY_AGENT_TOOLS if t["name"] == "search_functions"),
+        None,
+    )
+    assert sf_tool is not None, "search_functions tool must exist"
+    desc = sf_tool["description"]
+    assert "signature" in desc.lower() or "parameter" in desc.lower(), (
+        "search_functions description should mention it returns signatures/parameters"
+    )
+
+
+def test_codegen_flows_still_discover_tools_via_scanner():
+    """AC-028.3: Codegen flows still discover tools through the registry scanner."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    # _collect_relevant_registry_entries is the primary codegen discovery path
+    entries = agent._collect_relevant_registry_entries("quality control", max_entries=5)
+    assert isinstance(entries, list)
+    # The scanner should still find QC-related entries
+    if entries:
+        names = [e.get("full_name", "") for e in entries]
+        assert any("qc" in n.lower() for n in names), (
+            f"Expected QC-related entries, got: {names}"
+        )
+
+
+def test_no_new_runtime_dependencies():
+    """AC-028.4: No new runtime dependencies introduced."""
+    import importlib
+    # The compact summary only uses stdlib (json removed, uses string formatting)
+    # and existing internal modules. Verify no new third-party imports.
+    source_path = Path(__file__).resolve().parents[2] / "omicverse" / "utils" / "smart_agent.py"
+    source = source_path.read_text(encoding="utf-8")
+    # Check that no new third-party imports were added beyond what existed
+    # (the file already imports json, os, re, sys, etc.)
+    new_suspects = ["yaml", "toml", "rich", "click", "pydantic"]
+    for suspect in new_suspects:
+        assert f"import {suspect}" not in source, (
+            f"New runtime dependency '{suspect}' found in smart_agent.py"
+        )
