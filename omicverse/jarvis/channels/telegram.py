@@ -26,6 +26,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
+from .channel_core import strip_local_paths as _core_strip_local_paths
 from .. import _fmt
 from ..config import default_state_dir
 from ..model_help import render_model_help
@@ -527,19 +528,7 @@ class TelegramRuntimePresenter:
 
     @classmethod
     def _strip_local_paths(cls, text: str) -> str:
-        t = text or ""
-        t = re.sub(r'`[^`\n]*(?:/[^`\n]*){2,}`', '', t)
-        t = re.sub(r'/(?:Users|home|tmp|var|opt|root|data|mnt|private)/\S+', '', t)
-        t = re.sub(r'~[/\\]\S+', '', t)
-        t = re.sub(
-            rf'\.?/?(?:\w[\w/-]*/)+\w[\w.-]*\.(?:{cls._ARTIFACT_EXTS})',
-            '',
-            t,
-            flags=re.IGNORECASE,
-        )
-        t = re.sub(r'[ \t]{2,}', ' ', t)
-        t = re.sub(r'\n{3,}', '\n\n', t)
-        return t.strip()
+        return _core_strip_local_paths(text)
 
 
 class TelegramDelivery:
