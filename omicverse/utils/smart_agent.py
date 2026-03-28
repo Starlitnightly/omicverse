@@ -11,6 +11,7 @@ Usage:
 """
 
 import asyncio
+import inspect
 import json
 import logging
 import os
@@ -471,6 +472,7 @@ class OmicVerseAgent(CodegenToolDispatchFacadeMixin, SessionContextFacadeMixin):
                 self, self._prompt_builder, self._tool_runtime,
             )
             self._codegen_pipeline = _CodegenPipeline(self)
+            self._analysis_executor._set_codegen_pipeline(self._codegen_pipeline)
 
             _emit(EventLevel.SUCCESS, "Smart Agent initialized successfully!", "init")
         except Exception as e:
@@ -483,7 +485,7 @@ class OmicVerseAgent(CodegenToolDispatchFacadeMixin, SessionContextFacadeMixin):
 
     def _get_registry_stats(self) -> dict:
         """Get statistics about the function registry."""
-        static_entries = self._load_static_registry_entries()
+        static_entries = self._scanner.load_static_entries()
         unique_functions = set(e['full_name'] for e in static_entries)
         categories = set(e['category'] for e in static_entries)
 
@@ -509,7 +511,7 @@ class OmicVerseAgent(CodegenToolDispatchFacadeMixin, SessionContextFacadeMixin):
         seen: set = set()
 
         # Prefer static entries (always available); fall back to runtime
-        entries = self._load_static_registry_entries()
+        entries = self._scanner.load_static_entries()
         if not entries:
             for entry in getattr(_global_registry, "_registry", {}).values():
                 full_name = entry.get("full_name", "")
@@ -794,6 +796,68 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         )
 
     # =====================================================================
+    # Direct-Python seams (overridable by test doubles)
+    # =====================================================================
+
+    def _detect_direct_python_request(self, request: str) -> Optional[str]:
+        """Detect explicit Python code in *request*.
+
+        Default implementation delegates to the codegen pipeline subsystem.
+        Tests may override this at instance level to inject fake behaviour
+        without requiring `_codegen_pipeline` / `_analysis_executor` to exist.
+        """
+        return self._codegen.detect_direct_python_request(request)
+
+    def _execute_generated_code(self, code: str, adata: Any) -> Any:
+        """Execute *code* against *adata* and return the (possibly mutated) result.
+
+        Default implementation delegates to the analysis executor subsystem.
+        Overridable at instance level for lightweight test doubles.
+        """
+        return self._analysis_executor.execute_generated_code(code, adata)
+
+    # =====================================================================
+    # Legacy thin delegation seams (codegen / tool-runtime / code-only)
+    # =====================================================================
+
+    def _extract_python_code(self, response: str) -> str:
+        """Delegate to CodegenPipeline.extract_python_code."""
+        return self._codegen.extract_python_code(response)
+
+    def _extract_python_code_strict(self, response: str) -> str:
+        """Delegate to CodegenPipeline.extract_python_code_strict."""
+        return self._codegen.extract_python_code_strict(response)
+
+    def _normalize_code_candidate(self, code: str) -> str:
+        """Delegate to CodegenPipeline.normalize_code_candidate."""
+        return self._codegen.normalize_code_candidate(code)
+
+    def _gather_code_candidates(self, response: str) -> list:
+        """Delegate to CodegenPipeline.gather_code_candidates."""
+        return self._codegen.gather_code_candidates(response)
+
+    def _looks_like_python(self, text: str) -> bool:
+        """Delegate to CodegenPipeline.looks_like_python."""
+        return self._codegen.looks_like_python(text)
+
+    def _get_visible_agent_tools(self, *, allowed_names=None):
+        """Delegate to ToolRuntime.get_visible_agent_tools."""
+        return self._tool_runtime.get_visible_agent_tools(allowed_names=allowed_names)
+
+    def _tool_blocked_in_plan_mode(self, tool_name: str) -> bool:
+        """Delegate to ToolRuntime.tool_blocked_in_plan_mode."""
+        return self._tool_runtime.tool_blocked_in_plan_mode(tool_name)
+
+    def _capture_code_only_snippet(self, code: str, description: str = "") -> None:
+        """Store code snippet captured during code-only mode."""
+        history = getattr(self, "_code_only_captured_history", None)
+        if history is None:
+            history = []
+            self._code_only_captured_history = history
+        history.append({"code": code, "description": description or ""})
+        self._code_only_captured_code = code
+
+    # =====================================================================
     # Public API: run / stream
     # =====================================================================
 
@@ -1017,61 +1081,51 @@ def list_supported_models(show_all: bool = False) -> str:
     """
     return ModelConfig.list_supported_models(show_all)
 
+# Canonical default values derived from OmicVerseAgent.__init__ so the
+# Agent() factory stays in sync without duplicating them.  Computed once
+# at module load time; the dict is keyed by parameter name.
+_INIT_DEFAULTS: Dict[str, Any] = {
+    name: param.default
+    for name, param in inspect.signature(OmicVerseAgent.__init__).parameters.items()
+    if name != "self" and param.default is not inspect.Parameter.empty
+}
+_D = _INIT_DEFAULTS  # short alias used in the Agent() signature below
+
+
 def Agent(
-    model: str = "gpt-5.2",
-    api_key: Optional[str] = None,
-    endpoint: Optional[str] = None,
-    auth_mode: str = "environment",
-    auth_provider: Optional[str] = None,
-    auth_file: Optional[str] = None,
-    enable_reflection: bool = True,
-    reflection_iterations: int = 1,
-    enable_result_review: bool = True,
-    use_notebook_execution: bool = True,
-    max_prompts_per_session: int = 5,
-    notebook_storage_dir: Optional[str] = None,
-    keep_execution_notebooks: bool = True,
-    notebook_timeout: int = 600,
-    strict_kernel_validation: bool = True,
-    enable_filesystem_context: bool = True,
-    context_storage_dir: Optional[str] = None,
-    approval_mode: str = "never",
-    agent_mode: str = "agentic",
-    max_agent_turns: int = 15,
-    security_level: Optional[str] = None,
+    model: str = _D["model"],
+    api_key: Optional[str] = _D["api_key"],
+    endpoint: Optional[str] = _D["endpoint"],
+    auth_mode: str = _D["auth_mode"],
+    auth_provider: Optional[str] = _D["auth_provider"],
+    auth_file: Optional[str] = _D["auth_file"],
+    enable_reflection: bool = _D["enable_reflection"],
+    reflection_iterations: int = _D["reflection_iterations"],
+    enable_result_review: bool = _D["enable_result_review"],
+    use_notebook_execution: bool = _D["use_notebook_execution"],
+    max_prompts_per_session: int = _D["max_prompts_per_session"],
+    notebook_storage_dir: Optional[str] = _D["notebook_storage_dir"],
+    keep_execution_notebooks: bool = _D["keep_execution_notebooks"],
+    notebook_timeout: int = _D["notebook_timeout"],
+    strict_kernel_validation: bool = _D["strict_kernel_validation"],
+    enable_filesystem_context: bool = _D["enable_filesystem_context"],
+    context_storage_dir: Optional[str] = _D["context_storage_dir"],
+    approval_mode: str = _D["approval_mode"],
+    agent_mode: str = _D["agent_mode"],
+    max_agent_turns: int = _D["max_agent_turns"],
+    security_level: Optional[str] = _D["security_level"],
     *,
-    config: Optional[AgentConfig] = None,
-    reporter: Optional[Reporter] = None,
-    verbose: bool = True,
+    config: Optional[AgentConfig] = _D["config"],
+    reporter: Optional[Reporter] = _D["reporter"],
+    verbose: bool = _D["verbose"],
 ) -> OmicVerseAgent:
     """Convenience factory — creates an :class:`OmicVerseAgent`.
 
     Accepts the same parameters as :meth:`OmicVerseAgent.__init__`.
-    See that docstring for the full parameter reference and examples.
-
-    Returns
-    -------
-    OmicVerseAgent
-        Configured agent instance ready for use.
+    Defaults are derived from the constructor at import time so they
+    cannot drift.
     """
-    return OmicVerseAgent(
-        model=model, api_key=api_key, endpoint=endpoint,
-        auth_mode=auth_mode, auth_provider=auth_provider, auth_file=auth_file,
-        enable_reflection=enable_reflection,
-        reflection_iterations=reflection_iterations,
-        enable_result_review=enable_result_review,
-        use_notebook_execution=use_notebook_execution,
-        max_prompts_per_session=max_prompts_per_session,
-        notebook_storage_dir=notebook_storage_dir,
-        keep_execution_notebooks=keep_execution_notebooks,
-        notebook_timeout=notebook_timeout,
-        strict_kernel_validation=strict_kernel_validation,
-        enable_filesystem_context=enable_filesystem_context,
-        context_storage_dir=context_storage_dir,
-        approval_mode=approval_mode, agent_mode=agent_mode,
-        max_agent_turns=max_agent_turns, security_level=security_level,
-        config=config, reporter=reporter, verbose=verbose,
-    )
+    return OmicVerseAgent(**locals())
 
 
 __all__ = [

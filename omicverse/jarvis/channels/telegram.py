@@ -31,7 +31,7 @@ from .channel_core import (
     gather_usage,
     gather_workspace,
     perform_save,
-    strip_local_paths as _core_strip_local_paths,
+    strip_local_paths,
 )
 from .. import _fmt
 from ..config import default_state_dir
@@ -59,6 +59,13 @@ logger = logging.getLogger("omicverse.jarvis")
 
 _POLLING_RESTART_DELAY_SECONDS = 1.0
 _POLLING_MAX_ATTEMPTS = 2
+
+_SESSION_INIT_ERROR_TEMPLATE = (
+    "Agent 初始化失败：{exc}\n"
+    "请检查 --model 参数，或运行 "
+    "<code>import omicverse as ov; print(ov.list_supported_models())</code> "
+    "查看可用模型。"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -220,7 +227,6 @@ def telegram_runtime_envelope(
 
 class TelegramRuntimePresenter:
     _BORING = {"分析完成", "分析完成。", "task completed", "done", "完成"}
-    _ARTIFACT_EXTS = r"pdf|csv|tsv|txt|xlsx|html|json|h5ad|png|jpg|svg"
     _DRAFT_MAX = 2800
 
     def ack(self, envelope: MessageEnvelope, session: Any) -> List[DeliveryEvent]:
@@ -366,7 +372,7 @@ class TelegramRuntimePresenter:
         a_cur = result.adata or session.adata
         a_info = f"{a_cur.n_obs:,} cells × {a_cur.n_vars:,} genes" if a_cur else ""
 
-        summary = self._strip_local_paths((result.summary or "").strip())
+        summary = strip_local_paths((result.summary or "").strip())
         has_summary = bool(summary and summary.lower() not in self._BORING)
         long_summary = has_summary and len(summary) > 1200
         final_text = _fmt.md_to_html(summary) if has_summary and not long_summary else ""
@@ -382,7 +388,7 @@ class TelegramRuntimePresenter:
         is_complex = has_media or has_reports or has_artifacts or long_summary
 
         if is_complex:
-            explain = summary if has_summary else self._strip_local_paths(llm_text.strip())
+            explain = summary if has_summary else strip_local_paths(llm_text.strip())
             for i, rep in enumerate(result.reports or [], start=1):
                 header = "📝  <b>分析报告</b>" if i == 1 else f"📝  <b>分析报告（续 {i}）</b>"
                 events.append(
@@ -535,10 +541,6 @@ class TelegramRuntimePresenter:
             + "\n\n[...内容较长，已省略中间部分...]\n\n"
             + text[-tail:].lstrip()
         )
-
-    @classmethod
-    def _strip_local_paths(cls, text: str) -> str:
-        return _core_strip_local_paths(text)
 
 
 class TelegramDelivery:
@@ -1059,12 +1061,7 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         except Exception as exc:
             logger.exception("Failed to create session")
             await update.message.reply_text(
-                _fmt.error_message(
-                    f"Agent 初始化失败：{exc}\n"
-                    "请检查 --model 参数，或运行 "
-                    "<code>import omicverse as ov; print(ov.list_supported_models())</code> "
-                    "查看可用模型。"
-                ),
+                _fmt.error_message(_SESSION_INIT_ERROR_TEMPLATE.format(exc=exc)),
                 parse_mode="HTML",
             )
             return None
@@ -1142,12 +1139,7 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         except Exception as exc:
             logger.exception("Failed to handle Telegram analysis message")
             await update.message.reply_text(
-                _fmt.error_message(
-                    f"Agent 初始化失败：{exc}\n"
-                    "请检查 --model 参数，或运行 "
-                    "<code>import omicverse as ov; print(ov.list_supported_models())</code> "
-                    "查看可用模型。"
-                ),
+                _fmt.error_message(_SESSION_INIT_ERROR_TEMPLATE.format(exc=exc)),
                 parse_mode="HTML",
             )
 
@@ -1331,12 +1323,13 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         session = await _get_session(update)
         if session is None:
             return
-        if session.adata is None:
+
+        result = perform_save(session)
+        if result.no_data:
             await update.message.reply_text("❌  没有数据，请先 <code>/load</code> 加载。", parse_mode="HTML")
             return
 
         await update.message.reply_text("⏳  正在保存…")
-        result = perform_save(session)
         if result.success and result.path:
             n_obs, n_vars = result.adata_shape
             with open(result.path, "rb") as fh:
@@ -1734,44 +1727,38 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
 
         data = query.data or ""
         try:
-            route = ConversationRoute(
-                channel="telegram",
-                scope_type="dm" if query.message.chat.type == "private" else "group",
-                scope_id=str(chat_id),
-                thread_id=(
-                    str(query.message.message_thread_id)
-                    if getattr(query.message, "message_thread_id", None)
-                    else None
-                ),
-                sender_id=str(user.id),
-            )
+            route = telegram_route_from_update(update)
             session = runtime.get_session(route)
         except Exception:
             return
 
         if data == "jarvis:save":
-            if session.adata is None:
+            result = perform_save(session)
+            if result.no_data:
                 await context.bot.send_message(chat_id=chat_id, text="❌  没有数据。")
                 return
-            path = session.save_adata()
-            if path and path.exists():
-                a = session.adata
-                with open(str(path), "rb") as fh:
+            if result.success and result.path:
+                n_obs, n_vars = result.adata_shape
+                with open(result.path, "rb") as fh:
                     await context.bot.send_document(
                         chat_id=chat_id,
                         document=fh,
                         filename="current.h5ad",
-                        caption=f"💾  {a.n_obs:,} cells × {a.n_vars:,} genes",
+                        caption=f"💾  {n_obs:,} cells × {n_vars:,} genes",
                     )
             else:
-                await context.bot.send_message(chat_id=chat_id, text="❌  保存失败。")
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"❌  {result.error or '保存失败。'}",
+                )
 
         elif data == "jarvis:status":
-            if session.adata is not None:
-                a = session.adata
-                lines = [f"🔬  {a.n_obs:,} cells × {a.n_vars:,} genes"]
-                if a.obs.columns.tolist():
-                    cols = ", ".join(a.obs.columns.tolist()[:8])
+            info = gather_status(session, is_running=runtime.task_state(route).running)
+            if info.adata_shape:
+                n_obs, n_vars = info.adata_shape
+                lines = [f"🔬  {n_obs:,} cells × {n_vars:,} genes"]
+                if info.obs_columns:
+                    cols = ", ".join(info.obs_columns)
                     lines.append(f"📋  obs: <code>{_fmt.esc(cols)}</code>")
                 await context.bot.send_message(
                     chat_id=chat_id, text="\n".join(lines), parse_mode="HTML"

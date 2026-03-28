@@ -48,12 +48,12 @@ def _resolve_bash_allowed_roots(ctx: "AgentContext") -> List[str]:
             roots.append(os.path.realpath(str(ws)))
     try:
         roots.append(os.path.realpath(os.getcwd()))
-    except OSError:
-        pass
+    except OSError as exc:
+        logger.debug("Could not resolve cwd for bash roots: %s", exc)
     try:
         roots.append(os.path.realpath(tempfile.gettempdir()))
-    except OSError:
-        pass
+    except OSError as exc:
+        logger.debug("Could not resolve tempdir for bash roots: %s", exc)
     return roots
 
 
@@ -78,7 +78,13 @@ def _validate_bash_cwd(ctx: "AgentContext", cwd: str) -> str:
 
 
 def _kill_process_tree(proc: subprocess.Popen) -> None:
-    """Kill a subprocess and its entire process group (best-effort)."""
+    """Kill a subprocess and its entire process group (best-effort).
+
+    Intentional cleanup silence: every except block below catches only
+    narrow OS/process-lookup errors that are expected when the process
+    has already exited.  Logging these would create noise in normal
+    teardown paths.
+    """
     try:
         pgid = os.getpgid(proc.pid)
         os.killpg(pgid, signal.SIGKILL)
@@ -206,9 +212,11 @@ def handle_execute_code(
 
     code = ProactiveCodeTransformer().transform(code)
     if getattr(ctx, "_code_only_mode", False):
-        capture = getattr(ctx, "_capture_code_only_snippet", None)
-        if callable(capture):
-            capture(code, description=description)
+        pipeline = getattr(executor, "_codegen_pipeline", None)
+        if pipeline is not None:
+            pipeline.capture_code_only_snippet(code, description=description)
+        elif callable(getattr(ctx, "_capture_code_only_snippet", None)):
+            ctx._capture_code_only_snippet(code, description=description)
         return {
             "adata": adata,
             "output": (
@@ -223,7 +231,8 @@ def handle_execute_code(
 
     # --- Structured self-healing loop ---
     repair_loop = ExecutionRepairLoop(executor, max_retries=3)
-    extract_code_fn = getattr(ctx, "_extract_python_code", None)
+    pipeline = getattr(executor, "_codegen_pipeline", None)
+    extract_code_fn = pipeline.extract_python_code if pipeline is not None else None
 
     import asyncio as _asyncio
 
@@ -316,7 +325,8 @@ def handle_execute_code(
             )
             output_parts.append(result_msg)
             debug_output_parts.append(result_msg)
-        except Exception:
+        except Exception as exc:
+            logger.debug("Could not read adata shape: %s", exc)
             result_msg = f"Result type: {type(result_adata).__name__}"
             output_parts.append(result_msg)
             debug_output_parts.append(result_msg)
@@ -410,7 +420,8 @@ def handle_search_functions(ctx: "AgentContext", query: str) -> str:
 
     try:
         runtime_matches = list(_global_registry.find(query))
-    except Exception:
+    except Exception as exc:
+        logger.debug("Runtime registry search failed for %r: %s", query, exc)
         runtime_matches = []
     _extend(runtime_matches)
 
@@ -420,7 +431,8 @@ def handle_search_functions(ctx: "AgentContext", query: str) -> str:
             static_matches = list(static_search(query, max_entries=20))
         except TypeError:
             static_matches = list(static_search(query))
-        except Exception:
+        except Exception as exc:
+            logger.debug("Static registry search failed for %r: %s", query, exc)
             static_matches = []
         _extend(static_matches)
 
@@ -636,6 +648,7 @@ def handle_bash(
     except subprocess.TimeoutExpired:
         _kill_process_tree(proc)
         stdout, stderr = "", ""
+        # Intentional cleanup silence: best-effort drain after hard kill.
         try:
             stdout, stderr = proc.communicate(timeout=5)
         except (subprocess.TimeoutExpired, OSError):

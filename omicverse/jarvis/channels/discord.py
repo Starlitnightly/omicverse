@@ -25,6 +25,7 @@ except ImportError:  # pragma: no cover - optional dependency
     _discord = None
 
 from .channel_core import (
+    command_parts,
     text_chunks,
     strip_local_paths,
     gather_status,
@@ -601,7 +602,7 @@ class DiscordJarvisBot:
             )
             return
 
-        cmd, tail = self._command_parts(text)
+        cmd, tail = command_parts(text)
         image_note = build_workspace_note(
             session.workspace,
             inbound_images,
@@ -705,12 +706,6 @@ class DiscordJarvisBot:
         logger.info("Discord guild mention accepted for processing")
         return re.sub(pattern, "", raw).strip()
 
-    @staticmethod
-    def _command_parts(text: str) -> tuple[str, str]:
-        tokens = text.split()
-        cmd = tokens[0].lower() if tokens else ""
-        tail = text.split(None, 1)[1].strip() if len(tokens) > 1 else ""
-        return cmd, tail
 
     async def _send_text(self, channel, text: str, *, reply_to=None) -> None:
         first = True

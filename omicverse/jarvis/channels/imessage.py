@@ -14,24 +14,24 @@ import time
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
-from ..agent_bridge import AgentBridge
-from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from ..model_help import render_model_help
+from ..runtime import (
+    AgentBridgeExecutionAdapter,
+    ConversationRoute,
+    DeliveryEvent,
+    MessageEnvelope,
+    MessageRuntime,
+    MessageRouter,
+)
 from .channel_core import (
-    RunningTask,
     command_parts,
-    text_chunks,
-    strip_local_paths,
-    build_full_request,
-    get_prior_history,
-    notify_turn_complete,
-    process_result_state,
-    format_analysis_error,
     default_summary,
-    gather_status,
     format_status_plain,
+    gather_status,
+    strip_local_paths,
+    text_chunks,
 )
 
 logger = logging.getLogger("omicverse.jarvis.imessage")
@@ -359,6 +359,266 @@ class IMessageRpcClient:
         return None
 
 
+# ---------------------------------------------------------------------------
+# Routing helpers
+# ---------------------------------------------------------------------------
+
+
+def imessage_route_from_message(message: Dict[str, Any]) -> Optional[ConversationRoute]:
+    """Build a :class:`ConversationRoute` from an imsg RPC message dict."""
+    is_group = bool(message.get("is_group"))
+    chat_id = message.get("chat_id")
+    sender = _normalize_handle(str(message.get("sender") or ""))
+    chat_identifier = str(message.get("chat_identifier") or "").strip()
+    scope_id = ""
+    if isinstance(chat_id, int):
+        scope_id = str(chat_id)
+    elif not is_group and sender:
+        scope_id = sender
+    elif chat_identifier:
+        scope_id = chat_identifier
+    if not scope_id:
+        return None
+    return ConversationRoute(
+        channel="imessage",
+        scope_type="group" if is_group else "dm",
+        scope_id=scope_id,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Presenter  (implements ``MessagePresenter`` protocol)
+# ---------------------------------------------------------------------------
+
+
+class IMessageRuntimePresenter:
+    """Produce :class:`DeliveryEvent` instances for iMessage rendering (plain text)."""
+
+    _BORING = _BORING_SUMMARIES
+
+    def ack(self, envelope: MessageEnvelope, session: Any) -> List[DeliveryEvent]:
+        return [
+            DeliveryEvent(
+                route=envelope.route,
+                kind="text",
+                text="⏳ 已收到，开始分析。",
+            )
+        ]
+
+    def queue_started(self, route: ConversationRoute, queued_count: int) -> List[DeliveryEvent]:
+        return [
+            DeliveryEvent(
+                route=route,
+                kind="text",
+                text=f"开始执行队列中的 {queued_count} 条请求...",
+            )
+        ]
+
+    def draft_open(self, route: ConversationRoute) -> DeliveryEvent:
+        return DeliveryEvent(
+            route=route,
+            kind="text",
+            mode="open",
+            target="analysis-draft",
+            text="⏳ 已收到，开始分析。",
+        )
+
+    def draft_update(self, route: ConversationRoute, llm_text: str, progress: str) -> DeliveryEvent:
+        if progress:
+            text = f"⚙️ {progress[:200]}"
+        elif llm_text.strip():
+            text = f"💭 {llm_text.strip()[-200:]}"
+        else:
+            text = "💭 分析中…"
+        return DeliveryEvent(
+            route=route,
+            kind="text",
+            mode="edit",
+            target="analysis-draft",
+            text=text,
+        )
+
+    def draft_cancelled(self, route: ConversationRoute) -> DeliveryEvent:
+        return DeliveryEvent(
+            route=route,
+            kind="text",
+            mode="edit",
+            target="analysis-draft",
+            text="🚫 已取消当前分析。",
+        )
+
+    def analysis_error(self, route: ConversationRoute, error_text: str) -> DeliveryEvent:
+        return DeliveryEvent(
+            route=route,
+            kind="text",
+            mode="edit",
+            target="analysis-draft",
+            text=f"❌ {error_text}",
+        )
+
+    def typing(self, route: ConversationRoute) -> Optional[DeliveryEvent]:
+        return None
+
+    def quick_chat_reply(self, route: ConversationRoute, text: str) -> DeliveryEvent:
+        return DeliveryEvent(route=route, kind="text", text=text)
+
+    def quick_chat_fallback(self, route: ConversationRoute) -> DeliveryEvent:
+        return DeliveryEvent(
+            route=route,
+            kind="text",
+            text="⏳ 后台分析进行中，请等待完成。使用 /cancel 取消。",
+        )
+
+    def analysis_status(
+        self,
+        route: ConversationRoute,
+        *,
+        has_media: bool,
+        has_reports: bool,
+        has_artifacts: bool,
+    ) -> Optional[DeliveryEvent]:
+        return None  # iMessage is plain text; no mid-delivery status needed
+
+    def final_events(
+        self,
+        route: ConversationRoute,
+        *,
+        session: Any,
+        user_text: str,
+        llm_text: str,
+        result: Any,
+    ) -> List[DeliveryEvent]:
+        del user_text
+        events: List[DeliveryEvent] = []
+
+        # Reports
+        for report in list(result.reports or []):
+            for chunk in text_chunks(report, limit=_MAX_TEXT):
+                events.append(DeliveryEvent(route=route, kind="text", text=chunk))
+
+        # Figures
+        for index, figure_data in enumerate(result.figures or [], start=1):
+            data = figure_data if isinstance(figure_data, bytes) else b""
+            events.append(
+                DeliveryEvent(
+                    route=route,
+                    kind="photo",
+                    binary=data,
+                    filename=f"figure_{index}.png",
+                    caption=f"图 {index}",
+                )
+            )
+
+        # Artifacts
+        for artifact in list(result.artifacts or []):
+            events.append(
+                DeliveryEvent(
+                    route=route,
+                    kind="document",
+                    binary=getattr(artifact, "data", b""),
+                    filename=getattr(artifact, "filename", None) or "artifact.bin",
+                    caption=f"附件: {getattr(artifact, 'filename', 'artifact.bin')}",
+                )
+            )
+
+        # Summary text
+        summary = strip_local_paths((result.summary or "").strip())
+        if not summary or summary.lower() in self._BORING:
+            summary = strip_local_paths(llm_text.strip()) if llm_text.strip() else ""
+        if not summary:
+            summary = default_summary(session)
+        for chunk in text_chunks(summary, limit=_MAX_TEXT):
+            events.append(DeliveryEvent(route=route, kind="text", text=chunk))
+
+        # Mark draft complete
+        events.append(
+            DeliveryEvent(
+                route=route,
+                kind="text",
+                mode="edit",
+                target="analysis-draft",
+                text="✅ 分析完成",
+            )
+        )
+
+        return events
+
+
+# ---------------------------------------------------------------------------
+# Delivery  (iMessage transport layer)
+# ---------------------------------------------------------------------------
+
+
+class IMessageDelivery:
+    """Translate :class:`DeliveryEvent` instances into iMessage RPC calls."""
+
+    # Edit-mode texts that are pure status markers; skip sending as new
+    # messages to avoid noise (iMessage cannot edit sent messages).
+    _SKIP_EDITS = {"✅ 分析完成", "💭 分析中…", "⏳ 已收到，开始分析。"}
+
+    def __init__(self, *, client: IMessageRpcClient) -> None:
+        self._client = client
+        self._targets: Dict[str, str] = {}
+
+    def register_target(self, route: ConversationRoute, target: str) -> None:
+        """Cache the iMessage target (handle / chat_id) for a route."""
+        self._targets[route.route_key()] = target
+
+    async def deliver(self, event: DeliveryEvent) -> None:
+        target = self._targets.get(event.route.route_key()) or event.route.scope_id
+        if not target:
+            logger.warning("Cannot resolve iMessage target for %s", event.route.route_key())
+            return
+
+        try:
+            if event.kind == "typing":
+                return
+
+            if event.kind in ("photo", "document"):
+                await self._send_binary(target, event)
+                return
+
+            # Text events (all modes)
+            text = (event.text or "").strip()
+            if not text:
+                return
+
+            # For edit-mode events: iMessage cannot edit, so skip pure status
+            # markers but send substantive updates as new messages.
+            if event.mode == "edit" and text in self._SKIP_EDITS:
+                return
+
+            for chunk in text_chunks(text, limit=_MAX_TEXT):
+                await self._client.send_message(target, chunk)
+        except Exception:
+            logger.warning(
+                "iMessage delivery failed for %s kind=%s",
+                event.route.route_key(),
+                event.kind,
+                exc_info=True,
+            )
+
+    async def _send_binary(self, target: str, event: DeliveryEvent) -> None:
+        data = event.binary or b""
+        if not data:
+            return
+        filename = event.filename or "attachment.bin"
+        suffix = Path(filename).suffix or ".bin"
+        with tempfile.NamedTemporaryFile(
+            prefix="jarvis-imessage-", suffix=suffix, delete=False,
+        ) as handle:
+            handle.write(data)
+            temp_path = handle.name
+        try:
+            caption = event.caption or filename
+            await self._client.send_message(target, caption, file_path=temp_path, timeout=120.0)
+        finally:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+
+
 class IMessageJarvisBot:
     def __init__(
         self,
@@ -373,13 +633,19 @@ class IMessageJarvisBot:
         self._cli_path = cli_path or "imsg"
         self._db_path = db_path
         self._include_attachments = include_attachments
-        self._route_registry = GatewaySessionRegistry(session_manager)
-        self._tasks: Dict[str, RunningTask] = {}
         self._stop_event = stop_event
         self._client = IMessageRpcClient(
             cli_path=self._cli_path,
             db_path=self._db_path,
             on_notification=self._handle_notification,
+        )
+        self._delivery = IMessageDelivery(client=self._client)
+        self._message_runtime = MessageRuntime(
+            router=MessageRouter(session_manager),
+            presenter=IMessageRuntimePresenter(),
+            execution_adapter=AgentBridgeExecutionAdapter(),
+            deliver=self._delivery.deliver,
+            web_bridge=getattr(session_manager, "gateway_web_bridge", None),
         )
 
     async def run(self) -> None:
@@ -428,9 +694,9 @@ class IMessageJarvisBot:
         if not sender or bool(message.get("is_from_me")):
             return
 
-        session_key = self._session_key_for_message(message)
+        route = imessage_route_from_message(message)
         target = _message_target(message)
-        if session_key is None or not target:
+        if route is None or not target:
             return
 
         text = str(message.get("text") or "").strip()
@@ -448,8 +714,8 @@ class IMessageJarvisBot:
                     or (Path(_path).name if _path else "")
                 ).strip()
                 if _fname.lower().endswith(".h5ad") and _path:
-                    session = self._route_registry.get_or_create(session_key)
-                    await self._handle_h5ad_attachment(session_key, session, target, _path, _fname)
+                    session = self._message_runtime.get_session(route)
+                    await self._handle_h5ad_attachment(route, session, target, _path, _fname)
                     return
 
         if not text and attachments:
@@ -458,43 +724,26 @@ class IMessageJarvisBot:
             return
 
         if text.startswith("/"):
-            await self._handle_command(session_key, target, text)
+            await self._handle_command(route, target, text)
             return
 
-        task_key = session_key.as_key()
-        running = self._tasks.get(task_key)
-        if running is not None and not running.task.done():
-            await self._send_text(target, "⏳ 当前会话已有任务在运行，请等待完成或发送 /cancel。")
-            return
-
-        task = asyncio.create_task(self._run_analysis(task_key, session_key, target, text))
-        self._tasks[task_key] = RunningTask(task=task, request=text, started_at=time.time())
-
-    def _session_key_for_message(self, message: Dict[str, Any]) -> Optional[SessionKey]:
-        is_group = bool(message.get("is_group"))
-        chat_id = message.get("chat_id")
-        sender = _normalize_handle(str(message.get("sender") or ""))
-        chat_identifier = str(message.get("chat_identifier") or "").strip()
-        scope_id = ""
-        if isinstance(chat_id, int):
-            scope_id = str(chat_id)
-        elif not is_group and sender:
-            scope_id = sender
-        elif chat_identifier:
-            scope_id = chat_identifier
-        if not scope_id:
-            return None
-        return SessionKey(
-            channel="imessage",
-            scope_type="group" if is_group else "dm",
-            scope_id=scope_id,
+        # Register the delivery target and delegate to the shared runtime.
+        self._delivery.register_target(route, target)
+        envelope = MessageEnvelope(
+            route=route,
+            text=text,
+            sender_id=sender,
+            trigger="direct" if route.is_direct else "group",
+            explicit_trigger=True,
         )
+        try:
+            await self._message_runtime.handle_message(envelope)
+        except Exception as exc:
+            logger.exception("iMessage analysis dispatch failed")
+            await self._send_text(target, f"分析异常: {exc}")
 
-    def _build_full_request(self, session: Any, text: str) -> str:
-        return build_full_request(session, text, channel_label="iMessage")
-
-    async def _handle_command(self, session_key: SessionKey, target: str, text: str) -> None:
-        session = self._route_registry.get_or_create(session_key)
+    async def _handle_command(self, route: ConversationRoute, target: str, text: str) -> None:
+        session = self._message_runtime.get_session(route)
         cmd, tail = command_parts(text)
 
         if cmd == "/help":
@@ -509,21 +758,26 @@ class IMessageJarvisBot:
             return
 
         if cmd == "/reset":
+            await self._message_runtime.cancel(route)
             session.reset()
             await self._send_text(target, "✅ 已重置当前会话。")
             return
 
         if cmd == "/cancel":
-            running = self._tasks.get(session_key.as_key())
-            if running and not running.task.done():
-                running.task.cancel()
+            cancelled = await self._message_runtime.cancel(route)
+            if cancelled:
                 await self._send_text(target, "🚫 已取消当前分析。")
             else:
                 await self._send_text(target, "当前没有正在运行的分析任务。")
             return
 
         if cmd == "/status":
-            info = gather_status(session)
+            state = self._message_runtime.task_state(route)
+            info = gather_status(
+                session,
+                is_running=state.running,
+                running_request=state.request[:300] if state.running else "",
+            )
             await self._send_text(target, format_status_plain(info))
             return
 
@@ -541,100 +795,13 @@ class IMessageJarvisBot:
 
         await self._send_text(target, f"未知命令: {cmd}\n发送 /help 查看帮助。")
 
-    async def _run_analysis(
-        self,
-        task_key: str,
-        session_key: SessionKey,
-        target: str,
-        user_text: str,
-    ) -> None:
-        session = self._route_registry.get_or_create(session_key)
-        full_request = self._build_full_request(session, user_text)
-        llm_buf = ""
-        last_progress_sent = 0.0
-
-        async def progress_cb(msg: str) -> None:
-            nonlocal last_progress_sent
-            now = asyncio.get_running_loop().time()
-            if now - last_progress_sent < _PROGRESS_GAP:
-                return
-            last_progress_sent = now
-            await self._send_text(target, f"⚙️ {msg[:200]}")
-
-        async def llm_chunk_cb(chunk: str) -> None:
-            nonlocal llm_buf
-            if chunk:
-                llm_buf += chunk
-
-        _prior_history = get_prior_history(
-            self._sm, "imessage", session_key.scope_type, session_key.scope_id, session,
-        )
-
-        await self._send_text(target, "⏳ 已收到，开始分析。")
-        bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
-
-        try:
-            result = await bridge.run(full_request, session.adata, history=_prior_history)
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            logger.exception("iMessage analysis failed")
-            await self._send_text(target, f"分析失败: {exc}")
-            return
-        finally:
-            self._tasks.pop(task_key, None)
-
-        delivery_figures, _adata_info = process_result_state(session, result, user_text)
-
-        notify_turn_complete(
-            self._sm,
-            channel="imessage",
-            scope_type=session_key.scope_type,
-            scope_id=session_key.scope_id,
-            session=session,
-            user_text=user_text,
-            llm_text=llm_buf,
-            adata=result.adata,
-            figures=result.figures or [],
-        )
-
-        if result.error:
-            await self._send_text(target, format_analysis_error(result, llm_buf))
-            return
-
-        for report in list(result.reports or []):
-            for chunk in text_chunks(report):
-                await self._send_text(target, chunk)
-
-        for index, figure in enumerate(delivery_figures, start=1):
-            await self._send_bytes(
-                target,
-                figure,
-                filename=f"figure_{index}.png",
-                caption=f"图 {index}",
-            )
-
-        for artifact in list(result.artifacts or []):
-            await self._send_bytes(
-                target,
-                artifact.data,
-                filename=artifact.filename or "artifact.bin",
-                caption=f"附件: {artifact.filename}",
-            )
-
-        summary = strip_local_paths(bridge.pick_reply_text(result, llm_buf))
-        if not summary:
-            summary = default_summary(session)
-        for chunk in text_chunks(summary):
-            await self._send_text(target, chunk)
-
     async def _send_text(self, target: str, text: str) -> None:
         for chunk in text_chunks(text):
             await self._client.send_message(target, chunk)
 
     async def _handle_h5ad_attachment(
         self,
-        session_key,
+        route: ConversationRoute,
         session: Any,
         target: str,
         src_path: str,
@@ -663,20 +830,6 @@ class IMessageJarvisBot:
         except Exception as exc:
             logger.exception("iMessage failed to load h5ad attachment")
             await self._send_text(target, f"❌ 文件处理失败: {exc}")
-
-    async def _send_bytes(self, target: str, data: bytes, *, filename: str, caption: str) -> None:
-        suffix = Path(filename).suffix or ".bin"
-        with tempfile.NamedTemporaryFile(prefix="jarvis-imessage-", suffix=suffix, delete=False) as handle:
-            handle.write(data)
-            temp_path = handle.name
-        try:
-            await self._client.send_message(target, caption or filename, file_path=temp_path, timeout=120.0)
-        finally:
-            try:
-                os.unlink(temp_path)
-            except OSError:
-                pass
-
 
 def run_imessage_bot(
     *,

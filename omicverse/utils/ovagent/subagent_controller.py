@@ -156,7 +156,7 @@ class SubagentController:
         # Snapshot tool schemas — the subagent sees a frozen list, not a
         # live reference into the parent's tool registry.
         tool_schemas = list(
-            self._ctx._get_visible_agent_tools(
+            self._tool_runtime.get_visible_agent_tools(
                 allowed_names=set(allowed_tools)
             )
         )

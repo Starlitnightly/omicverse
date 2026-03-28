@@ -134,8 +134,10 @@ class FakeSubagentToolRuntime:
         self,
         handlers: Optional[Dict[str, Any]] = None,
         registry_tools: Optional[Dict[str, Dict[str, Any]]] = None,
+        tool_schemas: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         self._handlers = dict(handlers or {})
+        self._tool_schemas = list(tool_schemas or [])
         # Ensure every registry entry has the attributes PermissionPolicy needs.
         enriched: Dict[str, Dict[str, Any]] = {}
         for name, attrs in (registry_tools or {}).items():
@@ -144,6 +146,13 @@ class FakeSubagentToolRuntime:
             enriched[name] = merged
         self.registry = FakeToolRegistry(enriched)
         self.dispatch_calls: List[Dict[str, Any]] = []
+
+    def get_visible_agent_tools(
+        self, *, allowed_names: Optional[Set[str]] = None
+    ) -> List[Dict[str, Any]]:
+        if allowed_names:
+            return [s for s in self._tool_schemas if s.get("name") in allowed_names]
+        return list(self._tool_schemas)
 
     async def dispatch_tool(
         self,
@@ -185,7 +194,11 @@ def _build_controller(
 ) -> SubagentController:
     """Wire up a SubagentController with all test doubles."""
     cfg = config or AgentConfig()
-    ctx = FakeAgentContext(llm, cfg, tool_schemas=tool_schemas or [])
+    schemas = tool_schemas or []
+    ctx = FakeAgentContext(llm, cfg, tool_schemas=schemas)
+    # Ensure tool_runtime also has the schemas (SubagentController now
+    # calls tool_runtime.get_visible_agent_tools() directly).
+    tool_runtime._tool_schemas = list(schemas)
     prompt_builder = FakePromptBuilder()
     return SubagentController(ctx, prompt_builder, tool_runtime)
 
@@ -277,7 +290,7 @@ class TestSubagentToolSchemaSnapshot:
             make_chat_response(content="Done."),
         ])
 
-        tool_runtime = FakeSubagentToolRuntime()
+        tool_runtime = FakeSubagentToolRuntime(tool_schemas=parent_schemas)
         cfg = AgentConfig()
         ctx = FakeAgentContext(llm, cfg, tool_schemas=parent_schemas)
         prompt_builder = FakePromptBuilder()
@@ -297,9 +310,11 @@ class TestSubagentToolSchemaSnapshot:
         assert "finish" in snapshot_names
         original_count = len(runtime.tool_schemas)
 
-        # Now mutate the parent's schemas
+        # Now mutate the parent's schemas (both ctx and tool_runtime)
         ctx._tool_schemas.append(_make_tool_schema("execute_code"))
         ctx._tool_schemas.append(_make_tool_schema("new_tool"))
+        tool_runtime._tool_schemas.append(_make_tool_schema("execute_code"))
+        tool_runtime._tool_schemas.append(_make_tool_schema("new_tool"))
 
         # Subagent snapshot is unaffected
         assert len(runtime.tool_schemas) == original_count
