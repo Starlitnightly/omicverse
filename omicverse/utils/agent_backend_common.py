@@ -9,6 +9,7 @@ import concurrent.futures as _cf
 import logging
 import os
 import random
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, TypeVar
@@ -78,6 +79,7 @@ _STREAM_DISPATCH = {
 
 _SHARED_EXECUTOR: Optional[_cf.ThreadPoolExecutor] = None
 _EXECUTOR_ATEXIT_REGISTERED: bool = False
+_EXECUTOR_LOCK = threading.Lock()
 
 
 def _shutdown_shared_executor() -> None:
@@ -92,15 +94,22 @@ def _shutdown_shared_executor() -> None:
 
 
 def _get_shared_executor() -> _cf.ThreadPoolExecutor:
+    """Return the module-level shared executor, creating it if needed.
+
+    Uses double-checked locking to avoid duplicate construction under
+    concurrent access from multiple threads.
+    """
     global _SHARED_EXECUTOR, _EXECUTOR_ATEXIT_REGISTERED
     if _SHARED_EXECUTOR is None:
-        _SHARED_EXECUTOR = _cf.ThreadPoolExecutor(
-            max_workers=4, thread_name_prefix="ovagent-stream",
-        )
-        if not _EXECUTOR_ATEXIT_REGISTERED:
-            import atexit
-            atexit.register(_shutdown_shared_executor)
-            _EXECUTOR_ATEXIT_REGISTERED = True
+        with _EXECUTOR_LOCK:
+            if _SHARED_EXECUTOR is None:
+                _SHARED_EXECUTOR = _cf.ThreadPoolExecutor(
+                    max_workers=4, thread_name_prefix="ovagent-stream",
+                )
+                if not _EXECUTOR_ATEXIT_REGISTERED:
+                    import atexit
+                    atexit.register(_shutdown_shared_executor)
+                    _EXECUTOR_ATEXIT_REGISTERED = True
     return _SHARED_EXECUTOR
 
 
@@ -262,12 +271,12 @@ def _should_retry(exc: Exception) -> bool:
 
 def _retry_with_backoff(
     func: Callable[..., T],
+    *args,
     max_attempts: int = 3,
     base_delay: float = 1.0,
     factor: float = 2.0,
     jitter: float = 0.5,
-    *args,
-    **kwargs
+    **kwargs,
 ) -> T:
     """Retry a function call with exponential backoff and jitter.
 
@@ -275,16 +284,18 @@ def _retry_with_backoff(
     ----------
     func : Callable
         Function to retry
+    *args
+        Positional arguments forwarded to *func*
     max_attempts : int
-        Maximum number of attempts (default: 3)
+        Maximum number of attempts (keyword-only, default: 3)
     base_delay : float
-        Base delay in seconds (default: 1.0)
+        Base delay in seconds (keyword-only, default: 1.0)
     factor : float
-        Exponential backoff factor (default: 2.0)
+        Exponential backoff factor (keyword-only, default: 2.0)
     jitter : float
-        Maximum jitter factor as proportion of delay (default: 0.5)
-    *args, **kwargs
-        Arguments to pass to func
+        Maximum jitter factor as proportion of delay (keyword-only, default: 0.5)
+    **kwargs
+        Keyword arguments forwarded to *func*
 
     Returns
     -------
@@ -292,8 +303,8 @@ def _retry_with_backoff(
 
     Raises
     ------
-    Exception
-        Last exception encountered if all retries fail
+    RuntimeError
+        If all retry attempts are exhausted
     """
     last_exception = None
 
