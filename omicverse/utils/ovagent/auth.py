@@ -226,7 +226,22 @@ def collect_api_key_env(
 
 @contextmanager
 def temporary_api_keys(env_mapping: Dict[str, str]):
-    """Temporarily inject API keys into ``os.environ`` and clean up afterwards."""
+    """Temporarily inject API keys into ``os.environ`` and clean up afterwards.
+
+    **Environment-exposure tradeoff:** While the ``with`` block executes,
+    the API keys are visible in ``os.environ`` to any code running in the
+    same process — including spawned subprocesses that inherit the
+    environment.  This is an intentional trade-off: many provider SDKs
+    read credentials exclusively from environment variables, so injection
+    is the only way to authenticate without modifying those libraries.
+
+    The exposure window is strictly bounded by the ``with`` block.  The
+    ``finally`` clause unconditionally restores the previous environment
+    state (or removes the variable if it was not previously set), so keys
+    never persist beyond the caller's intent even if an exception
+    propagates.  Callers should keep the ``with`` block as short as
+    possible to minimize the exposure window.
+    """
     if not env_mapping:
         yield
         return

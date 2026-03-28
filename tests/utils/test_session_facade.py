@@ -220,6 +220,62 @@ def test_lazy_context_service_creation():
 
 
 # -----------------------------------------------------------------------
+# AC: Thread-safe lazy initialization — concurrent access atomicity
+# -----------------------------------------------------------------------
+
+def test_concurrent_session_service_same_instance():
+    """Concurrent _get_session_service calls must all return the same instance."""
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    from omicverse.utils.ovagent.session_context import SessionService
+
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    barrier = threading.Barrier(4)
+
+    def get_service():
+        barrier.wait()
+        return agent._get_session_service()
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = [pool.submit(get_service) for _ in range(4)]
+        results = [f.result() for f in as_completed(futures)]
+
+    assert all(r is results[0] for r in results)
+    assert isinstance(results[0], SessionService)
+
+
+def test_concurrent_context_service_same_instance():
+    """Concurrent _get_context_service calls must all return the same instance."""
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    from omicverse.utils.ovagent.session_context import ContextService
+
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    barrier = threading.Barrier(4)
+
+    def get_service():
+        barrier.wait()
+        return agent._get_context_service()
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = [pool.submit(get_service) for _ in range(4)]
+        results = [f.result() for f in as_completed(futures)]
+
+    assert all(r is results[0] for r in results)
+    assert isinstance(results[0], ContextService)
+
+
+def test_service_init_lock_exists_on_mixin():
+    """The mixin must expose a threading.Lock for service initialization."""
+    import threading
+
+    assert hasattr(SessionContextFacadeMixin, "_service_init_lock")
+    assert isinstance(SessionContextFacadeMixin._service_init_lock, threading.Lock)
+
+
+# -----------------------------------------------------------------------
 # AC-001.5: No new runtime dependencies
 # -----------------------------------------------------------------------
 
@@ -232,6 +288,7 @@ def test_no_new_external_dependencies():
     allowed_prefixes = (
         "from __future__",
         "import logging",
+        "import threading",
         "from contextlib",
         "from pathlib",
         "from typing",

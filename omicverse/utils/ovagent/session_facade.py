@@ -14,6 +14,7 @@ manages.
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
@@ -79,24 +80,45 @@ class SessionContextFacadeMixin:
     # Lazy service constructors (for __new__-based instances)
     # ----------------------------------------------------------------
 
-    def _get_session_service(self) -> "SessionService":
-        """Lazily construct SessionService for legacy __new__-based instances."""
-        service = getattr(self, "_session_service", None)
-        if service is None:
-            from .session_context import SessionService
+    # Class-level lock for thread-safe lazy service initialization.
+    # Double-checked locking ensures at most one service instance is
+    # created even when multiple threads race on first access.
+    _service_init_lock = threading.Lock()
 
-            service = SessionService(self)
-            self._session_service = service
+    def _get_session_service(self) -> "SessionService":
+        """Lazily construct SessionService for legacy __new__-based instances.
+
+        Thread-safe: uses double-checked locking so concurrent callers
+        never create duplicate service instances.
+        """
+        service = getattr(self, "_session_service", None)
+        if service is not None:
+            return service
+        with self._service_init_lock:
+            service = getattr(self, "_session_service", None)
+            if service is None:
+                from .session_context import SessionService
+
+                service = SessionService(self)
+                self._session_service = service
         return service
 
     def _get_context_service(self) -> "ContextService":
-        """Lazily construct ContextService for legacy __new__-based instances."""
-        service = getattr(self, "_context_service", None)
-        if service is None:
-            from .session_context import ContextService
+        """Lazily construct ContextService for legacy __new__-based instances.
 
-            service = ContextService(self)
-            self._context_service = service
+        Thread-safe: uses double-checked locking so concurrent callers
+        never create duplicate service instances.
+        """
+        service = getattr(self, "_context_service", None)
+        if service is not None:
+            return service
+        with self._service_init_lock:
+            service = getattr(self, "_context_service", None)
+            if service is None:
+                from .session_context import ContextService
+
+                service = ContextService(self)
+                self._context_service = service
         return service
 
     # ----------------------------------------------------------------

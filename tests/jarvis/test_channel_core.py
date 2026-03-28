@@ -14,6 +14,7 @@ Covers:
 from __future__ import annotations
 
 import asyncio
+import logging
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
 
@@ -102,6 +103,43 @@ class TestStripLocalPaths:
     def test_preserves_normal_text(self) -> None:
         text = "Analysis complete: 5000 cells detected"
         assert strip_local_paths(text) == text
+
+    def test_preserves_scientific_data_paths(self) -> None:
+        """Paths under /data, /opt, /mnt, /var are legitimate scientific paths."""
+        assert "/data/shared/genome.fa" in strip_local_paths(
+            "Reference genome at /data/shared/genome.fa"
+        )
+
+    def test_preserves_opt_tool_paths(self) -> None:
+        assert "/opt/cellranger/bin" in strip_local_paths(
+            "Using tool at /opt/cellranger/bin"
+        )
+
+    def test_preserves_mnt_paths(self) -> None:
+        assert "/mnt/nfs/lab" in strip_local_paths(
+            "Lab data on /mnt/nfs/lab/experiment_1"
+        )
+
+    def test_preserves_var_paths(self) -> None:
+        assert "/var/log/analysis" in strip_local_paths(
+            "See /var/log/analysis for details"
+        )
+
+    def test_still_removes_users_paths(self) -> None:
+        result = strip_local_paths("see /Users/alice/work/project here")
+        assert "/Users/" not in result
+
+    def test_still_removes_home_paths(self) -> None:
+        result = strip_local_paths("file at /home/bob/.config/app.ini")
+        assert "/home/" not in result
+
+    def test_still_removes_tmp_paths(self) -> None:
+        result = strip_local_paths("cached in /tmp/ov_session_abc123")
+        assert "/tmp/" not in result
+
+    def test_still_removes_private_paths(self) -> None:
+        result = strip_local_paths("see /private/var/folders/xx/tmp here")
+        assert "/private/" not in result
 
 
 # ── build_full_request ───────────────────────────────────────────────────────
@@ -213,6 +251,28 @@ class TestNotifyTurnComplete:
             llm_text="y",
         )
 
+    def test_logs_debug_on_exception(self, caplog) -> None:
+        """Exception in web bridge produces a debug log with traceback."""
+        class FakeBridge:
+            def on_turn_complete_simple(self, **kwargs):
+                raise RuntimeError("bridge-error")
+
+        sm = SimpleNamespace(gateway_web_bridge=FakeBridge())
+        with caplog.at_level(logging.DEBUG, logger="omicverse.jarvis.channels.channel_core"):
+            notify_turn_complete(
+                sm,
+                channel="discord",
+                scope_type="dm",
+                scope_id="123",
+                session=SimpleNamespace(
+                    agent=SimpleNamespace(get_current_session_info=lambda: None),
+                ),
+                user_text="x",
+                llm_text="y",
+            )
+        assert any("notify_turn_complete" in r.message for r in caplog.records)
+        assert any(r.exc_info for r in caplog.records if "notify_turn_complete" in r.message)
+
 
 # ── process_result_state ─────────────────────────────────────────────────────
 
@@ -261,6 +321,24 @@ class TestProcessResultState:
         result = self._make_result()
         _, adata_info = process_result_state(session, result, "test")
         assert adata_info == ""
+
+    def test_logs_debug_on_save_adata_failure(self, caplog) -> None:
+        """save_adata failure produces a debug log entry."""
+        session = self._make_session()
+        session.save_adata = lambda: (_ for _ in ()).throw(IOError("disk"))
+        result = self._make_result(adata=SimpleNamespace(n_obs=1, n_vars=1))
+        with caplog.at_level(logging.DEBUG, logger="omicverse.jarvis.channels.channel_core"):
+            process_result_state(session, result, "test")
+        assert any("save_adata" in r.message for r in caplog.records)
+
+    def test_logs_debug_on_memory_log_failure(self, caplog) -> None:
+        """append_memory_log failure produces a debug log entry."""
+        session = self._make_session()
+        session.append_memory_log = lambda **kw: (_ for _ in ()).throw(RuntimeError("mem"))
+        result = self._make_result()
+        with caplog.at_level(logging.DEBUG, logger="omicverse.jarvis.channels.channel_core"):
+            process_result_state(session, result, "test")
+        assert any("append_memory_log" in r.message for r in caplog.records)
 
     def test_appends_memory_log(self) -> None:
         log_calls = []
