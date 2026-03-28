@@ -157,9 +157,13 @@ def _compute_fov_geometry_transform(adata, fov_id: str, fov_col: str, basis: str
     target_span = target_max - target_min
 
     sx = float(target_span[0] / local_span[0]) if local_span[0] > 0 else 1.0
-    sy = float(target_span[1] / local_span[1]) if local_span[1] > 0 else 1.0
     tx = float(target_min[0] - (local_min[0] * sx))
-    ty = float(target_min[1] - (local_min[1] * sy))
+
+    # Segmentation polygons are stored in image-style local coordinates.
+    # When projecting them into the stitched basis, flip Y within each FOV bbox
+    # so the polygon orientation matches `imshow(origin="upper")`.
+    sy = float(-target_span[1] / local_span[1]) if local_span[1] > 0 else -1.0
+    ty = float(target_max[1] - (local_min[1] * sy))
     return sx, sy, tx, ty
 
 
@@ -168,7 +172,7 @@ def _compute_fov_image_extent(adata, fov_id: str, fov_col: str, basis: str):
     return _compute_basis_bbox(adata, fov_id, fov_col, basis)
 
 
-def _place_fov_images(ax, adata, fovs_to_plot, fov_col, basis, img_key, alpha_img):
+def _place_fov_images(ax, adata, fovs_to_plot, fov_col, basis, img_key, alpha_img, bw):
     """Draw each FOV's background image at its position in the chosen basis."""
     for fov_id in fovs_to_plot:
         fov_info = adata.uns.get("spatial", {}).get(fov_id, {})
@@ -180,11 +184,14 @@ def _place_fov_images(ax, adata, fovs_to_plot, fov_col, basis, img_key, alpha_im
         if extent is None:
             continue
         img = np.asarray(img)
+        if bw and img.ndim == 3 and img.shape[2] >= 3:
+            img = np.dot(img[..., :3], [0.2989, 0.5870, 0.1140])
 
         # Match `ov.pl.spatial`: use `origin="upper"` and invert the axis later
         # via `set_ylim(y_max, y_min)`. Do not pre-flip the extent here.
         ax.imshow(
             img,
+            cmap="gray" if bw and img.ndim == 2 else None,
             origin="upper",
             extent=extent,
             alpha=alpha_img,
@@ -251,6 +258,7 @@ def nanostring(
     basis: str = "spatial_fov",
     figsize: Optional[tuple] = None,
     img_key: Optional[str] = "hires",
+    bw: bool = False,
     scale_factor: Optional[float] = None,
     alpha_img: float = 1.0,
     cmap: str = "viridis",
@@ -293,6 +301,8 @@ def nanostring(
     img_key : str, optional
         Key in ``uns['spatial'][fov]['images']`` for the background image
         (default ``'hires'``).
+    bw : bool
+        If ``True``, render the background image in grayscale.
     scale_factor : float, optional
         Override the scale factor stored per FOV.
     alpha_img : float
@@ -403,7 +413,7 @@ def nanostring(
         # Background images
         img_alpha = alpha_img if color_key is None else alpha_img
         _place_fov_images(
-            current_ax, adata, fovs_to_plot, fov_col, basis, img_key, img_alpha
+            current_ax, adata, fovs_to_plot, fov_col, basis, img_key, img_alpha, bw
         )
 
         if color_key is None:
@@ -542,6 +552,7 @@ def nanostringseg(
     groupby: Optional[str] = None,
     figsize: Optional[tuple] = None,
     img_key: Optional[str] = "hires",
+    bw: bool = False,
     scale_factor: Optional[float] = None,
     alpha_img: float = 0.5,
     cmap: str = "viridis",
@@ -596,6 +607,8 @@ def nanostringseg(
     img_key : str, optional
         Key for the background image in ``uns['spatial'][fov]['images']``
         (default ``'hires'``).
+    bw : bool
+        If ``True``, render the background image in grayscale.
     scale_factor : float, optional
         Override the per-FOV scale factor.
     alpha_img : float
@@ -823,7 +836,7 @@ def nanostringseg(
         # Background images
         _place_fov_images(
             current_ax, adata, fovs_to_plot, fov_col, basis, img_key,
-            1.0 if color_key is None else alpha_img,
+            1.0 if color_key is None else alpha_img, bw,
         )
 
         if color_key is None:
