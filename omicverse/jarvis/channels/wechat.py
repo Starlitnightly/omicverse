@@ -37,6 +37,9 @@ except ImportError:  # pragma: no cover
 
 from ..agent_bridge import AgentBridge
 from .channel_core import (
+    RunningTask,
+    coalesce_pending_requests,
+    command_parts,
     text_chunks,
     strip_local_paths,
     build_full_request,
@@ -153,12 +156,6 @@ def _parse_cdn_aes_key(*, aes_key_b64: str = "", aeskey_hex: str = "") -> Option
         f"WeChat aes_key must decode to 16 raw bytes or 32-char hex string, got {len(decoded)} bytes"
     )
 
-
-@dataclass
-class RunningTask:
-    task: asyncio.Task
-    request: str
-    started_at: float
 
 
 
@@ -1014,10 +1011,7 @@ class WeChatJarvisBot:
 
     @staticmethod
     def _command_parts(text: str) -> tuple[str, str]:
-        tokens = text.split()
-        cmd = tokens[0].lower() if tokens else ""
-        tail = text.split(None, 1)[1].strip() if len(tokens) > 1 else ""
-        return cmd, tail
+        return command_parts(text)
 
     async def _prepare_inbound_images(self, raw: Dict[str, Any], session: Any) -> List[PreparedImage]:
         item_list = raw.get("item_list") or []
@@ -1122,14 +1116,7 @@ class WeChatJarvisBot:
 
     @staticmethod
     def _coalesce_pending_requests(items: List[Dict[str, Any]]) -> tuple[str, List[Dict[str, Any]]]:
-        parts: List[str] = []
-        request_content: List[Dict[str, Any]] = []
-        for item in items:
-            text = str(item.get("text") or "").strip()
-            if text:
-                parts.append(text)
-            request_content.extend(list(item.get("request_content") or []))
-        return "\n\n".join(parts).strip(), request_content
+        return coalesce_pending_requests(items)
 
     async def _send_figures(self, session_key: SessionKey, figures: List[Any]) -> None:
         """Upload and send each figure as a WeChat image message."""
