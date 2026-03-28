@@ -1225,3 +1225,261 @@ class TestBashPayloadBackwardsCompat:
         assert callable(tool_runtime_exec._resolve_bash_allowed_roots)
         assert callable(tool_runtime_exec._validate_bash_cwd)
         assert callable(tool_runtime_exec._kill_process_tree)
+
+
+# -----------------------------------------------------------------------
+# Task-044: Sync bridge recovery + preserved bash/stdout fixes
+# -----------------------------------------------------------------------
+
+
+class TestSyncBridgeRecovery:
+    """AC-001 criterion 1: running-event-loop bridge has bounded return/error."""
+
+    def test_bridge_uses_bounded_future_not_context_manager(self):
+        """The sync bridge must not wrap ThreadPoolExecutor in a context manager.
+
+        A ``with ThreadPoolExecutor(...) as pool:`` block calls
+        ``pool.shutdown(wait=True)`` on exit, which waits for the worker
+        thread even after a ``Future.result(timeout=...)`` raises
+        ``TimeoutError``.  The fixed implementation creates the pool
+        directly and calls ``shutdown(wait=False)`` so the caller always
+        returns or raises promptly.
+        """
+        import ast
+        import inspect
+        from omicverse.utils.ovagent import tool_runtime_exec
+
+        source = inspect.getsource(tool_runtime_exec.handle_execute_code)
+        tree = ast.parse(source)
+
+        # Walk the AST — there should be no ``with`` statement whose
+        # context expression mentions ThreadPoolExecutor.
+        for node in ast.walk(tree):
+            if isinstance(node, ast.With):
+                for item in node.items:
+                    src_fragment = ast.dump(item.context_expr)
+                    assert "ThreadPoolExecutor" not in src_fragment, (
+                        "handle_execute_code must not use ThreadPoolExecutor "
+                        "as a context manager — shutdown(wait=True) blocks "
+                        "after timeout"
+                    )
+
+    def test_bridge_calls_shutdown_wait_false(self):
+        """The sync bridge must call pool.shutdown(wait=False)."""
+        import inspect
+        from omicverse.utils.ovagent import tool_runtime_exec
+
+        source = inspect.getsource(tool_runtime_exec.handle_execute_code)
+        assert "shutdown(wait=False)" in source, (
+            "handle_execute_code must call pool.shutdown(wait=False) "
+            "to avoid blocking on executor teardown"
+        )
+
+    def test_bridge_future_result_has_timeout(self):
+        """Future.result() must be called with a timeout argument."""
+        import inspect
+        from omicverse.utils.ovagent import tool_runtime_exec
+
+        source = inspect.getsource(tool_runtime_exec.handle_execute_code)
+        assert ".result(timeout=" in source, (
+            "handle_execute_code must call future.result(timeout=...) "
+            "to bound the sync bridge wait"
+        )
+
+    def test_bridge_raises_on_timeout(self, monkeypatch):
+        """When the bridge future times out, RuntimeError is raised — not a hang."""
+        import concurrent.futures
+        from unittest.mock import patch, MagicMock
+        from omicverse.utils.ovagent import tool_runtime_exec
+
+        class _Ctx:
+            _code_only_mode = False
+
+            @staticmethod
+            def _extract_python_code(text):
+                return text
+
+        class _Executor:
+            _notebook_fallback_error = None
+            _ctx = _Ctx()
+
+            def check_code_prerequisites(self, code, adata):
+                return ""
+
+        # Make get_running_loop return a running loop so the bridge path
+        # is triggered.
+        fake_loop = MagicMock()
+        fake_loop.is_running.return_value = True
+        monkeypatch.setattr(
+            "omicverse.utils.ovagent.tool_runtime_exec.asyncio.get_running_loop",
+            lambda: fake_loop,
+        )
+
+        # Patch ThreadPoolExecutor so submit().result() raises TimeoutError
+        mock_future = MagicMock()
+        mock_future.result.side_effect = concurrent.futures.TimeoutError()
+        mock_future.cancel.return_value = True
+
+        mock_pool = MagicMock()
+        mock_pool.submit.return_value = mock_future
+
+        monkeypatch.setattr(
+            concurrent.futures, "ThreadPoolExecutor",
+            lambda **kw: mock_pool,
+        )
+
+        with pytest.raises(RuntimeError, match="sync bridge timed out"):
+            tool_runtime_exec.handle_execute_code(
+                _Ctx(), _Executor(), "print(1)", "test", None,
+            )
+
+        mock_future.cancel.assert_called_once()
+        mock_pool.shutdown.assert_called_once_with(wait=False)
+
+    def test_bridge_normal_return_also_shuts_down_without_wait(self, monkeypatch):
+        """On normal completion the bridge still calls shutdown(wait=False)."""
+        import concurrent.futures
+        from unittest.mock import MagicMock
+        from omicverse.utils.ovagent import tool_runtime_exec
+        from omicverse.utils.ovagent.repair_loop import RepairResult
+
+        class _Ctx:
+            _code_only_mode = False
+
+            @staticmethod
+            def _extract_python_code(text):
+                return text
+
+        class _Executor:
+            _notebook_fallback_error = None
+            _ctx = _Ctx()
+
+            def check_code_prerequisites(self, code, adata):
+                return ""
+
+        fake_loop = MagicMock()
+        fake_loop.is_running.return_value = True
+        monkeypatch.setattr(
+            "omicverse.utils.ovagent.tool_runtime_exec.asyncio.get_running_loop",
+            lambda: fake_loop,
+        )
+
+        # Build a successful RepairResult
+        ok_result = RepairResult(
+            success=True,
+            final_code="print(1)",
+            exec_result={"adata": None, "stdout": "1"},
+            attempts=[],
+        )
+        mock_future = MagicMock()
+        mock_future.result.return_value = ok_result
+
+        mock_pool = MagicMock()
+        mock_pool.submit.return_value = mock_future
+
+        monkeypatch.setattr(
+            concurrent.futures, "ThreadPoolExecutor",
+            lambda **kw: mock_pool,
+        )
+
+        result = tool_runtime_exec.handle_execute_code(
+            _Ctx(), _Executor(), "print(1)", "test", None,
+        )
+
+        assert "output" in result
+        mock_pool.shutdown.assert_called_once_with(wait=False)
+
+
+class TestBashEmptyRootsFailsClosed:
+    """AC-001 criterion 2: empty roots must reject, not allow."""
+
+    def test_empty_roots_raises_valueerror(self, monkeypatch):
+        """When no workspace roots can be determined, cwd is rejected."""
+        import tempfile
+        from omicverse.utils.ovagent.tool_runtime_exec import (
+            _validate_bash_cwd,
+            _resolve_bash_allowed_roots,
+        )
+
+        ctx = _DummyCtx()
+        ctx._filesystem_context = None
+        # Force _resolve_bash_allowed_roots to return [] by making
+        # getcwd and gettempdir both raise.
+        monkeypatch.setattr(os, "getcwd", _raise_os_error)
+        monkeypatch.setattr(tempfile, "gettempdir", _raise_os_error)
+
+        with pytest.raises(ValueError, match="no allowed workspace roots"):
+            _validate_bash_cwd(ctx, "/tmp")
+
+    def test_empty_roots_even_with_valid_path(self, monkeypatch):
+        """Even a seemingly innocent path is rejected when roots are empty."""
+        import tempfile
+        from omicverse.utils.ovagent.tool_runtime_exec import _validate_bash_cwd
+
+        ctx = _DummyCtx()
+        ctx._filesystem_context = None
+        monkeypatch.setattr(os, "getcwd", _raise_os_error)
+        monkeypatch.setattr(tempfile, "gettempdir", _raise_os_error)
+
+        with pytest.raises(ValueError, match="no allowed workspace roots"):
+            _validate_bash_cwd(ctx, "/tmp")
+
+
+class TestStdoutPipeGuard:
+    """AC-001 criterion 3: stdout pipe uses explicit check, not assert."""
+
+    def test_no_assert_on_proc_stdout(self):
+        """background_bash_worker must not use assert for stdout pipe check."""
+        import inspect
+        from omicverse.utils.ovagent import tool_runtime_exec
+
+        source = inspect.getsource(tool_runtime_exec.background_bash_worker)
+        assert "assert proc.stdout" not in source, (
+            "background_bash_worker must use an explicit runtime check "
+            "instead of assert for stdout pipe validation"
+        )
+
+    def test_explicit_runtime_error_on_missing_stdout(self):
+        """The explicit guard raises RuntimeError, not AssertionError."""
+        import inspect
+        from omicverse.utils.ovagent import tool_runtime_exec
+
+        source = inspect.getsource(tool_runtime_exec.background_bash_worker)
+        assert "RuntimeError" in source
+        assert "stdout pipe" in source.lower() or "stdout" in source
+
+    def test_missing_stdout_raises_runtime_error(self, monkeypatch):
+        """If Popen somehow produces stdout=None, RuntimeError is raised."""
+        from omicverse.utils.ovagent import tool_runtime_exec
+
+        class FakePopen:
+            pid = 99999
+            stdout = None
+            stderr = None
+
+            def __init__(self, *a, **kw):
+                pass
+
+        ctx = _BashTestCtx()
+        monkeypatch.setattr(subprocess, "Popen", FakePopen)
+        # Bypass cwd validation and runtime_state registration
+        monkeypatch.setattr(
+            tool_runtime_exec, "_validate_bash_cwd",
+            lambda ctx, cwd: cwd,
+        )
+        monkeypatch.setattr(
+            runtime_state, "attach_background_process",
+            lambda sid, tid, proc: None,
+        )
+
+        with pytest.raises(RuntimeError, match="stdout pipe"):
+            tool_runtime_exec.background_bash_worker(
+                ctx, "test-task-id",
+                command="echo hi",
+                cwd=os.getcwd(),
+                timeout_ms=5000,
+            )
+
+
+def _raise_os_error():
+    raise OSError("forced")

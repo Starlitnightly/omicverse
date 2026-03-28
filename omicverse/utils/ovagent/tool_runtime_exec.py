@@ -66,9 +66,9 @@ def _validate_bash_cwd(ctx: "AgentContext", cwd: str) -> str:
     resolved = os.path.realpath(cwd)
     roots = _resolve_bash_allowed_roots(ctx)
     if not roots:
-        # No roots determinable — degrade to allowing (avoid blocking
-        # legitimate use when filesystem context is absent).
-        return resolved
+        raise ValueError(
+            "Bash cwd rejected: no allowed workspace roots could be determined"
+        )
     for root in roots:
         if resolved == root or resolved.startswith(root + os.sep):
             return resolved
@@ -233,13 +233,33 @@ def handle_execute_code(
         loop = None
 
     if loop and loop.is_running():
+        # Bridge sync caller into async repair loop without blocking on
+        # executor context-manager shutdown.  A plain ThreadPoolExecutor
+        # context manager calls shutdown(wait=True) on __exit__, which
+        # would wait for the worker even after a Future.result() timeout.
+        # Instead we create the pool without a context manager, use a
+        # bounded Future.result(timeout=...) call, and then call
+        # shutdown(wait=False) so the caller always returns/raises
+        # promptly.
         import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            repair_result = pool.submit(
-                _asyncio.run,
-                repair_loop.run(code, adata, phase="execution",
-                               extract_code_fn=extract_code_fn),
-            ).result()
+
+        _BRIDGE_TIMEOUT = 300  # seconds — generous but finite
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = pool.submit(
+            _asyncio.run,
+            repair_loop.run(code, adata, phase="execution",
+                           extract_code_fn=extract_code_fn),
+        )
+        try:
+            repair_result = future.result(timeout=_BRIDGE_TIMEOUT)
+        except concurrent.futures.TimeoutError:
+            future.cancel()
+            pool.shutdown(wait=False)
+            raise RuntimeError(
+                f"execute_code sync bridge timed out after {_BRIDGE_TIMEOUT}s"
+            )
+        else:
+            pool.shutdown(wait=False)
     else:
         repair_result = _asyncio.run(
             repair_loop.run(code, adata, phase="execution",
@@ -513,7 +533,10 @@ def background_bash_worker(
         start_new_session=True,
     )
     runtime_state.attach_background_process(session_id, task_id, proc)
-    assert proc.stdout is not None
+    if proc.stdout is None:
+        raise RuntimeError(
+            "background_bash_worker: stdout pipe was not created"
+        )
     deadline = time.monotonic() + timeout_ms / 1000
     for line in proc.stdout:
         runtime_state.append_task_output(
