@@ -303,6 +303,91 @@ class TestWorkflowNeedsFallbackCompat:
         import omicverse.utils.agent_errors as mod
         assert direct is mod.WorkflowNeedsFallback
 
+    def test_in_utils_all_as_intentional_export(self):
+        """WorkflowNeedsFallback is an intentional public export, not accidental."""
+        from omicverse.utils import __all__ as exports
+        assert "WorkflowNeedsFallback" in exports
+
+    def test_docstring_documents_no_runtime_usage(self):
+        """The docstring explicitly states the shim has no runtime usage."""
+        from omicverse.utils.agent_errors import WorkflowNeedsFallback
+        doc = WorkflowNeedsFallback.__doc__ or ""
+        assert "compatibility" in doc.lower()
+        assert "no code path" in doc.lower() or "no runtime" in doc.lower()
+
+    def test_not_raised_in_runtime_source(self):
+        """No runtime module raises WorkflowNeedsFallback."""
+        from pathlib import Path
+        import re
+        utils_dir = Path(__file__).resolve().parents[2] / "omicverse" / "utils"
+        pattern = re.compile(r"\braise\s+WorkflowNeedsFallback\b")
+        for py_file in utils_dir.rglob("*.py"):
+            source = py_file.read_text(encoding="utf-8", errors="replace")
+            assert not pattern.search(source), (
+                f"Runtime code raises WorkflowNeedsFallback in {py_file.name}"
+            )
+
+    def test_not_caught_in_runtime_source(self):
+        """No runtime module catches WorkflowNeedsFallback."""
+        from pathlib import Path
+        import re
+        utils_dir = Path(__file__).resolve().parents[2] / "omicverse" / "utils"
+        pattern = re.compile(r"\bexcept\b.*\bWorkflowNeedsFallback\b")
+        for py_file in utils_dir.rglob("*.py"):
+            source = py_file.read_text(encoding="utf-8", errors="replace")
+            assert not pattern.search(source), (
+                f"Runtime code catches WorkflowNeedsFallback in {py_file.name}"
+            )
+
+
+# ===================================================================
+# 3b. agent_mode legacy handling (no-op compatibility path)
+# ===================================================================
+
+
+class TestAgentModeLegacyHandling:
+    """agent_mode='legacy' is a documented no-op — warn and continue."""
+
+    def test_agent_mode_parameter_exists_on_init(self):
+        """OmicVerseAgent.__init__ accepts agent_mode with default 'agentic'."""
+        from omicverse.utils.smart_agent import OmicVerseAgent
+        sig = inspect.signature(OmicVerseAgent.__init__)
+        param = sig.parameters["agent_mode"]
+        assert param.default == "agentic"
+
+    def test_agent_mode_parameter_exists_on_factory(self):
+        """Agent() factory accepts agent_mode with default 'agentic'."""
+        from omicverse.utils.smart_agent import Agent
+        sig = inspect.signature(Agent)
+        param = sig.parameters["agent_mode"]
+        assert param.default == "agentic"
+
+    def test_agent_mode_not_forwarded_to_config(self):
+        """agent_mode is never passed to AgentConfig.from_flat_kwargs."""
+        from omicverse.utils.agent_config import AgentConfig
+        sig = inspect.signature(AgentConfig.from_flat_kwargs)
+        assert "agent_mode" not in sig.parameters, (
+            "agent_mode must not be a config parameter — it is a no-op shim"
+        )
+
+    def test_agent_mode_not_stored_on_config_class(self):
+        """AgentConfig has no agent_mode field — the parameter is truly discarded."""
+        from omicverse.utils.agent_config import AgentConfig
+        assert not hasattr(AgentConfig, "agent_mode"), (
+            "AgentConfig must not store agent_mode"
+        )
+        # Also check dataclass fields if present
+        if hasattr(AgentConfig, "__dataclass_fields__"):
+            assert "agent_mode" not in AgentConfig.__dataclass_fields__
+
+    def test_legacy_warning_source_guard(self):
+        """__init__ source emits DeprecationWarning for non-agentic agent_mode."""
+        from omicverse.utils.smart_agent import OmicVerseAgent
+        source = inspect.getsource(OmicVerseAgent.__init__)
+        assert "agent_mode" in source
+        assert "DeprecationWarning" in source
+        assert "deprecated" in source.lower()
+
 
 # ===================================================================
 # 4. No provider-specific behavior changes
