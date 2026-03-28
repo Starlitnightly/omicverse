@@ -85,8 +85,8 @@ def handle_inspect_data(adata: Any, aspect: str) -> str:
                 parts.append(
                     f"obs.head(3):\n{adata.obs.head(3).to_string()}"
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Failed to format obs.head(3): %s", exc)
         if aspect in ("var", "full") and not is_mudata:
             cols = list(adata.var.columns)
             parts.append(f"var columns ({len(cols)}): {cols}")
@@ -94,8 +94,8 @@ def handle_inspect_data(adata: Any, aspect: str) -> str:
                 parts.append(
                     f"var.head(3):\n{adata.var.head(3).to_string()}"
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Failed to format var.head(3): %s", exc)
         if aspect in ("obsm", "full"):
             keys = (
                 list(adata.obsm.keys()) if hasattr(adata, "obsm") else []
@@ -104,8 +104,8 @@ def handle_inspect_data(adata: Any, aspect: str) -> str:
             for k in keys:
                 try:
                     parts.append(f"  {k}: shape {adata.obsm[k].shape}")
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Failed to get shape for obsm[%s]: %s", k, exc)
         if aspect in ("uns", "full"):
             keys = (
                 list(adata.uns.keys()) if hasattr(adata, "uns") else []

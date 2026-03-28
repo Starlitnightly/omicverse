@@ -425,3 +425,77 @@ def test_agentic_loop_retries_after_text_only_promise_until_tool_call():
 
     assert [call["tool_choice"] for call in chat_calls[:2]] == ["required", "required"]
     assert "WebFetch" in dispatch_log
+
+
+# -----------------------------------------------------------------------
+# Task-008: Runtime observability tests
+# -----------------------------------------------------------------------
+
+from omicverse.utils.agent_reporter import (
+    AgentEvent,
+    EventLevel,
+    SilentReporter,
+)
+
+
+def test_run_async_silent_reporter_no_stdout():
+    """AC-001.2: SilentReporter mode produces no stdout leakage for runtime paths."""
+    import io
+    from contextlib import redirect_stdout
+
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+
+    # Wire up SilentReporter exactly as __init__ would
+    agent._reporter = SilentReporter()
+
+    def _emit(level, message, category=""):
+        agent._reporter.emit(AgentEvent(level=level, message=message, category=category))
+
+    agent._emit = _emit
+    agent.provider = "python"
+    agent.last_usage = None
+    agent.last_usage_breakdown = {
+        "generation": None,
+        "reflection": [],
+        "review": [],
+        "total": None,
+    }
+
+    # Stub the direct-python path so run_async never touches the LLM
+    agent._detect_direct_python_request = lambda request: "x = 1"
+    agent._execute_generated_code = lambda code, adata: adata
+
+    captured = io.StringIO()
+    with redirect_stdout(captured):
+        result = asyncio.run(agent.run_async("x = 1", None))
+
+    stdout_text = captured.getvalue()
+    assert stdout_text == "", (
+        f"SilentReporter leaked to stdout: {stdout_text!r}"
+    )
+
+
+def test_del_fallback_logs_debug_on_exception(caplog):
+    """AC-001.3/4: __del__ fallback sites emit debug diagnostics."""
+    import logging as _logging
+
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+
+    class _FailingExecutor:
+        def shutdown(self):
+            raise RuntimeError("test shutdown boom")
+
+    agent._notebook_executor = _FailingExecutor()
+    agent._filesystem_context = None  # only notebook path triggers
+
+    with caplog.at_level(_logging.DEBUG, logger="omicverse.utils.smart_agent"):
+        agent.__del__()
+
+    debug_msgs = [
+        rec
+        for rec in caplog.records
+        if rec.levelno == _logging.DEBUG and "notebook executor shutdown failed" in rec.message
+    ]
+    assert len(debug_msgs) == 1, (
+        f"Expected exactly 1 debug log about notebook executor, got {len(debug_msgs)}"
+    )

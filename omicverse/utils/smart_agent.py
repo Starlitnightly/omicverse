@@ -522,7 +522,7 @@ class OmicVerseAgent:
         # When using a custom endpoint (proxy), keep the model name as-is.
         # Proxies expect the exact model name the user typed.
         if endpoint:
-            print(f"   🔌 Proxy mode: model={model}, endpoint={endpoint}")
+            _emit(EventLevel.INFO, f"Proxy mode: model={model}, endpoint={endpoint}", "init")
         else:
             # Normalize model ID for aliases and variations, then validate
             original_model = model
@@ -532,7 +532,7 @@ class OmicVerseAgent:
                 logger.debug("Model ID normalization fallback for %r: %s", model, exc)
                 model = model
             if model != original_model:
-                print(f"   📝 Model ID normalized: {original_model} → {model}")
+                _emit(EventLevel.INFO, f"Model ID normalized: {original_model} → {model}", "init")
 
         # --- Auth & backend resolution (ovagent.auth) --------------------------
         backend = _resolve_model_and_provider(model, api_key, endpoint)
@@ -602,7 +602,7 @@ class OmicVerseAgent:
             with self._temporary_api_keys():
                 self._setup_agent()
             stats = self._get_registry_stats()
-            print(f"   📚 Function registry loaded: {stats['total_functions']} functions in {stats['categories']} categories")
+            _emit(EventLevel.INFO, f"Function registry loaded: {stats['total_functions']} functions in {stats['categories']} categories", "init")
 
             _display_reflection_config(
                 self.enable_reflection,
@@ -663,9 +663,9 @@ class OmicVerseAgent:
             )
             self._codegen_pipeline = _CodegenPipeline(self)
 
-            print("✅ Smart Agent initialized successfully!")
+            _emit(EventLevel.SUCCESS, "Smart Agent initialized successfully!", "init")
         except Exception as e:
-            print(f"❌ Agent initialization failed: {e}")
+            _emit(EventLevel.ERROR, f"Agent initialization failed: {e}", "init")
             raise
 
     # =====================================================================
@@ -1279,30 +1279,26 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         Any
             Processed adata object.
         """
-        print(f"\n{'=' * 70}")
-        print(f"🤖 OmicVerse Agent Processing Request")
-        print(f"{'=' * 70}")
-        print(f"Request: \"{request}\"")
         if adata is not None and hasattr(adata, 'shape'):
-            print(f"Dataset: {adata.shape[0]} cells × {adata.shape[1]} genes")
+            dataset_desc = f"{adata.shape[0]} cells × {adata.shape[1]} genes"
         else:
-            print(f"Dataset: None (knowledge query)")
-        print(f"{'=' * 70}\n")
+            dataset_desc = "None (knowledge query)"
+        self._emit(EventLevel.INFO, f"Processing request: \"{request}\" | Dataset: {dataset_desc}", "execution")
 
         # Direct execution path for explicit Python snippets (no LLM required)
         direct_code = self._detect_direct_python_request(request)
         if direct_code:
-            print(f"🧪 Direct Python detected → executing without model calls")
+            self._emit(EventLevel.INFO, "Direct Python detected → executing without model calls", "execution")
             self.last_usage = None
             self.last_usage_breakdown = {
                 'generation': None, 'reflection': [], 'review': [], 'total': None
             }
             try:
                 result_adata = self._execute_generated_code(direct_code, adata)
-                print(f"✅ Python code executed directly.")
+                self._emit(EventLevel.SUCCESS, "Python code executed directly.", "execution")
                 return result_adata
             except Exception as exc:
-                print(f"❌ Direct Python execution failed: {exc}")
+                self._emit(EventLevel.ERROR, f"Direct Python execution failed: {exc}", "execution")
                 raise
 
         if self.provider == "python":
@@ -1312,23 +1308,16 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
 
     async def _run_agentic_mode(self, request: str, adata: Any) -> Any:
         """Agentic loop mode: LLM autonomously calls tools to complete the task."""
-        print(f"🤖 Mode: Agentic Loop (tool-calling)")
-        print()
+        self._emit(EventLevel.INFO, "Mode: Agentic Loop (tool-calling)", "execution")
 
         try:
             result = await self._run_agentic_loop(request, adata)
             self._turn_controller._persist_harness_history(request)
-            print()
-            print(f"{'=' * 70}")
-            print(f"✅ SUCCESS - Agentic loop completed!")
-            print(f"{'=' * 70}\n")
+            self._emit(EventLevel.SUCCESS, "Agentic loop completed!", "execution")
             return result
         except Exception as e:
             self._turn_controller._persist_harness_history(request)
-            print()
-            print(f"{'=' * 70}")
-            print(f"❌ ERROR - Agentic loop failed: {e}")
-            print(f"{'=' * 70}\n")
+            self._emit(EventLevel.ERROR, f"Agentic loop failed: {e}", "execution")
             raise
 
     async def generate_code_async(self, request: str, adata: Any = None, *, max_functions: int = 8, progress_callback: Optional[Callable[[str], None]] = None) -> str:
@@ -1532,13 +1521,13 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         if hasattr(self, '_notebook_executor') and self._notebook_executor:
             try:
                 self._notebook_executor.shutdown()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("__del__: notebook executor shutdown failed: %s", exc)
         if hasattr(self, '_filesystem_context') and self._filesystem_context:
             try:
                 self._filesystem_context.cleanup_session(keep_summary=True)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("__del__: filesystem context cleanup failed: %s", exc)
 
 
 # =====================================================================

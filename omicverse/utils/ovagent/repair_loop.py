@@ -157,8 +157,8 @@ def build_dataset_context(adata: Any) -> str:
     if hasattr(adata, "obsm") and hasattr(adata.obsm, "keys"):
         try:
             parts.append(f"obsm keys: {list(adata.obsm.keys())[:10]}")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to list obsm keys for dataset context: %s", exc)
     return "; ".join(parts) if parts else ""
 
 
