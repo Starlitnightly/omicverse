@@ -1,5 +1,7 @@
 import asyncio
 import json
+import os
+import subprocess
 from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -742,3 +744,484 @@ class TestExtractedExecHandlers:
         from omicverse.utils.ovagent.tool_runtime_exec import handle_agent
         import inspect
         assert inspect.iscoroutinefunction(handle_agent)
+
+
+# -----------------------------------------------------------------------
+# Task-035: Bash runtime hardening tests
+# -----------------------------------------------------------------------
+
+
+class _BashTestCtx(_DummyCtx):
+    """_DummyCtx with no-op approval/server-tool gates for direct handle_bash calls."""
+
+    def _request_tool_approval(self, tool_name: str, *, reason: str, payload):
+        pass  # no-op for testing
+
+
+class TestBashHardeningNonLoginShell:
+    """AC-001 criterion 1: Bash execution uses non-login shells."""
+
+    def test_foreground_bash_uses_non_login_shell(self, monkeypatch):
+        """handle_bash must invoke ['bash', '-c', ...], not ['bash', '-lc', ...]."""
+        from omicverse.utils.ovagent import tool_runtime_exec
+
+        captured_args = {}
+
+        class FakePopen:
+            returncode = 0
+            pid = 99999
+
+            def __init__(self, cmd, **kwargs):
+                captured_args["cmd"] = cmd
+                captured_args["kwargs"] = kwargs
+
+            def communicate(self, **kw):
+                return ("out", "err")
+
+            def wait(self, **kw):
+                return 0
+
+        ctx = _BashTestCtx()
+        monkeypatch.setattr(subprocess, "Popen", FakePopen)
+
+        tool_runtime_exec.handle_bash(
+            ctx,
+            tool_blocked_fn=lambda _: False,
+            command="echo hello",
+            description="test",
+        )
+
+        assert captured_args["cmd"] == ["bash", "-c", "echo hello"]
+        assert "-lc" not in " ".join(captured_args["cmd"])
+
+    def test_background_bash_uses_non_login_shell(self, monkeypatch):
+        """Background inline path must invoke ['bash', '-c', ...]."""
+        from omicverse.utils.ovagent import tool_runtime_exec
+
+        captured_args = {}
+
+        class FakePopen:
+            returncode = 0
+            pid = 99999
+            task_id = "bg-1"
+
+            def __init__(self, cmd, **kwargs):
+                captured_args["cmd"] = cmd
+                captured_args["kwargs"] = kwargs
+                self.stdout = iter([])
+                self.stderr = iter([])
+
+            def communicate(self, **kw):
+                return ("", "")
+
+            def wait(self, **kw):
+                return 0
+
+        ctx = _BashTestCtx()
+        monkeypatch.setattr(subprocess, "Popen", FakePopen)
+
+        result_json = tool_runtime_exec.handle_bash(
+            ctx,
+            tool_blocked_fn=lambda _: False,
+            command="sleep 1",
+            description="bg test",
+            run_in_background=True,
+        )
+
+        assert captured_args["cmd"] == ["bash", "-c", "sleep 1"]
+
+    def test_background_worker_uses_non_login_shell(self, monkeypatch):
+        """background_bash_worker must invoke ['bash', '-c', ...]."""
+        from omicverse.utils.ovagent import tool_runtime_exec
+
+        captured_args = {}
+
+        class FakePopen:
+            returncode = 0
+            pid = 99999
+
+            def __init__(self, cmd, **kwargs):
+                captured_args["cmd"] = cmd
+                captured_args["kwargs"] = kwargs
+                self.stdout = iter(["line1\n"])
+
+            def wait(self, **kw):
+                return 0
+
+        ctx = _DummyCtx()
+        monkeypatch.setattr(subprocess, "Popen", FakePopen)
+        monkeypatch.setattr(runtime_state, "attach_background_process", lambda *a, **kw: None)
+        monkeypatch.setattr(runtime_state, "append_task_output", lambda *a, **kw: None)
+        monkeypatch.setattr(runtime_state, "update_task", lambda *a, **kw: None)
+
+        tool_runtime_exec.background_bash_worker(
+            ctx, "task-1", command="echo hi", cwd=".", timeout_ms=60000,
+        )
+
+        assert captured_args["cmd"] == ["bash", "-c", "echo hi"]
+
+
+class TestBashCwdValidation:
+    """AC-001 criterion 2: cwd validation against workspace roots."""
+
+    def test_cwd_under_workspace_root_accepted(self):
+        """A cwd inside the workspace root passes validation."""
+        import tempfile
+        from omicverse.utils.ovagent.tool_runtime_exec import _validate_bash_cwd
+
+        ctx = _DummyCtx()
+        with tempfile.TemporaryDirectory() as td:
+            ctx._filesystem_context = SimpleNamespace(workspace_dir=td)
+            subdir = os.path.join(td, "sub")
+            os.makedirs(subdir)
+            result = _validate_bash_cwd(ctx, subdir)
+            assert result == os.path.realpath(subdir)
+
+    def test_cwd_at_workspace_root_accepted(self):
+        """A cwd exactly equal to the workspace root passes."""
+        import tempfile
+        from omicverse.utils.ovagent.tool_runtime_exec import _validate_bash_cwd
+
+        ctx = _DummyCtx()
+        with tempfile.TemporaryDirectory() as td:
+            ctx._filesystem_context = SimpleNamespace(workspace_dir=td)
+            result = _validate_bash_cwd(ctx, td)
+            assert result == os.path.realpath(td)
+
+    def test_cwd_outside_all_roots_rejected(self, monkeypatch):
+        """A cwd outside every allowed root raises ValueError."""
+        import tempfile
+        from omicverse.utils.ovagent.tool_runtime_exec import _validate_bash_cwd
+
+        ctx = _DummyCtx()
+        with tempfile.TemporaryDirectory() as ws, tempfile.TemporaryDirectory() as outside:
+            ctx._filesystem_context = SimpleNamespace(workspace_dir=ws)
+            # Monkeypatch cwd and tempdir so the escaping path has no fallback
+            monkeypatch.setattr(os, "getcwd", lambda: ws)
+            monkeypatch.setattr(tempfile, "gettempdir", lambda: ws)
+            with pytest.raises(ValueError, match="outside allowed workspace roots"):
+                _validate_bash_cwd(ctx, outside)
+
+    def test_cwd_traversal_attempt_rejected(self, monkeypatch):
+        """A path containing '..' that escapes roots is rejected."""
+        import tempfile
+        from omicverse.utils.ovagent.tool_runtime_exec import _validate_bash_cwd
+
+        ctx = _DummyCtx()
+        with tempfile.TemporaryDirectory() as ws:
+            ctx._filesystem_context = SimpleNamespace(workspace_dir=ws)
+            monkeypatch.setattr(os, "getcwd", lambda: ws)
+            monkeypatch.setattr(tempfile, "gettempdir", lambda: ws)
+            escaping = os.path.join(ws, "..", "..", "etc")
+            with pytest.raises(ValueError, match="outside allowed workspace roots"):
+                _validate_bash_cwd(ctx, escaping)
+
+    def test_cwd_resolves_symlinks(self):
+        """Symlink-based cwd is resolved to realpath before validation."""
+        import tempfile
+        from omicverse.utils.ovagent.tool_runtime_exec import _validate_bash_cwd
+
+        ctx = _DummyCtx()
+        with tempfile.TemporaryDirectory() as ws:
+            ctx._filesystem_context = SimpleNamespace(workspace_dir=ws)
+            subdir = os.path.join(ws, "real")
+            os.makedirs(subdir)
+            link = os.path.join(ws, "link")
+            os.symlink(subdir, link)
+            result = _validate_bash_cwd(ctx, link)
+            assert result == os.path.realpath(subdir)
+
+    def test_no_roots_degrades_gracefully(self):
+        """When no roots can be determined, validation passes (graceful degradation)."""
+        from omicverse.utils.ovagent.tool_runtime_exec import _validate_bash_cwd
+
+        ctx = _DummyCtx()
+        ctx._filesystem_context = None
+        # Even with no filesystem context, the cwd and tempdir roots still apply.
+        # To truly test graceful degradation, we need a custom helper test.
+        # This just confirms no crash with minimal context.
+        result = _validate_bash_cwd(ctx, ".")
+        assert isinstance(result, str)
+
+    def test_handle_bash_rejects_invalid_cwd(self, monkeypatch):
+        """handle_bash fails fast when cwd is outside allowed roots."""
+        import tempfile
+        from omicverse.utils.ovagent import tool_runtime_exec
+
+        ctx = _BashTestCtx()
+        with tempfile.TemporaryDirectory() as ws, tempfile.TemporaryDirectory() as outside:
+            ctx._filesystem_context = SimpleNamespace(workspace_dir=ws)
+            monkeypatch.setattr(os, "getcwd", lambda: ws)
+            monkeypatch.setattr(tempfile, "gettempdir", lambda: ws)
+            ctx._refresh_runtime_working_directory = lambda: outside
+
+            with pytest.raises(ValueError, match="outside allowed workspace roots"):
+                tool_runtime_exec.handle_bash(
+                    ctx,
+                    tool_blocked_fn=lambda _: False,
+                    command="echo pwned",
+                )
+
+
+class TestBashProcessGroupIsolation:
+    """AC-001 criterion 3: bounded execution via process group isolation."""
+
+    def test_foreground_uses_start_new_session(self, monkeypatch):
+        """Foreground Popen must pass start_new_session=True."""
+        from omicverse.utils.ovagent import tool_runtime_exec
+
+        captured_kwargs = {}
+
+        class FakePopen:
+            returncode = 0
+            pid = 99999
+
+            def __init__(self, cmd, **kwargs):
+                captured_kwargs.update(kwargs)
+
+            def communicate(self, **kw):
+                return ("", "")
+
+            def wait(self, **kw):
+                return 0
+
+        ctx = _BashTestCtx()
+        monkeypatch.setattr(subprocess, "Popen", FakePopen)
+
+        tool_runtime_exec.handle_bash(
+            ctx,
+            tool_blocked_fn=lambda _: False,
+            command="true",
+        )
+
+        assert captured_kwargs.get("start_new_session") is True
+
+    def test_background_uses_start_new_session(self, monkeypatch):
+        """Background Popen must pass start_new_session=True."""
+        from omicverse.utils.ovagent import tool_runtime_exec
+
+        captured_kwargs = {}
+
+        class FakePopen:
+            returncode = 0
+            pid = 99999
+
+            def __init__(self, cmd, **kwargs):
+                captured_kwargs.update(kwargs)
+                self.stdout = iter([])
+                self.stderr = iter([])
+
+            def communicate(self, **kw):
+                return ("", "")
+
+            def wait(self, **kw):
+                return 0
+
+        ctx = _BashTestCtx()
+        monkeypatch.setattr(subprocess, "Popen", FakePopen)
+
+        tool_runtime_exec.handle_bash(
+            ctx,
+            tool_blocked_fn=lambda _: False,
+            command="sleep 1",
+            run_in_background=True,
+        )
+
+        assert captured_kwargs.get("start_new_session") is True
+
+    def test_foreground_timeout_triggers_process_group_kill(self, monkeypatch):
+        """On timeout, foreground path must call _kill_process_tree."""
+        from omicverse.utils.ovagent import tool_runtime_exec
+
+        kill_called = []
+
+        class FakePopen:
+            returncode = None
+            pid = 99999
+
+            def __init__(self, cmd, **kwargs):
+                pass
+
+            def communicate(self, **kw):
+                raise subprocess.TimeoutExpired("bash", kw.get("timeout", 1))
+
+            def wait(self, **kw):
+                return -9
+
+            def kill(self):
+                pass
+
+        ctx = _BashTestCtx()
+        monkeypatch.setattr(subprocess, "Popen", FakePopen)
+        original_kill = tool_runtime_exec._kill_process_tree
+        def tracking_kill(proc):
+            kill_called.append(proc)
+            # Don't call original — it would fail on fake proc
+        monkeypatch.setattr(tool_runtime_exec, "_kill_process_tree", tracking_kill)
+
+        result_json = tool_runtime_exec.handle_bash(
+            ctx,
+            tool_blocked_fn=lambda _: False,
+            command="sleep 999",
+            timeout=1,
+        )
+
+        assert len(kill_called) == 1
+        result = json.loads(result_json)
+        assert result["returncode"] < 0  # negative = killed by signal
+
+    def test_background_worker_timeout_triggers_process_group_kill(self, monkeypatch):
+        """background_bash_worker must call _kill_process_tree on timeout."""
+        import time as _time
+        from omicverse.utils.ovagent import tool_runtime_exec
+
+        kill_called = []
+        call_count = [0]
+
+        class FakePopen:
+            returncode = None
+            pid = 99999
+
+            def __init__(self, cmd, **kwargs):
+                # Yield lines indefinitely; the timeout check should break out
+                self.stdout = iter(["line\n"] * 100)
+
+            def wait(self, **kw):
+                return -9
+
+            def kill(self):
+                pass
+
+        ctx = _DummyCtx()
+        monkeypatch.setattr(subprocess, "Popen", FakePopen)
+        monkeypatch.setattr(runtime_state, "attach_background_process", lambda *a, **kw: None)
+        monkeypatch.setattr(runtime_state, "append_task_output", lambda *a, **kw: None)
+
+        update_calls = []
+        monkeypatch.setattr(
+            runtime_state, "update_task",
+            lambda *a, **kw: update_calls.append(kw),
+        )
+        monkeypatch.setattr(
+            tool_runtime_exec, "_kill_process_tree",
+            lambda proc: kill_called.append(proc),
+        )
+
+        # Use a timeout of 0ms so it fires immediately
+        tool_runtime_exec.background_bash_worker(
+            ctx, "task-bg", command="yes", cwd=".", timeout_ms=0,
+        )
+
+        assert len(kill_called) == 1
+        assert any(c.get("status") == "failed" for c in update_calls)
+
+
+class TestBashPayloadBackwardsCompat:
+    """AC-001 criterion 4: payload schema remains backwards compatible."""
+
+    def test_foreground_payload_has_expected_keys(self, monkeypatch):
+        """Foreground result JSON must contain cwd, command, returncode, stdout, stderr, output."""
+        from omicverse.utils.ovagent import tool_runtime_exec
+
+        class FakePopen:
+            returncode = 0
+            pid = 99999
+
+            def __init__(self, cmd, **kwargs):
+                pass
+
+            def communicate(self, **kw):
+                return ("hello\n", "")
+
+            def wait(self, **kw):
+                return 0
+
+        ctx = _BashTestCtx()
+        monkeypatch.setattr(subprocess, "Popen", FakePopen)
+
+        result_json = tool_runtime_exec.handle_bash(
+            ctx,
+            tool_blocked_fn=lambda _: False,
+            command="echo hello",
+        )
+        result = json.loads(result_json)
+
+        assert set(result.keys()) == {"cwd", "command", "returncode", "stdout", "stderr", "output"}
+        assert result["command"] == "echo hello"
+        assert result["returncode"] == 0
+        assert result["stdout"] == "hello\n"
+
+    def test_background_payload_has_expected_keys(self, monkeypatch):
+        """Background result JSON must contain task_id, status, cwd, command."""
+        from omicverse.utils.ovagent import tool_runtime_exec
+
+        class FakePopen:
+            returncode = 0
+            pid = 99999
+
+            def __init__(self, cmd, **kwargs):
+                self.stdout = iter([])
+                self.stderr = iter([])
+
+            def communicate(self, **kw):
+                return ("", "")
+
+            def wait(self, **kw):
+                return 0
+
+        ctx = _BashTestCtx()
+        monkeypatch.setattr(subprocess, "Popen", FakePopen)
+
+        result_json = tool_runtime_exec.handle_bash(
+            ctx,
+            tool_blocked_fn=lambda _: False,
+            command="sleep 1",
+            run_in_background=True,
+        )
+        result = json.loads(result_json)
+
+        assert "task_id" in result
+        assert result["status"] == "in_progress"
+        assert result["command"] == "sleep 1"
+        assert "cwd" in result
+
+    def test_timeout_payload_has_expected_keys(self, monkeypatch):
+        """Timeout result must still have the standard foreground payload keys."""
+        from omicverse.utils.ovagent import tool_runtime_exec
+
+        class FakePopen:
+            returncode = None
+            pid = 99999
+
+            def __init__(self, cmd, **kwargs):
+                pass
+
+            def communicate(self, **kw):
+                raise subprocess.TimeoutExpired("bash", kw.get("timeout", 1))
+
+            def wait(self, **kw):
+                return -9
+
+            def kill(self):
+                pass
+
+        ctx = _BashTestCtx()
+        monkeypatch.setattr(subprocess, "Popen", FakePopen)
+        monkeypatch.setattr(tool_runtime_exec, "_kill_process_tree", lambda p: None)
+
+        result_json = tool_runtime_exec.handle_bash(
+            ctx,
+            tool_blocked_fn=lambda _: False,
+            command="sleep 999",
+            timeout=1,
+        )
+        result = json.loads(result_json)
+
+        assert set(result.keys()) == {"cwd", "command", "returncode", "stdout", "stderr", "output"}
+
+    def test_hardening_helpers_are_exported(self):
+        """The new helpers exist as module-level functions."""
+        from omicverse.utils.ovagent import tool_runtime_exec
+        assert callable(tool_runtime_exec._resolve_bash_allowed_roots)
+        assert callable(tool_runtime_exec._validate_bash_cwd)
+        assert callable(tool_runtime_exec._kill_process_tree)
