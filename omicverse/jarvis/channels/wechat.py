@@ -19,10 +19,8 @@ import math
 import re
 import secrets
 import threading
-import time
 import urllib.parse
 import uuid
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -35,24 +33,24 @@ try:
 except ImportError:  # pragma: no cover
     _CRYPTO_AVAILABLE = False
 
-from ..agent_bridge import AgentBridge
 from .channel_core import (
-    RunningTask,
-    coalesce_pending_requests,
     command_parts,
     text_chunks,
     strip_local_paths,
-    build_full_request,
-    get_prior_history,
-    notify_turn_complete,
-    process_result_state,
-    format_analysis_error,
     default_summary,
     gather_status,
     format_status_plain,
 )
 from ..config import default_state_dir
-from ..gateway.routing import GatewaySessionRegistry, SessionKey
+from ..gateway.routing import SessionKey
+from ..runtime import (
+    AgentBridgeExecutionAdapter,
+    ConversationRoute,
+    DeliveryEvent,
+    MessageEnvelope,
+    MessageRuntime,
+    MessageRouter,
+)
 from ..channel_media import prepare_inbound_image, MAX_INBOUND_IMAGES
 from ..media_ingest import (
     PreparedImage,
@@ -504,6 +502,151 @@ class WeChatApiClient:
         return decrypted
 
 
+# ── Runtime integration helpers ──────────────────────────────────────────────
+
+
+def wechat_route_from_session_key(sk: SessionKey) -> ConversationRoute:
+    """Map a WeChat ``SessionKey`` to a shared ``ConversationRoute``."""
+    return ConversationRoute(
+        channel="wechat",
+        scope_type=sk.scope_type,
+        scope_id=sk.scope_id,
+        thread_id=sk.thread_id,
+    )
+
+
+def wechat_runtime_envelope(
+    sk: SessionKey,
+    text: str,
+    *,
+    sender_id: str,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Optional[MessageEnvelope]:
+    """Build a ``MessageEnvelope`` from a WeChat inbound message."""
+    stripped = (text or "").strip()
+    if not stripped:
+        return None
+    route = wechat_route_from_session_key(sk)
+    return MessageEnvelope(
+        route=route,
+        text=stripped,
+        sender_id=sender_id,
+        trigger="direct" if route.is_direct else "mention",
+        explicit_trigger=True,
+        metadata=dict(metadata or {}),
+    )
+
+
+class WeChatRuntimePresenter:
+    """``MessagePresenter`` implementation for WeChat iLink channels.
+
+    WeChat messages are plain text; image sending uses the CDN upload path
+    handled in the delivery layer.
+    """
+
+    def ack(self, envelope: MessageEnvelope, session: Any) -> List[DeliveryEvent]:
+        if session.adata is not None:
+            a = session.adata
+            text = f"⏳ 已收到，开始分析。\n当前数据: {a.n_obs:,} cells x {a.n_vars:,} genes"
+        else:
+            try:
+                h5ad_files = session.list_h5ad_files()
+            except Exception:
+                h5ad_files = []
+            if h5ad_files:
+                names = ", ".join(item.name for item in h5ad_files[:5])
+                text = f"⏳ 已收到，开始分析。\n检测到工作区数据文件: {names}"
+            else:
+                text = "⏳ 已收到，开始分析。"
+        image_count = (envelope.metadata or {}).get("image_count", 0)
+        if image_count:
+            text += f"\n检测到图片: {image_count} 张（已保存到 workspace/uploads/wechat）"
+        return [DeliveryEvent(route=envelope.route, kind="text", text=text)]
+
+    def queue_started(
+        self, route: ConversationRoute, queued_count: int,
+    ) -> List[DeliveryEvent]:
+        return [DeliveryEvent(
+            route=route, kind="text",
+            text=f"开始执行队列中的 {queued_count} 条请求...",
+        )]
+
+    def draft_open(self, route: ConversationRoute) -> DeliveryEvent:
+        return DeliveryEvent(
+            route=route, kind="text", mode="open",
+            target="analysis-draft", text="💭 思考中…",
+        )
+
+    def draft_update(
+        self, route: ConversationRoute, llm_text: str, progress: str,
+    ) -> DeliveryEvent:
+        if progress:
+            text = f"⚙️ {progress[:200]}"
+        elif llm_text.strip():
+            text = f"💭 {llm_text.strip()[-200:]}"
+        else:
+            text = "💭 思考中…"
+        return DeliveryEvent(route=route, kind="text", mode="send", text=text)
+
+    def draft_cancelled(self, route: ConversationRoute) -> DeliveryEvent:
+        return DeliveryEvent(route=route, kind="text", text="已取消当前分析。")
+
+    def analysis_error(self, route: ConversationRoute, error_text: str) -> DeliveryEvent:
+        return DeliveryEvent(route=route, kind="text", text=f"分析异常: {error_text}")
+
+    def typing(self, route: ConversationRoute) -> Optional[DeliveryEvent]:
+        return None  # WeChat iLink has no typing indicator
+
+    def quick_chat_reply(self, route: ConversationRoute, text: str) -> DeliveryEvent:
+        return DeliveryEvent(route=route, kind="text", text=text)
+
+    def quick_chat_fallback(self, route: ConversationRoute) -> DeliveryEvent:
+        return DeliveryEvent(route=route, kind="text", text="正在后台分析，请等待完成。")
+
+    def analysis_status(
+        self,
+        route: ConversationRoute,
+        *,
+        has_media: bool,
+        has_reports: bool,
+        has_artifacts: bool,
+    ) -> Optional[DeliveryEvent]:
+        return None
+
+    def final_events(
+        self,
+        route: ConversationRoute,
+        *,
+        session: Any,
+        user_text: str,
+        llm_text: str,
+        result: Any,
+    ) -> List[DeliveryEvent]:
+        events: List[DeliveryEvent] = []
+
+        for report in list(result.reports or []):
+            events.append(DeliveryEvent(route=route, kind="text", text=report))
+
+        for fig in list(result.figures or []):
+            if isinstance(fig, bytes):
+                events.append(DeliveryEvent(route=route, kind="photo", binary=fig))
+
+        if result.artifacts:
+            events.append(DeliveryEvent(
+                route=route, kind="text",
+                text=f"已生成 {len(result.artifacts)} 个附件，请在 Web 界面下载。",
+            ))
+
+        # WeChat-specific: suppress agent meta-commentary fragments
+        summary = strip_local_paths(llm_text or result.summary or "")
+        if summary and _META_COMMENTARY_RE.search(summary):
+            summary = ""
+        if not summary.strip() or summary.strip().lower() in _BORING_SUMMARIES:
+            summary = default_summary(session)
+        events.append(DeliveryEvent(route=route, kind="text", text=summary))
+        return events
+
+
 class WeChatJarvisBot:
     def __init__(
         self,
@@ -518,11 +661,17 @@ class WeChatJarvisBot:
         self._sm = session_manager
         self._stop_event = stop_event or threading.Event()
         self._allow_from = {str(item).strip() for item in (allow_from or []) if str(item).strip()}
-        self._registry = GatewaySessionRegistry(session_manager)
-        self._tasks: Dict[str, RunningTask] = {}
-        self._pending: Dict[str, List[Dict[str, Any]]] = {}
         self._context_tokens: Dict[str, str] = {}
         self._cursor_path = self._cursor_store_path(token)
+        # Shared runtime wiring — delegates analysis lifecycle, task tracking,
+        # queuing, quick-chat, and result delivery to the shared MessageRuntime.
+        self._runtime = MessageRuntime(
+            router=MessageRouter(session_manager),
+            presenter=WeChatRuntimePresenter(),
+            execution_adapter=AgentBridgeExecutionAdapter(),
+            deliver=self._deliver_event,
+            web_bridge=getattr(session_manager, "gateway_web_bridge", None),
+        )
 
     @staticmethod
     def _cursor_store_path(token: str) -> Path:
@@ -551,6 +700,33 @@ class WeChatJarvisBot:
             tmp.replace(self._cursor_path)
         except Exception:
             logger.debug("Failed to persist WeChat cursor", exc_info=True)
+
+    # ── Delivery ──────────────────────────────────────────────────────────
+
+    async def _deliver_event(self, event: DeliveryEvent) -> None:
+        """Send a ``DeliveryEvent`` via the WeChat iLink API."""
+        scope_id = event.route.scope_id
+        sk = SessionKey(
+            channel="wechat", scope_type=event.route.scope_type,
+            scope_id=scope_id, thread_id=event.route.thread_id,
+        )
+
+        if event.kind == "text":
+            text = (event.text or "").strip()
+            if text:
+                await self._send_session_text(sk, text)
+            return
+
+        if event.kind == "photo":
+            if event.binary is not None:
+                await self._send_figures(sk, [event.binary])
+            return
+
+        if event.kind == "document":
+            logger.info("WeChat: artifact '%s' (file send not supported via iLink)", event.filename or "unknown")
+            return
+
+    # ── Main loop ────────────────────────────────────────────────────────
 
     async def run(self) -> None:
         try:
@@ -648,9 +824,10 @@ class WeChatJarvisBot:
             logger.warning("WeChat message ignored because context_token is missing: from=%s", from_user_id)
             return
 
+        session_key = SessionKey(channel="wechat", scope_type="dm", scope_id=from_user_id)
+        route = wechat_route_from_session_key(session_key)
+
         # Intercept .h5ad file uploads (item type 4) before passing text to the LLM.
-        # Prefer the official openclaw-weixin media CDN fields; fall back to file_key
-        # for older payloads that still expose direct media download tokens.
         item_list = raw.get("item_list") or []
         for _item in item_list if isinstance(item_list, list) else []:
             if not isinstance(_item, dict) or _item.get("type") != 4:
@@ -662,10 +839,9 @@ class WeChatJarvisBot:
             _fkey = str(_file_item.get("file_key") or _file_item.get("media_id") or "").strip()
             if _fname.lower().endswith(".h5ad") and (_enc or _fkey):
                 self._context_tokens[from_user_id] = context_token
-                _sk = SessionKey(channel="wechat", scope_type="dm", scope_id=from_user_id)
-                _session = self._registry.get_or_create(_sk)
+                _session = self._runtime.get_session(route)
                 await self._handle_h5ad_file(
-                    _sk,
+                    session_key,
                     _session,
                     context_token,
                     _file_item,
@@ -673,8 +849,7 @@ class WeChatJarvisBot:
                 )
                 return
 
-        session_key = SessionKey(channel="wechat", scope_type="dm", scope_id=from_user_id)
-        session = self._registry.get_or_create(session_key)
+        session = self._runtime.get_session(route)
         text = _extract_text(raw.get("item_list"))
         inbound_images = await self._prepare_inbound_images(raw, session)
         if inbound_images:
@@ -693,8 +868,7 @@ class WeChatJarvisBot:
             return
 
         self._context_tokens[from_user_id] = context_token
-        route = session_key.as_key()
-        cmd, tail = self._command_parts(text)
+        cmd, tail = command_parts(text)
         image_note = build_workspace_note(
             session.workspace,
             inbound_images,
@@ -750,81 +924,44 @@ class WeChatJarvisBot:
             )
             return
 
-        running = self._tasks.get(route)
-        if running and not running.task.done():
-            self._pending.setdefault(route, []).append(
-                {
-                    "text": user_text,
-                    "request_content": request_content,
-                }
-            )
-            await self._send_session_text(
-                session_key,
-                "⏭ 已加入当前会话队列，当前分析完成后继续处理。",
-                context_token=context_token,
-            )
-            return
-
-        await self._send_ack(session_key, session, context_token, image_count=len(inbound_images))
-        await self._spawn_analysis(
+        # ── Analysis path: delegate to shared MessageRuntime ─────────────
+        envelope = wechat_runtime_envelope(
             session_key,
-            session,
             user_text,
-            request_content=request_content,
+            sender_id=from_user_id,
+            metadata={
+                "image_count": len(inbound_images),
+                "request_content": request_content,
+            },
         )
+        if envelope is not None:
+            await self._runtime.handle_message(envelope)
 
     async def _handle_status(
         self,
         session_key: SessionKey,
         session: Any,
-        route: str,
+        route: ConversationRoute,
         context_token: str,
     ) -> None:
-        running = self._tasks.get(route)
+        state = self._runtime.task_state(route)
         info = gather_status(
             session,
-            is_running=bool(running and not running.task.done()),
-            running_request=running.request[:300] if (running and not running.task.done()) else "",
+            is_running=state.running,
+            running_request=state.request[:300] if state.running else "",
         )
         await self._send_session_text(session_key, format_status_plain(info), context_token=context_token)
 
-    async def _handle_cancel(self, session_key: SessionKey, route: str, context_token: str) -> None:
-        self._pending.pop(route, None)
-        running = self._tasks.get(route)
-        if not running or running.task.done():
+    async def _handle_cancel(self, session_key: SessionKey, route: ConversationRoute, context_token: str) -> None:
+        cancelled = await self._runtime.cancel(route)
+        if cancelled:
+            await self._send_session_text(session_key, "🚫 已发送取消信号。", context_token=context_token)
+        else:
             await self._send_session_text(
                 session_key,
                 "当前没有正在运行的分析任务。",
                 context_token=context_token,
             )
-            return
-        running.task.cancel()
-        await self._send_session_text(session_key, "🚫 已发送取消信号。", context_token=context_token)
-
-    async def _send_ack(
-        self,
-        session_key: SessionKey,
-        session: Any,
-        context_token: str,
-        *,
-        image_count: int = 0,
-    ) -> None:
-        if session.adata is not None:
-            adata = session.adata
-            text = f"⏳ 已收到，开始分析。\n当前数据: {adata.n_obs:,} cells x {adata.n_vars:,} genes"
-        else:
-            try:
-                h5ad_files = session.list_h5ad_files()
-            except Exception:
-                h5ad_files = []
-            if h5ad_files:
-                names = ", ".join(item.name for item in h5ad_files[:5])
-                text = f"⏳ 已收到，开始分析。\n检测到工作区数据文件: {names}"
-            else:
-                text = "⏳ 已收到，开始分析。"
-        if image_count:
-            text += f"\n检测到图片: {image_count} 张（已保存到 workspace/uploads/wechat）"
-        await self._send_session_text(session_key, text, context_token=context_token)
 
     async def _handle_h5ad_file(
         self,
@@ -863,155 +1000,6 @@ class WeChatJarvisBot:
                 f"❌ 文件处理失败: {exc}",
                 context_token=context_token,
             )
-
-    async def _spawn_analysis(
-        self,
-        session_key: SessionKey,
-        session: Any,
-        user_text: str,
-        request_content: Optional[List[Dict[str, Any]]] = None,
-    ) -> None:
-        route = session_key.as_key()
-        task = asyncio.create_task(
-            self._analysis_wrapper(
-                session_key,
-                session,
-                user_text,
-                request_content or [],
-            )
-        )
-        self._tasks[route] = RunningTask(task=task, request=user_text, started_at=time.time())
-
-    async def _analysis_wrapper(
-        self,
-        session_key: SessionKey,
-        session: Any,
-        user_text: str,
-        request_content: List[Dict[str, Any]],
-    ) -> None:
-        route = session_key.as_key()
-        try:
-            await self._run_analysis(session_key, session, user_text, request_content)
-        except asyncio.CancelledError:
-            try:
-                await self._send_session_text(session_key, "已取消当前分析。")
-            except Exception:
-                pass
-            raise
-        except Exception as exc:
-            logger.exception("WeChat analysis wrapper failed")
-            await self._send_session_text(session_key, f"分析异常: {exc}")
-        finally:
-            self._tasks.pop(route, None)
-            queued = self._pending.pop(route, [])
-            if queued:
-                await self._send_session_text(session_key, f"开始执行队列中的 {len(queued)} 条请求...")
-                next_session = self._registry.get_or_create(session_key)
-                coalesced, request_content = self._coalesce_pending_requests(queued)
-                await self._spawn_analysis(
-                    session_key,
-                    next_session,
-                    coalesced,
-                    request_content=request_content,
-                )
-
-    async def _run_analysis(
-        self,
-        session_key: SessionKey,
-        session: Any,
-        user_text: str,
-        request_content: List[Dict[str, Any]],
-    ) -> None:
-        llm_buf = ""
-        last_progress_sent = 0.0
-        full_request = self._build_full_request(session, user_text)
-
-        async def progress_cb(msg: str) -> None:
-            nonlocal last_progress_sent
-            now = asyncio.get_running_loop().time()
-            if now - last_progress_sent < _PROGRESS_GAP:
-                return
-            last_progress_sent = now
-            await self._send_session_text(session_key, f"⚙️ {msg[:200]}")
-
-        async def llm_chunk_cb(chunk: str) -> None:
-            nonlocal llm_buf
-            if chunk:
-                llm_buf += chunk
-
-        _prior_history = get_prior_history(
-            self._sm, "wechat", session_key.scope_type, session_key.scope_id, session,
-        )
-
-        bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
-        try:
-            result = await bridge.run(
-                full_request,
-                session.adata,
-                history=_prior_history,
-                request_content=request_content,
-            )
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            logger.exception("WeChat analysis failed")
-            await self._send_session_text(session_key, f"分析失败: {exc}")
-            return
-
-        logger.info(
-            "WeChat: bridge result figures=%d artifacts=%d error=%s",
-            len(result.figures),
-            len(result.artifacts),
-            result.error,
-        )
-
-        delivery_figures, _adata_info = process_result_state(session, result, user_text)
-
-        notify_turn_complete(
-            self._sm,
-            channel="wechat",
-            scope_type=session_key.scope_type,
-            scope_id=session_key.scope_id,
-            session=session,
-            user_text=user_text,
-            llm_text=llm_buf,
-            adata=result.adata,
-            figures=result.figures or [],
-        )
-
-        if result.error:
-            await self._send_session_text(session_key, format_analysis_error(result, llm_buf))
-            return
-
-        for report in list(result.reports or []):
-            for chunk in text_chunks(report, limit=_MAX_TEXT):
-                await self._send_session_text(session_key, chunk)
-
-        if delivery_figures:
-            await self._send_figures(session_key, delivery_figures)
-        if result.artifacts:
-            await self._send_session_text(
-                session_key,
-                f"已生成 {len(result.artifacts)} 个附件，请在 Web 界面下载。",
-            )
-
-        # pick_reply_text handles has_artifacts + llm_buf priority; WeChat then
-        # additionally strips agent meta-commentary fragments.
-        summary = strip_local_paths(bridge.pick_reply_text(result, llm_buf))
-        if summary and _META_COMMENTARY_RE.search(summary):
-            logger.debug("WeChat: suppressing meta-commentary summary: %.120s", summary)
-            summary = ""
-        if not summary:
-            summary = default_summary(session)
-        for chunk in text_chunks(summary, limit=_MAX_TEXT):
-            await self._send_session_text(session_key, chunk)
-
-    def _build_full_request(self, session: Any, text: str) -> str:
-        return build_full_request(session, text, channel_label="WeChat")
-
-    @staticmethod
-    def _command_parts(text: str) -> tuple[str, str]:
-        return command_parts(text)
 
     async def _prepare_inbound_images(self, raw: Dict[str, Any], session: Any) -> List[PreparedImage]:
         item_list = raw.get("item_list") or []
@@ -1113,10 +1101,6 @@ class WeChatJarvisBot:
         if not legacy_file_key:
             raise RuntimeError("WeChat inbound file missing media reference")
         return self._client.download_file(legacy_file_key)
-
-    @staticmethod
-    def _coalesce_pending_requests(items: List[Dict[str, Any]]) -> tuple[str, List[Dict[str, Any]]]:
-        return coalesce_pending_requests(items)
 
     async def _send_figures(self, session_key: SessionKey, figures: List[Any]) -> None:
         """Upload and send each figure as a WeChat image message."""
