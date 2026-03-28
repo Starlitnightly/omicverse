@@ -192,9 +192,7 @@ class SubagentController:
         dict
             ``{"result": str, "adata": AnnData, "last_usage": Any}``
         """
-        from ..agent_config import SUBAGENT_CONFIGS
-
-        config = SUBAGENT_CONFIGS[agent_type]
+        config = self._ctx._config.get_subagent_config(agent_type)
 
         # Create isolated runtime
         runtime = self._create_subagent_runtime(
