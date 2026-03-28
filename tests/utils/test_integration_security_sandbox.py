@@ -324,13 +324,13 @@ class TestCustomConfigComposition:
         assert violations[0].category == "dangerous_import"
         assert violations[0].severity == "critical"
 
-    def test_extra_blocked_calls_catches_pandas_eval(self):
-        cfg = SecurityConfig(extra_blocked_calls=frozenset({"pandas.eval"}))
+    def test_extra_blocked_calls_catches_custom_call(self):
+        cfg = SecurityConfig(extra_blocked_calls=frozenset({"numpy.save"}))
         scanner = CodeSecurityScanner(cfg)
-        violations = scanner.scan('pandas.eval("x")')
+        violations = scanner.scan('numpy.save("out.npy", arr)')
         assert len(violations) == 1
         assert violations[0].category == "file_danger"
-        assert "pandas.eval" in violations[0].description
+        assert "numpy.save" in violations[0].description
 
     def test_allowed_import_roots_whitelists_requests(self):
         cfg = SecurityConfig(allowed_import_roots=frozenset({"requests"}))
@@ -593,15 +593,15 @@ class TestRuntimeImportBlocking:
     def test_import_importlib_blocked_at_runtime(
         self, local_backend, _bypass_scanner
     ):
-        """import importlib must be blocked by _safe_import, not just scanner."""
-        with pytest.raises(RuntimeError, match="blocked.*importlib"):
+        """import importlib must be blocked by limited_import, not just scanner."""
+        with pytest.raises(RuntimeError, match="(?i)importlib.*blocked"):
             local_backend._run_python_local("import importlib")
 
     def test_importlib_import_module_blocked(
         self, local_backend, _bypass_scanner
     ):
         """importlib.import_module escape path is blocked at runtime."""
-        with pytest.raises(RuntimeError, match="blocked.*importlib"):
+        with pytest.raises(RuntimeError, match="(?i)importlib.*blocked"):
             local_backend._run_python_local(
                 "import importlib\nimportlib.import_module('subprocess')"
             )
@@ -610,7 +610,7 @@ class TestRuntimeImportBlocking:
         self, local_backend, _bypass_scanner
     ):
         """from importlib import import_module is blocked at runtime."""
-        with pytest.raises(RuntimeError, match="blocked.*importlib"):
+        with pytest.raises(RuntimeError, match="(?i)importlib.*blocked"):
             local_backend._run_python_local(
                 "from importlib import import_module"
             )
@@ -619,15 +619,29 @@ class TestRuntimeImportBlocking:
         self, local_backend, _bypass_scanner
     ):
         """import ctypes must be blocked at runtime."""
-        with pytest.raises(RuntimeError, match="blocked.*ctypes"):
+        with pytest.raises(RuntimeError, match="(?i)ctypes.*blocked"):
             local_backend._run_python_local("import ctypes")
 
     def test_import_cffi_blocked_at_runtime(
         self, local_backend, _bypass_scanner
     ):
         """import cffi must be blocked at runtime."""
-        with pytest.raises(RuntimeError, match="blocked.*cffi"):
+        with pytest.raises(RuntimeError, match="(?i)cffi.*blocked"):
             local_backend._run_python_local("import cffi")
+
+    def test_import_subprocess_blocked_at_runtime(
+        self, local_backend, _bypass_scanner
+    ):
+        """import subprocess must be blocked at runtime, not just scanner."""
+        with pytest.raises(RuntimeError, match="(?i)subprocess.*blocked"):
+            local_backend._run_python_local("import subprocess")
+
+    def test_import_sys_blocked_at_runtime(
+        self, local_backend, _bypass_scanner
+    ):
+        """import sys must be blocked to prevent sys.path/sys.modules access."""
+        with pytest.raises(RuntimeError, match="(?i)sys.*blocked"):
+            local_backend._run_python_local("import sys")
 
     def test_safe_imports_still_work(
         self, local_backend, _bypass_scanner
@@ -637,3 +651,279 @@ class TestRuntimeImportBlocking:
             "import json\nprint(json.dumps({'ok': True}))"
         )
         assert '"ok": true' in result
+
+
+# ===================================================================
+# 10. Runtime bypass vector enforcement (build_sandbox_globals)
+# ===================================================================
+
+from omicverse.utils.agent_sandbox import build_sandbox_globals
+
+
+class TestRuntimeGetAttrBypass:
+    """getattr(os, 'system') and similar dynamic attribute access must be
+    blocked at runtime by SafeOsProxy, not only by the AST scanner."""
+
+    def test_getattr_os_system_blocked(self):
+        globs = build_sandbox_globals()
+        with pytest.raises(SecurityViolationError, match="os.system"):
+            exec("result = getattr(os, 'system')", globs)
+
+    def test_getattr_os_popen_blocked(self):
+        globs = build_sandbox_globals()
+        with pytest.raises(SecurityViolationError, match="os.popen"):
+            exec("result = getattr(os, 'popen')", globs)
+
+    def test_getattr_os_execv_blocked(self):
+        globs = build_sandbox_globals()
+        with pytest.raises(SecurityViolationError, match="os.execv"):
+            exec("getattr(os, 'execv')", globs)
+
+    def test_getattr_os_kill_blocked(self):
+        globs = build_sandbox_globals()
+        with pytest.raises(SecurityViolationError, match="os.kill"):
+            exec("getattr(os, 'kill')", globs)
+
+    def test_getattr_os_path_allowed(self):
+        """os.path is safe and must remain accessible."""
+        globs = build_sandbox_globals()
+        loc = {}
+        exec("result = getattr(os, 'path')", globs, loc)
+        assert loc["result"] is os.path
+
+    def test_os_getcwd_allowed(self):
+        globs = build_sandbox_globals()
+        loc = {}
+        exec("result = os.getcwd()", globs, loc)
+        assert loc["result"] == os.getcwd()
+
+
+class TestRuntimeDunderImportBypass:
+    """Direct __import__ usage must go through restricted limited_import."""
+
+    def test_dunder_import_subprocess_blocked(self):
+        globs = build_sandbox_globals()
+        with pytest.raises(ImportError, match="subprocess.*blocked"):
+            exec("mod = __import__('subprocess')", globs)
+
+    def test_dunder_import_socket_blocked(self):
+        globs = build_sandbox_globals()
+        with pytest.raises(ImportError, match="socket.*blocked"):
+            exec("mod = __import__('socket')", globs)
+
+    def test_dunder_import_sys_blocked(self):
+        globs = build_sandbox_globals()
+        with pytest.raises(ImportError, match="sys.*blocked"):
+            exec("mod = __import__('sys')", globs)
+
+    def test_dunder_import_os_returns_proxy(self):
+        """__import__('os') must return SafeOsProxy, not real os."""
+        from omicverse.utils.agent_sandbox import SafeOsProxy
+        globs = build_sandbox_globals()
+        loc = {}
+        exec("mod = __import__('os')", globs, loc)
+        assert isinstance(loc["mod"], SafeOsProxy)
+
+    def test_dunder_import_json_allowed(self):
+        globs = build_sandbox_globals()
+        loc = {}
+        exec("mod = __import__('json')", globs, loc)
+        import json
+        assert loc["mod"] is json
+
+    def test_import_importlib_metadata_allowed(self):
+        """Safe importlib sub-modules must remain importable."""
+        globs = build_sandbox_globals()
+        loc = {}
+        exec("from importlib import metadata\nresult = hasattr(metadata, 'version')", globs, loc)
+        assert loc["result"] is True
+
+
+class TestRuntimeSysPathManipulation:
+    """sys.path and sys.modules manipulation must be blocked."""
+
+    def test_import_sys_blocked(self):
+        globs = build_sandbox_globals()
+        with pytest.raises(ImportError, match="sys.*blocked"):
+            exec("import sys", globs)
+
+    def test_from_sys_import_blocked(self):
+        globs = build_sandbox_globals()
+        with pytest.raises(ImportError, match="sys.*blocked"):
+            exec("from sys import path", globs)
+
+    def test_sys_modules_inaccessible(self):
+        """Without sys, sys.modules cannot be used to retrieve blocked modules."""
+        globs = build_sandbox_globals()
+        with pytest.raises(ImportError, match="sys.*blocked"):
+            exec("import sys; mod = sys.modules['os']", globs)
+
+
+class TestRuntimeIntrospectionEscapes:
+    """Dangerous builtins (eval, exec, compile, globals, locals) must not
+    be available in the sandbox namespace."""
+
+    def test_eval_not_available(self):
+        globs = build_sandbox_globals()
+        with pytest.raises(NameError):
+            exec("eval('1+1')", globs)
+
+    def test_exec_not_available(self):
+        globs = build_sandbox_globals()
+        with pytest.raises(NameError):
+            exec("exec('x = 1')", globs)
+
+    def test_compile_not_available(self):
+        globs = build_sandbox_globals()
+        with pytest.raises(NameError):
+            exec("compile('1+1', '<test>', 'exec')", globs)
+
+    def test_globals_not_available(self):
+        globs = build_sandbox_globals()
+        with pytest.raises(NameError):
+            exec("g = globals()", globs)
+
+    def test_locals_not_available(self):
+        globs = build_sandbox_globals()
+        with pytest.raises(NameError):
+            exec("l = locals()", globs)
+
+    def test_breakpoint_not_available(self):
+        globs = build_sandbox_globals()
+        with pytest.raises(NameError):
+            exec("breakpoint()", globs)
+
+    def test_standard_builtins_still_work(self):
+        """Common builtins like len, range, print must still be available."""
+        globs = build_sandbox_globals()
+        loc = {}
+        exec("result = len(list(range(5)))", globs, loc)
+        assert loc["result"] == 5
+
+    def test_import_os_then_getattr_system_blocked(self):
+        """Full chain: import os; getattr(os, 'system') must be caught."""
+        globs = build_sandbox_globals()
+        with pytest.raises(SecurityViolationError, match="os.system"):
+            exec("import os\ngetattr(os, 'system')", globs)
+
+    def test_restricted_import_still_blocks_after_getattr(self):
+        """The restricted __import__ obtained via builtins still enforces blocks."""
+        globs = build_sandbox_globals()
+        with pytest.raises(ImportError, match="blocked"):
+            exec(
+                "imp = __builtins__['__import__']\n"
+                "imp('subprocess')",
+                globs,
+            )
+
+
+class TestRuntimeLegitimateCodeWorks:
+    """Verify that legitimate data-science code runs successfully in the
+    sandboxed environment."""
+
+    def test_math_operations(self):
+        globs = build_sandbox_globals()
+        loc = {}
+        exec("import math\nresult = math.sqrt(144)", globs, loc)
+        assert loc["result"] == 12.0
+
+    def test_json_roundtrip(self):
+        globs = build_sandbox_globals()
+        loc = {}
+        exec(
+            "import json\n"
+            "data = {'key': [1, 2, 3]}\n"
+            "result = json.loads(json.dumps(data))",
+            globs, loc,
+        )
+        assert loc["result"] == {"key": [1, 2, 3]}
+
+    def test_os_path_join(self):
+        globs = build_sandbox_globals()
+        loc = {}
+        exec("result = os.path.join('a', 'b', 'c')", globs, loc)
+        assert loc["result"] == os.path.join("a", "b", "c")
+
+    def test_from_os_path_import_join(self):
+        globs = build_sandbox_globals()
+        loc = {}
+        exec("from os.path import join\nresult = join('x', 'y')", globs, loc)
+        assert loc["result"] == os.path.join("x", "y")
+
+    def test_list_comprehension_and_builtins(self):
+        globs = build_sandbox_globals()
+        loc = {}
+        exec(
+            "result = sorted([x**2 for x in range(5)], reverse=True)",
+            globs, loc,
+        )
+        assert loc["result"] == [16, 9, 4, 1, 0]
+
+    def test_exception_handling(self):
+        globs = build_sandbox_globals()
+        loc = {}
+        exec(
+            "try:\n"
+            "    1 / 0\n"
+            "except ZeroDivisionError:\n"
+            "    result = 'caught'\n",
+            globs, loc,
+        )
+        assert loc["result"] == "caught"
+
+
+# ===================================================================
+# 11. pandas.eval scanner classification correction
+# ===================================================================
+
+
+class TestPandasEvalClassification:
+    """pandas.eval / pd.eval must be categorized as code_execution,
+    not file_danger, and must have critical severity."""
+
+    def test_pd_eval_detected_as_code_execution(self):
+        scanner = CodeSecurityScanner()
+        violations = scanner.scan('pd.eval("x + 1")')
+        eval_v = [v for v in violations if "pd.eval" in v.description]
+        assert len(eval_v) == 1
+        assert eval_v[0].category == "code_execution"
+        assert eval_v[0].severity == "critical"
+
+    def test_pandas_eval_detected_as_code_execution(self):
+        scanner = CodeSecurityScanner()
+        violations = scanner.scan('pandas.eval("x + 1")')
+        eval_v = [v for v in violations if "pandas.eval" in v.description]
+        assert len(eval_v) == 1
+        assert eval_v[0].category == "code_execution"
+        assert eval_v[0].severity == "critical"
+
+    def test_pd_eval_not_file_danger(self):
+        scanner = CodeSecurityScanner()
+        violations = scanner.scan('pd.eval("something")')
+        for v in violations:
+            if "eval" in v.description.lower():
+                assert v.category != "file_danger", (
+                    f"pandas.eval must not be categorized as file_danger, "
+                    f"got: {v.category}"
+                )
+
+    def test_pd_eval_blocked_at_standard_level(self):
+        scanner = _scanner_for(SecurityLevel.STANDARD)
+        violations = scanner.scan('pd.eval("1+1")')
+        assert scanner.has_critical(violations)
+
+    def test_code_execution_severity_overridable(self):
+        cfg = SecurityConfig(severity_overrides={"code_execution": "warning"})
+        scanner = CodeSecurityScanner(cfg)
+        violations = scanner.scan('pd.eval("x")')
+        eval_v = [v for v in violations if v.category == "code_execution"]
+        assert len(eval_v) == 1
+        assert eval_v[0].severity == "warning"
+
+    def test_cffi_in_scanner_blocked_imports(self):
+        """cffi must be in the scanner's BLOCKED_IMPORT_ROOTS."""
+        scanner = CodeSecurityScanner()
+        violations = scanner.scan("import cffi")
+        assert len(violations) == 1
+        assert violations[0].category == "dangerous_import"
+        assert violations[0].severity == "critical"

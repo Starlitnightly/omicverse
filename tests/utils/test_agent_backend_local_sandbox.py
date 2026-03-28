@@ -65,7 +65,7 @@ class TestRestrictedBuiltins:
         result = backend._run_python_local(
             "result = __import__.__name__"
         )
-        assert result == "'_safe_import'"
+        assert result == "'limited_import'"
 
     def test_breakpoint_not_accessible(self, monkeypatch):
         """breakpoint() is not caught by the AST scanner, only by builtins."""
@@ -91,9 +91,10 @@ class TestRestrictedBuiltins:
         assert result == "True"
 
     def test_denied_builtins_list(self):
-        """Verify the denied builtins set matches spec."""
-        expected = {"eval", "exec", "compile", "__import__", "breakpoint"}
-        assert OmicVerseLLMBackend._DENIED_BUILTINS == expected
+        """Verify that the sandbox excludes dangerous builtins."""
+        from omicverse.utils.agent_sandbox import _EXCLUDED_BUILTINS
+        expected_minimum = {"eval", "exec", "compile", "__import__", "breakpoint"}
+        assert expected_minimum <= _EXCLUDED_BUILTINS
 
 
 # ---------------------------------------------------------------------------

@@ -20,12 +20,13 @@ This module provides:
 from __future__ import annotations
 
 import ast
+import builtins as _builtins
 import logging
 import os
 import types
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, FrozenSet, List, Optional
+from typing import Any, Dict, FrozenSet, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -190,6 +191,8 @@ class CodeSecurityScanner:
         "subprocess.getoutput", "subprocess.getstatusoutput",
         # shutil dangerous ops
         "shutil.rmtree", "shutil.move",
+        # Code execution via data-science libraries
+        "pandas.eval", "pd.eval",
     })
 
     # Dangerous attribute access (sandbox escape vectors)
@@ -210,11 +213,16 @@ class CodeSecurityScanner:
         "__spec__",
     })
 
+    # Calls that represent code-execution risk (not file I/O or shell access)
+    CODE_EXECUTION_CALLS: FrozenSet[str] = frozenset({
+        "pandas.eval", "pd.eval",
+    })
+
     # Modules that should never appear in import statements
     BLOCKED_IMPORT_ROOTS: FrozenSet[str] = frozenset({
         "subprocess", "socket", "ssl", "urllib", "http",
         "ftplib", "smtplib", "telnetlib", "paramiko", "requests",
-        "importlib", "ctypes", "multiprocessing",
+        "importlib", "ctypes", "cffi", "multiprocessing",
     })
 
     SAFE_IMPORT_SUBMODULES: FrozenSet[str] = frozenset({
@@ -293,7 +301,12 @@ class CodeSecurityScanner:
             # Check exact match or prefix match (os.exec covers os.execl etc.)
             for blocked in self._blocked_calls:
                 if name == blocked or name.startswith(blocked + "."):
-                    category = "shell_access" if "os." in blocked or "subprocess" in blocked else "file_danger"
+                    if blocked in self.CODE_EXECUTION_CALLS:
+                        category = "code_execution"
+                    elif "os." in blocked or "subprocess" in blocked:
+                        category = "shell_access"
+                    else:
+                        category = "file_danger"
                     severity = self._severity_overrides.get(category, "critical")
                     violations.append(SecurityViolation(
                         category=category,
@@ -472,3 +485,105 @@ class SafeOsProxy(types.ModuleType):
 
     def __repr__(self) -> str:
         return "<SafeOsProxy: restricted os module for OmicVerse agent>"
+
+
+# ---------------------------------------------------------------------------
+# Runtime sandbox globals builder
+# ---------------------------------------------------------------------------
+
+# Modules blocked at runtime import time — superset of the scanner's
+# BLOCKED_IMPORT_ROOTS, extended with sys (path/module manipulation)
+# and cffi (foreign-function interface escape).
+BLOCKED_RUNTIME_IMPORT_ROOTS: FrozenSet[str] = frozenset({
+    "subprocess", "socket", "ssl", "urllib", "http",
+    "ftplib", "smtplib", "telnetlib", "paramiko", "requests",
+    "importlib", "ctypes", "cffi", "multiprocessing", "sys",
+})
+
+_SAFE_IMPORT_SUBMODULES: FrozenSet[str] = frozenset({
+    "importlib.metadata",
+    "importlib.resources",
+})
+
+# Builtins explicitly excluded from the runtime sandbox.
+_EXCLUDED_BUILTINS: FrozenSet[str] = frozenset({
+    "eval", "exec", "compile",   # arbitrary code execution
+    "globals", "locals",          # namespace introspection
+    "breakpoint",                 # debugger entry
+    "exit", "quit",               # interpreter termination
+    "__import__",                 # replaced with restricted version
+})
+
+
+def build_sandbox_globals(
+    *,
+    security_config: Optional[SecurityConfig] = None,
+) -> Dict[str, Any]:
+    """Build restricted globals dict for local Python ``exec()``.
+
+    Returns a namespace with:
+
+    * Allowlisted builtins (no ``eval``/``exec``/``compile``/``globals``/``locals``)
+    * A restricted ``__import__`` that blocks dangerous modules at runtime
+    * ``os`` replaced with :class:`SafeOsProxy`
+
+    This is the runtime enforcement counterpart of :class:`CodeSecurityScanner`.
+    The scanner catches patterns at AST level; these globals catch bypass
+    vectors that only manifest at execution time (e.g. ``getattr(os, 'system')``
+    or ``__import__('subprocess')``).
+    """
+    config = security_config or SecurityConfig()
+
+    # -- restricted builtins ------------------------------------------------
+    excluded = set(_EXCLUDED_BUILTINS)
+    if not config.restrict_introspection:
+        excluded -= {"globals", "locals"}
+
+    safe_builtins: Dict[str, Any] = {}
+    for name in dir(_builtins):
+        if name.startswith("_"):
+            continue
+        if name in excluded:
+            continue
+        obj = getattr(_builtins, name, None)
+        if obj is not None:
+            safe_builtins[name] = obj
+
+    # -- restricted import --------------------------------------------------
+    deny_roots = BLOCKED_RUNTIME_IMPORT_ROOTS | config.extra_blocked_modules
+    os_proxy = SafeOsProxy()
+
+    def limited_import(name, globals=None, locals=None, fromlist=(), level=0):
+        root = name.split(".")[0]
+        fromlist_names = {str(f) for f in (fromlist or ())}
+        allow_safe = (
+            name in _SAFE_IMPORT_SUBMODULES
+            or any(name.startswith(f"{sm}.") for sm in _SAFE_IMPORT_SUBMODULES)
+            or (name == "importlib" and fromlist_names
+                and fromlist_names <= {"metadata", "resources"})
+        )
+        if root in deny_roots and not allow_safe:
+            raise ImportError(
+                f"Module '{name}' is blocked inside the OmicVerse agent sandbox."
+            )
+        # Redirect os imports to SafeOsProxy so getattr(os, 'system') is
+        # caught at runtime rather than returning the real os attribute.
+        if root == "os":
+            if fromlist and name != "os":
+                # e.g. from os.path import join — return real submodule
+                return _real_import(name, globals, locals, fromlist, level)
+            # import os / import os.path / from os import X — proxy
+            _real_import(name, globals, locals, fromlist, level)
+            return os_proxy
+        return _real_import(name, globals, locals, fromlist, level)
+
+    _real_import = __import__
+    safe_builtins["__import__"] = limited_import
+
+    # -- assemble globals ---------------------------------------------------
+    sandbox_globals: Dict[str, Any] = {
+        "__name__": "__main__",
+        "__builtins__": safe_builtins,
+        "os": os_proxy,
+    }
+    return sandbox_globals
