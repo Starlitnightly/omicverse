@@ -250,14 +250,17 @@ def test_tool_execute_code_in_code_only_mode_captures_without_execution():
     from omicverse.utils.ovagent.tool_runtime_exec import handle_execute_code
     captured = {}
 
-    class _Ctx:
-        _code_only_mode = True
-
-        def _capture_code_only_snippet(self, code, description=""):
+    class _FakePipeline:
+        def capture_code_only_snippet(self, code, description=""):
             captured["code"] = code
             captured["description"] = description
 
+    class _Ctx:
+        _code_only_mode = True
+
     class _Executor:
+        _codegen_pipeline = _FakePipeline()
+
         def check_code_prerequisites(self, code, adata):
             raise AssertionError("should not check prerequisites in code-only mode")
 
@@ -403,6 +406,11 @@ def test_agentic_loop_retries_after_text_only_promise_until_tool_call():
     class _FakeToolRuntime:
         def __init__(self):
             self.registry = _FakeToolRegistry()
+        def get_visible_agent_tools(self, *, allowed_names=None):
+            return [
+                {"name": "WebFetch", "description": "fetch", "parameters": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}},
+                {"name": "finish", "description": "finish", "parameters": {"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]}},
+            ]
         async def dispatch_tool(self, tool_call, current_adata, request, **kw):
             dispatch_log.append(tool_call.name)
             if tool_call.name == "WebFetch":
@@ -1028,3 +1036,120 @@ def test_no_new_runtime_dependencies():
         assert f"import {suspect}" not in source, (
             f"New runtime dependency '{suspect}' found in smart_agent.py"
         )
+
+
+# -----------------------------------------------------------------------
+# Task-049: Direct consumer rewiring tests
+# -----------------------------------------------------------------------
+
+import inspect as _inspect
+
+
+def test_subagent_controller_uses_tool_runtime_directly():
+    """AC-049.1: SubagentController calls tool_runtime.get_visible_agent_tools, not ctx."""
+    from omicverse.utils.ovagent.subagent_controller import SubagentController
+
+    src = _inspect.getsource(SubagentController._create_subagent_runtime)
+    assert "self._tool_runtime.get_visible_agent_tools" in src, (
+        "SubagentController should call self._tool_runtime.get_visible_agent_tools"
+    )
+    assert "self._ctx._get_visible_agent_tools" not in src, (
+        "SubagentController should NOT route through ctx._get_visible_agent_tools"
+    )
+
+
+def test_turn_controller_uses_tool_runtime_directly():
+    """AC-049.1: TurnController calls tool_runtime.get_visible_agent_tools, not ctx."""
+    from omicverse.utils.ovagent.turn_controller import TurnController
+
+    src = _inspect.getsource(TurnController.run_agentic_loop)
+    assert "self._tool_runtime.get_visible_agent_tools" in src, (
+        "TurnController should call self._tool_runtime.get_visible_agent_tools"
+    )
+    assert "ctx._get_visible_agent_tools" not in src, (
+        "TurnController should NOT route through ctx._get_visible_agent_tools"
+    )
+
+
+def test_analysis_executor_holds_direct_codegen_pipeline():
+    """AC-049.1: AnalysisExecutor resolves extract_code_fn from its own _codegen_pipeline."""
+    from omicverse.utils.ovagent.analysis_executor import AnalysisExecutor
+
+    src = _inspect.getsource(AnalysisExecutor._get_extract_code_fn)
+    assert "self._codegen_pipeline" in src, (
+        "AnalysisExecutor should use self._codegen_pipeline"
+    )
+    assert 'self._ctx' not in src, (
+        "AnalysisExecutor._get_extract_code_fn should NOT reach through ctx"
+    )
+
+
+def test_tool_runtime_exec_uses_executor_codegen_pipeline():
+    """AC-049.1: handle_execute_code gets codegen_pipeline from executor, not ctx."""
+    from omicverse.utils.ovagent import tool_runtime_exec
+
+    src = _inspect.getsource(tool_runtime_exec.handle_execute_code)
+    assert 'getattr(executor, "_codegen_pipeline"' in src, (
+        "handle_execute_code should get pipeline from executor"
+    )
+    assert 'getattr(ctx, "_codegen_pipeline"' not in src, (
+        "handle_execute_code should NOT reach through ctx for codegen_pipeline"
+    )
+
+
+def test_repair_loop_uses_executor_codegen_pipeline():
+    """AC-049.1: ExecutionRepairLoop resolves extract_code_fn from executor directly."""
+    from omicverse.utils.ovagent.repair_loop import ExecutionRepairLoop
+
+    src = _inspect.getsource(ExecutionRepairLoop.run)
+    assert 'getattr(self._executor, "_codegen_pipeline"' in src, (
+        "RepairLoop should get pipeline from self._executor._codegen_pipeline"
+    )
+    assert "_ctx._codegen_pipeline" not in src, (
+        "RepairLoop should NOT reach through executor._ctx._codegen_pipeline"
+    )
+
+
+def test_protocol_does_not_declare_retired_facade_methods():
+    """AC-049.1: AgentContext protocol no longer declares tool facade methods."""
+    from omicverse.utils.ovagent.protocol import AgentContext
+
+    protocol_methods = set(dir(AgentContext))
+    retired = {"_get_visible_agent_tools", "_get_loaded_tool_names", "_tool_blocked_in_plan_mode"}
+    for name in retired:
+        assert name not in protocol_methods, (
+            f"AgentContext should no longer declare {name} after consumer rewiring"
+        )
+
+
+def test_analysis_executor_set_codegen_pipeline_wiring():
+    """AC-049.1: AnalysisExecutor.set_codegen_pipeline correctly late-binds the pipeline."""
+    from omicverse.utils.ovagent.analysis_executor import AnalysisExecutor
+
+    class _StubCtx:
+        pass
+
+    executor = AnalysisExecutor(_StubCtx())
+    assert executor._codegen_pipeline is None
+
+    sentinel = object()
+    executor.set_codegen_pipeline(sentinel)
+    assert executor._codegen_pipeline is sentinel
+
+
+def test_smart_agent_init_wires_codegen_pipeline_to_executor():
+    """AC-049.1: OmicVerseAgent.__init__ wires codegen_pipeline to analysis_executor."""
+    src = _inspect.getsource(OmicVerseAgent.__init__)
+    assert "set_codegen_pipeline" in src, (
+        "OmicVerseAgent.__init__ should call analysis_executor.set_codegen_pipeline"
+    )
+
+
+def test_no_new_wrapper_layer_introduced():
+    """AC-049.3: No new compatibility wrapper layer replaces the removed indirection."""
+    from omicverse.utils.ovagent import codegen_tool_facade
+
+    src = _inspect.getsource(codegen_tool_facade.CodegenToolDispatchFacadeMixin)
+    # The facade should NOT have grown new delegation wrappers for the rewired paths
+    assert "get_visible_agent_tools_direct" not in src
+    assert "tool_runtime_proxy" not in src
