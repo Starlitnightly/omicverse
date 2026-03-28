@@ -33,6 +33,12 @@ from ..runtime import ConversationRoute
 from .channel_core import (
     RunningTask,
     build_full_request,
+    default_summary,
+    format_analysis_error,
+    format_save_result_plain,
+    format_status_plain,
+    format_usage_plain,
+    format_workspace_plain,
     gather_status,
     gather_usage,
     gather_workspace,
@@ -955,12 +961,7 @@ class FeishuRuntime:
         )
 
         if result.error:
-            err_text = f"❌ {result.error}"
-            if result.diagnostics:
-                hints = "\n".join(f"- {x}" for x in result.diagnostics[:4])
-                err_text += f"\n\n诊断信息:\n{hints}"
-            if llm_buf.strip():
-                err_text += f"\n\n最后模型输出片段:\n{_trim(llm_buf, max_len=1200)}"
+            err_text = format_analysis_error(result, llm_buf)
             if draft_id:
                 ok = await asyncio.to_thread(
                     self._client.edit_card, draft_id, err_text, "❌ 分析失败", "red"
@@ -1012,11 +1013,7 @@ class FeishuRuntime:
             bridge.pick_reply_text(result, llm_buf, max_len=3600)
         )
         if not summary:
-            if session.adata is not None:
-                a = session.adata
-                summary = f"✅ 分析完成\n🔬 {a.n_obs:,} cells × {a.n_vars:,} genes"
-            else:
-                summary = "✅ 分析完成"
+            summary = default_summary(session)
         if len(summary) <= 4800:
             await asyncio.to_thread(
                 self._client.send_markdown_card, chat_id, summary, "✅ 分析完成", "green"

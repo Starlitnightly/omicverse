@@ -441,6 +441,34 @@ def format_workspace_plain(info: WorkspaceInfo) -> str:
     return "\n".join(lines)
 
 
+# ── Shared request-queue helpers ───────────────────────────────────────────
+
+def coalesce_pending_requests(
+    items: List[Dict[str, Any]],
+) -> Tuple[str, List[Dict[str, Any]]]:
+    """Merge a queue of pending analysis requests into one.
+
+    Each *item* is expected to have ``"text"`` and optional
+    ``"request_content"`` keys.  Returns ``(coalesced_text, merged_content)``.
+    """
+    parts: List[str] = []
+    request_content: List[Dict[str, Any]] = []
+    for item in items:
+        text = str(item.get("text") or "").strip()
+        if text:
+            parts.append(text)
+        request_content.extend(list(item.get("request_content") or []))
+    return "\n\n".join(parts).strip(), request_content
+
+
+def command_parts(text: str) -> Tuple[str, str]:
+    """Split ``/command tail`` text into ``(command, tail)`` pair."""
+    tokens = text.split()
+    cmd = tokens[0].lower() if tokens else ""
+    tail = text.split(None, 1)[1].strip() if len(tokens) > 1 else ""
+    return cmd, tail
+
+
 def format_save_result_plain(result: SaveResult) -> str:
     """Format *SaveResult* as plain text."""
     if result.no_data:

@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import tempfile
+import time
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,6 +20,8 @@ from ..agent_bridge import AgentBridge
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from ..model_help import render_model_help
 from .channel_core import (
+    RunningTask,
+    command_parts,
     text_chunks,
     strip_local_paths,
     build_full_request,
@@ -27,6 +30,8 @@ from .channel_core import (
     process_result_state,
     format_analysis_error,
     default_summary,
+    gather_status,
+    format_status_plain,
 )
 
 logger = logging.getLogger("omicverse.jarvis.imessage")
@@ -369,7 +374,7 @@ class IMessageJarvisBot:
         self._db_path = db_path
         self._include_attachments = include_attachments
         self._route_registry = GatewaySessionRegistry(session_manager)
-        self._tasks: Dict[str, asyncio.Task] = {}
+        self._tasks: Dict[str, RunningTask] = {}
         self._stop_event = stop_event
         self._client = IMessageRpcClient(
             cli_path=self._cli_path,
@@ -458,12 +463,12 @@ class IMessageJarvisBot:
 
         task_key = session_key.as_key()
         running = self._tasks.get(task_key)
-        if running is not None and not running.done():
+        if running is not None and not running.task.done():
             await self._send_text(target, "⏳ 当前会话已有任务在运行，请等待完成或发送 /cancel。")
             return
 
         task = asyncio.create_task(self._run_analysis(task_key, session_key, target, text))
-        self._tasks[task_key] = task
+        self._tasks[task_key] = RunningTask(task=task, request=text, started_at=time.time())
 
     def _session_key_for_message(self, message: Dict[str, Any]) -> Optional[SessionKey]:
         is_group = bool(message.get("is_group"))
@@ -490,9 +495,7 @@ class IMessageJarvisBot:
 
     async def _handle_command(self, session_key: SessionKey, target: str, text: str) -> None:
         session = self._route_registry.get_or_create(session_key)
-        parts = text.strip().split(maxsplit=1)
-        cmd = parts[0].lower()
-        tail = parts[1].strip() if len(parts) > 1 else ""
+        cmd, tail = command_parts(text)
 
         if cmd == "/help":
             await self._send_text(
@@ -511,12 +514,17 @@ class IMessageJarvisBot:
             return
 
         if cmd == "/cancel":
-            task = self._tasks.get(session_key.as_key())
-            if task and not task.done():
-                task.cancel()
+            running = self._tasks.get(session_key.as_key())
+            if running and not running.task.done():
+                running.task.cancel()
                 await self._send_text(target, "🚫 已取消当前分析。")
             else:
                 await self._send_text(target, "当前没有正在运行的分析任务。")
+            return
+
+        if cmd == "/status":
+            info = gather_status(session)
+            await self._send_text(target, format_status_plain(info))
             return
 
         if cmd == "/model":

@@ -50,7 +50,10 @@ from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from .channel_core import (
     RunningTask,
     build_full_request,
+    coalesce_pending_requests,
+    command_parts,
     default_summary,
+    format_analysis_error,
     format_save_result_plain,
     format_status_plain,
     format_usage_plain,
@@ -696,14 +699,7 @@ class QQRuntime:
 
     @staticmethod
     def _coalesce_pending_requests(items: List[Dict[str, Any]]) -> tuple[str, List[Dict[str, Any]]]:
-        parts: List[str] = []
-        request_content: List[Dict[str, Any]] = []
-        for item in items:
-            text = str(item.get("text") or "").strip()
-            if text:
-                parts.append(text)
-            request_content.extend(list(item.get("request_content") or []))
-        return "\n\n".join(parts).strip(), request_content
+        return coalesce_pending_requests(items)
 
     @staticmethod
     def _text_chunks(text: str, limit: int = _MAX_TEXT) -> List[str]:
@@ -931,13 +927,7 @@ class QQRuntime:
         )
 
         if result.error:
-            err_text = f"分析出错: {result.error}"
-            if result.diagnostics:
-                hints = "\n".join(f"- {x}" for x in result.diagnostics[:4])
-                err_text += f"\n\n诊断:\n{hints}"
-            if llm_buf.strip():
-                err_text += f"\n\n模型输出:\n{_trim(llm_buf, 1200)}"
-            # Use markdown for error detail (mirrors Feishu edit_card red)
+            err_text = format_analysis_error(result, llm_buf)
             await asyncio.to_thread(self._send_markdown, target, err_text, msg_id)
             return
 
