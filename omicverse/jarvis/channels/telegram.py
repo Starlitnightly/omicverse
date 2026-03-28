@@ -31,7 +31,7 @@ from .channel_core import (
     gather_usage,
     gather_workspace,
     perform_save,
-    strip_local_paths as _core_strip_local_paths,
+    strip_local_paths,
 )
 from .. import _fmt
 from ..config import default_state_dir
@@ -227,7 +227,6 @@ def telegram_runtime_envelope(
 
 class TelegramRuntimePresenter:
     _BORING = {"分析完成", "分析完成。", "task completed", "done", "完成"}
-    _ARTIFACT_EXTS = r"pdf|csv|tsv|txt|xlsx|html|json|h5ad|png|jpg|svg"
     _DRAFT_MAX = 2800
 
     def ack(self, envelope: MessageEnvelope, session: Any) -> List[DeliveryEvent]:
@@ -373,7 +372,7 @@ class TelegramRuntimePresenter:
         a_cur = result.adata or session.adata
         a_info = f"{a_cur.n_obs:,} cells × {a_cur.n_vars:,} genes" if a_cur else ""
 
-        summary = self._strip_local_paths((result.summary or "").strip())
+        summary = strip_local_paths((result.summary or "").strip())
         has_summary = bool(summary and summary.lower() not in self._BORING)
         long_summary = has_summary and len(summary) > 1200
         final_text = _fmt.md_to_html(summary) if has_summary and not long_summary else ""
@@ -389,7 +388,7 @@ class TelegramRuntimePresenter:
         is_complex = has_media or has_reports or has_artifacts or long_summary
 
         if is_complex:
-            explain = summary if has_summary else self._strip_local_paths(llm_text.strip())
+            explain = summary if has_summary else strip_local_paths(llm_text.strip())
             for i, rep in enumerate(result.reports or [], start=1):
                 header = "📝  <b>分析报告</b>" if i == 1 else f"📝  <b>分析报告（续 {i}）</b>"
                 events.append(
@@ -542,10 +541,6 @@ class TelegramRuntimePresenter:
             + "\n\n[...内容较长，已省略中间部分...]\n\n"
             + text[-tail:].lstrip()
         )
-
-    @classmethod
-    def _strip_local_paths(cls, text: str) -> str:
-        return _core_strip_local_paths(text)
 
 
 class TelegramDelivery:

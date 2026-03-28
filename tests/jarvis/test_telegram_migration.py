@@ -390,10 +390,10 @@ class TestTelegramRuntimePresenter:
         photo_events = [e for e in events if e.kind == "photo"]
         assert len(photo_events) == 2
 
-    def test_strip_local_paths_delegates_to_channel_core(self):
-        """Presenter's _strip_local_paths should delegate to channel_core."""
+    def test_strip_local_paths_used_from_channel_core(self):
+        """Presenter uses strip_local_paths from channel_core directly."""
         text = "saved to /Users/alice/workspace/result.csv"
-        cleaned = TelegramRuntimePresenter._strip_local_paths(text)
+        cleaned = strip_local_paths(text)
         assert "/Users/alice" not in cleaned
 
 
