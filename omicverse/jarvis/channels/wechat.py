@@ -36,8 +36,16 @@ except ImportError:  # pragma: no cover
     _CRYPTO_AVAILABLE = False
 
 from ..agent_bridge import AgentBridge
-from .._bridge_session import resolve_bridge_session_id
-from ..channel_media import build_channel_request, prepare_channel_delivery_figures
+from .channel_core import (
+    text_chunks,
+    strip_local_paths,
+    build_full_request,
+    get_prior_history,
+    notify_turn_complete,
+    process_result_state,
+    format_analysis_error,
+    default_summary,
+)
 from ..config import default_state_dir
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from ..media_ingest import (
@@ -151,51 +159,6 @@ class RunningTask:
     started_at: float
 
 
-def _text_chunks(text: str, limit: int = _MAX_TEXT) -> List[str]:
-    text = (text or "").strip()
-    if not text:
-        return []
-    if len(text) <= limit:
-        return [text]
-    chunks: List[str] = []
-    buf = ""
-    for para in text.split("\n\n"):
-        cand = f"{buf}\n\n{para}".strip() if buf else para
-        if len(cand) <= limit:
-            buf = cand
-            continue
-        if buf:
-            chunks.append(buf)
-        if len(para) <= limit:
-            buf = para
-            continue
-        pos = 0
-        while pos < len(para):
-            chunks.append(para[pos : pos + limit])
-            pos += limit
-        buf = ""
-    if buf:
-        chunks.append(buf)
-    return chunks
-
-
-def _strip_local_paths(text: str) -> str:
-    value = text or ""
-    # Markdown links/images whose href is a local or sandbox path:
-    #   [label](sandbox:/mnt/...)  ![img](./output/foo.png)
-    value = re.sub(r"!?\[[^\]]*\]\((?:sandbox:|file:)?[./~]?[^\)]*\)", "", value)
-    # Inline code containing multi-segment paths
-    value = re.sub(r"`[^`\n]*(?:/[^`\n]*){2,}`", "", value)
-    # Absolute system paths
-    value = re.sub(r"/(?:Users|home|tmp|var|opt|root|data|mnt|private)/\S+", "", value)
-    # Tilde-relative paths
-    value = re.sub(r"~[/\\]\S+", "", value)
-    # Relative file references with known extensions
-    ext = r"pdf|csv|tsv|txt|xlsx|html|json|h5ad|png|jpg|svg"
-    value = re.sub(rf"\.?/?(?:\w[\w/-]*/)+\w[\w.-]*\.(?:{ext})", "", value, flags=re.IGNORECASE)
-    value = re.sub(r"[ \t]{2,}", " ", value)
-    value = re.sub(r"\n{3,}", "\n\n", value)
-    return value.strip()
 
 
 def _extract_text(item_list: Any) -> str:
@@ -769,7 +732,7 @@ class WeChatJarvisBot:
 
         if cmd == "/model":
             if not tail:
-                for chunk in _text_chunks(render_model_help(getattr(self._sm, "_model", "unknown"))):
+                for chunk in text_chunks(render_model_help(getattr(self._sm, "_model", "unknown")), limit=_MAX_TEXT):
                     await self._send_session_text(session_key, chunk, context_token=context_token)
                 return
             self._sm._model = tail
@@ -986,13 +949,9 @@ class WeChatJarvisBot:
             if chunk:
                 llm_buf += chunk
 
-        _wb = getattr(self._sm, "gateway_web_bridge", None)
-        _prior_history = _wb.get_prior_history_simple(
-            "wechat",
-            session_key.scope_type,
-            session_key.scope_id,
-            session_id=resolve_bridge_session_id(session),
-        ) if _wb else []
+        _prior_history = get_prior_history(
+            self._sm, "wechat", session_key.scope_type, session_key.scope_id, session,
+        )
 
         bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
         try:
@@ -1016,55 +975,26 @@ class WeChatJarvisBot:
             result.error,
         )
 
-        if result.adata is not None:
-            session.adata = result.adata
-            try:
-                session.save_adata()
-                session.prompt_count += 1
-            except Exception:
-                pass
-        if result.usage is not None:
-            session.last_usage = result.usage
-        delivery_figures = prepare_channel_delivery_figures(session, result.figures)
-        try:
-            adata = session.adata
-            adata_info = f"{adata.n_obs:,} cells x {adata.n_vars:,} genes" if adata is not None else ""
-            session.append_memory_log(
-                request=user_text,
-                summary=(result.summary or "分析完成"),
-                adata_info=adata_info,
-            )
-        except Exception:
-            pass
+        delivery_figures, _adata_info = process_result_state(session, result, user_text)
 
-        web_bridge = getattr(self._sm, "gateway_web_bridge", None)
-        if web_bridge is not None:
-            try:
-                web_bridge.on_turn_complete_simple(
-                    channel="wechat",
-                    scope_type=session_key.scope_type,
-                    scope_id=session_key.scope_id,
-                    user_text=user_text,
-                    llm_text=llm_buf,
-                    adata=result.adata,
-                    figures=result.figures or [],
-                    session_id=resolve_bridge_session_id(session),
-                )
-            except Exception:
-                pass
+        notify_turn_complete(
+            self._sm,
+            channel="wechat",
+            scope_type=session_key.scope_type,
+            scope_id=session_key.scope_id,
+            session=session,
+            user_text=user_text,
+            llm_text=llm_buf,
+            adata=result.adata,
+            figures=result.figures or [],
+        )
 
         if result.error:
-            err_text = f"分析出错: {result.error}"
-            if result.diagnostics:
-                hints = "\n".join(f"- {item}" for item in result.diagnostics[:4])
-                err_text += f"\n\n诊断:\n{hints}"
-            if llm_buf.strip():
-                err_text += f"\n\n模型输出:\n{llm_buf[:1200]}"
-            await self._send_session_text(session_key, err_text)
+            await self._send_session_text(session_key, format_analysis_error(result, llm_buf))
             return
 
         for report in list(result.reports or []):
-            for chunk in _text_chunks(report):
+            for chunk in text_chunks(report, limit=_MAX_TEXT):
                 await self._send_session_text(session_key, chunk)
 
         if delivery_figures:
@@ -1077,21 +1007,17 @@ class WeChatJarvisBot:
 
         # pick_reply_text handles has_artifacts + llm_buf priority; WeChat then
         # additionally strips agent meta-commentary fragments.
-        summary = _strip_local_paths(bridge.pick_reply_text(result, llm_buf))
+        summary = strip_local_paths(bridge.pick_reply_text(result, llm_buf))
         if summary and _META_COMMENTARY_RE.search(summary):
             logger.debug("WeChat: suppressing meta-commentary summary: %.120s", summary)
             summary = ""
         if not summary:
-            if session.adata is not None:
-                adata = session.adata
-                summary = f"分析完成\n{adata.n_obs:,} cells x {adata.n_vars:,} genes"
-            else:
-                summary = "分析完成"
-        for chunk in _text_chunks(summary):
+            summary = default_summary(session)
+        for chunk in text_chunks(summary, limit=_MAX_TEXT):
             await self._send_session_text(session_key, chunk)
 
     def _build_full_request(self, session: Any, text: str) -> str:
-        return build_channel_request(session, text, channel_label="WeChat")
+        return build_full_request(session, text, channel_label="WeChat")
 
     @staticmethod
     def _command_parts(text: str) -> tuple[str, str]:
@@ -1295,7 +1221,7 @@ class WeChatJarvisBot:
         if not token:
             logger.warning("Skipping WeChat send because context_token is missing: scope_id=%s", session_key.scope_id)
             return
-        for chunk in _text_chunks(text):
+        for chunk in text_chunks(text, limit=_MAX_TEXT):
             await asyncio.to_thread(
                 self._client.send_text,
                 to_user_id=session_key.scope_id,

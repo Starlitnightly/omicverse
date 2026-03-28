@@ -47,9 +47,17 @@ from typing import Any, Dict, List, Optional, Tuple
 import requests
 
 from ..agent_bridge import AgentBridge
-from .._bridge_session import resolve_bridge_session_id
-from ..channel_media import build_channel_request, prepare_channel_delivery_figures
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
+from .channel_core import (
+    RunningTask,
+    build_full_request,
+    default_summary,
+    get_prior_history,
+    notify_turn_complete,
+    process_result_state,
+    strip_local_paths,
+    text_chunks,
+)
 from ..media_ingest import (
     PreparedImage,
     build_workspace_note,
@@ -97,13 +105,6 @@ _OP_RECONNECT = 7
 _OP_INVALID_SESSION = 9
 _OP_HELLO = 10
 _OP_HEARTBEAT_ACK = 11
-
-
-@dataclass
-class RunningTask:
-    task: asyncio.Task
-    request: str
-    started_at: float
 
 
 class QQDeduper:
@@ -521,18 +522,10 @@ class QQRuntime:
 
     @staticmethod
     def _strip_local_paths(text: str) -> str:
-        t = text or ""
-        t = re.sub(r'`[^`\n]*(?:/[^`\n]*){2,}`', '', t)
-        t = re.sub(r'/(?:Users|home|tmp|var|opt|root|data|mnt|private)/\S+', '', t)
-        t = re.sub(r'~[/\\]\S+', '', t)
-        _ext = r"pdf|csv|tsv|txt|xlsx|html|json|h5ad|png|jpg|svg"
-        t = re.sub(rf'\.?/?(?:\w[\w/-]*/)+\w[\w.-]*\.(?:{_ext})', '', t, flags=re.IGNORECASE)
-        t = re.sub(r'[ \t]{2,}', ' ', t)
-        t = re.sub(r'\n{3,}', '\n\n', t)
-        return t.strip()
+        return strip_local_paths(text)
 
     def _build_full_request(self, session: Any, text: str) -> str:
-        return build_channel_request(session, text, channel_label="QQ")
+        return build_full_request(session, text, channel_label="QQ")
 
     @staticmethod
     def _looks_like_image_name(name: str) -> bool:
@@ -715,31 +708,7 @@ class QQRuntime:
 
     @staticmethod
     def _text_chunks(text: str, limit: int = _MAX_TEXT) -> List[str]:
-        text = (text or "").strip()
-        if not text:
-            return []
-        if len(text) <= limit:
-            return [text]
-        chunks: List[str] = []
-        buf = ""
-        for para in text.split("\n\n"):
-            cand = f"{buf}\n\n{para}".strip() if buf else para
-            if len(cand) <= limit:
-                buf = cand
-                continue
-            if buf:
-                chunks.append(buf)
-            if len(para) <= limit:
-                buf = para
-            else:
-                pos = 0
-                while pos < len(para):
-                    chunks.append(para[pos:pos + limit])
-                    pos += limit
-                buf = ""
-        if buf:
-            chunks.append(buf)
-        return chunks
+        return text_chunks(text, limit=limit)
 
     def _send_markdown(self, target: QQTarget, text: str, msg_id: Optional[str] = None) -> Optional[str]:
         """Send markdown content (mirrors Feishu send_markdown_card).
@@ -805,7 +774,7 @@ class QQRuntime:
             ]
             response = await session.agent._llm.chat(messages, tools=None, tool_choice=None)
             reply = (response.content or "").strip() or "正在分析，请稍候..."
-            for chunk in self._text_chunks(reply):
+            for chunk in text_chunks(reply):
                 await asyncio.to_thread(self._send_text, target, chunk, msg_id)
         except Exception as exc:
             logger.warning("QQ quick_chat failed: %s", exc)
@@ -930,13 +899,7 @@ class QQRuntime:
                 pass
 
         _scope_id = str(target.channel_id if hasattr(target, "channel_id") else target)
-        _wb = getattr(self._sm, "gateway_web_bridge", None)
-        _prior_history = _wb.get_prior_history_simple(
-            "qq",
-            "dm",
-            _scope_id,
-            session_id=resolve_bridge_session_id(session),
-        ) if _wb else []
+        _prior_history = get_prior_history(self._sm, "qq", "dm", _scope_id, session)
 
         bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
         try:
@@ -954,44 +917,19 @@ class QQRuntime:
             await asyncio.to_thread(self._send_text, target, f"分析失败: {exc}", msg_id)
             return
 
-        if result.adata is not None:
-            session.adata = result.adata
-            try:
-                session.save_adata()
-                session.prompt_count += 1
-            except Exception:
-                pass
-        if result.usage is not None:
-            session.last_usage = result.usage
-        delivery_figures = prepare_channel_delivery_figures(session, result.figures)
-        try:
-            a = session.adata
-            adata_info = f"{a.n_obs:,} cells x {a.n_vars:,} genes" if a is not None else ""
-            session.append_memory_log(
-                request=user_text,
-                summary=(result.summary or "分析完成"),
-                adata_info=adata_info,
-            )
-        except Exception:
-            pass
+        delivery_figures, _adata_info = process_result_state(session, result, user_text)
 
-        # Mirror the completed turn into the web session (gateway mode)
-        _web_bridge = getattr(self._sm, "gateway_web_bridge", None)
-        if _web_bridge is not None:
-            try:
-                scope_id = str(target.channel_id if hasattr(target, "channel_id") else target)
-                _web_bridge.on_turn_complete_simple(
-                    channel="qq",
-                    scope_type="dm",
-                    scope_id=scope_id,
-                    user_text=user_text,
-                    llm_text=llm_buf,
-                    adata=result.adata,
-                    figures=result.figures or [],
-                    session_id=resolve_bridge_session_id(session),
-                )
-            except Exception:
-                pass
+        notify_turn_complete(
+            self._sm,
+            channel="qq",
+            scope_type="dm",
+            scope_id=_scope_id,
+            session=session,
+            user_text=user_text,
+            llm_text=llm_buf,
+            adata=result.adata,
+            figures=result.figures or [],
+        )
 
         if result.error:
             err_text = f"分析出错: {result.error}"
@@ -1006,7 +944,7 @@ class QQRuntime:
 
         # Send reports — markdown rendering (mirrors Feishu send_markdown_card "📊 分析报告")
         for rep in list(result.reports or []):
-            for chunk in self._text_chunks(rep, limit=_MAX_TEXT):
+            for chunk in text_chunks(rep, limit=_MAX_TEXT):
                 await asyncio.to_thread(self._send_markdown, target, chunk, msg_id)
 
         # Send figures
@@ -1029,13 +967,12 @@ class QQRuntime:
             logger.info("QQ: artifact '%s' generated (file send not supported in QQ Bot API)", art.filename)
 
         # Send summary
-        summary = self._strip_local_paths(
+        summary = strip_local_paths(
             bridge.pick_reply_text(result, llm_buf, max_len=1800)
         )
-        if not summary and session.adata is not None:
-            a = session.adata
-            summary = f"分析完成\n{a.n_obs:,} cells x {a.n_vars:,} genes"
-        for chunk in self._text_chunks(summary or "分析完成", limit=_MAX_TEXT):
+        if not summary:
+            summary = default_summary(session)
+        for chunk in text_chunks(summary, limit=_MAX_TEXT):
             await asyncio.to_thread(self._send_markdown, target, chunk, msg_id)
 
     # ── Message dispatcher ────────────────────────────────────────────────────
@@ -1275,7 +1212,7 @@ class QQRuntime:
     async def _handle_ls(self, target: QQTarget, msg_id: Optional[str], session: Any, subpath: str) -> None:
         cmd = f"ls -lh {subpath}".strip() if subpath else "ls -lh"
         out = session.shell.exec(cmd, cwd=session.workspace)
-        for chunk in self._text_chunks(f"$ {cmd}\n{out}", limit=1800):
+        for chunk in text_chunks(f"$ {cmd}\n{out}", limit=1800):
             await asyncio.to_thread(self._send_text, target, chunk, msg_id)
 
     async def _handle_find(self, target: QQTarget, msg_id: Optional[str], session: Any, pattern: str) -> None:
@@ -1285,7 +1222,7 @@ class QQRuntime:
             return
         cmd = f"find . -name {pattern}"
         out = session.shell.exec(cmd, cwd=session.workspace)
-        for chunk in self._text_chunks(f"$ {cmd}\n{out}", limit=1800):
+        for chunk in text_chunks(f"$ {cmd}\n{out}", limit=1800):
             await asyncio.to_thread(self._send_text, target, chunk, msg_id)
 
     async def _handle_load(self, target: QQTarget, msg_id: Optional[str], session: Any, filename: str) -> None:
@@ -1322,12 +1259,12 @@ class QQRuntime:
             )
             return
         out = session.shell.exec(cmd, cwd=session.workspace)
-        for chunk in self._text_chunks(f"$ {cmd}\n{out}", limit=1800):
+        for chunk in text_chunks(f"$ {cmd}\n{out}", limit=1800):
             await asyncio.to_thread(self._send_text, target, chunk, msg_id)
 
     async def _handle_memory(self, target: QQTarget, msg_id: Optional[str], session: Any) -> None:
         text = session.get_recent_memory_text()
-        for chunk in self._text_chunks(f"分析历史（近两天）\n\n{text}", limit=1800):
+        for chunk in text_chunks(f"分析历史（近两天）\n\n{text}", limit=1800):
             await asyncio.to_thread(self._send_text, target, chunk, msg_id)
 
     async def _handle_usage(self, target: QQTarget, msg_id: Optional[str], session: Any) -> None:
@@ -1355,7 +1292,7 @@ class QQRuntime:
         model_name = (model_name or "").strip()
         if not model_name:
             text = render_model_help(getattr(self._sm, "_model", "unknown"))
-            for chunk in self._text_chunks(text, limit=1800):
+            for chunk in text_chunks(text, limit=1800):
                 await asyncio.to_thread(self._send_text, target, chunk, msg_id)
             return
         self._sm._model = model_name

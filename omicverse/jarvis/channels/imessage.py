@@ -16,10 +16,18 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from ..agent_bridge import AgentBridge
-from .._bridge_session import resolve_bridge_session_id
-from ..channel_media import build_channel_request, prepare_channel_delivery_figures
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from ..model_help import render_model_help
+from .channel_core import (
+    text_chunks,
+    strip_local_paths,
+    build_full_request,
+    get_prior_history,
+    notify_turn_complete,
+    process_result_state,
+    format_analysis_error,
+    default_summary,
+)
 
 logger = logging.getLogger("omicverse.jarvis.imessage")
 
@@ -38,46 +46,6 @@ class IMessageTarget:
     kind: str
     value: str
     service: str = "auto"
-
-
-def _strip_local_paths(text: str) -> str:
-    t = text or ""
-    t = re.sub(r'`[^`\n]*(?:/[^`\n]*){2,}`', '', t)
-    t = re.sub(r'/(?:Users|home|tmp|var|opt|root|data|mnt|private)/\S+', '', t)
-    t = re.sub(r'~[/\\]\S+', '', t)
-    _ext = r"pdf|csv|tsv|txt|xlsx|html|json|h5ad|png|jpg|svg"
-    t = re.sub(rf'\.?/?(?:\w[\w/-]*/)+\w[\w.-]*\.(?:{_ext})', '', t, flags=re.IGNORECASE)
-    t = re.sub(r'[ \t]{2,}', ' ', t)
-    t = re.sub(r'\n{3,}', '\n\n', t)
-    return t.strip()
-
-
-def _text_chunks(text: str, limit: int = _MAX_TEXT) -> List[str]:
-    text = (text or "").strip()
-    if not text:
-        return []
-    if len(text) <= limit:
-        return [text]
-    chunks: List[str] = []
-    buf = ""
-    for para in text.split("\n\n"):
-        cand = f"{buf}\n\n{para}".strip() if buf else para
-        if len(cand) <= limit:
-            buf = cand
-            continue
-        if buf:
-            chunks.append(buf)
-        if len(para) <= limit:
-            buf = para
-            continue
-        pos = 0
-        while pos < len(para):
-            chunks.append(para[pos:pos + limit])
-            pos += limit
-        buf = ""
-    if buf:
-        chunks.append(buf)
-    return chunks
 
 
 def _normalize_handle(raw: str) -> str:
@@ -518,7 +486,7 @@ class IMessageJarvisBot:
         )
 
     def _build_full_request(self, session: Any, text: str) -> str:
-        return build_channel_request(session, text, channel_label="iMessage")
+        return build_full_request(session, text, channel_label="iMessage")
 
     async def _handle_command(self, session_key: SessionKey, target: str, text: str) -> None:
         session = self._route_registry.get_or_create(session_key)
@@ -553,7 +521,7 @@ class IMessageJarvisBot:
 
         if cmd == "/model":
             if not tail:
-                for chunk in _text_chunks(render_model_help(getattr(self._sm, "_model", "unknown"))):
+                for chunk in text_chunks(render_model_help(getattr(self._sm, "_model", "unknown"))):
                     await self._send_text(target, chunk)
                 return
             self._sm._model = tail
@@ -590,13 +558,9 @@ class IMessageJarvisBot:
             if chunk:
                 llm_buf += chunk
 
-        _wb = getattr(self._sm, "gateway_web_bridge", None)
-        _prior_history = _wb.get_prior_history_simple(
-            "imessage",
-            session_key.scope_type,
-            session_key.scope_id,
-            session_id=resolve_bridge_session_id(session),
-        ) if _wb else []
+        _prior_history = get_prior_history(
+            self._sm, "imessage", session_key.scope_type, session_key.scope_id, session,
+        )
 
         await self._send_text(target, "⏳ 已收到，开始分析。")
         bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
@@ -612,56 +576,26 @@ class IMessageJarvisBot:
         finally:
             self._tasks.pop(task_key, None)
 
-        if result.adata is not None:
-            session.adata = result.adata
-            try:
-                session.save_adata()
-                session.prompt_count += 1
-            except Exception:
-                pass
-        if result.usage is not None:
-            session.last_usage = result.usage
-        delivery_figures = prepare_channel_delivery_figures(session, result.figures)
-        try:
-            a = session.adata
-            adata_info = f"{a.n_obs:,} cells x {a.n_vars:,} genes" if a is not None else ""
-            session.append_memory_log(
-                request=user_text,
-                summary=(result.summary or "分析完成"),
-                adata_info=adata_info,
-            )
-        except Exception:
-            pass
+        delivery_figures, _adata_info = process_result_state(session, result, user_text)
 
-        # Mirror the completed turn into the web session (gateway mode)
-        _web_bridge = getattr(self._sm, "gateway_web_bridge", None)
-        if _web_bridge is not None:
-            try:
-                _web_bridge.on_turn_complete_simple(
-                    channel="imessage",
-                    scope_type=session_key.scope_type,
-                    scope_id=session_key.scope_id,
-                    user_text=user_text,
-                    llm_text=llm_buf,
-                    adata=result.adata,
-                    figures=result.figures or [],
-                    session_id=resolve_bridge_session_id(session),
-                )
-            except Exception:
-                pass
+        notify_turn_complete(
+            self._sm,
+            channel="imessage",
+            scope_type=session_key.scope_type,
+            scope_id=session_key.scope_id,
+            session=session,
+            user_text=user_text,
+            llm_text=llm_buf,
+            adata=result.adata,
+            figures=result.figures or [],
+        )
 
         if result.error:
-            err_text = f"分析出错: {result.error}"
-            if result.diagnostics:
-                hints = "\n".join(f"- {item}" for item in result.diagnostics[:4])
-                err_text += f"\n\n诊断:\n{hints}"
-            if llm_buf.strip():
-                err_text += f"\n\n模型输出:\n{llm_buf[:1200]}"
-            await self._send_text(target, err_text)
+            await self._send_text(target, format_analysis_error(result, llm_buf))
             return
 
         for report in list(result.reports or []):
-            for chunk in _text_chunks(report):
+            for chunk in text_chunks(report):
                 await self._send_text(target, chunk)
 
         for index, figure in enumerate(delivery_figures, start=1):
@@ -680,18 +614,14 @@ class IMessageJarvisBot:
                 caption=f"附件: {artifact.filename}",
             )
 
-        summary = _strip_local_paths(bridge.pick_reply_text(result, llm_buf))
+        summary = strip_local_paths(bridge.pick_reply_text(result, llm_buf))
         if not summary:
-            if session.adata is not None:
-                a = session.adata
-                summary = f"分析完成\n{a.n_obs:,} cells x {a.n_vars:,} genes"
-            else:
-                summary = "分析完成"
-        for chunk in _text_chunks(summary):
+            summary = default_summary(session)
+        for chunk in text_chunks(summary):
             await self._send_text(target, chunk)
 
     async def _send_text(self, target: str, text: str) -> None:
-        for chunk in _text_chunks(text):
+        for chunk in text_chunks(text):
             await self._client.send_message(target, chunk)
 
     async def _handle_h5ad_attachment(
