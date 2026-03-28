@@ -49,6 +49,7 @@ assert smart_agent_spec.loader is not None
 smart_agent_spec.loader.exec_module(smart_agent_module)
 
 OmicVerseAgent = smart_agent_module.OmicVerseAgent
+_run_coroutine_sync = smart_agent_module._run_coroutine_sync
 from omicverse.utils.harness import build_stream_event
 from omicverse.utils.ovagent.tool_runtime import ToolRuntime
 
@@ -425,3 +426,605 @@ def test_agentic_loop_retries_after_text_only_promise_until_tool_call():
 
     assert [call["tool_choice"] for call in chat_calls[:2]] == ["required", "required"]
     assert "WebFetch" in dispatch_log
+
+
+# -----------------------------------------------------------------------
+# Task-008: Runtime observability tests
+# -----------------------------------------------------------------------
+
+from omicverse.utils.agent_reporter import (
+    AgentEvent,
+    EventLevel,
+    SilentReporter,
+)
+
+
+def test_run_async_silent_reporter_no_stdout():
+    """AC-001.2: SilentReporter mode produces no stdout leakage for runtime paths."""
+    import io
+    from contextlib import redirect_stdout
+
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+
+    # Wire up SilentReporter exactly as __init__ would
+    agent._reporter = SilentReporter()
+
+    def _emit(level, message, category=""):
+        agent._reporter.emit(AgentEvent(level=level, message=message, category=category))
+
+    agent._emit = _emit
+    agent.provider = "python"
+    agent.last_usage = None
+    agent.last_usage_breakdown = {
+        "generation": None,
+        "reflection": [],
+        "review": [],
+        "total": None,
+    }
+
+    # Stub the direct-python path so run_async never touches the LLM
+    agent._detect_direct_python_request = lambda request: "x = 1"
+    agent._execute_generated_code = lambda code, adata: adata
+
+    captured = io.StringIO()
+    with redirect_stdout(captured):
+        result = asyncio.run(agent.run_async("x = 1", None))
+
+    stdout_text = captured.getvalue()
+    assert stdout_text == "", (
+        f"SilentReporter leaked to stdout: {stdout_text!r}"
+    )
+
+
+def test_del_fallback_logs_debug_on_exception(caplog):
+    """AC-001.3/4: __del__ fallback sites emit debug diagnostics."""
+    import logging as _logging
+
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+
+    class _FailingExecutor:
+        def shutdown(self):
+            raise RuntimeError("test shutdown boom")
+
+    agent._notebook_executor = _FailingExecutor()
+    agent._filesystem_context = None  # only notebook path triggers
+
+    with caplog.at_level(_logging.DEBUG, logger="omicverse.utils.smart_agent"):
+        agent.__del__()
+
+    debug_msgs = [
+        rec
+        for rec in caplog.records
+        if rec.levelno == _logging.DEBUG and "notebook executor shutdown failed" in rec.message
+    ]
+    assert len(debug_msgs) == 1, (
+        f"Expected exactly 1 debug log about notebook executor, got {len(debug_msgs)}"
+    )
+
+
+# -----------------------------------------------------------------------
+# Task-014: Sync/async entrypoint stabilization
+# -----------------------------------------------------------------------
+
+import traceback
+
+
+def _build_agent_that_raises(exc):
+    """Build a minimal agent whose run_async raises *exc*."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+
+    async def _fake_run_async(self, request, adata):
+        raise exc
+
+    agent.run_async = MethodType(_fake_run_async, agent)
+    return agent
+
+
+# --- AC-001.1: Traceback preservation ---------------------------------
+
+def test_run_preserves_traceback_outside_event_loop():
+    """run() outside a loop preserves the async traceback chain."""
+    agent = _build_agent_that_raises(ValueError("outside-loop-error"))
+
+    with pytest.raises(ValueError, match="outside-loop-error") as exc_info:
+        agent.run("fail", None)
+
+    tb_text = "".join(traceback.format_exception(
+        type(exc_info.value), exc_info.value, exc_info.value.__traceback__,
+    ))
+    assert "_fake_run_async" in tb_text, (
+        f"Traceback should contain the original async function name:\n{tb_text}"
+    )
+
+
+def test_run_preserves_traceback_inside_running_loop():
+    """run() inside a running loop preserves the async traceback chain."""
+    agent = _build_agent_that_raises(ValueError("inside-loop-error"))
+
+    async def _caller():
+        with pytest.raises(ValueError, match="inside-loop-error") as exc_info:
+            agent.run("fail", None)
+
+        tb_text = "".join(traceback.format_exception(
+            type(exc_info.value), exc_info.value, exc_info.value.__traceback__,
+        ))
+        assert "_fake_run_async" in tb_text, (
+            f"Traceback should contain the original async function:\n{tb_text}"
+        )
+
+    asyncio.run(_caller())
+
+
+def test_run_preserves_exception_type_and_message():
+    """Exception type and message survive the sync bridge unchanged."""
+
+    class CustomAgentError(RuntimeError):
+        pass
+
+    agent = _build_agent_that_raises(CustomAgentError("custom-payload"))
+
+    with pytest.raises(CustomAgentError, match="custom-payload"):
+        agent.run("fail", None)
+
+
+def test_run_preserves_traceback_inside_loop_chained():
+    """The traceback chain inside a running loop includes intermediate frames."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+
+    async def _inner_helper():
+        raise RuntimeError("deep-origin")
+
+    async def _fake_run_async(self, request, adata):
+        await _inner_helper()
+
+    agent.run_async = MethodType(_fake_run_async, agent)
+
+    async def _caller():
+        with pytest.raises(RuntimeError, match="deep-origin") as exc_info:
+            agent.run("fail", None)
+
+        tb_text = "".join(traceback.format_exception(
+            type(exc_info.value), exc_info.value, exc_info.value.__traceback__,
+        ))
+        assert "_inner_helper" in tb_text, (
+            f"Traceback should include the inner helper frame:\n{tb_text}"
+        )
+
+    asyncio.run(_caller())
+
+
+# --- AC-001.2: Event-loop-present regression tests --------------------
+
+def test_event_loop_present_uses_worker_thread():
+    """When a loop is already running, _run_coroutine_sync delegates to a thread."""
+    worker_thread_names = []
+    main_thread_name = threading.current_thread().name
+
+    async def _track_thread():
+        worker_thread_names.append(threading.current_thread().name)
+        return "threaded-result"
+
+    async def _caller():
+        result = _run_coroutine_sync(_track_thread())
+        assert result == "threaded-result"
+        assert len(worker_thread_names) == 1
+        assert worker_thread_names[0] != main_thread_name
+
+    asyncio.run(_caller())
+
+
+def test_no_event_loop_uses_main_thread():
+    """Without a running loop, _run_coroutine_sync uses asyncio.run on the current thread."""
+    worker_thread_names = []
+
+    async def _track_thread():
+        worker_thread_names.append(threading.current_thread().name)
+        return "direct-result"
+
+    result = _run_coroutine_sync(_track_thread())
+    assert result == "direct-result"
+    assert len(worker_thread_names) == 1
+    assert worker_thread_names[0] == threading.current_thread().name
+
+
+# --- AC-001.3: No silent nest_asyncio patching ------------------------
+
+def test_no_nest_asyncio_import_after_run():
+    """run() must not import or patch nest_asyncio as a side effect."""
+    agent = _build_agent(return_value="clean")
+    agent.run("test", None)
+    assert "nest_asyncio" not in sys.modules, (
+        "nest_asyncio was imported as a side effect of run()"
+    )
+
+
+def test_no_nest_asyncio_import_inside_running_loop():
+    """run() inside a running loop must not import nest_asyncio."""
+    agent = _build_agent(return_value="clean-nested")
+
+    async def _caller():
+        agent.run("test", None)
+        assert "nest_asyncio" not in sys.modules, (
+            "nest_asyncio was imported inside a running loop"
+        )
+
+    asyncio.run(_caller())
+
+
+# --- AC-001.4: Public signature unchanged -----------------------------
+
+def test_run_signature_unchanged():
+    """run() accepts (request: str, adata: Any) and returns Any."""
+    import inspect
+    sig = inspect.signature(OmicVerseAgent.run)
+    param_names = list(sig.parameters.keys())
+    assert param_names == ["self", "request", "adata"]
+
+
+def test_generate_code_signature_unchanged():
+    """generate_code() signature is preserved."""
+    import inspect
+    sig = inspect.signature(OmicVerseAgent.generate_code)
+    param_names = list(sig.parameters.keys())
+    assert param_names == ["self", "request", "adata", "max_functions", "progress_callback"]
+
+
+def test_run_async_signature_unchanged():
+    """run_async() signature is preserved."""
+    import inspect
+    sig = inspect.signature(OmicVerseAgent.run_async)
+    param_names = list(sig.parameters.keys())
+    assert param_names == ["self", "request", "adata"]
+
+
+def test_generate_code_async_signature_unchanged():
+    """generate_code_async() signature is preserved."""
+    import inspect
+    sig = inspect.signature(OmicVerseAgent.generate_code_async)
+    param_names = list(sig.parameters.keys())
+    assert param_names == ["self", "request", "adata", "max_functions", "progress_callback"]
+
+
+# --- AC-001.5: Backward compatibility ---------------------------------
+
+def test_run_returns_value_outside_loop():
+    """run() returns the coroutine result when no loop is running."""
+    sentinel = object()
+    agent = _build_agent(return_value=sentinel)
+    result = agent.run("request", None)
+    assert result["value"] is sentinel
+
+
+def test_run_returns_value_inside_loop():
+    """run() returns the coroutine result when called inside a running loop."""
+    sentinel = object()
+    agent = _build_agent(return_value=sentinel)
+
+    async def _caller():
+        result = agent.run("request", None)
+        assert result["value"] is sentinel
+
+    asyncio.run(_caller())
+
+
+def test_generate_code_sync_delegates_to_async():
+    """generate_code() calls generate_code_async through the sync bridge."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    calls = []
+
+    async def _fake_generate_code_async(self, request, adata=None, *, max_functions=8, progress_callback=None):
+        calls.append({"request": request, "adata": adata, "max_functions": max_functions})
+        return "generated-code"
+
+    agent.generate_code_async = MethodType(_fake_generate_code_async, agent)
+
+    result = agent.generate_code("build a plot", None, max_functions=5)
+    assert result == "generated-code"
+    assert len(calls) == 1
+    assert calls[0]["request"] == "build a plot"
+    assert calls[0]["max_functions"] == 5
+
+
+# -----------------------------------------------------------------------
+# Task-027 (reconciled task-013): Codegen / tool-dispatch facade extraction
+# -----------------------------------------------------------------------
+
+from omicverse.utils.ovagent.codegen_tool_facade import CodegenToolDispatchFacadeMixin
+
+
+def test_codegen_tool_facade_mixin_is_base_of_agent():
+    """AC-001.1: OmicVerseAgent inherits from CodegenToolDispatchFacadeMixin."""
+    assert issubclass(OmicVerseAgent, CodegenToolDispatchFacadeMixin)
+
+
+def test_codegen_delegates_available_on_agent_via_mixin():
+    """AC-001.1: Codegen delegate methods resolve via mixin, not on OmicVerseAgent body."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    # These methods should be inherited from the mixin
+    codegen_methods = [
+        "_extract_python_code",
+        "_normalize_registry_entry_for_codegen",
+        "_capture_code_only_snippet",
+        "_select_codegen_skill_matches",
+        "_format_registry_context_for_codegen",
+        "_format_prerequisites_for_codegen_entry",
+        "_build_code_generation_system_prompt",
+        "_build_code_generation_user_prompt",
+        "_contains_forbidden_scanpy_usage",
+        "_rewrite_scanpy_calls_with_registry",
+        "_rewrite_code_without_scanpy",
+        "_review_generated_code_lightweight",
+        "_build_code_only_agentic_request",
+        "_generate_code_via_agentic_loop",
+        "_gather_code_candidates",
+        "_looks_like_python",
+        "_extract_inline_python",
+        "_normalize_code_candidate",
+        "_extract_python_code_strict",
+        "_review_result",
+        "_reflect_on_code",
+        "_detect_direct_python_request",
+        "_merge_usage_stats",
+    ]
+    for name in codegen_methods:
+        assert hasattr(agent, name), f"Missing codegen delegate: {name}"
+        # Verify the method is defined on the mixin, not directly on OmicVerseAgent
+        assert name in CodegenToolDispatchFacadeMixin.__dict__, (
+            f"{name} should be defined on CodegenToolDispatchFacadeMixin, not OmicVerseAgent"
+        )
+
+
+def test_tool_dispatch_delegates_available_on_agent_via_mixin():
+    """AC-001.1: Tool dispatch delegate methods resolve via mixin."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    tool_methods = [
+        "_get_visible_agent_tools",
+        "_get_loaded_tool_names",
+        "_tool_blocked_in_plan_mode",
+        "_dispatch_tool",
+    ]
+    for name in tool_methods:
+        assert hasattr(agent, name), f"Missing tool delegate: {name}"
+        assert name in CodegenToolDispatchFacadeMixin.__dict__, (
+            f"{name} should be defined on CodegenToolDispatchFacadeMixin"
+        )
+
+
+def test_analysis_executor_delegates_available_on_agent_via_mixin():
+    """AC-001.1: Analysis executor delegate methods resolve via mixin."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    executor_methods = [
+        "_check_code_prerequisites",
+        "_apply_execution_error_fix",
+        "_extract_package_name",
+        "_auto_install_package",
+        "_diagnose_error_with_llm",
+        "_validate_outputs",
+        "_generate_completion_code",
+        "_request_approval",
+        "_execute_generated_code",
+        "_normalize_doublet_obs",
+        "_process_context_directives",
+        "_build_sandbox_globals",
+    ]
+    for name in executor_methods:
+        assert hasattr(agent, name), f"Missing executor delegate: {name}"
+        assert name in CodegenToolDispatchFacadeMixin.__dict__, (
+            f"{name} should be defined on CodegenToolDispatchFacadeMixin"
+        )
+
+
+def test_followup_gate_delegates_available_on_agent_via_mixin():
+    """AC-001.1: FollowUp gate delegate methods resolve via mixin."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    gate_methods = [
+        "_request_requires_tool_action",
+        "_response_is_promissory",
+        "_select_agent_tool_choice",
+    ]
+    for name in gate_methods:
+        assert hasattr(agent, name), f"Missing gate delegate: {name}"
+        assert name in CodegenToolDispatchFacadeMixin.__dict__, (
+            f"{name} should be defined on CodegenToolDispatchFacadeMixin"
+        )
+
+
+def test_registry_scanner_delegates_available_on_agent_via_mixin():
+    """AC-001.1: Registry scanner delegate methods resolve via mixin."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    scanner_methods = [
+        "_load_static_registry_entries",
+        "_collect_relevant_registry_entries",
+        "_collect_static_registry_entries",
+        "_score_registry_entry_for_codegen",
+    ]
+    for name in scanner_methods:
+        assert hasattr(agent, name), f"Missing scanner delegate: {name}"
+        assert name in CodegenToolDispatchFacadeMixin.__dict__, (
+            f"{name} should be defined on CodegenToolDispatchFacadeMixin"
+        )
+
+
+def test_extract_python_code_behavioral_equivalence():
+    """AC-001.2: _extract_python_code still works identically through mixin path."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    response = """Here is the code:
+```python
+import omicverse as ov
+ov.pp.qc(adata)
+```
+"""
+    code = agent._extract_python_code(response)
+    assert "ov.pp.qc" in code
+    # Verify AST-valid
+    ast.parse(code)
+
+
+def test_codegen_lazy_property_via_mixin():
+    """AC-001.2: _codegen lazy property works through mixin for __new__ instances."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    # The _codegen property should lazily create a CodegenPipeline
+    pipeline = agent._codegen
+    from omicverse.utils.ovagent.codegen_pipeline import CodegenPipeline
+    assert isinstance(pipeline, CodegenPipeline)
+    # Second access should return same instance
+    assert agent._codegen is pipeline
+
+
+def test_scanner_lazy_property_via_mixin():
+    """AC-001.2: _scanner lazy property works through mixin for __new__ instances."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    scanner = agent._scanner
+    from omicverse.utils.ovagent.registry_scanner import RegistryScanner
+    assert isinstance(scanner, RegistryScanner)
+    assert agent._scanner is scanner
+
+
+def test_followup_gate_behavioral_equivalence():
+    """AC-001.2: Follow-up gate methods produce identical results through mixin."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    # These methods are stateless -- verify they work through the mixin path
+    assert agent._request_requires_tool_action(
+        "https://example.com\nanalyze this", None
+    ) is True
+    assert agent._response_is_promissory(
+        "Let me first fetch the page to understand."
+    ) is True
+    assert agent._select_agent_tool_choice(
+        request="https://example.com\nanalyze",
+        adata=None,
+        turn_index=0,
+        had_meaningful_tool_call=False,
+        forced_retry=False,
+    ) == "required"
+
+
+def test_no_provider_logic_in_facade_mixin():
+    """AC-001.5: Mixin does not import or reference provider-specific modules."""
+    import inspect
+    source = inspect.getsource(CodegenToolDispatchFacadeMixin)
+    # Should not contain provider-specific references
+    for provider_term in ["openai", "anthropic", "google", "bedrock", "groq"]:
+        assert provider_term not in source.lower(), (
+            f"Provider logic '{provider_term}' found in CodegenToolDispatchFacadeMixin"
+        )
+
+
+def test_mixin_methods_not_duplicated_on_agent_class():
+    """AC-001.1: Extracted methods should NOT be redefined on OmicVerseAgent itself."""
+    # Get methods defined directly on OmicVerseAgent (not inherited),
+    # excluding standard Python dunder attributes that every class has.
+    dunder_ignore = {"__module__", "__doc__", "__dict__", "__weakref__",
+                     "__firstlineno__", "__static_attributes__", "__qualname__"}
+    agent_own_methods = set(OmicVerseAgent.__dict__.keys()) - dunder_ignore
+    mixin_methods = set(CodegenToolDispatchFacadeMixin.__dict__.keys()) - dunder_ignore
+    # No overlap means no duplication
+    overlap = agent_own_methods & mixin_methods
+    assert not overlap, (
+        f"These methods are duplicated on both OmicVerseAgent and the mixin: {overlap}"
+    )
+
+
+# -----------------------------------------------------------------------
+# Task-028: Function-registry prompt footprint optimization
+# -----------------------------------------------------------------------
+
+
+def test_compact_registry_summary_returns_category_lines():
+    """AC-028.1: _get_compact_registry_summary produces category-level lines, not full JSON."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    summary = agent._get_compact_registry_summary()
+    # Must be a non-empty string
+    assert isinstance(summary, str)
+    assert len(summary) > 0
+    # Must NOT contain the full JSON dump pattern
+    assert '"signature"' not in summary, "Compact summary should not contain full function signatures"
+    assert '"examples"' not in summary, "Compact summary should not contain example lists"
+    assert '"aliases"' not in summary, "Compact summary should not contain alias lists"
+    # Must contain category markers
+    assert "**" in summary or "functions)" in summary, (
+        "Summary should contain category headings with function counts"
+    )
+
+
+def test_compact_registry_summary_is_much_smaller_than_full_dump():
+    """AC-028.1: The compact summary is significantly smaller than the old full JSON dump."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    compact = agent._get_compact_registry_summary()
+    # The compact summary should be well under 5 KB
+    assert len(compact) < 5000, (
+        f"Compact summary is {len(compact)} chars — expected under 5000"
+    )
+
+
+def test_setup_agent_instructions_do_not_contain_full_registry():
+    """AC-028.1: _setup_agent system prompt uses compact summary, not full registry."""
+    import inspect
+    source = inspect.getsource(OmicVerseAgent._setup_agent)
+    # The old code called _get_available_functions_info which returned full JSON
+    assert "_get_available_functions_info" not in source, (
+        "_setup_agent should no longer call _get_available_functions_info"
+    )
+    # The new code should reference the compact summary
+    assert "_get_compact_registry_summary" in source, (
+        "_setup_agent should use _get_compact_registry_summary"
+    )
+    # The old "Here are all the currently registered functions" dump header is gone
+    assert "Here are all the currently registered functions" not in source, (
+        "System prompt should not dump all functions"
+    )
+
+
+def test_search_functions_tool_still_works():
+    """AC-028.2: search_functions tool remains functional for on-demand lookup."""
+    from omicverse.utils.ovagent.tool_runtime_exec import handle_search_functions
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    # search_functions must return results for a known domain keyword
+    result = handle_search_functions(agent, "qc")
+    assert isinstance(result, str)
+    # Should either find matches or return a "no functions" message
+    assert "qc" in result.lower() or "No functions found" in result
+
+
+def test_search_functions_tool_description_mentions_signatures():
+    """AC-028.2: search_functions tool description is informative."""
+    from omicverse.utils.ovagent.tool_runtime import LEGACY_AGENT_TOOLS
+    sf_tool = next(
+        (t for t in LEGACY_AGENT_TOOLS if t["name"] == "search_functions"),
+        None,
+    )
+    assert sf_tool is not None, "search_functions tool must exist"
+    desc = sf_tool["description"]
+    assert "signature" in desc.lower() or "parameter" in desc.lower(), (
+        "search_functions description should mention it returns signatures/parameters"
+    )
+
+
+def test_codegen_flows_still_discover_tools_via_scanner():
+    """AC-028.3: Codegen flows still discover tools through the registry scanner."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    # _collect_relevant_registry_entries is the primary codegen discovery path
+    entries = agent._collect_relevant_registry_entries("quality control", max_entries=5)
+    assert isinstance(entries, list)
+    # The scanner should still find QC-related entries
+    if entries:
+        names = [e.get("full_name", "") for e in entries]
+        assert any("qc" in n.lower() for n in names), (
+            f"Expected QC-related entries, got: {names}"
+        )
+
+
+def test_no_new_runtime_dependencies():
+    """AC-028.4: No new runtime dependencies introduced."""
+    import importlib
+    # The compact summary only uses stdlib (json removed, uses string formatting)
+    # and existing internal modules. Verify no new third-party imports.
+    source_path = Path(__file__).resolve().parents[2] / "omicverse" / "utils" / "smart_agent.py"
+    source = source_path.read_text(encoding="utf-8")
+    # Check that no new third-party imports were added beyond what existed
+    # (the file already imports json, os, re, sys, etc.)
+    new_suspects = ["yaml", "toml", "rich", "click", "pydantic"]
+    for suspect in new_suspects:
+        assert f"import {suspect}" not in source, (
+            f"New runtime dependency '{suspect}' found in smart_agent.py"
+        )

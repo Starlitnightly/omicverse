@@ -18,11 +18,8 @@ import hashlib
 import json
 import logging
 import os
-import re
 import threading
 import time
-from datetime import datetime
-from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Tuple
@@ -30,11 +27,28 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 import requests
 
 from ..agent_bridge import AgentBridge
-from .._bridge_session import resolve_bridge_session_id
-from ..channel_media import build_channel_request, prepare_channel_delivery_figures
 from ..gateway.routing import GatewaySessionRegistry, SessionKey
 from ..model_help import render_model_help
 from ..runtime import ConversationRoute
+from .channel_core import (
+    RunningTask,
+    build_full_request,
+    default_summary,
+    format_analysis_error,
+    format_save_result_plain,
+    format_status_plain,
+    format_usage_plain,
+    format_workspace_plain,
+    gather_status,
+    gather_usage,
+    gather_workspace,
+    get_prior_history,
+    notify_turn_complete,
+    perform_save,
+    process_result_state,
+    strip_local_paths,
+    text_chunks,
+)
 
 logger = logging.getLogger("omicverse.jarvis.feishu")
 
@@ -44,13 +58,6 @@ _MAX_BODY_BYTES = 2 * 1024 * 1024
 _DEDUP_TTL_SECONDS = 24 * 60 * 60
 _DEDUP_MAX_ENTRIES = 10000
 _FEISHU_EVENT_MESSAGE_RECEIVE = "im.message.receive_v1"
-
-
-@dataclass
-class RunningTask:
-    task: asyncio.Task
-    request: str
-    started_at: float
 
 
 class FeishuClient:
@@ -619,19 +626,10 @@ class FeishuRuntime:
 
     @staticmethod
     def _strip_local_paths(text: str) -> str:
-        """Remove local filesystem path references from result text."""
-        t = text or ""
-        t = re.sub(r'`[^`\n]*(?:/[^`\n]*){2,}`', '', t)
-        t = re.sub(r'/(?:Users|home|tmp|var|opt|root|data|mnt|private)/\S+', '', t)
-        t = re.sub(r'~[/\\]\S+', '', t)
-        _ext = r"pdf|csv|tsv|txt|xlsx|html|json|h5ad|png|jpg|svg"
-        t = re.sub(rf'\.?/?(?:\w[\w/-]*/)+\w[\w.-]*\.(?:{_ext})', '', t, flags=re.IGNORECASE)
-        t = re.sub(r'[ \t]{2,}', ' ', t)
-        t = re.sub(r'\n{3,}', '\n\n', t)
-        return t.strip()
+        return strip_local_paths(text)
 
     def _build_full_request(self, session: Any, text: str) -> str:
-        return build_channel_request(session, text, channel_label="Feishu")
+        return build_full_request(session, text, channel_label="Feishu")
 
     async def _spawn_analysis(
         self, chat_id: str, route: str, session: Any, user_text: str
@@ -721,7 +719,7 @@ class FeishuRuntime:
             ]
             response = await session.agent._llm.chat(messages, tools=None, tool_choice=None)
             reply = (response.content or "").strip() or "⏳ 后台分析进行中，请等待完成。"
-            for chunk in self._text_chunks(reply):
+            for chunk in text_chunks(reply):
                 await asyncio.to_thread(self._client.send_text, chat_id, chunk)
         except Exception as exc:
             logger.warning("Feishu quick_chat failed: %s", exc)
@@ -922,13 +920,7 @@ class FeishuRuntime:
             last_progress = msg
             await _edit(force=True)
 
-        _wb = getattr(self._sm, "gateway_web_bridge", None)
-        _prior_history = _wb.get_prior_history_simple(
-            "feishu",
-            "dm",
-            chat_id,
-            session_id=resolve_bridge_session_id(session),
-        ) if _wb else []
+        _prior_history = get_prior_history(self._sm, "feishu", "dm", chat_id, session)
 
         bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
         try:
@@ -954,51 +946,22 @@ class FeishuRuntime:
                 await asyncio.to_thread(self._client.send_text, chat_id, err_msg)
             return
 
-        if result.adata is not None:
-            session.adata = result.adata
-            try:
-                session.save_adata()
-                session.prompt_count += 1
-            except Exception:
-                pass
-        if result.usage is not None:
-            session.last_usage = result.usage
-        delivery_figures = prepare_channel_delivery_figures(session, result.figures)
-        try:
-            a = session.adata
-            adata_info = f"{a.n_obs:,} cells × {a.n_vars:,} genes" if a is not None else ""
-            session.append_memory_log(
-                request=user_text,
-                summary=(result.summary or "分析完成"),
-                adata_info=adata_info,
-            )
-        except Exception:
-            pass
+        delivery_figures, _adata_info = process_result_state(session, result, user_text)
 
-        # Mirror the completed turn into the web session (gateway mode)
-        _web_bridge = getattr(self._sm, "gateway_web_bridge", None)
-        if _web_bridge is not None:
-            try:
-                _web_bridge.on_turn_complete_simple(
-                    channel="feishu",
-                    scope_type="dm",
-                    scope_id=chat_id,
-                    user_text=user_text,
-                    llm_text=llm_buf,
-                    adata=result.adata,
-                    figures=result.figures or [],
-                    session_id=resolve_bridge_session_id(session),
-                )
-            except Exception:
-                pass
+        notify_turn_complete(
+            self._sm,
+            channel="feishu",
+            scope_type="dm",
+            scope_id=chat_id,
+            session=session,
+            user_text=user_text,
+            llm_text=llm_buf,
+            adata=result.adata,
+            figures=result.figures or [],
+        )
 
         if result.error:
-            err_text = f"❌ {result.error}"
-            if result.diagnostics:
-                hints = "\n".join(f"- {x}" for x in result.diagnostics[:4])
-                err_text += f"\n\n诊断信息:\n{hints}"
-            if llm_buf.strip():
-                err_text += f"\n\n最后模型输出片段:\n{_trim(llm_buf, max_len=1200)}"
+            err_text = format_analysis_error(result, llm_buf)
             if draft_id:
                 ok = await asyncio.to_thread(
                     self._client.edit_card, draft_id, err_text, "❌ 分析失败", "red"
@@ -1022,7 +985,7 @@ class FeishuRuntime:
                     self._client.send_markdown_card, chat_id, rep, "📊 分析报告"
                 )
             else:
-                for chunk in self._text_chunks(rep):
+                for chunk in text_chunks(rep):
                     await asyncio.to_thread(self._client.send_text, chat_id, chunk)
 
         for i, fig in enumerate(delivery_figures, start=1):
@@ -1046,21 +1009,17 @@ class FeishuRuntime:
             except Exception:
                 logger.warning("Failed to send artifact %s", art.filename)
 
-        summary = self._strip_local_paths(
+        summary = strip_local_paths(
             bridge.pick_reply_text(result, llm_buf, max_len=3600)
         )
         if not summary:
-            if session.adata is not None:
-                a = session.adata
-                summary = f"✅ 分析完成\n🔬 {a.n_obs:,} cells × {a.n_vars:,} genes"
-            else:
-                summary = "✅ 分析完成"
+            summary = default_summary(session)
         if len(summary) <= 4800:
             await asyncio.to_thread(
                 self._client.send_markdown_card, chat_id, summary, "✅ 分析完成", "green"
             )
         else:
-            for chunk in self._text_chunks(summary):
+            for chunk in text_chunks(summary):
                 await asyncio.to_thread(self._client.send_text, chat_id, chunk)
         if draft_id:
             ok = await asyncio.to_thread(
@@ -1101,60 +1060,53 @@ class FeishuRuntime:
         self._client.send_text(chat_id, text)
 
     async def _handle_status(self, chat_id: str, session: Any, route: str) -> None:
+        running = self._tasks.get(route)
+        info = gather_status(
+            session,
+            session_manager=self._sm,
+            is_running=bool(running and not running.task.done()),
+        )
         lines: List[str] = []
-        if session.adata is not None:
-            a = session.adata
-            lines.append(f"🔬 {a.n_obs:,} cells × {a.n_vars:,} genes")
-            try:
-                cols = ", ".join(list(a.obs.columns[:8]))
-                if cols:
-                    lines.append(f"📋 obs: {cols}")
-            except Exception:
-                pass
+        if info.adata_shape:
+            n_obs, n_vars = info.adata_shape
+            lines.append(f"🔬 {n_obs:,} cells × {n_vars:,} genes")
+            if info.obs_columns:
+                lines.append(f"📋 obs: {', '.join(info.obs_columns)}")
         else:
             lines.append("📭 暂无数据")
-        try:
-            kname = self._sm.get_active_kernel(session.user_id)
-            lines.append(f"🧩 kernel: {kname}")
-        except Exception:
-            pass
-        kst = session.kernel_status()
-        if kst:
-            lines.append(f"💬 prompts: {kst.get('prompt_count', 0)}/{kst.get('max_prompts', '?')}")
-            if kst.get("session_id"):
-                lines.append(f"🆔 session: {kst.get('session_id')}")
-        running = self._tasks.get(route)
-        if running and not running.task.done():
+        if info.kernel_name:
+            lines.append(f"🧩 kernel: {info.kernel_name}")
+        if info.prompt_count is not None:
+            lines.append(f"💬 prompts: {info.prompt_count}/{info.max_prompts or '?'}")
+            if info.session_id:
+                lines.append(f"🆔 session: {info.session_id}")
+        if info.is_running:
             lines.append("⚙️ 分析中（可 /cancel）")
         self._client.send_text(chat_id, "\n".join(lines))
 
     async def _handle_workspace(self, chat_id: str, session: Any) -> None:
-        ws = session.workspace
-        h5ad_files = session.list_h5ad_files()
-        agents_md = session.get_agents_md()
-        today_log = session.memory_dir / f"{datetime.now().date()}.md"
+        info = gather_workspace(session)
         lines = [
             "📁 Workspace",
             "--------------------",
-            str(ws),
+            info.path,
             "",
         ]
-        if h5ad_files:
-            lines.append(f"📊 数据文件 ({len(h5ad_files)})")
-            for f in h5ad_files[:10]:
-                try:
-                    mb = f.stat().st_size / 1_048_576
-                    lines.append(f"- {f.name} ({mb:.1f} MB)")
-                except OSError:
-                    lines.append(f"- {f.name}")
-            if len(h5ad_files) > 10:
-                lines.append(f"... 还有 {len(h5ad_files) - 10} 个")
+        if info.h5ad_files:
+            lines.append(f"📊 数据文件 ({info.h5ad_total})")
+            for name, mb in info.h5ad_files:
+                if mb is not None:
+                    lines.append(f"- {name} ({mb:.1f} MB)")
+                else:
+                    lines.append(f"- {name}")
+            if info.h5ad_total > len(info.h5ad_files):
+                lines.append(f"... 还有 {info.h5ad_total - len(info.h5ad_files)} 个")
         else:
             lines.append("📊 数据文件 (空)")
         lines += [
             "",
-            f"📋 AGENTS.md {'✅' if agents_md else '—'}",
-            f"🧠 今日记忆 {'✅' if today_log.exists() else '—'}",
+            f"📋 AGENTS.md {'✅' if info.has_agents_md else '—'}",
+            f"🧠 今日记忆 {'✅' if info.has_today_memory else '—'}",
             "",
             "可用: /load <文件名> | /ls | /memory",
         ]
@@ -1163,7 +1115,7 @@ class FeishuRuntime:
     async def _handle_ls(self, chat_id: str, session: Any, subpath: str) -> None:
         cmd = f"ls -lh {subpath}".strip() if subpath else "ls -lh"
         out = session.shell.exec(cmd, cwd=session.workspace)
-        for chunk in self._text_chunks(f"$ {cmd}\n{out}", limit=3200):
+        for chunk in text_chunks(f"$ {cmd}\n{out}", limit=3200):
             self._client.send_text(chat_id, chunk)
 
     async def _handle_find(self, chat_id: str, session: Any, pattern: str) -> None:
@@ -1173,7 +1125,7 @@ class FeishuRuntime:
             return
         cmd = f"find . -name {pattern}"
         out = session.shell.exec(cmd, cwd=session.workspace)
-        for chunk in self._text_chunks(f"$ {cmd}\n{out}", limit=3200):
+        for chunk in text_chunks(f"$ {cmd}\n{out}", limit=3200):
             self._client.send_text(chat_id, chunk)
 
     async def _handle_load(self, chat_id: str, session: Any, filename: str) -> None:
@@ -1209,47 +1161,37 @@ class FeishuRuntime:
             )
             return
         out = session.shell.exec(cmd, cwd=session.workspace)
-        for chunk in self._text_chunks(f"$ {cmd}\n{out}", limit=3200):
+        for chunk in text_chunks(f"$ {cmd}\n{out}", limit=3200):
             self._client.send_text(chat_id, chunk)
 
     async def _handle_memory(self, chat_id: str, session: Any) -> None:
         text = session.get_recent_memory_text()
-        for chunk in self._text_chunks(f"🧠 分析历史（近两天）\n\n{text}", limit=3200):
+        for chunk in text_chunks(f"🧠 分析历史（近两天）\n\n{text}", limit=3200):
             self._client.send_text(chat_id, chunk)
 
     async def _handle_usage(self, chat_id: str, session: Any) -> None:
-        usage = session.last_usage
-        if usage is None:
+        info = gather_usage(session)
+        if not info.has_data:
             self._client.send_text(chat_id, "ℹ️ 暂无用量数据，请先进行一次分析。")
             return
-
-        def _attr(obj: Any, *names: str, default: str = "?") -> str:
-            for name in names:
-                v = getattr(obj, name, None)
-                if v is not None:
-                    return f"{v:,}" if isinstance(v, int) else str(v)
-            return default
-
         lines = [
             "📊 Token 用量（最近一次）",
             "--------------------",
-            f"输入: {_attr(usage, 'input_tokens')}",
-            f"输出: {_attr(usage, 'output_tokens')}",
-            f"合计: {_attr(usage, 'total_tokens')}",
+            f"输入: {info.input_tokens}",
+            f"输出: {info.output_tokens}",
+            f"合计: {info.total_tokens}",
         ]
-        cr = _attr(usage, "cache_read_input_tokens", default="")
-        cc = _attr(usage, "cache_creation_input_tokens", default="")
-        if cr and cr != "?":
-            lines.append(f"缓存读取: {cr}")
-        if cc and cc != "?":
-            lines.append(f"缓存写入: {cc}")
+        if info.cache_read and info.cache_read != "?":
+            lines.append(f"缓存读取: {info.cache_read}")
+        if info.cache_creation and info.cache_creation != "?":
+            lines.append(f"缓存写入: {info.cache_creation}")
         self._client.send_text(chat_id, "\n".join(lines))
 
     async def _handle_model(self, chat_id: str, model_name: str) -> None:
         model_name = (model_name or "").strip()
         if not model_name:
             text = render_model_help(getattr(self._sm, "_model", "unknown"))
-            for chunk in self._text_chunks(text):
+            for chunk in text_chunks(text):
                 self._client.send_text(chat_id, chunk)
             return
         self._sm._model = model_name
@@ -1263,18 +1205,20 @@ class FeishuRuntime:
             self._client.send_text(chat_id, "❌ 没有数据，请先 /load 或完成分析。")
             return
         self._client.send_text(chat_id, "⏳ 正在保存 current.h5ad ...")
-        try:
-            path = await asyncio.to_thread(session.save_adata)
-            if not path or not Path(path).exists():
-                self._client.send_text(chat_id, "❌ 保存失败，请重试。")
-                return
-            data = Path(path).read_bytes()
-            await asyncio.to_thread(self._client.send_file_bytes, chat_id, data, "current.h5ad")
-            a = session.adata
-            self._client.send_text(chat_id, f"💾 已发送 current.h5ad\n🔬 {a.n_obs:,} cells × {a.n_vars:,} genes")
-        except Exception as exc:
-            logger.exception("Feishu /save failed")
-            self._client.send_text(chat_id, f"❌ 保存失败: {exc}")
+        result = await asyncio.to_thread(perform_save, session)
+        if result.success and result.path:
+            try:
+                data = Path(result.path).read_bytes()
+                await asyncio.to_thread(self._client.send_file_bytes, chat_id, data, "current.h5ad")
+                n_obs, n_vars = result.adata_shape
+                self._client.send_text(chat_id, f"💾 已发送 current.h5ad\n🔬 {n_obs:,} cells × {n_vars:,} genes")
+            except Exception as exc:
+                logger.exception("Feishu /save failed")
+                self._client.send_text(chat_id, f"❌ 保存失败: {exc}")
+        elif result.error:
+            self._client.send_text(chat_id, f"❌ {result.error}")
+        else:
+            self._client.send_text(chat_id, "❌ 保存失败，请重试。")
 
     async def _handle_kernel(self, chat_id: str, session: Any, route: str, args: List[str]) -> None:
         if not args:
@@ -1322,35 +1266,6 @@ class FeishuRuntime:
                 self._client.send_text(chat_id, f"❌ kernel 操作失败: {exc}")
             return
         self._client.send_text(chat_id, "用法: /kernel | /kernel ls | /kernel new 名称 | /kernel use 名称")
-
-    @staticmethod
-    def _text_chunks(text: str, limit: int = _MAX_TEXT) -> List[str]:
-        text = (text or "").strip()
-        if not text:
-            return []
-        if len(text) <= limit:
-            return [text]
-        chunks: List[str] = []
-        buf = ""
-        for para in text.split("\n\n"):
-            cand = f"{buf}\n\n{para}".strip() if buf else para
-            if len(cand) <= limit:
-                buf = cand
-                continue
-            if buf:
-                chunks.append(buf)
-            if len(para) <= limit:
-                buf = para
-            else:
-                pos = 0
-                while pos < len(para):
-                    chunks.append(para[pos:pos + limit])
-                    pos += limit
-                buf = ""
-        if buf:
-            chunks.append(buf)
-        return chunks
-
 
 def run_feishu_bot(
     *,

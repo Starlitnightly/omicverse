@@ -324,15 +324,13 @@ class OmicVerseLLMBackend:
         return None
 
     def _retry(self, func: Callable[..., T], *args, **kwargs) -> T:
-        """Retry *func* using the retry settings from self.config."""
+        """Retry *func* with config retry settings, binding any args into a zero-arg closure."""
         return _retry_with_backoff(
-            func,
+            (lambda: func(*args, **kwargs)) if args or kwargs else func,
             max_attempts=self.config.max_retry_attempts,
             base_delay=self.config.retry_base_delay,
             factor=self.config.retry_backoff_factor,
             jitter=self.config.retry_jitter,
-            *args,
-            **kwargs,
         )
 
     # -----------------------------------------------------------------
@@ -372,18 +370,12 @@ class OmicVerseLLMBackend:
             )
 
         wire = self._effective_wire_api(provider_info)
-        if wire == WireAPI.CHAT_COMPLETIONS:
-            return self._chat_tools_openai(messages, tools, tool_choice)
-        elif wire == WireAPI.ANTHROPIC_MESSAGES:
-            return self._chat_tools_anthropic(messages, tools, tool_choice)
-        elif wire == WireAPI.GEMINI_GENERATE:
-            return self._chat_tools_gemini(messages, tools, tool_choice)
-        elif wire == WireAPI.DASHSCOPE:
-            return self._chat_tools_openai(messages, tools, tool_choice)
-        else:
+        method_name = _CHAT_DISPATCH.get(wire)
+        if method_name is None:
             raise RuntimeError(
                 f"Tool-calling chat not supported for wire API '{wire.value}'"
             )
+        return getattr(self, method_name)(messages, tools, tool_choice)
 
     async def _stream_async(self, user_prompt: str):
         """Internal async generator that dispatches to provider-specific streaming."""
@@ -412,201 +404,8 @@ class OmicVerseLLMBackend:
         async for chunk in method(user_prompt):
             yield chunk
 
-    # -----------------------------------------------------------------
-    # Provider-specific delegates (thin wrappers calling helper modules)
-    # -----------------------------------------------------------------
-
-    # --- OpenAI ---
-    def _apply_openai_chat_param_policy(self, kwargs):
-        return _oai._apply_openai_chat_param_policy(self, kwargs)
-
-    def _extract_openai_error_text(self, exc):
-        return _oai._extract_openai_error_text(self, exc)
-
-    def _adapt_openai_chat_kwargs_from_error(self, kwargs, exc):
-        return _oai._adapt_openai_chat_kwargs_from_error(self, kwargs, exc)
-
-    def _call_openai_chat_with_adaptation(self, request_fn, kwargs, *, base_url):
-        return _oai._call_openai_chat_with_adaptation(self, request_fn, kwargs, base_url=base_url)
-
-    @staticmethod
-    def _is_openai_codex_base_url(base_url):
-        return _oai._is_openai_codex_base_url(base_url)
-
-    @staticmethod
-    def _resolve_openai_codex_url(base_url):
-        return _oai._resolve_openai_codex_url(base_url)
-
-    @staticmethod
-    def _decode_openai_codex_jwt(token):
-        return _oai._decode_openai_codex_jwt(token)
-
-    @classmethod
-    def _extract_openai_codex_account_id(cls, token):
-        return _oai._extract_openai_codex_account_id(token)
-
-    @staticmethod
-    def _openai_codex_user_agent():
-        return _oai._openai_codex_user_agent()
-
-    @staticmethod
-    def _is_ollama_endpoint(base_url):
-        return _oai._is_ollama_endpoint(base_url)
-
-    def _wrap_openai_connection_error(self, exc, base_url):
-        return _oai._wrap_openai_connection_error(self, exc, base_url)
-
-    @staticmethod
-    def _responses_jsonable(value):
-        return _oai._responses_jsonable(value)
-
-    @staticmethod
-    def _extract_responses_output_items(payload):
-        return _oai._extract_responses_output_items(payload)
-
-    @staticmethod
-    def _extract_responses_text_from_items(items):
-        return _oai._extract_responses_text_from_items(items)
-
-    @staticmethod
-    def _extract_responses_tool_calls_from_items(items):
-        return _oai._extract_responses_tool_calls_from_items(items)
-
-    @staticmethod
-    def _extract_responses_text_from_dict(payload):
-        return _oai._extract_responses_text_from_dict(payload)
-
-    def _build_openai_responses_request(self, *, messages, tools, tool_choice, include_system_messages):
-        return _oai._build_openai_responses_request(self, messages=messages, tools=tools, tool_choice=tool_choice, include_system_messages=include_system_messages)
-
-    @staticmethod
-    def _iter_openai_codex_sse_events(raw_bytes):
-        return _oai._iter_openai_codex_sse_events(raw_bytes)
-
-    def _extract_openai_codex_final_response(self, events):
-        return _oai._extract_openai_codex_final_response(self, events)
-
-    def _call_openai_codex_responses(self, *, base_url, api_key, messages, tools, tool_choice):
-        return _oai._call_openai_codex_responses(self, base_url=base_url, api_key=api_key, messages=messages, tools=tools, tool_choice=tool_choice)
-
-    def _convert_messages_openai_responses(self, messages):
-        return _oai._convert_messages_openai_responses(self, messages)
-
-    def _build_chat_response_from_responses_payload(self, payload):
-        return _oai._build_chat_response_from_responses_payload(self, payload)
-
-    def _convert_tools_openai(self, tools):
-        return _oai._convert_tools_openai(tools)
-
-    def _convert_tools_openai_responses(self, tools):
-        return _oai._convert_tools_openai_responses(tools)
-
-    def _chat_via_openai_compatible(self, user_prompt):
-        return _oai._chat_via_openai_compatible(self, user_prompt)
-
-    def _chat_via_openai_http(self, base_url, api_key, user_prompt):
-        return _oai._chat_via_openai_http(self, base_url, api_key, user_prompt)
-
-    def _chat_via_openai_responses(self, base_url, api_key, user_prompt):
-        return _oai._chat_via_openai_responses(self, base_url, api_key, user_prompt)
-
-    def _chat_via_openai_responses_http(self, base_url, api_key, user_prompt):
-        return _oai._chat_via_openai_responses_http(self, base_url, api_key, user_prompt)
-
-    def _chat_tools_openai(self, messages, tools, tool_choice):
-        return _oai._chat_tools_openai(self, messages, tools, tool_choice)
-
-    def _chat_tools_openai_responses(self, messages, tools, tool_choice):
-        return _oai._chat_tools_openai_responses(self, messages, tools, tool_choice)
-
-    # --- Anthropic ---
-    def _convert_tools_anthropic(self, tools):
-        return _ant._convert_tools_anthropic(tools)
-
-    def _chat_via_anthropic(self, user_prompt):
-        return _ant._chat_via_anthropic(self, user_prompt)
-
-    def _chat_tools_anthropic(self, messages, tools, tool_choice):
-        return _ant._chat_tools_anthropic(self, messages, tools, tool_choice)
-
-    # --- Gemini ---
-    @staticmethod
-    def _json_schema_to_gemini_schema(schema):
-        return _gem._json_schema_to_gemini_schema(schema)
-
-    @staticmethod
-    def _messages_to_gemini_contents(messages):
-        return _gem._messages_to_gemini_contents(messages)
-
-    def _chat_via_gemini(self, user_prompt):
-        return _gem._chat_via_gemini(self, user_prompt)
-
-    def _chat_tools_gemini(self, messages, tools, tool_choice):
-        return _gem._chat_tools_gemini(self, messages, tools, tool_choice)
-
-    # --- Gemini CLI OAuth helpers ---
-    @staticmethod
-    def _gemini_uses_oauth_bearer(api_key):
-        return _gem._gemini_uses_oauth_bearer(api_key)
-
-    @staticmethod
-    def _gemini_auth_headers(api_key):
-        return _gem._gemini_auth_headers(api_key)
-
-    @staticmethod
-    def _gemini_oauth_payload(api_key):
-        return _gem._gemini_oauth_payload(api_key)
-
-    def _gemini_base_url(self):
-        return _gem._gemini_base_url(self)
-
-    def _gemini_generate_content_url(self):
-        return _gem._gemini_generate_content_url(self)
-
-    def _gemini_cli_base_url(self):
-        return _gem._gemini_cli_base_url(self)
-
-    def _gemini_cli_generate_content_url(self, stream=False):
-        return _gem._gemini_cli_generate_content_url(self, stream=stream)
-
-    @staticmethod
-    def _gemini_function_response_payload(result):
-        return _gem._gemini_function_response_payload(result)
-
-    @staticmethod
-    def _clean_schema_for_gemini_cli(schema):
-        return _gem._clean_schema_for_gemini_cli(schema)
-
-    def _messages_to_gemini_rest_contents(self, messages):
-        return _gem._messages_to_gemini_rest_contents(self, messages)
-
-    def _gemini_rest_generation_config(self):
-        return _gem._gemini_rest_generation_config(self)
-
-    def _gemini_rest_request(self, body, api_key):
-        return _gem._gemini_rest_request(self, body, api_key)
-
-    def _gemini_cli_request(self, body, api_key):
-        return _gem._gemini_cli_request(self, body, api_key)
-
-    def _capture_gemini_usage(self, payload):
-        return _gem._capture_gemini_usage(self, payload)
-
-    @staticmethod
-    def _extract_gemini_text_and_tool_calls(payload):
-        return _gem._extract_gemini_text_and_tool_calls(payload)
-
-    def _chat_tools_gemini_rest(self, messages, tools, tool_choice, api_key):
-        return _gem._chat_tools_gemini_rest(self, messages, tools, tool_choice, api_key)
-
-    def _chat_via_gemini_rest(self, user_prompt, api_key):
-        return _gem._chat_via_gemini_rest(self, user_prompt, api_key)
-
-    # --- DashScope ---
-    def _chat_via_dashscope(self, user_prompt):
-        return _ds._chat_via_dashscope(self, user_prompt)
-
     # --- Local Python executor ---
+
     def _run_python_local(self, user_prompt: str) -> str:
         """Execute Python code locally when provider is set to 'python'."""
 
@@ -625,8 +424,10 @@ class OmicVerseLLMBackend:
         if not code:
             raise ValueError("No Python code provided for execution")
 
-        # Pre-execution security scan
-        from .agent_sandbox import CodeSecurityScanner
+        # Pre-execution security scan — SyntaxError is NOT swallowed so that
+        # callers receive a diagnosable failure instead of silently falling
+        # through to compile().
+        from .agent_sandbox import CodeSecurityScanner, build_sandbox_globals
         from .agent_errors import SecurityViolationError
         scanner = CodeSecurityScanner()
         try:
@@ -637,12 +438,12 @@ class OmicVerseLLMBackend:
                     f"Code blocked by security scanner:\n{report}",
                     violations=violations,
                 )
-        except SyntaxError:
-            pass  # Syntax errors handled downstream by compile()
+        except SyntaxError as exc:
+            raise RuntimeError(f"Python execution failed: {exc}") from exc
 
         stdout = io.StringIO()
         stderr = io.StringIO()
-        sandbox_globals: Dict[str, Any] = {"__name__": "__main__"}
+        sandbox_globals = build_sandbox_globals()
         sandbox_locals: Dict[str, Any] = {}
 
         try:
@@ -711,34 +512,138 @@ class OmicVerseLLMBackend:
                 "content": result,
             }
 
-    # --- Streaming delegates ---
-    async def _run_generator_in_thread(self, generator_func):
-        async for chunk in _stream._run_generator_in_thread(self, generator_func):
-            yield chunk
 
-    async def _stream_openai_compatible(self, user_prompt):
-        async for chunk in _stream._stream_openai_compatible(self, user_prompt):
-            yield chunk
+# ---------------------------------------------------------------------------
+# Provider delegation registry
+# ---------------------------------------------------------------------------
+# Instead of ~60 handwritten forwarding methods on the class, the registry
+# maps method names to their provider module and binding kind.
+# _install_provider_delegates() materializes each entry as a late-bound
+# method on OmicVerseLLMBackend so monkeypatching the module-level function
+# is picked up at call time.
+#
+# kind: 'instance'  — func(backend, *args, **kwargs)
+#       'static'    — func(*args, **kwargs), no backend arg
+#       'async_gen' — async generator func(backend, *args, **kwargs)
 
-    async def _stream_openai_http_fallback(self, base_url, api_key, user_prompt):
-        async for chunk in _stream._stream_openai_http_fallback(self, base_url, api_key, user_prompt):
-            yield chunk
+_CHAT_DISPATCH = {
+    WireAPI.CHAT_COMPLETIONS:   "_chat_tools_openai",
+    WireAPI.ANTHROPIC_MESSAGES: "_chat_tools_anthropic",
+    WireAPI.GEMINI_GENERATE:    "_chat_tools_gemini",
+    WireAPI.DASHSCOPE:          "_chat_tools_openai",
+}
 
-    async def _stream_openai_responses(self, base_url, api_key, user_prompt):
-        async for chunk in _stream._stream_openai_responses(self, base_url, api_key, user_prompt):
-            yield chunk
+_PROVIDER_DELEGATES = [
+    # --- OpenAI: instance ---
+    ("_apply_openai_chat_param_policy",          _oai, "instance"),
+    ("_extract_openai_error_text",               _oai, "instance"),
+    ("_adapt_openai_chat_kwargs_from_error",     _oai, "instance"),
+    ("_call_openai_chat_with_adaptation",        _oai, "instance"),
+    ("_wrap_openai_connection_error",            _oai, "instance"),
+    ("_build_openai_responses_request",          _oai, "instance"),
+    ("_extract_openai_codex_final_response",     _oai, "instance"),
+    ("_call_openai_codex_responses",             _oai, "instance"),
+    ("_convert_messages_openai_responses",       _oai, "instance"),
+    ("_build_chat_response_from_responses_payload", _oai, "instance"),
+    ("_chat_via_openai_compatible",              _oai, "instance"),
+    ("_chat_via_openai_http",                    _oai, "instance"),
+    ("_chat_via_openai_responses",               _oai, "instance"),
+    ("_chat_via_openai_responses_http",          _oai, "instance"),
+    ("_chat_tools_openai",                       _oai, "instance"),
+    ("_chat_tools_openai_responses",             _oai, "instance"),
+    # --- OpenAI: static ---
+    ("_convert_tools_openai",                    _oai, "static"),
+    ("_convert_tools_openai_responses",          _oai, "static"),
+    ("_is_openai_codex_base_url",                _oai, "static"),
+    ("_resolve_openai_codex_url",                _oai, "static"),
+    ("_decode_openai_codex_jwt",                 _oai, "static"),
+    ("_extract_openai_codex_account_id",         _oai, "static"),
+    ("_openai_codex_user_agent",                 _oai, "static"),
+    ("_is_ollama_endpoint",                      _oai, "static"),
+    ("_responses_jsonable",                      _oai, "static"),
+    ("_extract_responses_output_items",          _oai, "static"),
+    ("_extract_responses_text_from_items",       _oai, "static"),
+    ("_extract_responses_tool_calls_from_items", _oai, "static"),
+    ("_extract_responses_text_from_dict",        _oai, "static"),
+    ("_iter_openai_codex_sse_events",            _oai, "static"),
+    # --- Anthropic: instance ---
+    ("_chat_via_anthropic",                      _ant, "instance"),
+    ("_chat_tools_anthropic",                    _ant, "instance"),
+    # --- Anthropic: static ---
+    ("_convert_tools_anthropic",                 _ant, "static"),
+    # --- Gemini: instance ---
+    ("_chat_via_gemini",                         _gem, "instance"),
+    ("_chat_tools_gemini",                       _gem, "instance"),
+    ("_gemini_base_url",                         _gem, "instance"),
+    ("_gemini_generate_content_url",             _gem, "instance"),
+    ("_gemini_cli_base_url",                     _gem, "instance"),
+    ("_gemini_cli_generate_content_url",         _gem, "instance"),
+    ("_messages_to_gemini_rest_contents",        _gem, "instance"),
+    ("_gemini_rest_generation_config",           _gem, "instance"),
+    ("_gemini_rest_request",                     _gem, "instance"),
+    ("_gemini_cli_request",                      _gem, "instance"),
+    ("_capture_gemini_usage",                    _gem, "instance"),
+    ("_chat_tools_gemini_rest",                  _gem, "instance"),
+    ("_chat_via_gemini_rest",                    _gem, "instance"),
+    # --- Gemini: static ---
+    ("_json_schema_to_gemini_schema",            _gem, "static"),
+    ("_messages_to_gemini_contents",             _gem, "static"),
+    ("_gemini_uses_oauth_bearer",                _gem, "static"),
+    ("_gemini_auth_headers",                     _gem, "static"),
+    ("_gemini_oauth_payload",                    _gem, "static"),
+    ("_gemini_function_response_payload",        _gem, "static"),
+    ("_clean_schema_for_gemini_cli",             _gem, "static"),
+    ("_extract_gemini_text_and_tool_calls",      _gem, "static"),
+    # --- DashScope: instance ---
+    ("_chat_via_dashscope",                      _ds,  "instance"),
+    # --- Streaming: async generators ---
+    ("_run_generator_in_thread",                 _stream, "async_gen"),
+    ("_stream_openai_compatible",                _stream, "async_gen"),
+    ("_stream_openai_http_fallback",             _stream, "async_gen"),
+    ("_stream_openai_responses",                 _stream, "async_gen"),
+    ("_stream_anthropic",                        _stream, "async_gen"),
+    ("_stream_gemini",                           _stream, "async_gen"),
+    ("_stream_dashscope",                        _stream, "async_gen"),
+]
 
-    async def _stream_anthropic(self, user_prompt):
-        async for chunk in _stream._stream_anthropic(self, user_prompt):
-            yield chunk
 
-    async def _stream_gemini(self, user_prompt):
-        async for chunk in _stream._stream_gemini(self, user_prompt):
-            yield chunk
+def _install_provider_delegates(cls, delegates):
+    """Materialize provider delegate methods onto *cls* from the registry.
 
-    async def _stream_dashscope(self, user_prompt):
-        async for chunk in _stream._stream_dashscope(self, user_prompt):
-            yield chunk
+    Each wrapper resolves the target function at call time via ``getattr``
+    so that monkeypatching the module-level function is picked up.
+    """
+    for name, mod, kind in delegates:
+        if kind == "instance":
+            def _make(m, n):
+                def _delegate(self, *args, **kwargs):
+                    return getattr(m, n)(self, *args, **kwargs)
+                _delegate.__name__ = n
+                _delegate.__qualname__ = f"{cls.__name__}.{n}"
+                return _delegate
+            setattr(cls, name, _make(mod, name))
+        elif kind == "static":
+            def _make(m, n):
+                def _delegate(*args, **kwargs):
+                    return getattr(m, n)(*args, **kwargs)
+                _delegate.__name__ = n
+                _delegate.__qualname__ = f"{cls.__name__}.{n}"
+                return staticmethod(_delegate)
+            setattr(cls, name, _make(mod, name))
+        elif kind == "async_gen":
+            def _make(m, n):
+                async def _delegate(self, *args, **kwargs):
+                    async for chunk in getattr(m, n)(self, *args, **kwargs):
+                        yield chunk
+                _delegate.__name__ = n
+                _delegate.__qualname__ = f"{cls.__name__}.{n}"
+                return _delegate
+            setattr(cls, name, _make(mod, name))
+        else:
+            raise ValueError(f"Unknown delegate kind: {kind!r} for {name}")
+
+
+_install_provider_delegates(OmicVerseLLMBackend, _PROVIDER_DELEGATES)
 
 
 __all__ = ["OmicVerseLLMBackend", "Usage", "ChatResponse", "ToolCall", "BackendConfig"]

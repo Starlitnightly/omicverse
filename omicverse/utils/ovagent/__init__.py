@@ -32,6 +32,7 @@ from .context_budget import (
 )
 from .subagent_controller import SubagentController, SubagentRuntime
 from .repair_loop import (
+    DEFAULT_LLM_TIMEOUT,
     DEFAULT_MAX_RETRIES,
     ExecutionRepairLoop,
     FailureEnvelope,
@@ -58,6 +59,7 @@ from .event_stream import RuntimeEventEmitter
 from .turn_controller import TurnController, FollowUpGate
 from .turn_followup import ConvergenceMonitor
 from .session_context import SessionService, ContextService
+from .session_facade import SessionContextFacadeMixin
 from .registry_scanner import RegistryScanner
 from .auth import (
     ResolvedBackend,
@@ -91,6 +93,7 @@ __all__ = [
     "ContextBudgetManager",
     "ContextService",
     "ConvergenceMonitor",
+    "DEFAULT_LLM_TIMEOUT",
     "DEFAULT_MAX_RETRIES",
     "ExecutionBatch",
     "ExecutionRepairLoop",
@@ -109,6 +112,7 @@ __all__ = [
     "RepairResult",
     "ResolvedBackend",
     "RunStore",
+    "SessionContextFacadeMixin",
     "SessionService",
     "SubagentController",
     "SubagentRuntime",

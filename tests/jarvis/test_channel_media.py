@@ -1,12 +1,23 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, List
 
 import pytest
 
 from omicverse.jarvis.agent_bridge import AgentRunResult
-from omicverse.jarvis.channel_media import build_channel_request, prepare_channel_delivery_figures
+from omicverse.jarvis.channel_media import (
+    MAX_INBOUND_IMAGES,
+    build_channel_request,
+    format_h5ad_load_result,
+    inbound_upload_dir,
+    is_image_attachment,
+    load_h5ad_to_session,
+    prepare_channel_delivery_figures,
+    prepare_inbound_image,
+    prepare_inbound_image_from_file,
+)
 from omicverse.jarvis.runtime.models import ConversationRoute, DeliveryEvent, MessageEnvelope
 from omicverse.jarvis.runtime.runtime import MessageRuntime
 
@@ -203,3 +214,266 @@ async def test_message_runtime_routes_only_latest_workspace_figure(tmp_path: Pat
     assert "figures/<descriptive_name>.png" in adapter.requests[0]["request"]
     assert "show=False before saving" in adapter.requests[0]["request"]
     assert "newest PNG" in adapter.requests[0]["request"]
+
+
+# ── MAX_INBOUND_IMAGES ─────────────────────────────────────────────────────
+
+class TestMaxInboundImages:
+    def test_constant_is_four(self) -> None:
+        assert MAX_INBOUND_IMAGES == 4
+
+    def test_constant_is_int(self) -> None:
+        assert isinstance(MAX_INBOUND_IMAGES, int)
+
+
+# ── is_image_attachment ────────────────────────────────────────────────────
+
+class TestIsImageAttachment:
+    def test_by_mime_type(self) -> None:
+        assert is_image_attachment("", "image/png") is True
+        assert is_image_attachment("", "image/jpeg") is True
+        assert is_image_attachment("", "image/webp") is True
+
+    def test_by_filename(self) -> None:
+        assert is_image_attachment("photo.png") is True
+        assert is_image_attachment("scan.jpg") is True
+        assert is_image_attachment("diagram.webp") is True
+
+    def test_non_image_rejected(self) -> None:
+        assert is_image_attachment("data.csv") is False
+        assert is_image_attachment("", "application/json") is False
+        assert is_image_attachment("") is False
+
+    def test_h5ad_rejected(self) -> None:
+        assert is_image_attachment("sample.h5ad") is False
+
+    def test_mime_takes_precedence(self) -> None:
+        assert is_image_attachment("data.csv", "image/png") is True
+
+    def test_case_insensitive_mime(self) -> None:
+        assert is_image_attachment("", "Image/PNG") is True
+
+    def test_whitespace_stripped(self) -> None:
+        assert is_image_attachment("", "  image/png  ") is True
+
+
+# ── inbound_upload_dir ─────────────────────────────────────────────────────
+
+class TestInboundUploadDir:
+    def test_creates_directory(self, tmp_path: Path) -> None:
+        result = inbound_upload_dir(tmp_path, "discord")
+        assert result == tmp_path / "uploads" / "discord"
+        assert result.is_dir()
+
+    def test_returns_path_object(self, tmp_path: Path) -> None:
+        result = inbound_upload_dir(str(tmp_path), "telegram")
+        assert isinstance(result, Path)
+        assert result.is_dir()
+
+    def test_idempotent(self, tmp_path: Path) -> None:
+        first = inbound_upload_dir(tmp_path, "qq")
+        second = inbound_upload_dir(tmp_path, "qq")
+        assert first == second
+
+
+# ── prepare_inbound_image ──────────────────────────────────────────────────
+
+class TestPrepareInboundImage:
+    def _make_png(self) -> bytes:
+        """Create minimal valid PNG bytes for testing."""
+        try:
+            from PIL import Image
+            import io
+            img = Image.new("RGB", (2, 2), color="red")
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            return buf.getvalue()
+        except ImportError:
+            pytest.skip("PIL not available")
+
+    def test_creates_file_in_upload_dir(self, tmp_path: Path) -> None:
+        png = self._make_png()
+        result = prepare_inbound_image(
+            png,
+            workspace_root=tmp_path,
+            channel_name="discord",
+            filename="photo.png",
+            mime_type="image/png",
+        )
+        assert result.path.exists()
+        assert result.path.parent == tmp_path / "uploads" / "discord"
+        assert result.mime_type == "image/png"
+        assert result.source == "discord"
+        assert result.size == len(png)
+
+    def test_uses_channel_name_as_prefix(self, tmp_path: Path) -> None:
+        png = self._make_png()
+        result = prepare_inbound_image(
+            png,
+            workspace_root=tmp_path,
+            channel_name="qq",
+            filename="test.png",
+        )
+        assert "qq_image" in result.path.name
+
+    def test_default_filename(self, tmp_path: Path) -> None:
+        png = self._make_png()
+        result = prepare_inbound_image(
+            png,
+            workspace_root=tmp_path,
+            channel_name="wechat",
+        )
+        assert "wechat_image" in result.path.name
+
+    def test_request_block_has_data_url(self, tmp_path: Path) -> None:
+        png = self._make_png()
+        result = prepare_inbound_image(
+            png,
+            workspace_root=tmp_path,
+            channel_name="discord",
+            filename="img.png",
+            mime_type="image/png",
+        )
+        assert result.request_block["type"] == "input_image"
+        assert result.request_block["image_url"].startswith("data:image/png;base64,")
+
+
+# ── prepare_inbound_image_from_file ────────────────────────────────────────
+
+class TestPrepareInboundImageFromFile:
+    def _write_png(self, path: Path) -> Path:
+        try:
+            from PIL import Image
+            import io
+            img = Image.new("RGB", (2, 2), color="blue")
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(buf.getvalue())
+            return path
+        except ImportError:
+            pytest.skip("PIL not available")
+
+    def test_processes_local_file(self, tmp_path: Path) -> None:
+        src = self._write_png(tmp_path / "raw" / "photo.png")
+        result = prepare_inbound_image_from_file(
+            src,
+            workspace_root=tmp_path,
+            channel_name="telegram",
+        )
+        assert result.path.exists()
+        assert result.mime_type == "image/png"
+        assert result.source == "telegram"
+
+    def test_uses_channel_prefix(self, tmp_path: Path) -> None:
+        src = self._write_png(tmp_path / "raw" / "image.png")
+        result = prepare_inbound_image_from_file(
+            src,
+            workspace_root=tmp_path,
+            channel_name="telegram",
+        )
+        assert "telegram_image" in result.path.name
+
+    def test_passes_mime_type(self, tmp_path: Path) -> None:
+        src = self._write_png(tmp_path / "raw" / "doc.png")
+        result = prepare_inbound_image_from_file(
+            src,
+            workspace_root=tmp_path,
+            channel_name="telegram",
+            mime_type="image/png",
+        )
+        assert result.mime_type == "image/png"
+
+
+# ── load_h5ad_to_session ──────────────────────────────────────────────────
+
+class TestLoadH5adToSession:
+    def test_writes_data_and_calls_load(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        load_calls: list = []
+
+        session = SimpleNamespace(
+            workspace=workspace,
+            load_from_workspace=lambda fname: (load_calls.append(fname), "mock_adata")[-1],
+        )
+        result = load_h5ad_to_session(session, b"fake-h5ad-data", "test.h5ad")
+        assert result == "mock_adata"
+        assert load_calls == ["test.h5ad"]
+        assert (workspace / "test.h5ad").read_bytes() == b"fake-h5ad-data"
+
+    def test_returns_none_when_load_fails(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        session = SimpleNamespace(
+            workspace=workspace,
+            load_from_workspace=lambda fname: None,
+        )
+        result = load_h5ad_to_session(session, b"data", "bad.h5ad")
+        assert result is None
+
+    def test_returns_none_when_no_workspace(self) -> None:
+        session = SimpleNamespace()
+        result = load_h5ad_to_session(session, b"data", "test.h5ad")
+        assert result is None
+
+    def test_creates_nested_directories(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "deep" / "workspace"
+        session = SimpleNamespace(
+            workspace=workspace,
+            load_from_workspace=lambda fname: "ok",
+        )
+        result = load_h5ad_to_session(session, b"data", "test.h5ad")
+        assert result == "ok"
+        assert (workspace / "test.h5ad").exists()
+
+
+# ── format_h5ad_load_result ───────────────────────────────────────────────
+
+class TestFormatH5adLoadResult:
+    def test_success_format(self) -> None:
+        adata = SimpleNamespace(n_obs=5000, n_vars=2000)
+        text = format_h5ad_load_result(adata, "sample.h5ad")
+        assert "加载成功" in text
+        assert "5,000" in text
+        assert "2,000" in text
+        assert "sample.h5ad" in text
+
+    def test_failure_format(self) -> None:
+        text = format_h5ad_load_result(None, "bad.h5ad")
+        assert "bad.h5ad" in text
+        assert "加载失败" in text
+
+    def test_matches_discord_format(self) -> None:
+        adata = SimpleNamespace(n_obs=100, n_vars=50)
+        text = format_h5ad_load_result(adata, "data.h5ad")
+        assert "✅" in text
+        assert "🔬" in text
+        assert "📁" in text
+
+
+# ── Channel imports use shared media helpers ──────────────────────────────
+
+class TestChannelMediaImports:
+    """Verify that channel modules import and use the shared helpers."""
+
+    def test_discord_uses_shared_helpers(self) -> None:
+        from omicverse.jarvis.channels import discord as mod
+        from omicverse.jarvis import channel_media
+        assert hasattr(mod, "is_image_attachment")
+        assert mod.is_image_attachment is channel_media.is_image_attachment
+        assert mod.MAX_INBOUND_IMAGES is channel_media.MAX_INBOUND_IMAGES
+        assert mod.prepare_inbound_image is channel_media.prepare_inbound_image
+
+    def test_qq_uses_shared_helpers(self) -> None:
+        from omicverse.jarvis.channels import qq as mod
+        from omicverse.jarvis import channel_media
+        assert hasattr(mod, "is_image_attachment")
+        assert mod.is_image_attachment is channel_media.is_image_attachment
+        assert mod.MAX_INBOUND_IMAGES is channel_media.MAX_INBOUND_IMAGES
+
+    def test_telegram_uses_shared_helpers(self) -> None:
+        from omicverse.jarvis.channels import telegram as mod
+        from omicverse.jarvis import channel_media
+        assert mod.MAX_INBOUND_IMAGES is channel_media.MAX_INBOUND_IMAGES
+        assert mod.prepare_inbound_image_from_file is channel_media.prepare_inbound_image_from_file

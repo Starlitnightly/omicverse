@@ -26,6 +26,13 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
+from .channel_core import (
+    gather_status,
+    gather_usage,
+    gather_workspace,
+    perform_save,
+    strip_local_paths as _core_strip_local_paths,
+)
 from .. import _fmt
 from ..config import default_state_dir
 from ..model_help import render_model_help
@@ -33,7 +40,11 @@ from ..media_ingest import (
     PreparedImage,
     build_workspace_note,
     compose_multimodal_user_text,
-    prepare_image_path,
+)
+from ..channel_media import (
+    inbound_upload_dir,
+    prepare_inbound_image_from_file,
+    MAX_INBOUND_IMAGES,
 )
 from ..runtime import (
     AgentBridgeExecutionAdapter,
@@ -527,19 +538,7 @@ class TelegramRuntimePresenter:
 
     @classmethod
     def _strip_local_paths(cls, text: str) -> str:
-        t = text or ""
-        t = re.sub(r'`[^`\n]*(?:/[^`\n]*){2,}`', '', t)
-        t = re.sub(r'/(?:Users|home|tmp|var|opt|root|data|mnt|private)/\S+', '', t)
-        t = re.sub(r'~[/\\]\S+', '', t)
-        t = re.sub(
-            rf'\.?/?(?:\w[\w/-]*/)+\w[\w.-]*\.(?:{cls._ARTIFACT_EXTS})',
-            '',
-            t,
-            flags=re.IGNORECASE,
-        )
-        t = re.sub(r'[ \t]{2,}', ' ', t)
-        t = re.sub(r'\n{3,}', '\n\n', t)
-        return t.strip()
+        return _core_strip_local_paths(text)
 
 
 class TelegramDelivery:
@@ -1090,14 +1089,13 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         session: Any,
     ) -> List[PreparedImage]:
         prepared: List[PreparedImage] = []
-        upload_dir = session.workspace_dir / "uploads" / "telegram"
+        upload_dir = inbound_upload_dir(session.workspace_dir, "telegram")
         if getattr(message, "photo", None):
             photo = message.photo[-1]
             tg_file = await bot.get_file(photo.file_id)
             raw_path = upload_dir / f"telegram_photo_{getattr(photo, 'file_unique_id', photo.file_id)}.jpg"
-            raw_path.parent.mkdir(parents=True, exist_ok=True)
             await tg_file.download_to_drive(raw_path)
-            image = prepare_image_path(raw_path, prefix="telegram_image", source="telegram")
+            image = prepare_inbound_image_from_file(raw_path, workspace_root=session.workspace_dir, channel_name="telegram")
             if image.path != raw_path and raw_path.exists():
                 raw_path.unlink(missing_ok=True)
             prepared.append(image)
@@ -1108,19 +1106,13 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         if document is not None and doc_mime.startswith("image/") and not doc_name.lower().endswith(".h5ad"):
             tg_file = await bot.get_file(document.file_id)
             raw_path = upload_dir / (doc_name or f"telegram_image_{document.file_unique_id}")
-            raw_path.parent.mkdir(parents=True, exist_ok=True)
             await tg_file.download_to_drive(raw_path)
-            image = prepare_image_path(
-                raw_path,
-                mime_type=doc_mime,
-                prefix="telegram_image",
-                source="telegram",
-            )
+            image = prepare_inbound_image_from_file(raw_path, workspace_root=session.workspace_dir, channel_name="telegram", mime_type=doc_mime)
             if image.path != raw_path and raw_path.exists():
                 raw_path.unlink(missing_ok=True)
             prepared.append(image)
 
-        return prepared[:4]
+        return prepared[:MAX_INBOUND_IMAGES]
 
     async def _handle_incoming_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         route = telegram_route_from_update(update)
@@ -1268,35 +1260,32 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         if session is None:
             return
 
+        info = gather_status(
+            session,
+            session_manager=sm,
+            is_running=runtime.task_state(route).running,
+        )
+
         lines = [f"👤  <b>用户</b>  <code>{user.id}</code>"]
-        try:
-            kname = sm.get_active_kernel(user.id)
-            lines.append(f"🧩  Kernel：<code>{_fmt.esc(kname)}</code>")
-        except Exception:
-            pass
-        if session.adata is not None:
-            a = session.adata
-            lines.append(f"🔬  {a.n_obs:,} cells × {a.n_vars:,} genes")
-            if a.obs.columns.tolist():
-                cols = ", ".join(a.obs.columns.tolist()[:8])
+        if info.kernel_name:
+            lines.append(f"🧩  Kernel：<code>{_fmt.esc(info.kernel_name)}</code>")
+        if info.adata_shape:
+            n_obs, n_vars = info.adata_shape
+            lines.append(f"🔬  {n_obs:,} cells × {n_vars:,} genes")
+            if info.obs_columns:
+                cols = ", ".join(info.obs_columns)
                 lines.append(f"📋  obs: <code>{_fmt.esc(cols)}</code>")
         else:
             lines.append("📭  暂无数据  ·  使用 <code>/load</code> 加载")
 
-        # Task status
-        if runtime.task_state(route).running:
+        if info.is_running:
             lines.append("⚙️  分析中…  ·  <code>/cancel</code> 取消")
 
-        try:
-            info = session.agent.get_current_session_info()
-            if info:
-                p  = info.get("prompt_count", 0)
-                mp = info.get("max_prompts", "?")
-                if getattr(session, "max_prompts_setting", 0) <= 0:
-                    mp = "∞"
-                lines.append(f"💬  会话  {p}/{mp}")
-        except Exception:
-            pass
+        if info.prompt_count is not None:
+            mp = info.max_prompts
+            if getattr(session, "max_prompts_setting", 0) <= 0:
+                mp = "∞"
+            lines.append(f"💬  会话  {info.prompt_count}/{mp}")
 
         await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 
@@ -1347,18 +1336,18 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
             return
 
         await update.message.reply_text("⏳  正在保存…")
-        path = session.save_adata()
-        if path and path.exists():
-            a = session.adata
-            with open(str(path), "rb") as fh:
+        result = perform_save(session)
+        if result.success and result.path:
+            n_obs, n_vars = result.adata_shape
+            with open(result.path, "rb") as fh:
                 await context.bot.send_document(
                     chat_id=update.effective_chat.id,
                     document=fh,
                     filename="current.h5ad",
-                    caption=f"💾  {a.n_obs:,} cells × {a.n_vars:,} genes",
+                    caption=f"💾  {n_obs:,} cells × {n_vars:,} genes",
                 )
         else:
-            await update.message.reply_text("❌  保存失败，请重试。")
+            await update.message.reply_text(f"❌  {result.error or '保存失败，请重试。'}")
 
     # ------------------------------------------------------------------
     # /usage
@@ -1371,32 +1360,22 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         if session is None:
             return
 
-        usage = session.last_usage
-        if usage is None:
+        info = gather_usage(session)
+        if not info.has_data:
             await update.message.reply_text("ℹ️  暂无用量数据，请先进行一次分析。")
             return
-
-        def _attr(obj: Any, *names: str, default: str = "?") -> str:
-            for name in names:
-                v = getattr(obj, name, None)
-                if v is not None:
-                    return f"{v:,}" if isinstance(v, int) else str(v)
-            return default
 
         lines = [
             "📊  <b>Token 用量</b>  （最近一次）",
             _fmt._DIV,
-            f"输入：<code>{_attr(usage, 'input_tokens')}</code>",
-            f"输出：<code>{_attr(usage, 'output_tokens')}</code>",
-            f"合计：<code>{_attr(usage, 'total_tokens')}</code>",
+            f"输入：<code>{info.input_tokens}</code>",
+            f"输出：<code>{info.output_tokens}</code>",
+            f"合计：<code>{info.total_tokens}</code>",
         ]
-        # cache_read / cache_creation if present (Anthropic prompt caching)
-        cr = _attr(usage, "cache_read_input_tokens", default="")
-        cc = _attr(usage, "cache_creation_input_tokens", default="")
-        if cr and cr != "?":
-            lines.append(f"缓存读取：<code>{cr}</code>")
-        if cc and cc != "?":
-            lines.append(f"缓存写入：<code>{cc}</code>")
+        if info.cache_read and info.cache_read != "?":
+            lines.append(f"缓存读取：<code>{info.cache_read}</code>")
+        if info.cache_creation and info.cache_creation != "?":
+            lines.append(f"缓存写入：<code>{info.cache_creation}</code>")
         await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 
     # ------------------------------------------------------------------
@@ -1539,36 +1518,31 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         if session is None:
             return
 
-        from datetime import datetime
-        ws         = session.workspace
-        h5ad_files = session.list_h5ad_files()
-        agents_md  = session.get_agents_md()
-        today_log  = session.memory_dir / f"{datetime.now().date()}.md"
+        ws_info = gather_workspace(session)
 
         lines = [
             "📁  <b>Workspace</b>",
             _fmt._DIV,
-            f"<code>{ws}</code>",
+            f"<code>{ws_info.path}</code>",
             "",
         ]
-        if h5ad_files:
-            lines.append(f"📊  <b>数据文件</b>  ({len(h5ad_files)})")
-            for f in h5ad_files[:10]:
-                try:
-                    mb = f.stat().st_size / 1_048_576
-                    lines.append(f"  • <code>{_fmt.esc(f.name)}</code>  <i>{mb:.1f} MB</i>")
-                except OSError:
-                    lines.append(f"  • <code>{_fmt.esc(f.name)}</code>")
-            if len(h5ad_files) > 10:
-                lines.append(f"  <i>… 还有 {len(h5ad_files) - 10} 个</i>")
+        if ws_info.h5ad_files:
+            lines.append(f"📊  <b>数据文件</b>  ({ws_info.h5ad_total})")
+            for name, mb in ws_info.h5ad_files:
+                if mb is not None:
+                    lines.append(f"  • <code>{_fmt.esc(name)}</code>  <i>{mb:.1f} MB</i>")
+                else:
+                    lines.append(f"  • <code>{_fmt.esc(name)}</code>")
+            if ws_info.h5ad_total > len(ws_info.h5ad_files):
+                lines.append(f"  <i>… 还有 {ws_info.h5ad_total - len(ws_info.h5ad_files)} 个</i>")
         else:
             lines.append("📊  <b>数据文件</b>  (空)")
-            lines.append(f"  <i>scp *.h5ad user@host:{ws}</i>")
+            lines.append(f"  <i>scp *.h5ad user@host:{ws_info.path}</i>")
 
         lines += [
             "",
-            f"📋  AGENTS.md  {'✅' if agents_md else '—'}",
-            f"🧠  今日记忆  {'✅' if today_log.exists() else '—'}",
+            f"📋  AGENTS.md  {'✅' if ws_info.has_agents_md else '—'}",
+            f"🧠  今日记忆  {'✅' if ws_info.has_today_memory else '—'}",
             "",
             "<code>/load &lt;文件名&gt;</code>  ·  <code>/ls</code>  ·  <code>/memory</code>",
         ]

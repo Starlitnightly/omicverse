@@ -24,10 +24,11 @@ carries:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import traceback as _traceback_mod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 if TYPE_CHECKING:
     from .analysis_executor import AnalysisExecutor
@@ -157,8 +158,8 @@ def build_dataset_context(adata: Any) -> str:
     if hasattr(adata, "obsm") and hasattr(adata.obsm, "keys"):
         try:
             parts.append(f"obsm keys: {list(adata.obsm.keys())[:10]}")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to list obsm keys for dataset context: %s", exc)
     return "; ".join(parts) if parts else ""
 
 
@@ -215,23 +216,26 @@ def build_llm_repair_prompt(envelope: FailureEnvelope) -> str:
 # ExecutionRepairLoop
 # ---------------------------------------------------------------------------
 
-# Default maximum number of repair attempts before giving up.
+# Default maximum number of execution attempts (including the initial run).
 DEFAULT_MAX_RETRIES = 3
+
+# Default timeout in seconds for a single LLM-guided repair call.
+DEFAULT_LLM_TIMEOUT: float = 30.0
 
 
 class ExecutionRepairLoop:
     """Bounded self-healing loop for code execution failures.
 
-    The loop runs up to *max_retries* repair attempts using this strategy
-    order:
+    The loop runs up to *max_retries* total execution attempts using this
+    strategy order:
 
     1. **Guardrail pass** — ``AnalysisExecutor.apply_execution_error_fix``
        applies fast regex-based transforms.  If the guardrail produces
        different code, re-execute immediately.  This is an *optional* early
        stage; if it does not match, the loop falls through.
     2. **LLM diagnosis** — build a structured :class:`FailureEnvelope`,
-       call the LLM with a consistent diagnostic prompt, extract repaired
-       code, and re-execute.
+       call the LLM (bounded by *llm_timeout*) with a consistent diagnostic
+       prompt, extract repaired code, and re-execute.
     3. If all attempts are exhausted, return the final
        :class:`FailureEnvelope` to the caller.
 
@@ -241,7 +245,13 @@ class ExecutionRepairLoop:
         Provides ``apply_execution_error_fix``, ``diagnose_error_with_llm``,
         and ``execute_generated_code``.
     max_retries : int
-        Upper bound on repair attempts (default 3).
+        Maximum number of execution attempts including the initial run
+        (default 3).  For example ``max_retries=3`` means one initial try
+        plus up to two repair-then-retry cycles.
+    llm_timeout : float or None
+        Timeout in seconds for a single LLM-guided repair call (default 30).
+        When the timeout is exceeded the attempt is recorded as a timeout
+        rather than an exhaustion.  Pass *None* to disable the timeout.
     """
 
     def __init__(
@@ -249,13 +259,19 @@ class ExecutionRepairLoop:
         executor: "AnalysisExecutor",
         *,
         max_retries: int = DEFAULT_MAX_RETRIES,
+        llm_timeout: Optional[float] = DEFAULT_LLM_TIMEOUT,
     ) -> None:
         self._executor = executor
-        self._max_retries = max_retries
+        self._max_retries = max(max_retries, 1)
+        self._llm_timeout = llm_timeout
 
     @property
     def max_retries(self) -> int:
         return self._max_retries
+
+    @property
+    def llm_timeout(self) -> Optional[float]:
+        return self._llm_timeout
 
     async def run(
         self,
@@ -306,7 +322,7 @@ class ExecutionRepairLoop:
         current_strategy = "passthrough"
         dataset_ctx = build_dataset_context(adata)
 
-        for attempt_num in range(self._max_retries + 1):
+        for attempt_num in range(self._max_retries):
             # --- Execute current code ---
             try:
                 result = exec_fn(current_code, adata)
@@ -331,8 +347,8 @@ class ExecutionRepairLoop:
                     dataset_context=dataset_ctx,
                 )
 
-                # Exhausted all retries?
-                if attempt_num >= self._max_retries:
+                # Exhausted all attempts?
+                if attempt_num >= self._max_retries - 1:
                     attempts.append(RepairAttempt(
                         attempt=attempt_num,
                         strategy="exhausted",
@@ -340,6 +356,11 @@ class ExecutionRepairLoop:
                         success=False,
                         envelope=envelope,
                     ))
+                    logger.info(
+                        "repair_loop exhausted after %d attempt(s) phase=%s",
+                        self._max_retries,
+                        phase,
+                    )
                     return RepairResult(
                         success=False,
                         final_code=current_code,
@@ -375,9 +396,13 @@ class ExecutionRepairLoop:
                     continue
 
                 # --- Stage 2: LLM-guided repair ---
-                llm_code = await self._try_llm_repair(
+                llm_code, timed_out = await self._try_llm_repair(
                     envelope, extract_code_fn
                 )
+                if timed_out:
+                    envelope.repair_hints.append(
+                        f"llm: diagnosis timed out after {self._llm_timeout}s"
+                    )
                 if llm_code and llm_code.strip() and llm_code != current_code:
                     envelope.repair_hints.append(
                         "llm: diagnosis produced replacement code"
@@ -424,22 +449,35 @@ class ExecutionRepairLoop:
         self,
         envelope: FailureEnvelope,
         extract_code_fn: Optional[Callable[[str], str]],
-    ) -> Optional[str]:
-        """Attempt LLM-guided repair and return extracted code or None."""
+    ) -> Tuple[Optional[str], bool]:
+        """Attempt LLM-guided repair and return ``(code_or_none, timed_out)``.
+
+        The second element is ``True`` when the call was aborted by the
+        configured *llm_timeout*, allowing callers to distinguish a timeout
+        from other LLM failures.
+        """
         try:
-            diagnosed = await self._executor.diagnose_error_with_llm(
-                envelope.code,
-                envelope.summary,
-                envelope.traceback_excerpt,
-                None,  # adata not passed to LLM diagnosis — context is in envelope
+            diagnosed = await asyncio.wait_for(
+                self._executor.diagnose_error_with_llm(
+                    envelope.code,
+                    envelope.summary,
+                    envelope.traceback_excerpt,
+                    None,  # adata not passed to LLM diagnosis — context is in envelope
+                ),
+                timeout=self._llm_timeout,
             )
             if diagnosed and extract_code_fn is not None:
                 try:
-                    return extract_code_fn(diagnosed)
+                    return extract_code_fn(diagnosed), False
                 except Exception as exc:
                     logger.warning("extract_code_fn failed: %s", exc)
-                    return diagnosed
-            return diagnosed
+                    return diagnosed, False
+            return diagnosed, False
+        except asyncio.TimeoutError:
+            logger.warning(
+                "LLM repair timed out after %.1fs", self._llm_timeout,
+            )
+            return None, True
         except Exception as exc:
             logger.debug("LLM repair failed: %s", exc)
-            return None
+            return None, False
