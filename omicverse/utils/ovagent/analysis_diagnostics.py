@@ -232,6 +232,8 @@ async def diagnose_error_with_llm(
     error_msg: str,
     traceback_str: str,
     adata: Any,
+    *,
+    extract_code_fn: Optional[Any] = None,
 ) -> Optional[str]:
     """Ask the LLM to diagnose and fix an execution error."""
     if ctx._llm is None:
@@ -261,10 +263,14 @@ async def diagnose_error_with_llm(
         "- Preserve all file output operations (savefig, to_csv, json.dump, etc.).\n"
     )
 
+    if extract_code_fn is None:
+        from .codegen_pipeline import CodegenPipeline
+        extract_code_fn = CodegenPipeline(ctx).extract_python_code
+
     try:
         print("   🔬 LLM diagnosing execution error...")
         response = await ctx._llm.run(diagnosis_prompt)
-        diagnosed_code = ctx._extract_python_code(response)
+        diagnosed_code = extract_code_fn(response)
         if diagnosed_code and diagnosed_code.strip():
             print(f"   💡 LLM generated fix ({len(diagnosed_code)} chars)")
             return diagnosed_code
@@ -306,6 +312,8 @@ async def generate_completion_code(
     missing_files: List[str],
     adata: Any,
     request: str,
+    *,
+    extract_code_fn: Optional[Any] = None,
 ) -> Optional[str]:
     """Generate a completion snippet to create missing output files."""
     if ctx._llm is None or not missing_files:
@@ -321,9 +329,13 @@ async def generate_completion_code(
         "- Reuse any variables/imports from the original code.\n"
         "- Wrap the code in ```python ... ``` markers.\n"
     )
+    if extract_code_fn is None:
+        from .codegen_pipeline import CodegenPipeline
+        extract_code_fn = CodegenPipeline(ctx).extract_python_code
+
     try:
         response = await ctx._llm.run(prompt)
-        return ctx._extract_python_code(response)
+        return extract_code_fn(response)
     except Exception as exc:
         logger.warning("Completion code generation failed: %s", exc)
         return None

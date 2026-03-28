@@ -84,6 +84,9 @@ from omicverse.utils.ovagent import (
 )
 from omicverse.utils.ovagent.turn_controller import ConvergenceMonitor
 from omicverse.utils.ovagent.tool_runtime import LEGACY_AGENT_TOOLS
+from omicverse.utils.ovagent.codegen_pipeline import CodegenPipeline
+from omicverse.utils.ovagent.registry_scanner import RegistryScanner
+from omicverse.utils.ovagent.protocol import AgentContext
 
 for name, mod in _SAVED.items():
     if mod is None:
@@ -170,12 +173,6 @@ class _MinimalCtx:
     def _load_skill_guidance(self, slug):
         return ""
 
-    def _extract_python_code(self, text):
-        return text
-
-    def _extract_python_code_strict(self, text):
-        return text
-
     def _gather_code_candidates(self, text):
         return [text]
 
@@ -196,9 +193,6 @@ class _MinimalCtx:
 
     def _rewrite_scanpy_calls_with_registry(self, code, entries):
         return code
-
-    def _normalize_registry_entry_for_codegen(self, entry):
-        return entry
 
     def _build_agentic_system_prompt(self):
         return "You are a test agent."
@@ -1165,14 +1159,15 @@ class TestNoBehaviorChange:
             "__init__.py", "analysis_executor.py", "auth.py",
             "analysis_transformer.py", "analysis_diagnostics.py",
             "analysis_sandbox.py",
-            "bootstrap.py", "codegen_pipeline.py", "context_budget.py",
+            "bootstrap.py", "codegen_pipeline.py", "codegen_tool_facade.py",
+            "context_budget.py",
             "event_stream.py", "permission_policy.py", "prompt_builder.py",
             "prompt_templates.py", "protocol.py", "registry_scanner.py",
             "repair_loop.py", "run_store.py", "runtime.py",
-            "tool_runtime_exec.py", "tool_runtime_io.py",
-            "tool_runtime_web.py", "tool_runtime_workspace.py",
-            "session_context.py", "subagent_controller.py",
-            "tool_registry.py", "tool_runtime.py", "tool_scheduler.py",
+            "session_context.py", "session_facade.py", "subagent_controller.py",
+            "tool_registry.py", "tool_runtime.py", "tool_runtime_exec.py",
+            "tool_runtime_io.py", "tool_runtime_web.py",
+            "tool_runtime_workspace.py", "tool_scheduler.py",
             "turn_controller.py", "turn_followup.py", "turn_artifacts.py",
             "workflow.py",
         }
@@ -1214,3 +1209,101 @@ class TestNoBehaviorChange:
         }
         new = dep_names - known
         assert not new, f"New core dependencies detected: {new}"
+
+
+# ===================================================================
+# SECTION 6: AgentContext protocol contraction contracts (task-048)
+# ===================================================================
+
+
+class TestProtocolContraction:
+    """Lock the contracted AgentContext protocol surface.
+
+    After task-048, ovagent consumers no longer depend on facade-only
+    codegen helper methods on AgentContext.  These tests verify:
+
+    1. The protocol does not expose the retired facade helpers.
+    2. Consumers reach subsystems directly (via _codegen_pipeline or
+       RegistryScanner) rather than through wrapper methods on ctx.
+    3. A minimal context double that lacks the retired methods still
+       satisfies the protocol for ovagent consumer construction.
+    """
+
+    def test_protocol_does_not_require_extract_python_code(self):
+        """AgentContext protocol must not declare _extract_python_code."""
+        assert "_extract_python_code" not in AgentContext.__protocol_attrs__, (
+            "_extract_python_code should not be in the AgentContext protocol"
+        )
+
+    def test_protocol_does_not_require_normalize_registry_entry(self):
+        """AgentContext protocol must not declare _normalize_registry_entry_for_codegen."""
+        assert "_normalize_registry_entry_for_codegen" not in AgentContext.__protocol_attrs__, (
+            "_normalize_registry_entry_for_codegen should not be in the AgentContext protocol"
+        )
+
+    def test_protocol_does_not_require_extract_python_code_strict(self):
+        """AgentContext protocol must not declare _extract_python_code_strict."""
+        assert "_extract_python_code_strict" not in AgentContext.__protocol_attrs__, (
+            "_extract_python_code_strict should not be in the AgentContext protocol"
+        )
+
+    def test_codegen_pipeline_uses_registry_scanner_directly(self):
+        """CodegenPipeline.rewrite_scanpy_calls_with_registry uses RegistryScanner
+        directly, not ctx._normalize_registry_entry_for_codegen."""
+        source = (OVAGENT_DIR / "codegen_pipeline.py").read_text()
+        assert "ctx._normalize_registry_entry_for_codegen" not in source, (
+            "codegen_pipeline.py should use RegistryScanner.normalize_entry, "
+            "not ctx._normalize_registry_entry_for_codegen"
+        )
+        assert "RegistryScanner.normalize_entry" in source
+
+    def test_analysis_diagnostics_does_not_call_ctx_extract(self):
+        """analysis_diagnostics.py must not call ctx._extract_python_code."""
+        source = (OVAGENT_DIR / "analysis_diagnostics.py").read_text()
+        assert "ctx._extract_python_code" not in source, (
+            "analysis_diagnostics.py should use extract_code_fn parameter, "
+            "not ctx._extract_python_code"
+        )
+
+    def test_tool_runtime_exec_does_not_call_ctx_extract(self):
+        """tool_runtime_exec.py must not call ctx._extract_python_code."""
+        source = (OVAGENT_DIR / "tool_runtime_exec.py").read_text()
+        assert 'ctx, "_extract_python_code"' not in source, (
+            "tool_runtime_exec.py should resolve extract fn from "
+            "_codegen_pipeline, not ctx._extract_python_code"
+        )
+
+    def test_repair_loop_does_not_call_ctx_extract(self):
+        """repair_loop.py must not call ctx._extract_python_code."""
+        source = (OVAGENT_DIR / "repair_loop.py").read_text()
+        assert 'ctx, "_extract_python_code"' not in source, (
+            "repair_loop.py should resolve extract fn from "
+            "_codegen_pipeline, not ctx._extract_python_code"
+        )
+
+    def test_retired_methods_not_needed_on_minimal_context(self):
+        """A minimal context without retired facade methods can construct
+        CodegenPipeline and RegistryScanner subsystems."""
+        ctx = _MinimalCtx()
+        # Verify the retired methods are absent
+        assert not hasattr(ctx, "_extract_python_code")
+        assert not hasattr(ctx, "_normalize_registry_entry_for_codegen")
+        assert not hasattr(ctx, "_extract_python_code_strict")
+
+        # CodegenPipeline should still construct
+        pipeline = CodegenPipeline(ctx)
+        assert pipeline is not None
+
+        # extract_python_code should work via subsystem directly
+        code = pipeline.extract_python_code(
+            "```python\nimport omicverse as ov\nov.pp.qc(adata)\n```"
+        )
+        assert "ov.pp.qc" in code
+
+    def test_registry_scanner_normalize_entry_is_static(self):
+        """RegistryScanner.normalize_entry is a static method callable
+        without any context object."""
+        entry = {"full_name": "omicverse.pp.qc", "name": "qc"}
+        normalized = RegistryScanner.normalize_entry(entry)
+        assert "full_name" in normalized
+        assert normalized["full_name"].startswith("ov.")

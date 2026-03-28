@@ -296,7 +296,7 @@ class ExecutionRepairLoop:
         extract_code_fn : callable, optional
             ``(llm_response) -> code_str``.  Used to extract Python from an
             LLM repair response.  Defaults to
-            ``executor._ctx._extract_python_code``.
+            ``executor._ctx._codegen_pipeline.extract_python_code``.
         phase : str
             Label for the pipeline phase (used in envelopes).
 
@@ -315,7 +315,9 @@ class ExecutionRepairLoop:
         if extract_code_fn is None:
             ctx = getattr(self._executor, "_ctx", None)
             if ctx is not None:
-                extract_code_fn = getattr(ctx, "_extract_python_code", None)
+                pipeline = getattr(ctx, "_codegen_pipeline", None)
+                if pipeline is not None:
+                    extract_code_fn = pipeline.extract_python_code
 
         attempts: List[RepairAttempt] = []
         current_code = code

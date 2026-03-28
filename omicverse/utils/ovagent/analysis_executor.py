@@ -69,6 +69,11 @@ class AnalysisExecutor:
 
     # -- LLM-based error diagnosis ------------------------------------------
 
+    def _get_extract_code_fn(self):
+        """Resolve extract_python_code from the codegen pipeline subsystem."""
+        pipeline = getattr(self._ctx, "_codegen_pipeline", None)
+        return pipeline.extract_python_code if pipeline is not None else None
+
     async def diagnose_error_with_llm(
         self,
         code: str,
@@ -78,6 +83,7 @@ class AnalysisExecutor:
     ) -> Optional[str]:
         return await analysis_diagnostics.diagnose_error_with_llm(
             self._ctx, code, error_msg, traceback_str, adata,
+            extract_code_fn=self._get_extract_code_fn(),
         )
 
     # -- output validation --------------------------------------------------
@@ -94,6 +100,7 @@ class AnalysisExecutor:
     ) -> Optional[str]:
         return await analysis_diagnostics.generate_completion_code(
             self._ctx, original_code, missing_files, adata, request,
+            extract_code_fn=self._get_extract_code_fn(),
         )
 
     # -- approval gate ------------------------------------------------------

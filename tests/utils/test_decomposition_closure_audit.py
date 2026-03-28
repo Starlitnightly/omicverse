@@ -109,12 +109,11 @@ _STUB_METHODS = [
     "_refresh_runtime_working_directory", "_tool_blocked_in_plan_mode",
     "_detect_repo_root", "_resolve_local_path", "_ensure_server_tool_mode",
     "_request_interaction", "_request_tool_approval", "_load_skill_guidance",
-    "_extract_python_code", "_extract_python_code_strict",
     "_gather_code_candidates", "_normalize_code_candidate",
     "_collect_static_registry_entries", "_collect_runtime_registry_entries",
     "_review_generated_code_lightweight", "_contains_forbidden_scanpy_usage",
     "_rewrite_scanpy_calls_with_registry",
-    "_normalize_registry_entry_for_codegen", "_build_agentic_system_prompt",
+    "_build_agentic_system_prompt",
 ]
 
 
