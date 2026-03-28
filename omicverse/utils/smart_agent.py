@@ -796,6 +796,27 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         )
 
     # =====================================================================
+    # Direct-Python seams (overridable by test doubles)
+    # =====================================================================
+
+    def _detect_direct_python_request(self, request: str) -> Optional[str]:
+        """Detect explicit Python code in *request*.
+
+        Default implementation delegates to the codegen pipeline subsystem.
+        Tests may override this at instance level to inject fake behaviour
+        without requiring `_codegen_pipeline` / `_analysis_executor` to exist.
+        """
+        return self._codegen.detect_direct_python_request(request)
+
+    def _execute_generated_code(self, code: str, adata: Any) -> Any:
+        """Execute *code* against *adata* and return the (possibly mutated) result.
+
+        Default implementation delegates to the analysis executor subsystem.
+        Overridable at instance level for lightweight test doubles.
+        """
+        return self._analysis_executor.execute_generated_code(code, adata)
+
+    # =====================================================================
     # Public API: run / stream
     # =====================================================================
 
@@ -822,7 +843,7 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         self._emit(EventLevel.INFO, f"Processing request: \"{request}\" | Dataset: {dataset_desc}", "execution")
 
         # Direct execution path for explicit Python snippets (no LLM required)
-        direct_code = self._codegen.detect_direct_python_request(request)
+        direct_code = self._detect_direct_python_request(request)
         if direct_code:
             self._emit(EventLevel.INFO, "Direct Python detected → executing without model calls", "execution")
             self.last_usage = None
@@ -830,7 +851,7 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
                 'generation': None, 'reflection': [], 'review': [], 'total': None
             }
             try:
-                result_adata = self._analysis_executor.execute_generated_code(direct_code, adata)
+                result_adata = self._execute_generated_code(direct_code, adata)
                 self._emit(EventLevel.SUCCESS, "Python code executed directly.", "execution")
                 return result_adata
             except Exception as exc:
