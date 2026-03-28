@@ -373,8 +373,8 @@ class CodegenPipeline:
                 return
             try:
                 progress_callback(message)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Progress callback failed (best-effort): %s", exc)
 
         async def _event_callback(event: Dict[str, Any]) -> None:
             event_type = str(event.get("type") or "")

@@ -17,6 +17,9 @@ Reference: https://blog.langchain.com/how-agents-can-use-filesystems-for-context
 from typing import Dict, List, Optional, Any, Set, TYPE_CHECKING
 from dataclasses import dataclass, field
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 from .inspector import DataStateInspector
 
@@ -471,8 +474,8 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
                 result = self.inspector.prerequisite_checker.check_function_executed(func_name)
                 if result.executed or result.confidence >= 0.5:
                     executed[func_name] = result.confidence
-            except Exception:
-                # Function not in registry or error checking
+            except Exception as exc:
+                logger.debug("Skipping function %r during detection: %s", func_name, exc)
                 continue
 
         return executed
@@ -586,8 +589,8 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
 
             return f"## Workspace Context\n\n{context}"
 
-        except Exception:
-            # Silently fail - filesystem context is optional
+        except Exception as exc:
+            logger.debug("Filesystem context query failed (optional): %s", exc)
             return ""
 
     def write_to_context(
@@ -626,7 +629,8 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
             path = fs_ctx.write_note(key, content, category, metadata)
             self.conversation_state.filesystem_notes.append(f"{category}/{key}")
             return path
-        except Exception:
+        except Exception as exc:
+            logger.debug("write_to_context failed for key=%r: %s", key, exc)
             return None
 
     def search_context(
@@ -664,7 +668,8 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
                 }
                 for r in results
             ]
-        except Exception:
+        except Exception as exc:
+            logger.debug("search_context failed for pattern=%r: %s", pattern, exc)
             return []
 
     def save_execution_plan(self, steps: List[Dict[str, Any]]) -> Optional[str]:
@@ -689,7 +694,8 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
 
         try:
             return fs_ctx.write_plan(steps)
-        except Exception:
+        except Exception as exc:
+            logger.debug("save_execution_plan failed: %s", exc)
             return None
 
     def update_plan_step(
@@ -711,8 +717,8 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
 
         try:
             fs_ctx.update_plan_step(step_index, status, result)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("update_plan_step failed for step %d: %s", step_index, exc)
 
     def save_data_snapshot(
         self,
@@ -735,7 +741,8 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
         try:
             state = self._get_current_state()
             return fs_ctx.write_snapshot(state, step_number, description)
-        except Exception:
+        except Exception as exc:
+            logger.debug("save_data_snapshot failed: %s", exc)
             return None
 
     def get_workspace_summary(self) -> str:
@@ -750,7 +757,8 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
 
         try:
             return fs_ctx.get_session_summary()
-        except Exception:
+        except Exception as exc:
+            logger.debug("get_workspace_summary failed: %s", exc)
             return "Error getting workspace summary."
 
     def create_sub_agent_injector(
