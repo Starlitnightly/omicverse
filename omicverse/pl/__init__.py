@@ -139,6 +139,7 @@ from ._spatialseg import (
     highlight_spatial_region,
     spatialseg,
 )
+from ._nanostring import nanostring, nanostringseg
 from ._violin import violin
 from ._animation_lines import (
     Streamlines,
@@ -250,6 +251,9 @@ __all__ = [
     # @ _spatialseg
     "spatialseg",
     "highlight_spatial_region",
+    # @ _nanostring
+    "nanostring",
+    "nanostringseg",
     # @ _violin
     "violin",
     # @ _animation_lines
