@@ -96,7 +96,7 @@ for _ in range(1):
     print(min(totals))
 """
 
-    code = agent._extract_python_code(response_text)
+    code = agent._codegen.extract_python_code(response_text)
 
     assert "def summarize_counts" in code
     assert "counts.append" in code
@@ -182,14 +182,16 @@ def test_stream_async_emits_harness_metadata():
 
 
 def test_url_request_requires_tool_action_and_promissory_text_retries():
-    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    # After task-050, FollowUpGate methods are no longer on the facade mixin;
+    # test them directly on the FollowUpGate class.
+    from omicverse.utils.ovagent.turn_controller import FollowUpGate
 
-    assert agent._request_requires_tool_action(
+    assert FollowUpGate.request_requires_tool_action(
         "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE135893\n分析这个数据",
         None,
     ) is True
-    assert agent._response_is_promissory("Let me first fetch the GEO page to understand this dataset.") is True
-    assert agent._select_agent_tool_choice(
+    assert FollowUpGate.response_is_promissory("Let me first fetch the GEO page to understand this dataset.") is True
+    assert FollowUpGate.select_tool_choice(
         request="https://example.com\nanalyze this",
         adata=None,
         turn_index=0,
@@ -210,7 +212,7 @@ def test_generate_code_async_reuses_agentic_loop_and_captures_execute_code():
     async def _fake_run_agentic_loop(self, request, adata, event_callback=None, cancel_event=None, history=None, approval_handler=None, request_content=None):
         seen["request"] = request
         assert self._code_only_mode is True
-        self._capture_code_only_snippet("import omicverse as ov\nov.pp.qc(adata)")
+        self._codegen.capture_code_only_snippet("import omicverse as ov\nov.pp.qc(adata)")
         await event_callback(build_stream_event(
             "tool_call",
             {"name": "execute_code", "arguments": {"description": "qc"}},
@@ -280,7 +282,7 @@ def test_tool_execute_code_in_code_only_mode_captures_without_execution():
 def test_static_registry_scanner_indexes_celltypist_method_branch():
     agent = OmicVerseAgent.__new__(OmicVerseAgent)
 
-    entries = agent._load_static_registry_entries()
+    entries = agent._scanner.load_static_entries()
 
     assert any(
         entry.get("source") == "static_ast_branch"
@@ -293,7 +295,7 @@ def test_static_registry_scanner_indexes_celltypist_method_branch():
 def test_static_registry_scanner_indexes_dynamo_method_branch():
     agent = OmicVerseAgent.__new__(OmicVerseAgent)
 
-    entries = agent._load_static_registry_entries()
+    entries = agent._scanner.load_static_entries()
 
     assert any(
         entry.get("source") == "static_ast_branch"
@@ -470,9 +472,12 @@ def test_run_async_silent_reporter_no_stdout():
         "total": None,
     }
 
-    # Stub the direct-python path so run_async never touches the LLM
-    agent._detect_direct_python_request = lambda request: "x = 1"
-    agent._execute_generated_code = lambda code, adata: adata
+    # Stub the direct-python path so run_async never touches the LLM.
+    # After task-050, smart_agent calls subsystems directly instead of
+    # facade wrappers, so we mock the subsystem objects.
+    from types import SimpleNamespace as _NS
+    agent._codegen_pipeline = _NS(detect_direct_python_request=lambda request: "x = 1")
+    agent._analysis_executor = _NS(execute_generated_code=lambda code, adata: adata)
 
     captured = io.StringIO()
     with redirect_stdout(captured):
@@ -735,6 +740,7 @@ def test_generate_code_sync_delegates_to_async():
 
 # -----------------------------------------------------------------------
 # Task-027 (reconciled task-013): Codegen / tool-dispatch facade extraction
+# Task-050: Facade wrapper collapse and closure audit
 # -----------------------------------------------------------------------
 
 from omicverse.utils.ovagent.codegen_tool_facade import CodegenToolDispatchFacadeMixin
@@ -745,142 +751,52 @@ def test_codegen_tool_facade_mixin_is_base_of_agent():
     assert issubclass(OmicVerseAgent, CodegenToolDispatchFacadeMixin)
 
 
-def test_codegen_delegates_available_on_agent_via_mixin():
-    """AC-001.1: Codegen delegate methods resolve via mixin, not on OmicVerseAgent body."""
+# -- Surviving mixin surface (task-050) ----------------------------------
+
+# After task-050, CodegenToolDispatchFacadeMixin retains only:
+#   properties: _codegen, _scanner
+#   methods:    _collect_static_registry_entries
+# All other ~42 wrapper methods were removed because consumers were rewired
+# to hold direct subsystem references in task-049.
+
+_ALLOWED_MIXIN_SURFACE = {
+    # Lazy-init properties (needed for __new__-based test agents)
+    "_codegen",
+    "_scanner",
+    # Compatibility wrapper (accessed via getattr in tool_runtime_exec)
+    "_collect_static_registry_entries",
+}
+
+
+def test_mixin_surface_is_minimal():
+    """AC-050.1: Mixin defines only the allowed residual surface."""
+    dunder_ignore = {"__module__", "__doc__", "__dict__", "__weakref__",
+                     "__firstlineno__", "__static_attributes__", "__qualname__"}
+    actual = set(CodegenToolDispatchFacadeMixin.__dict__.keys()) - dunder_ignore
+    assert actual == _ALLOWED_MIXIN_SURFACE, (
+        f"Mixin surface drift — "
+        f"unexpected: {actual - _ALLOWED_MIXIN_SURFACE}, "
+        f"missing: {_ALLOWED_MIXIN_SURFACE - actual}"
+    )
+
+
+def test_collect_static_registry_entries_available_on_agent():
+    """AC-050.2: The compatibility wrapper resolves on the concrete agent."""
     agent = OmicVerseAgent.__new__(OmicVerseAgent)
-    # These methods should be inherited from the mixin
-    codegen_methods = [
-        "_extract_python_code",
-        "_normalize_registry_entry_for_codegen",
-        "_capture_code_only_snippet",
-        "_select_codegen_skill_matches",
-        "_format_registry_context_for_codegen",
-        "_format_prerequisites_for_codegen_entry",
-        "_build_code_generation_system_prompt",
-        "_build_code_generation_user_prompt",
-        "_contains_forbidden_scanpy_usage",
-        "_rewrite_scanpy_calls_with_registry",
-        "_rewrite_code_without_scanpy",
-        "_review_generated_code_lightweight",
-        "_build_code_only_agentic_request",
-        "_generate_code_via_agentic_loop",
-        "_gather_code_candidates",
-        "_looks_like_python",
-        "_extract_inline_python",
-        "_normalize_code_candidate",
-        "_extract_python_code_strict",
-        "_review_result",
-        "_reflect_on_code",
-        "_detect_direct_python_request",
-        "_merge_usage_stats",
-    ]
-    for name in codegen_methods:
-        assert hasattr(agent, name), f"Missing codegen delegate: {name}"
-        # Verify the method is defined on the mixin, not directly on OmicVerseAgent
-        assert name in CodegenToolDispatchFacadeMixin.__dict__, (
-            f"{name} should be defined on CodegenToolDispatchFacadeMixin, not OmicVerseAgent"
-        )
-
-
-def test_tool_dispatch_delegates_available_on_agent_via_mixin():
-    """AC-001.1: Tool dispatch delegate methods resolve via mixin."""
-    agent = OmicVerseAgent.__new__(OmicVerseAgent)
-    tool_methods = [
-        "_get_visible_agent_tools",
-        "_get_loaded_tool_names",
-        "_tool_blocked_in_plan_mode",
-        "_dispatch_tool",
-    ]
-    for name in tool_methods:
-        assert hasattr(agent, name), f"Missing tool delegate: {name}"
-        assert name in CodegenToolDispatchFacadeMixin.__dict__, (
-            f"{name} should be defined on CodegenToolDispatchFacadeMixin"
-        )
-
-
-def test_analysis_executor_delegates_available_on_agent_via_mixin():
-    """AC-001.1: Analysis executor delegate methods resolve via mixin."""
-    agent = OmicVerseAgent.__new__(OmicVerseAgent)
-    executor_methods = [
-        "_check_code_prerequisites",
-        "_apply_execution_error_fix",
-        "_extract_package_name",
-        "_auto_install_package",
-        "_diagnose_error_with_llm",
-        "_validate_outputs",
-        "_generate_completion_code",
-        "_request_approval",
-        "_execute_generated_code",
-        "_normalize_doublet_obs",
-        "_process_context_directives",
-        "_build_sandbox_globals",
-    ]
-    for name in executor_methods:
-        assert hasattr(agent, name), f"Missing executor delegate: {name}"
-        assert name in CodegenToolDispatchFacadeMixin.__dict__, (
-            f"{name} should be defined on CodegenToolDispatchFacadeMixin"
-        )
-
-
-def test_followup_gate_delegates_available_on_agent_via_mixin():
-    """AC-001.1: FollowUp gate delegate methods resolve via mixin."""
-    agent = OmicVerseAgent.__new__(OmicVerseAgent)
-    gate_methods = [
-        "_request_requires_tool_action",
-        "_response_is_promissory",
-        "_select_agent_tool_choice",
-    ]
-    for name in gate_methods:
-        assert hasattr(agent, name), f"Missing gate delegate: {name}"
-        assert name in CodegenToolDispatchFacadeMixin.__dict__, (
-            f"{name} should be defined on CodegenToolDispatchFacadeMixin"
-        )
-
-
-def test_registry_scanner_delegates_available_on_agent_via_mixin():
-    """AC-001.1: Registry scanner delegate methods resolve via mixin."""
-    agent = OmicVerseAgent.__new__(OmicVerseAgent)
-    scanner_methods = [
-        "_load_static_registry_entries",
-        "_collect_relevant_registry_entries",
-        "_collect_static_registry_entries",
-        "_score_registry_entry_for_codegen",
-    ]
-    for name in scanner_methods:
-        assert hasattr(agent, name), f"Missing scanner delegate: {name}"
-        assert name in CodegenToolDispatchFacadeMixin.__dict__, (
-            f"{name} should be defined on CodegenToolDispatchFacadeMixin"
-        )
-
-
-def test_extract_python_code_behavioral_equivalence():
-    """AC-001.2: _extract_python_code still works identically through mixin path."""
-    agent = OmicVerseAgent.__new__(OmicVerseAgent)
-    response = """Here is the code:
-```python
-import omicverse as ov
-ov.pp.qc(adata)
-```
-"""
-    code = agent._extract_python_code(response)
-    assert "ov.pp.qc" in code
-    # Verify AST-valid
-    ast.parse(code)
+    assert callable(getattr(agent, "_collect_static_registry_entries", None))
 
 
 def test_codegen_lazy_property_via_mixin():
-    """AC-001.2: _codegen lazy property works through mixin for __new__ instances."""
+    """AC-050.2: _codegen lazy property works through mixin for __new__ instances."""
     agent = OmicVerseAgent.__new__(OmicVerseAgent)
-    # The _codegen property should lazily create a CodegenPipeline
     pipeline = agent._codegen
     from omicverse.utils.ovagent.codegen_pipeline import CodegenPipeline
     assert isinstance(pipeline, CodegenPipeline)
-    # Second access should return same instance
     assert agent._codegen is pipeline
 
 
 def test_scanner_lazy_property_via_mixin():
-    """AC-001.2: _scanner lazy property works through mixin for __new__ instances."""
+    """AC-050.2: _scanner lazy property works through mixin for __new__ instances."""
     agent = OmicVerseAgent.__new__(OmicVerseAgent)
     scanner = agent._scanner
     from omicverse.utils.ovagent.registry_scanner import RegistryScanner
@@ -888,30 +804,110 @@ def test_scanner_lazy_property_via_mixin():
     assert agent._scanner is scanner
 
 
-def test_followup_gate_behavioral_equivalence():
-    """AC-001.2: Follow-up gate methods produce identical results through mixin."""
+def test_extract_python_code_via_codegen_property():
+    """AC-050.2: Code extraction works through _codegen property (no facade wrapper)."""
     agent = OmicVerseAgent.__new__(OmicVerseAgent)
-    # These methods are stateless -- verify they work through the mixin path
-    assert agent._request_requires_tool_action(
-        "https://example.com\nanalyze this", None
-    ) is True
-    assert agent._response_is_promissory(
-        "Let me first fetch the page to understand."
-    ) is True
-    assert agent._select_agent_tool_choice(
-        request="https://example.com\nanalyze",
-        adata=None,
-        turn_index=0,
-        had_meaningful_tool_call=False,
-        forced_retry=False,
-    ) == "required"
+    response = """Here is the code:
+```python
+import omicverse as ov
+ov.pp.qc(adata)
+```
+"""
+    code = agent._codegen.extract_python_code(response)
+    assert "ov.pp.qc" in code
+    ast.parse(code)
+
+
+# -- Closure tests: removed wrappers must NOT reappear -------------------
+
+# Exhaustive list of wrappers removed in task-050.  If any name reappears
+# on CodegenToolDispatchFacadeMixin, the closure test fails — forcing an
+# explicit justification before the surface can grow again.
+_RETIRED_FACADE_WRAPPERS = frozenset({
+    # Tool visibility (ToolRuntime)
+    "_get_visible_agent_tools",
+    "_get_loaded_tool_names",
+    "_tool_blocked_in_plan_mode",
+    # Tool dispatch (ToolRuntime)
+    "_dispatch_tool",
+    # FollowUp gate (TurnController / FollowUpGate)
+    "_request_requires_tool_action",
+    "_response_is_promissory",
+    "_select_agent_tool_choice",
+    # Registry scanner (all but _collect_static_registry_entries)
+    "_load_static_registry_entries",
+    "_collect_relevant_registry_entries",
+    "_score_registry_entry_for_codegen",
+    # Codegen pipeline
+    "_extract_python_code",
+    "_normalize_registry_entry_for_codegen",
+    "_capture_code_only_snippet",
+    "_select_codegen_skill_matches",
+    "_format_registry_context_for_codegen",
+    "_format_prerequisites_for_codegen_entry",
+    "_build_code_generation_system_prompt",
+    "_build_code_generation_user_prompt",
+    "_contains_forbidden_scanpy_usage",
+    "_rewrite_scanpy_calls_with_registry",
+    "_rewrite_code_without_scanpy",
+    "_review_generated_code_lightweight",
+    "_build_code_only_agentic_request",
+    "_generate_code_via_agentic_loop",
+    "_gather_code_candidates",
+    "_looks_like_python",
+    "_extract_inline_python",
+    "_normalize_code_candidate",
+    "_extract_python_code_strict",
+    "_review_result",
+    "_reflect_on_code",
+    "_detect_direct_python_request",
+    "_merge_usage_stats",
+    # Analysis executor
+    "_check_code_prerequisites",
+    "_apply_execution_error_fix",
+    "_extract_package_name",
+    "_auto_install_package",
+    "_diagnose_error_with_llm",
+    "_validate_outputs",
+    "_generate_completion_code",
+    "_request_approval",
+    "_execute_generated_code",
+    "_normalize_doublet_obs",
+    "_process_context_directives",
+    "_build_sandbox_globals",
+})
+
+
+def test_retired_wrappers_not_on_mixin():
+    """AC-050.3: Removed wrappers must not silently reappear on the mixin."""
+    mixin_names = set(CodegenToolDispatchFacadeMixin.__dict__.keys())
+    regrown = mixin_names & _RETIRED_FACADE_WRAPPERS
+    assert not regrown, (
+        f"Retired facade wrappers reappeared on CodegenToolDispatchFacadeMixin — "
+        f"if intentional, remove them from _RETIRED_FACADE_WRAPPERS and justify: "
+        f"{sorted(regrown)}"
+    )
+
+
+def test_mixin_method_count_ceiling():
+    """AC-050.3: Hard ceiling prevents gradual wrapper accumulation."""
+    dunder_ignore = {"__module__", "__doc__", "__dict__", "__weakref__",
+                     "__firstlineno__", "__static_attributes__", "__qualname__"}
+    actual_count = len(set(CodegenToolDispatchFacadeMixin.__dict__.keys()) - dunder_ignore)
+    # Current surface is 3 items (2 properties + 1 method).
+    # Allow a small buffer for justified additions, but fail if it grows
+    # back toward the old ~45-method shape.
+    assert actual_count <= 6, (
+        f"CodegenToolDispatchFacadeMixin has {actual_count} members — "
+        f"expected ≤ 6.  If growth is justified, raise the ceiling and "
+        f"document the reason."
+    )
 
 
 def test_no_provider_logic_in_facade_mixin():
     """AC-001.5: Mixin does not import or reference provider-specific modules."""
     import inspect
     source = inspect.getsource(CodegenToolDispatchFacadeMixin)
-    # Should not contain provider-specific references
     for provider_term in ["openai", "anthropic", "google", "bedrock", "groq"]:
         assert provider_term not in source.lower(), (
             f"Provider logic '{provider_term}' found in CodegenToolDispatchFacadeMixin"
@@ -919,17 +915,14 @@ def test_no_provider_logic_in_facade_mixin():
 
 
 def test_mixin_methods_not_duplicated_on_agent_class():
-    """AC-001.1: Extracted methods should NOT be redefined on OmicVerseAgent itself."""
-    # Get methods defined directly on OmicVerseAgent (not inherited),
-    # excluding standard Python dunder attributes that every class has.
+    """AC-001.1: Mixin members are NOT redefined on OmicVerseAgent itself."""
     dunder_ignore = {"__module__", "__doc__", "__dict__", "__weakref__",
                      "__firstlineno__", "__static_attributes__", "__qualname__"}
-    agent_own_methods = set(OmicVerseAgent.__dict__.keys()) - dunder_ignore
-    mixin_methods = set(CodegenToolDispatchFacadeMixin.__dict__.keys()) - dunder_ignore
-    # No overlap means no duplication
-    overlap = agent_own_methods & mixin_methods
+    agent_own = set(OmicVerseAgent.__dict__.keys()) - dunder_ignore
+    mixin_own = set(CodegenToolDispatchFacadeMixin.__dict__.keys()) - dunder_ignore
+    overlap = agent_own & mixin_own
     assert not overlap, (
-        f"These methods are duplicated on both OmicVerseAgent and the mixin: {overlap}"
+        f"These members are duplicated on both OmicVerseAgent and the mixin: {overlap}"
     )
 
 
@@ -1011,8 +1004,8 @@ def test_search_functions_tool_description_mentions_signatures():
 def test_codegen_flows_still_discover_tools_via_scanner():
     """AC-028.3: Codegen flows still discover tools through the registry scanner."""
     agent = OmicVerseAgent.__new__(OmicVerseAgent)
-    # _collect_relevant_registry_entries is the primary codegen discovery path
-    entries = agent._collect_relevant_registry_entries("quality control", max_entries=5)
+    # After task-050, use the scanner directly instead of the removed facade wrapper
+    entries = agent._scanner.collect_relevant_entries("quality control", max_entries=5)
     assert isinstance(entries, list)
     # The scanner should still find QC-related entries
     if entries:
