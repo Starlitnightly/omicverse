@@ -60,6 +60,13 @@ logger = logging.getLogger("omicverse.jarvis")
 _POLLING_RESTART_DELAY_SECONDS = 1.0
 _POLLING_MAX_ATTEMPTS = 2
 
+_SESSION_INIT_ERROR_TEMPLATE = (
+    "Agent 初始化失败：{exc}\n"
+    "请检查 --model 参数，或运行 "
+    "<code>import omicverse as ov; print(ov.list_supported_models())</code> "
+    "查看可用模型。"
+)
+
 
 # ---------------------------------------------------------------------------
 # Access control
@@ -1059,12 +1066,7 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         except Exception as exc:
             logger.exception("Failed to create session")
             await update.message.reply_text(
-                _fmt.error_message(
-                    f"Agent 初始化失败：{exc}\n"
-                    "请检查 --model 参数，或运行 "
-                    "<code>import omicverse as ov; print(ov.list_supported_models())</code> "
-                    "查看可用模型。"
-                ),
+                _fmt.error_message(_SESSION_INIT_ERROR_TEMPLATE.format(exc=exc)),
                 parse_mode="HTML",
             )
             return None
@@ -1142,12 +1144,7 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         except Exception as exc:
             logger.exception("Failed to handle Telegram analysis message")
             await update.message.reply_text(
-                _fmt.error_message(
-                    f"Agent 初始化失败：{exc}\n"
-                    "请检查 --model 参数，或运行 "
-                    "<code>import omicverse as ov; print(ov.list_supported_models())</code> "
-                    "查看可用模型。"
-                ),
+                _fmt.error_message(_SESSION_INIT_ERROR_TEMPLATE.format(exc=exc)),
                 parse_mode="HTML",
             )
 
@@ -1331,12 +1328,13 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
         session = await _get_session(update)
         if session is None:
             return
-        if session.adata is None:
+
+        result = perform_save(session)
+        if result.no_data:
             await update.message.reply_text("❌  没有数据，请先 <code>/load</code> 加载。", parse_mode="HTML")
             return
 
         await update.message.reply_text("⏳  正在保存…")
-        result = perform_save(session)
         if result.success and result.path:
             n_obs, n_vars = result.adata_shape
             with open(result.path, "rb") as fh:
@@ -1734,44 +1732,38 @@ def _register_handlers(app: Any, sm: Any, ac: AccessControl, verbose: bool) -> N
 
         data = query.data or ""
         try:
-            route = ConversationRoute(
-                channel="telegram",
-                scope_type="dm" if query.message.chat.type == "private" else "group",
-                scope_id=str(chat_id),
-                thread_id=(
-                    str(query.message.message_thread_id)
-                    if getattr(query.message, "message_thread_id", None)
-                    else None
-                ),
-                sender_id=str(user.id),
-            )
+            route = telegram_route_from_update(update)
             session = runtime.get_session(route)
         except Exception:
             return
 
         if data == "jarvis:save":
-            if session.adata is None:
+            result = perform_save(session)
+            if result.no_data:
                 await context.bot.send_message(chat_id=chat_id, text="❌  没有数据。")
                 return
-            path = session.save_adata()
-            if path and path.exists():
-                a = session.adata
-                with open(str(path), "rb") as fh:
+            if result.success and result.path:
+                n_obs, n_vars = result.adata_shape
+                with open(result.path, "rb") as fh:
                     await context.bot.send_document(
                         chat_id=chat_id,
                         document=fh,
                         filename="current.h5ad",
-                        caption=f"💾  {a.n_obs:,} cells × {a.n_vars:,} genes",
+                        caption=f"💾  {n_obs:,} cells × {n_vars:,} genes",
                     )
             else:
-                await context.bot.send_message(chat_id=chat_id, text="❌  保存失败。")
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"❌  {result.error or '保存失败。'}",
+                )
 
         elif data == "jarvis:status":
-            if session.adata is not None:
-                a = session.adata
-                lines = [f"🔬  {a.n_obs:,} cells × {a.n_vars:,} genes"]
-                if a.obs.columns.tolist():
-                    cols = ", ".join(a.obs.columns.tolist()[:8])
+            info = gather_status(session, is_running=runtime.task_state(route).running)
+            if info.adata_shape:
+                n_obs, n_vars = info.adata_shape
+                lines = [f"🔬  {n_obs:,} cells × {n_vars:,} genes"]
+                if info.obs_columns:
+                    cols = ", ".join(info.obs_columns)
                     lines.append(f"📋  obs: <code>{_fmt.esc(cols)}</code>")
                 await context.bot.send_message(
                     chat_id=chat_id, text="\n".join(lines), parse_mode="HTML"
