@@ -22,6 +22,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional, Tuple, Union
+from urllib.parse import urlparse
 
 from ..model_config import ModelConfig, PROVIDER_API_KEYS
 from ...jarvis.config import load_auth
@@ -107,15 +108,29 @@ def _is_custom_openai_endpoint(endpoint: Optional[str]) -> bool:
     }
 
 
+def _endpoint_has_hostname(url: Optional[str], expected_hostname: str) -> bool:
+    """Return True only when *url* has exactly *expected_hostname* as its parsed host."""
+    try:
+        parsed = urlparse(str(url or ""))
+        return (parsed.hostname or "").lower() == expected_hostname.lower()
+    except Exception:
+        return False
+
+
 def _looks_like_openai_endpoint(endpoint: Optional[str]) -> bool:
     normalized = str(endpoint or "").strip().rstrip("/").lower()
     if not normalized:
         return False
+    if normalized == _LEGACY_OPENAI_CODEX_BASE_URL or normalized == OPENAI_CODEX_BASE_URL:
+        return True
+    try:
+        parsed = urlparse(normalized)
+        host = (parsed.hostname or "").lower()
+    except Exception:
+        return False
     return (
-        normalized == _LEGACY_OPENAI_CODEX_BASE_URL
-        or normalized == OPENAI_CODEX_BASE_URL
-        or "api.openai.com" in normalized
-        or "chatgpt.com/backend-api" in normalized
+        host == "api.openai.com"
+        or (host == "chatgpt.com" and parsed.path.startswith("/backend-api"))
     )
 
 
@@ -329,7 +344,7 @@ def _resolve_gemini_cli_oauth(
     if (
         not resolved_endpoint
         or _looks_like_openai_endpoint(resolved_endpoint)
-        or "generativelanguage.googleapis.com" in str(resolved_endpoint)
+        or _endpoint_has_hostname(resolved_endpoint, "generativelanguage.googleapis.com")
     ):
         resolved_endpoint = GOOGLE_CODE_ASSIST_ENDPOINT_PROD
     return resolved_model, payload, resolved_endpoint, "gemini_cli_oauth"
