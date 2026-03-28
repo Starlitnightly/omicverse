@@ -849,6 +849,7 @@ class TestAnalysisExecutorFacadeContract:
             "normalize_doublet_obs",
             "process_context_directives",
             "build_sandbox_globals",
+            "set_codegen_pipeline",
         }
         actual_public = {
             name for name in dir(AnalysisExecutor)
@@ -1042,7 +1043,8 @@ class TestAnalysisExecutorMethodPartition:
             and callable(getattr(AnalysisExecutor, name))
         }
         # process_context_directives is covered by the directive seam
-        documented = self.ALL_DOCUMENTED | {"process_context_directives"}
+        # set_codegen_pipeline is a late-bind wiring method (task-049)
+        documented = self.ALL_DOCUMENTED | {"process_context_directives", "set_codegen_pipeline"}
         undocumented = actual_public - documented
         assert not undocumented, (
             f"Undocumented AnalysisExecutor public methods: {undocumented}"

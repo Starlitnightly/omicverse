@@ -592,7 +592,7 @@ class TurnController:
                         response = await asyncio.wait_for(
                             ctx._llm.chat(
                                 messages,
-                                tools=ctx._get_visible_agent_tools(),
+                                tools=self._tool_runtime.get_visible_agent_tools(),
                                 tool_choice=tool_choice,
                             ),
                             timeout=chat_timeout + 15,

@@ -212,9 +212,9 @@ def handle_execute_code(
 
     code = ProactiveCodeTransformer().transform(code)
     if getattr(ctx, "_code_only_mode", False):
-        capture = getattr(ctx, "_capture_code_only_snippet", None)
-        if callable(capture):
-            capture(code, description=description)
+        pipeline = getattr(executor, "_codegen_pipeline", None)
+        if pipeline is not None:
+            pipeline.capture_code_only_snippet(code, description=description)
         return {
             "adata": adata,
             "output": (
@@ -229,7 +229,7 @@ def handle_execute_code(
 
     # --- Structured self-healing loop ---
     repair_loop = ExecutionRepairLoop(executor, max_retries=3)
-    pipeline = getattr(ctx, "_codegen_pipeline", None)
+    pipeline = getattr(executor, "_codegen_pipeline", None)
     extract_code_fn = pipeline.extract_python_code if pipeline is not None else None
 
     import asyncio as _asyncio

@@ -472,6 +472,7 @@ class OmicVerseAgent(CodegenToolDispatchFacadeMixin, SessionContextFacadeMixin):
                 self, self._prompt_builder, self._tool_runtime,
             )
             self._codegen_pipeline = _CodegenPipeline(self)
+            self._analysis_executor.set_codegen_pipeline(self._codegen_pipeline)
 
             _emit(EventLevel.SUCCESS, "Smart Agent initialized successfully!", "init")
         except Exception as e:
