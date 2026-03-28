@@ -11,6 +11,7 @@ Usage:
 """
 
 import asyncio
+import inspect
 import json
 import logging
 import os
@@ -1017,61 +1018,51 @@ def list_supported_models(show_all: bool = False) -> str:
     """
     return ModelConfig.list_supported_models(show_all)
 
+# Canonical default values derived from OmicVerseAgent.__init__ so the
+# Agent() factory stays in sync without duplicating them.  Computed once
+# at module load time; the dict is keyed by parameter name.
+_INIT_DEFAULTS: Dict[str, Any] = {
+    name: param.default
+    for name, param in inspect.signature(OmicVerseAgent.__init__).parameters.items()
+    if name != "self" and param.default is not inspect.Parameter.empty
+}
+_D = _INIT_DEFAULTS  # short alias used in the Agent() signature below
+
+
 def Agent(
-    model: str = "gpt-5.2",
-    api_key: Optional[str] = None,
-    endpoint: Optional[str] = None,
-    auth_mode: str = "environment",
-    auth_provider: Optional[str] = None,
-    auth_file: Optional[str] = None,
-    enable_reflection: bool = True,
-    reflection_iterations: int = 1,
-    enable_result_review: bool = True,
-    use_notebook_execution: bool = True,
-    max_prompts_per_session: int = 5,
-    notebook_storage_dir: Optional[str] = None,
-    keep_execution_notebooks: bool = True,
-    notebook_timeout: int = 600,
-    strict_kernel_validation: bool = True,
-    enable_filesystem_context: bool = True,
-    context_storage_dir: Optional[str] = None,
-    approval_mode: str = "never",
-    agent_mode: str = "agentic",
-    max_agent_turns: int = 15,
-    security_level: Optional[str] = None,
+    model: str = _D["model"],
+    api_key: Optional[str] = _D["api_key"],
+    endpoint: Optional[str] = _D["endpoint"],
+    auth_mode: str = _D["auth_mode"],
+    auth_provider: Optional[str] = _D["auth_provider"],
+    auth_file: Optional[str] = _D["auth_file"],
+    enable_reflection: bool = _D["enable_reflection"],
+    reflection_iterations: int = _D["reflection_iterations"],
+    enable_result_review: bool = _D["enable_result_review"],
+    use_notebook_execution: bool = _D["use_notebook_execution"],
+    max_prompts_per_session: int = _D["max_prompts_per_session"],
+    notebook_storage_dir: Optional[str] = _D["notebook_storage_dir"],
+    keep_execution_notebooks: bool = _D["keep_execution_notebooks"],
+    notebook_timeout: int = _D["notebook_timeout"],
+    strict_kernel_validation: bool = _D["strict_kernel_validation"],
+    enable_filesystem_context: bool = _D["enable_filesystem_context"],
+    context_storage_dir: Optional[str] = _D["context_storage_dir"],
+    approval_mode: str = _D["approval_mode"],
+    agent_mode: str = _D["agent_mode"],
+    max_agent_turns: int = _D["max_agent_turns"],
+    security_level: Optional[str] = _D["security_level"],
     *,
-    config: Optional[AgentConfig] = None,
-    reporter: Optional[Reporter] = None,
-    verbose: bool = True,
+    config: Optional[AgentConfig] = _D["config"],
+    reporter: Optional[Reporter] = _D["reporter"],
+    verbose: bool = _D["verbose"],
 ) -> OmicVerseAgent:
     """Convenience factory — creates an :class:`OmicVerseAgent`.
 
     Accepts the same parameters as :meth:`OmicVerseAgent.__init__`.
-    See that docstring for the full parameter reference and examples.
-
-    Returns
-    -------
-    OmicVerseAgent
-        Configured agent instance ready for use.
+    Defaults are derived from the constructor at import time so they
+    cannot drift.
     """
-    return OmicVerseAgent(
-        model=model, api_key=api_key, endpoint=endpoint,
-        auth_mode=auth_mode, auth_provider=auth_provider, auth_file=auth_file,
-        enable_reflection=enable_reflection,
-        reflection_iterations=reflection_iterations,
-        enable_result_review=enable_result_review,
-        use_notebook_execution=use_notebook_execution,
-        max_prompts_per_session=max_prompts_per_session,
-        notebook_storage_dir=notebook_storage_dir,
-        keep_execution_notebooks=keep_execution_notebooks,
-        notebook_timeout=notebook_timeout,
-        strict_kernel_validation=strict_kernel_validation,
-        enable_filesystem_context=enable_filesystem_context,
-        context_storage_dir=context_storage_dir,
-        approval_mode=approval_mode, agent_mode=agent_mode,
-        max_agent_turns=max_agent_turns, security_level=security_level,
-        config=config, reporter=reporter, verbose=verbose,
-    )
+    return OmicVerseAgent(**locals())
 
 
 __all__ = [
