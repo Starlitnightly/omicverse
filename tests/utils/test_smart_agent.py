@@ -1116,7 +1116,7 @@ def test_protocol_does_not_declare_retired_facade_methods():
 
 
 def test_analysis_executor_set_codegen_pipeline_wiring():
-    """AC-049.1: AnalysisExecutor.set_codegen_pipeline correctly late-binds the pipeline."""
+    """AC-049.1: AnalysisExecutor._set_codegen_pipeline correctly late-binds the pipeline."""
     from omicverse.utils.ovagent.analysis_executor import AnalysisExecutor
 
     class _StubCtx:
@@ -1126,15 +1126,15 @@ def test_analysis_executor_set_codegen_pipeline_wiring():
     assert executor._codegen_pipeline is None
 
     sentinel = object()
-    executor.set_codegen_pipeline(sentinel)
+    executor._set_codegen_pipeline(sentinel)
     assert executor._codegen_pipeline is sentinel
 
 
 def test_smart_agent_init_wires_codegen_pipeline_to_executor():
     """AC-049.1: OmicVerseAgent.__init__ wires codegen_pipeline to analysis_executor."""
     src = _inspect.getsource(OmicVerseAgent.__init__)
-    assert "set_codegen_pipeline" in src, (
-        "OmicVerseAgent.__init__ should call analysis_executor.set_codegen_pipeline"
+    assert "_set_codegen_pipeline" in src, (
+        "OmicVerseAgent.__init__ should call analysis_executor._set_codegen_pipeline"
     )
 
 

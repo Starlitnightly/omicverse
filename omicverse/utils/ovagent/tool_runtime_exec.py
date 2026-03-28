@@ -215,6 +215,8 @@ def handle_execute_code(
         pipeline = getattr(executor, "_codegen_pipeline", None)
         if pipeline is not None:
             pipeline.capture_code_only_snippet(code, description=description)
+        elif callable(getattr(ctx, "_capture_code_only_snippet", None)):
+            ctx._capture_code_only_snippet(code, description=description)
         return {
             "adata": adata,
             "output": (

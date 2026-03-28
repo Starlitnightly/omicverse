@@ -49,7 +49,7 @@ class AnalysisExecutor:
         self._ctx = ctx
         self._codegen_pipeline: Any = None  # late-bound to avoid circular init
 
-    def set_codegen_pipeline(self, pipeline: Any) -> None:
+    def _set_codegen_pipeline(self, pipeline: Any) -> None:
         """Late-bind the codegen pipeline to avoid circular init ordering."""
         self._codegen_pipeline = pipeline
 
