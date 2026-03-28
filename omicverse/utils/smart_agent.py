@@ -219,6 +219,10 @@ class OmicVerseAgent(CodegenToolDispatchFacadeMixin, SessionContextFacadeMixin):
     LEGACY_AGENT_TOOLS = _LEGACY_AGENT_TOOLS
     AGENT_TOOLS = get_visible_tool_schemas(get_default_loaded_tool_names()) + _LEGACY_AGENT_TOOLS
 
+    @staticmethod
+    def _emit(level: "EventLevel", message: str, category: str = "") -> None:
+        """No-op fallback; replaced by ``__init__`` with a reporter-backed emitter."""
+
     def __init__(self, model: str = "gpt-5.2", api_key: Optional[str] = None, endpoint: Optional[str] = None, auth_mode: str = "environment", auth_provider: Optional[str] = None, auth_file: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, approval_mode: str = "never", agent_mode: str = "agentic", max_agent_turns: int = 15, security_level: Optional[str] = None, *, config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True):
         """
         Initialize the OmicVerse Smart Agent.
@@ -1013,7 +1017,33 @@ def list_supported_models(show_all: bool = False) -> str:
     """
     return ModelConfig.list_supported_models(show_all)
 
-def Agent(*args: Any, **kwargs: Any) -> OmicVerseAgent:
+def Agent(
+    model: str = "gpt-5.2",
+    api_key: Optional[str] = None,
+    endpoint: Optional[str] = None,
+    auth_mode: str = "environment",
+    auth_provider: Optional[str] = None,
+    auth_file: Optional[str] = None,
+    enable_reflection: bool = True,
+    reflection_iterations: int = 1,
+    enable_result_review: bool = True,
+    use_notebook_execution: bool = True,
+    max_prompts_per_session: int = 5,
+    notebook_storage_dir: Optional[str] = None,
+    keep_execution_notebooks: bool = True,
+    notebook_timeout: int = 600,
+    strict_kernel_validation: bool = True,
+    enable_filesystem_context: bool = True,
+    context_storage_dir: Optional[str] = None,
+    approval_mode: str = "never",
+    agent_mode: str = "agentic",
+    max_agent_turns: int = 15,
+    security_level: Optional[str] = None,
+    *,
+    config: Optional[AgentConfig] = None,
+    reporter: Optional[Reporter] = None,
+    verbose: bool = True,
+) -> OmicVerseAgent:
     """Convenience factory — creates an :class:`OmicVerseAgent`.
 
     Accepts the same parameters as :meth:`OmicVerseAgent.__init__`.
@@ -1024,7 +1054,24 @@ def Agent(*args: Any, **kwargs: Any) -> OmicVerseAgent:
     OmicVerseAgent
         Configured agent instance ready for use.
     """
-    return OmicVerseAgent(*args, **kwargs)
+    return OmicVerseAgent(
+        model=model, api_key=api_key, endpoint=endpoint,
+        auth_mode=auth_mode, auth_provider=auth_provider, auth_file=auth_file,
+        enable_reflection=enable_reflection,
+        reflection_iterations=reflection_iterations,
+        enable_result_review=enable_result_review,
+        use_notebook_execution=use_notebook_execution,
+        max_prompts_per_session=max_prompts_per_session,
+        notebook_storage_dir=notebook_storage_dir,
+        keep_execution_notebooks=keep_execution_notebooks,
+        notebook_timeout=notebook_timeout,
+        strict_kernel_validation=strict_kernel_validation,
+        enable_filesystem_context=enable_filesystem_context,
+        context_storage_dir=context_storage_dir,
+        approval_mode=approval_mode, agent_mode=agent_mode,
+        max_agent_turns=max_agent_turns, security_level=security_level,
+        config=config, reporter=reporter, verbose=verbose,
+    )
 
 
 __all__ = [
