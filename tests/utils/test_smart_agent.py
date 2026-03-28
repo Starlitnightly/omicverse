@@ -49,6 +49,7 @@ assert smart_agent_spec.loader is not None
 smart_agent_spec.loader.exec_module(smart_agent_module)
 
 OmicVerseAgent = smart_agent_module.OmicVerseAgent
+_run_coroutine_sync = smart_agent_module._run_coroutine_sync
 from omicverse.utils.harness import build_stream_event
 from omicverse.utils.ovagent.tool_runtime import ToolRuntime
 
@@ -499,3 +500,226 @@ def test_del_fallback_logs_debug_on_exception(caplog):
     assert len(debug_msgs) == 1, (
         f"Expected exactly 1 debug log about notebook executor, got {len(debug_msgs)}"
     )
+
+
+# -----------------------------------------------------------------------
+# Task-014: Sync/async entrypoint stabilization
+# -----------------------------------------------------------------------
+
+import traceback
+
+
+def _build_agent_that_raises(exc):
+    """Build a minimal agent whose run_async raises *exc*."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+
+    async def _fake_run_async(self, request, adata):
+        raise exc
+
+    agent.run_async = MethodType(_fake_run_async, agent)
+    return agent
+
+
+# --- AC-001.1: Traceback preservation ---------------------------------
+
+def test_run_preserves_traceback_outside_event_loop():
+    """run() outside a loop preserves the async traceback chain."""
+    agent = _build_agent_that_raises(ValueError("outside-loop-error"))
+
+    with pytest.raises(ValueError, match="outside-loop-error") as exc_info:
+        agent.run("fail", None)
+
+    tb_text = "".join(traceback.format_exception(
+        type(exc_info.value), exc_info.value, exc_info.value.__traceback__,
+    ))
+    assert "_fake_run_async" in tb_text, (
+        f"Traceback should contain the original async function name:\n{tb_text}"
+    )
+
+
+def test_run_preserves_traceback_inside_running_loop():
+    """run() inside a running loop preserves the async traceback chain."""
+    agent = _build_agent_that_raises(ValueError("inside-loop-error"))
+
+    async def _caller():
+        with pytest.raises(ValueError, match="inside-loop-error") as exc_info:
+            agent.run("fail", None)
+
+        tb_text = "".join(traceback.format_exception(
+            type(exc_info.value), exc_info.value, exc_info.value.__traceback__,
+        ))
+        assert "_fake_run_async" in tb_text, (
+            f"Traceback should contain the original async function:\n{tb_text}"
+        )
+
+    asyncio.run(_caller())
+
+
+def test_run_preserves_exception_type_and_message():
+    """Exception type and message survive the sync bridge unchanged."""
+
+    class CustomAgentError(RuntimeError):
+        pass
+
+    agent = _build_agent_that_raises(CustomAgentError("custom-payload"))
+
+    with pytest.raises(CustomAgentError, match="custom-payload"):
+        agent.run("fail", None)
+
+
+def test_run_preserves_traceback_inside_loop_chained():
+    """The traceback chain inside a running loop includes intermediate frames."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+
+    async def _inner_helper():
+        raise RuntimeError("deep-origin")
+
+    async def _fake_run_async(self, request, adata):
+        await _inner_helper()
+
+    agent.run_async = MethodType(_fake_run_async, agent)
+
+    async def _caller():
+        with pytest.raises(RuntimeError, match="deep-origin") as exc_info:
+            agent.run("fail", None)
+
+        tb_text = "".join(traceback.format_exception(
+            type(exc_info.value), exc_info.value, exc_info.value.__traceback__,
+        ))
+        assert "_inner_helper" in tb_text, (
+            f"Traceback should include the inner helper frame:\n{tb_text}"
+        )
+
+    asyncio.run(_caller())
+
+
+# --- AC-001.2: Event-loop-present regression tests --------------------
+
+def test_event_loop_present_uses_worker_thread():
+    """When a loop is already running, _run_coroutine_sync delegates to a thread."""
+    worker_thread_names = []
+    main_thread_name = threading.current_thread().name
+
+    async def _track_thread():
+        worker_thread_names.append(threading.current_thread().name)
+        return "threaded-result"
+
+    async def _caller():
+        result = _run_coroutine_sync(_track_thread())
+        assert result == "threaded-result"
+        assert len(worker_thread_names) == 1
+        assert worker_thread_names[0] != main_thread_name
+
+    asyncio.run(_caller())
+
+
+def test_no_event_loop_uses_main_thread():
+    """Without a running loop, _run_coroutine_sync uses asyncio.run on the current thread."""
+    worker_thread_names = []
+
+    async def _track_thread():
+        worker_thread_names.append(threading.current_thread().name)
+        return "direct-result"
+
+    result = _run_coroutine_sync(_track_thread())
+    assert result == "direct-result"
+    assert len(worker_thread_names) == 1
+    assert worker_thread_names[0] == threading.current_thread().name
+
+
+# --- AC-001.3: No silent nest_asyncio patching ------------------------
+
+def test_no_nest_asyncio_import_after_run():
+    """run() must not import or patch nest_asyncio as a side effect."""
+    agent = _build_agent(return_value="clean")
+    agent.run("test", None)
+    assert "nest_asyncio" not in sys.modules, (
+        "nest_asyncio was imported as a side effect of run()"
+    )
+
+
+def test_no_nest_asyncio_import_inside_running_loop():
+    """run() inside a running loop must not import nest_asyncio."""
+    agent = _build_agent(return_value="clean-nested")
+
+    async def _caller():
+        agent.run("test", None)
+        assert "nest_asyncio" not in sys.modules, (
+            "nest_asyncio was imported inside a running loop"
+        )
+
+    asyncio.run(_caller())
+
+
+# --- AC-001.4: Public signature unchanged -----------------------------
+
+def test_run_signature_unchanged():
+    """run() accepts (request: str, adata: Any) and returns Any."""
+    import inspect
+    sig = inspect.signature(OmicVerseAgent.run)
+    param_names = list(sig.parameters.keys())
+    assert param_names == ["self", "request", "adata"]
+
+
+def test_generate_code_signature_unchanged():
+    """generate_code() signature is preserved."""
+    import inspect
+    sig = inspect.signature(OmicVerseAgent.generate_code)
+    param_names = list(sig.parameters.keys())
+    assert param_names == ["self", "request", "adata", "max_functions", "progress_callback"]
+
+
+def test_run_async_signature_unchanged():
+    """run_async() signature is preserved."""
+    import inspect
+    sig = inspect.signature(OmicVerseAgent.run_async)
+    param_names = list(sig.parameters.keys())
+    assert param_names == ["self", "request", "adata"]
+
+
+def test_generate_code_async_signature_unchanged():
+    """generate_code_async() signature is preserved."""
+    import inspect
+    sig = inspect.signature(OmicVerseAgent.generate_code_async)
+    param_names = list(sig.parameters.keys())
+    assert param_names == ["self", "request", "adata", "max_functions", "progress_callback"]
+
+
+# --- AC-001.5: Backward compatibility ---------------------------------
+
+def test_run_returns_value_outside_loop():
+    """run() returns the coroutine result when no loop is running."""
+    sentinel = object()
+    agent = _build_agent(return_value=sentinel)
+    result = agent.run("request", None)
+    assert result["value"] is sentinel
+
+
+def test_run_returns_value_inside_loop():
+    """run() returns the coroutine result when called inside a running loop."""
+    sentinel = object()
+    agent = _build_agent(return_value=sentinel)
+
+    async def _caller():
+        result = agent.run("request", None)
+        assert result["value"] is sentinel
+
+    asyncio.run(_caller())
+
+
+def test_generate_code_sync_delegates_to_async():
+    """generate_code() calls generate_code_async through the sync bridge."""
+    agent = OmicVerseAgent.__new__(OmicVerseAgent)
+    calls = []
+
+    async def _fake_generate_code_async(self, request, adata=None, *, max_functions=8, progress_callback=None):
+        calls.append({"request": request, "adata": adata, "max_functions": max_functions})
+        return "generated-code"
+
+    agent.generate_code_async = MethodType(_fake_generate_code_async, agent)
+
+    result = agent.generate_code("build a plot", None, max_functions=5)
+    assert result == "generated-code"
+    assert len(calls) == 1
+    assert calls[0]["request"] == "build a plot"
+    assert calls[0]["max_functions"] == 5

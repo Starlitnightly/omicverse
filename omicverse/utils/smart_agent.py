@@ -19,7 +19,9 @@ import sys
 import threading
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Coroutine, Dict, List, Optional, Tuple, TypeVar, Union
+
+_T = TypeVar("_T")
 
 # Internal LLM backend
 from .agent_backend import OmicVerseLLMBackend, Usage
@@ -157,6 +159,52 @@ def _wire_package_import_compatibility() -> None:
 
 
 _wire_package_import_compatibility()
+
+
+def _run_coroutine_sync(coro: Coroutine[Any, Any, _T]) -> _T:
+    """Run *coro* synchronously, preserving exception tracebacks.
+
+    * **No running loop** — delegates to ``asyncio.run()``.
+    * **Running loop detected** (e.g. Jupyter / Jarvis) — spawns a daemon
+      worker thread with its own event loop.  Exceptions are transported via
+      ``sys.exc_info()`` and re-raised with ``with_traceback()`` so the
+      caller sees the full original traceback chain instead of a collapsed
+      single-frame ``raise err`` from a dict container.
+
+    This function never imports or patches ``nest_asyncio``.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop is not None and loop.is_running():
+        _result: list = [None]
+        _exc_info: list = [None]
+
+        def _worker() -> None:
+            try:
+                _result[0] = asyncio.run(coro)
+            except BaseException:
+                _exc_info[0] = sys.exc_info()
+
+        thread = threading.Thread(
+            target=_worker, name="OmicVerseAgentSync", daemon=True,
+        )
+        thread.start()
+        thread.join()
+
+        if _exc_info[0] is not None:
+            _tp, exc, tb = _exc_info[0]
+            _exc_info[0] = None
+            try:
+                raise exc.with_traceback(tb)
+            finally:
+                del exc, tb
+
+        return _result[0]  # type: ignore[return-value]
+
+    return asyncio.run(coro)
 
 
 class OmicVerseAgent(SessionContextFacadeMixin):
@@ -1062,8 +1110,11 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
 
     def generate_code(self, request: str, adata: Any = None, *, max_functions: int = 8, progress_callback: Optional[Callable[[str], None]] = None) -> str:
         """Synchronous wrapper for code-only OmicVerse generation."""
-        return self._codegen.generate_code(
-            request, adata, max_functions=max_functions, progress_callback=progress_callback,
+        return _run_coroutine_sync(
+            self.generate_code_async(
+                request, adata, max_functions=max_functions,
+                progress_callback=progress_callback,
+            )
         )
 
     async def stream_async(self, request: str, adata: Any,
@@ -1162,31 +1213,7 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         >>> agent = ov.Agent(model="gpt-4o-mini")
         >>> result = agent.run("quality control with nUMI>500, mito<0.2", adata)
         """
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = None
-
-        if loop and loop.is_running():
-            result_container: Dict[str, Any] = {}
-            error_container: Dict[str, BaseException] = {}
-
-            def _run_in_thread() -> None:
-                try:
-                    result_container["value"] = asyncio.run(self.run_async(request, adata))
-                except BaseException as exc:  # pragma: no cover - propagate to caller
-                    error_container["error"] = exc
-
-            thread = threading.Thread(target=_run_in_thread, name="OmicVerseAgentRunner")
-            thread.start()
-            thread.join()
-
-            if "error" in error_container:
-                raise error_container["error"]
-
-            return result_container.get("value")
-
-        return asyncio.run(self.run_async(request, adata))
+        return _run_coroutine_sync(self.run_async(request, adata))
 
     # ===================================================================
     # Cleanup
