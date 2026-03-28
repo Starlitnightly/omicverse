@@ -268,11 +268,14 @@ def test_concurrent_context_service_same_instance():
 
 
 def test_service_init_lock_exists_on_mixin():
-    """The mixin must expose a threading.Lock for service initialization."""
-    import threading
-
+    """The mixin must expose a threading lock for service initialization."""
     assert hasattr(SessionContextFacadeMixin, "_service_init_lock")
-    assert isinstance(SessionContextFacadeMixin._service_init_lock, threading.Lock)
+    lock = SessionContextFacadeMixin._service_init_lock
+    # Verify lock semantics without isinstance(lock, threading.Lock),
+    # which is not portable because threading.Lock is a factory function
+    # rather than a type on some Python builds.
+    assert callable(getattr(lock, "acquire", None))
+    assert callable(getattr(lock, "release", None))
 
 
 # -----------------------------------------------------------------------
