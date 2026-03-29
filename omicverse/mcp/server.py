@@ -22,7 +22,6 @@ from pydantic import AnyHttpUrl
 from .manifest import build_registry_manifest
 from .session_store import SessionStore, SessionError, TraceRecord, RuntimeLimits
 from .executor import McpExecutor
-from .local_oauth import LocalOAuthProvider, LOCAL_AUTH_SCOPES
 from .adata_kernel_runtime import AdataKernelRuntime
 
 logger = logging.getLogger(__name__)
@@ -2173,6 +2172,7 @@ class RegistryMcpServer:
             from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
             from mcp.server.fastmcp.server import StreamableHTTPASGIApp
             from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+            from .local_oauth import LocalOAuthProvider, LOCAL_AUTH_SCOPES
         except ImportError:
             raise ImportError(
                 "Streamable HTTP transport requires: mcp, uvicorn, and starlette. "
