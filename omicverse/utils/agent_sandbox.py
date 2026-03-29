@@ -20,12 +20,13 @@ This module provides:
 from __future__ import annotations
 
 import ast
+import builtins as _builtins
 import logging
 import os
 import types
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, FrozenSet, List, Optional
+from typing import Any, Dict, FrozenSet, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -190,6 +191,8 @@ class CodeSecurityScanner:
         "subprocess.getoutput", "subprocess.getstatusoutput",
         # shutil dangerous ops
         "shutil.rmtree", "shutil.move",
+        # Code execution via data-science libraries
+        "pandas.eval", "pd.eval",
     })
 
     # Dangerous attribute access (sandbox escape vectors)
@@ -210,11 +213,16 @@ class CodeSecurityScanner:
         "__spec__",
     })
 
+    # Calls that represent code-execution risk (not file I/O or shell access)
+    CODE_EXECUTION_CALLS: FrozenSet[str] = frozenset({
+        "pandas.eval", "pd.eval",
+    })
+
     # Modules that should never appear in import statements
     BLOCKED_IMPORT_ROOTS: FrozenSet[str] = frozenset({
         "subprocess", "socket", "ssl", "urllib", "http",
         "ftplib", "smtplib", "telnetlib", "paramiko", "requests",
-        "importlib", "ctypes", "multiprocessing",
+        "importlib", "ctypes", "cffi", "multiprocessing",
     })
 
     SAFE_IMPORT_SUBMODULES: FrozenSet[str] = frozenset({
@@ -293,7 +301,12 @@ class CodeSecurityScanner:
             # Check exact match or prefix match (os.exec covers os.execl etc.)
             for blocked in self._blocked_calls:
                 if name == blocked or name.startswith(blocked + "."):
-                    category = "shell_access" if "os." in blocked or "subprocess" in blocked else "file_danger"
+                    if blocked in self.CODE_EXECUTION_CALLS:
+                        category = "code_execution"
+                    elif "os." in blocked or "subprocess" in blocked:
+                        category = "shell_access"
+                    else:
+                        category = "file_danger"
                     severity = self._severity_overrides.get(category, "critical")
                     violations.append(SecurityViolation(
                         category=category,
@@ -420,6 +433,12 @@ class CodeSecurityScanner:
 # Safe os module proxy
 # ---------------------------------------------------------------------------
 
+# Module-level reference to the real os module.  Intentionally NOT stored on
+# SafeOsProxy instances so that proxy.__dict__ never exposes a path back to
+# unrestricted os behaviour.
+_REAL_OS_MODULE = os
+
+
 class SafeOsProxy(types.ModuleType):
     """Drop-in proxy for the ``os`` module that blocks dangerous operations.
 
@@ -429,6 +448,10 @@ class SafeOsProxy(types.ModuleType):
 
     Blocked operations include shell execution, process management, file
     deletion, permission changes, and environment mutation.
+
+    The proxy uses an **explicit allowlist** model: only attributes listed in
+    ``_SAFE_ATTRS`` are forwarded to the real ``os`` module.  Everything else
+    — including unknown future ``os`` additions — is denied by default.
     """
 
     _BLOCKED_ATTRS: FrozenSet[str] = frozenset({
@@ -452,23 +475,151 @@ class SafeOsProxy(types.ModuleType):
         "putenv", "unsetenv",
     })
 
+    _SAFE_ATTRS: FrozenSet[str] = frozenset({
+        # Directory / file-status operations (read-only or create-only)
+        "getcwd", "listdir", "scandir", "walk",
+        "makedirs", "mkdir",
+        "stat", "lstat", "access",
+        "readlink",
+        # Platform constants
+        "sep", "altsep", "extsep", "linesep", "pathsep",
+        "curdir", "pardir", "devnull", "name",
+        # Environment reading (mutation stays blocked above)
+        "environ", "getenv", "environb", "getenvb",
+        # System info (read-only)
+        "cpu_count", "getpid", "getppid", "uname", "getlogin",
+        # Path encoding helpers
+        "fspath", "fsencode", "fsdecode",
+        # Misc safe
+        "urandom", "strerror", "get_terminal_size",
+    })
+
     def __init__(self) -> None:
         super().__init__("os")
-        self.__dict__["_real_os"] = os
-        # Expose os.path directly — it's entirely safe
+        # Expose os.path directly — it's entirely safe.
+        # NOTE: the real os module is NOT stored on the instance; see
+        # _REAL_OS_MODULE at module scope.
         self.__dict__["path"] = os.path
 
     def __getattr__(self, name: str) -> Any:
+        # Blocked attrs get an explicit, descriptive error.
         if name in self._BLOCKED_ATTRS:
             from .agent_errors import SecurityViolationError
             raise SecurityViolationError(
                 f"os.{name}() is blocked in the OmicVerse agent sandbox. "
                 f"This operation is not needed for bioinformatics analysis."
             )
-        real = self.__dict__.get("_real_os")
-        if real is not None:
-            return getattr(real, name)
-        return getattr(os, name)
+        # Only explicitly safe attrs are forwarded to the real os module.
+        if name in self._SAFE_ATTRS:
+            return getattr(_REAL_OS_MODULE, name)
+        raise AttributeError(
+            f"module 'os' has no attribute '{name}' in the OmicVerse agent sandbox"
+        )
+
+    def __dir__(self) -> List[str]:
+        return sorted(set(self._SAFE_ATTRS) | {"path"})
 
     def __repr__(self) -> str:
         return "<SafeOsProxy: restricted os module for OmicVerse agent>"
+
+
+# ---------------------------------------------------------------------------
+# Runtime sandbox globals builder
+# ---------------------------------------------------------------------------
+
+# Modules blocked at runtime import time — superset of the scanner's
+# BLOCKED_IMPORT_ROOTS, extended with sys (path/module manipulation)
+# and cffi (foreign-function interface escape).
+BLOCKED_RUNTIME_IMPORT_ROOTS: FrozenSet[str] = frozenset({
+    "subprocess", "socket", "ssl", "urllib", "http",
+    "ftplib", "smtplib", "telnetlib", "paramiko", "requests",
+    "importlib", "ctypes", "cffi", "multiprocessing", "sys",
+})
+
+_SAFE_IMPORT_SUBMODULES: FrozenSet[str] = frozenset({
+    "importlib.metadata",
+    "importlib.resources",
+})
+
+# Builtins explicitly excluded from the runtime sandbox.
+_EXCLUDED_BUILTINS: FrozenSet[str] = frozenset({
+    "eval", "exec", "compile",   # arbitrary code execution
+    "globals", "locals",          # namespace introspection
+    "breakpoint",                 # debugger entry
+    "exit", "quit",               # interpreter termination
+    "__import__",                 # replaced with restricted version
+})
+
+
+def build_sandbox_globals(
+    *,
+    security_config: Optional[SecurityConfig] = None,
+) -> Dict[str, Any]:
+    """Build restricted globals dict for local Python ``exec()``.
+
+    Returns a namespace with:
+
+    * Allowlisted builtins (no ``eval``/``exec``/``compile``/``globals``/``locals``)
+    * A restricted ``__import__`` that blocks dangerous modules at runtime
+    * ``os`` replaced with :class:`SafeOsProxy`
+
+    This is the runtime enforcement counterpart of :class:`CodeSecurityScanner`.
+    The scanner catches patterns at AST level; these globals catch bypass
+    vectors that only manifest at execution time (e.g. ``getattr(os, 'system')``
+    or ``__import__('subprocess')``).
+    """
+    config = security_config or SecurityConfig()
+
+    # -- restricted builtins ------------------------------------------------
+    excluded = set(_EXCLUDED_BUILTINS)
+    if not config.restrict_introspection:
+        excluded -= {"globals", "locals"}
+
+    safe_builtins: Dict[str, Any] = {}
+    for name in dir(_builtins):
+        if name.startswith("_"):
+            continue
+        if name in excluded:
+            continue
+        obj = getattr(_builtins, name, None)
+        if obj is not None:
+            safe_builtins[name] = obj
+
+    # -- restricted import --------------------------------------------------
+    deny_roots = BLOCKED_RUNTIME_IMPORT_ROOTS | config.extra_blocked_modules
+    os_proxy = SafeOsProxy()
+
+    def limited_import(name, globals=None, locals=None, fromlist=(), level=0):
+        root = name.split(".")[0]
+        fromlist_names = {str(f) for f in (fromlist or ())}
+        allow_safe = (
+            name in _SAFE_IMPORT_SUBMODULES
+            or any(name.startswith(f"{sm}.") for sm in _SAFE_IMPORT_SUBMODULES)
+            or (name == "importlib" and fromlist_names
+                and fromlist_names <= {"metadata", "resources"})
+        )
+        if root in deny_roots and not allow_safe:
+            raise ImportError(
+                f"Module '{name}' is blocked inside the OmicVerse agent sandbox."
+            )
+        # Redirect os imports to SafeOsProxy so getattr(os, 'system') is
+        # caught at runtime rather than returning the real os attribute.
+        if root == "os":
+            if fromlist and name != "os":
+                # e.g. from os.path import join — return real submodule
+                return _real_import(name, globals, locals, fromlist, level)
+            # import os / import os.path / from os import X — proxy
+            _real_import(name, globals, locals, fromlist, level)
+            return os_proxy
+        return _real_import(name, globals, locals, fromlist, level)
+
+    _real_import = __import__
+    safe_builtins["__import__"] = limited_import
+
+    # -- assemble globals ---------------------------------------------------
+    sandbox_globals: Dict[str, Any] = {
+        "__name__": "__main__",
+        "__builtins__": safe_builtins,
+        "os": os_proxy,
+    }
+    return sandbox_globals

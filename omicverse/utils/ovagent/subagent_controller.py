@@ -156,7 +156,7 @@ class SubagentController:
         # Snapshot tool schemas — the subagent sees a frozen list, not a
         # live reference into the parent's tool registry.
         tool_schemas = list(
-            self._ctx._get_visible_agent_tools(
+            self._tool_runtime.get_visible_agent_tools(
                 allowed_names=set(allowed_tools)
             )
         )
@@ -192,9 +192,7 @@ class SubagentController:
         dict
             ``{"result": str, "adata": AnnData, "last_usage": Any}``
         """
-        from ..agent_config import SUBAGENT_CONFIGS
-
-        config = SUBAGENT_CONFIGS[agent_type]
+        config = self._ctx._config.get_subagent_config(agent_type)
 
         # Create isolated runtime
         runtime = self._create_subagent_runtime(

@@ -5,7 +5,7 @@ from unittest import mock
 
 from omicverse.utils.ovagent.auth import collect_api_key_env
 from omicverse.utils.agent_backend import OmicVerseLLMBackend
-from omicverse.utils.smart_agent import _resolve_agent_llm_credentials
+from omicverse.utils.ovagent.auth import resolve_credentials as _resolve_agent_llm_credentials
 from omicverse.jarvis import gemini_cli_oauth
 
 
@@ -23,7 +23,7 @@ class GeminiCliRuntimeTests(unittest.TestCase):
 
     def test_resolve_agent_llm_credentials_rewrites_stale_openai_endpoint_for_gemini_oauth(self) -> None:
         with mock.patch(
-            "omicverse.utils.smart_agent.GeminiCliOAuthManager.build_api_key_payload",
+            "omicverse.utils.ovagent.auth.GeminiCliOAuthManager.build_api_key_payload",
             return_value='{"token":"oauth-token","projectId":"demo"}',
         ):
             model, api_key, endpoint, auth_mode = _resolve_agent_llm_credentials(

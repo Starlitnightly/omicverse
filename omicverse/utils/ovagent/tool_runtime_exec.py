@@ -12,8 +12,11 @@ import asyncio
 import json
 import logging
 import os
+import signal
 import subprocess
+import tempfile
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from ..harness.runtime_state import runtime_state
@@ -25,6 +28,76 @@ if TYPE_CHECKING:
     from .protocol import AgentContext
 
 logger = logging.getLogger(__name__)
+
+
+# ------------------------------------------------------------------
+# Bash hardening helpers
+# ------------------------------------------------------------------
+
+def _resolve_bash_allowed_roots(ctx: "AgentContext") -> List[str]:
+    """Compute the set of allowed workspace roots for Bash cwd validation.
+
+    Returns canonical (realpath-resolved) root directories under which Bash
+    commands are permitted to execute.
+    """
+    roots: List[str] = []
+    fs_ctx = getattr(ctx, "_filesystem_context", None)
+    if fs_ctx is not None:
+        ws = getattr(fs_ctx, "workspace_dir", None)
+        if ws is not None:
+            roots.append(os.path.realpath(str(ws)))
+    try:
+        roots.append(os.path.realpath(os.getcwd()))
+    except OSError as exc:
+        logger.debug("Could not resolve cwd for bash roots: %s", exc)
+    try:
+        roots.append(os.path.realpath(tempfile.gettempdir()))
+    except OSError as exc:
+        logger.debug("Could not resolve tempdir for bash roots: %s", exc)
+    return roots
+
+
+def _validate_bash_cwd(ctx: "AgentContext", cwd: str) -> str:
+    """Validate *cwd* against allowed workspace roots.
+
+    Returns the canonical resolved path on success.
+    Raises ``ValueError`` if *cwd* escapes every allowed root.
+    """
+    resolved = os.path.realpath(cwd)
+    roots = _resolve_bash_allowed_roots(ctx)
+    if not roots:
+        raise ValueError(
+            "Bash cwd rejected: no allowed workspace roots could be determined"
+        )
+    for root in roots:
+        if resolved == root or resolved.startswith(root + os.sep):
+            return resolved
+    raise ValueError(
+        f"Bash cwd rejected: '{resolved}' is outside allowed workspace roots"
+    )
+
+
+def _kill_process_tree(proc: subprocess.Popen) -> None:
+    """Kill a subprocess and its entire process group (best-effort).
+
+    Intentional cleanup silence: every except block below catches only
+    narrow OS/process-lookup errors that are expected when the process
+    has already exited.  Logging these would create noise in normal
+    teardown paths.
+    """
+    try:
+        pgid = os.getpgid(proc.pid)
+        os.killpg(pgid, signal.SIGKILL)
+    except (OSError, ProcessLookupError):
+        pass
+    try:
+        proc.kill()
+    except (OSError, ProcessLookupError):
+        pass
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        pass
 
 
 def _truncate_text(text: str, limit: int) -> str:
@@ -85,8 +158,8 @@ def handle_inspect_data(adata: Any, aspect: str) -> str:
                 parts.append(
                     f"obs.head(3):\n{adata.obs.head(3).to_string()}"
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Failed to format obs.head(3): %s", exc)
         if aspect in ("var", "full") and not is_mudata:
             cols = list(adata.var.columns)
             parts.append(f"var columns ({len(cols)}): {cols}")
@@ -94,8 +167,8 @@ def handle_inspect_data(adata: Any, aspect: str) -> str:
                 parts.append(
                     f"var.head(3):\n{adata.var.head(3).to_string()}"
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Failed to format var.head(3): %s", exc)
         if aspect in ("obsm", "full"):
             keys = (
                 list(adata.obsm.keys()) if hasattr(adata, "obsm") else []
@@ -104,8 +177,8 @@ def handle_inspect_data(adata: Any, aspect: str) -> str:
             for k in keys:
                 try:
                     parts.append(f"  {k}: shape {adata.obsm[k].shape}")
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Failed to get shape for obsm[%s]: %s", k, exc)
         if aspect in ("uns", "full"):
             keys = (
                 list(adata.uns.keys()) if hasattr(adata, "uns") else []
@@ -139,9 +212,11 @@ def handle_execute_code(
 
     code = ProactiveCodeTransformer().transform(code)
     if getattr(ctx, "_code_only_mode", False):
-        capture = getattr(ctx, "_capture_code_only_snippet", None)
-        if callable(capture):
-            capture(code, description=description)
+        pipeline = getattr(executor, "_codegen_pipeline", None)
+        if pipeline is not None:
+            pipeline.capture_code_only_snippet(code, description=description)
+        elif callable(getattr(ctx, "_capture_code_only_snippet", None)):
+            ctx._capture_code_only_snippet(code, description=description)
         return {
             "adata": adata,
             "output": (
@@ -156,7 +231,8 @@ def handle_execute_code(
 
     # --- Structured self-healing loop ---
     repair_loop = ExecutionRepairLoop(executor, max_retries=3)
-    extract_code_fn = getattr(ctx, "_extract_python_code", None)
+    pipeline = getattr(executor, "_codegen_pipeline", None)
+    extract_code_fn = pipeline.extract_python_code if pipeline is not None else None
 
     import asyncio as _asyncio
 
@@ -166,13 +242,33 @@ def handle_execute_code(
         loop = None
 
     if loop and loop.is_running():
+        # Bridge sync caller into async repair loop without blocking on
+        # executor context-manager shutdown.  A plain ThreadPoolExecutor
+        # context manager calls shutdown(wait=True) on __exit__, which
+        # would wait for the worker even after a Future.result() timeout.
+        # Instead we create the pool without a context manager, use a
+        # bounded Future.result(timeout=...) call, and then call
+        # shutdown(wait=False) so the caller always returns/raises
+        # promptly.
         import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            repair_result = pool.submit(
-                _asyncio.run,
-                repair_loop.run(code, adata, phase="execution",
-                               extract_code_fn=extract_code_fn),
-            ).result()
+
+        _BRIDGE_TIMEOUT = 300  # seconds — generous but finite
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = pool.submit(
+            _asyncio.run,
+            repair_loop.run(code, adata, phase="execution",
+                           extract_code_fn=extract_code_fn),
+        )
+        try:
+            repair_result = future.result(timeout=_BRIDGE_TIMEOUT)
+        except concurrent.futures.TimeoutError:
+            future.cancel()
+            pool.shutdown(wait=False)
+            raise RuntimeError(
+                f"execute_code sync bridge timed out after {_BRIDGE_TIMEOUT}s"
+            )
+        else:
+            pool.shutdown(wait=False)
     else:
         repair_result = _asyncio.run(
             repair_loop.run(code, adata, phase="execution",
@@ -229,7 +325,8 @@ def handle_execute_code(
             )
             output_parts.append(result_msg)
             debug_output_parts.append(result_msg)
-        except Exception:
+        except Exception as exc:
+            logger.debug("Could not read adata shape: %s", exc)
             result_msg = f"Result type: {type(result_adata).__name__}"
             output_parts.append(result_msg)
             debug_output_parts.append(result_msg)
@@ -323,7 +420,8 @@ def handle_search_functions(ctx: "AgentContext", query: str) -> str:
 
     try:
         runtime_matches = list(_global_registry.find(query))
-    except Exception:
+    except Exception as exc:
+        logger.debug("Runtime registry search failed for %r: %s", query, exc)
         runtime_matches = []
     _extend(runtime_matches)
 
@@ -333,7 +431,8 @@ def handle_search_functions(ctx: "AgentContext", query: str) -> str:
             static_matches = list(static_search(query, max_entries=20))
         except TypeError:
             static_matches = list(static_search(query))
-        except Exception:
+        except Exception as exc:
+            logger.debug("Static registry search failed for %r: %s", query, exc)
             static_matches = []
         _extend(static_matches)
 
@@ -436,22 +535,27 @@ def background_bash_worker(
 ) -> None:
     """Stream output from a background bash process into runtime state."""
     session_id = ctx._get_runtime_session_id()
+    resolved_cwd = _validate_bash_cwd(ctx, cwd)
     proc = subprocess.Popen(
-        ["bash", "-lc", command],
-        cwd=cwd,
+        ["bash", "-c", command],
+        cwd=resolved_cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        start_new_session=True,
     )
-    runtime_state.bind_process(session_id, task_id, proc)
-    assert proc.stdout is not None
-    start = time.time()
+    runtime_state.attach_background_process(session_id, task_id, proc)
+    if proc.stdout is None:
+        raise RuntimeError(
+            "background_bash_worker: stdout pipe was not created"
+        )
+    deadline = time.monotonic() + timeout_ms / 1000
     for line in proc.stdout:
         runtime_state.append_task_output(
             session_id, task_id, line.rstrip("\n")
         )
-        if time.time() - start > timeout_ms / 1000:
-            proc.terminate()
+        if time.monotonic() > deadline:
+            _kill_process_tree(proc)
             runtime_state.update_task(
                 session_id,
                 task_id,
@@ -492,6 +596,8 @@ def handle_bash(
         },
     )
     cwd = ctx._refresh_runtime_working_directory()
+    resolved_cwd = _validate_bash_cwd(ctx, cwd)
+
     if run_in_background:
         task = runtime_state.create_task(
             ctx._get_runtime_session_id(),
@@ -501,14 +607,15 @@ def handle_bash(
             status="in_progress",
             background=True,
             tool_name="Bash",
-            metadata={"cwd": cwd, "command": command},
+            metadata={"cwd": resolved_cwd, "command": command},
         )
         proc = subprocess.Popen(
-            ["bash", "-lc", command],
-            cwd=cwd,
+            ["bash", "-c", command],
+            cwd=resolved_cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            start_new_session=True,
         )
         runtime_state.attach_background_process(
             ctx._get_runtime_session_id(),
@@ -519,32 +626,60 @@ def handle_bash(
             {
                 "task_id": task.task_id,
                 "status": "in_progress",
-                "cwd": cwd,
+                "cwd": resolved_cwd,
                 "command": command,
             },
             ensure_ascii=False,
             indent=2,
         )
 
-    proc_result = subprocess.run(
-        ["bash", "-lc", command],
-        cwd=cwd,
-        capture_output=True,
+    # Foreground execution with process-group isolation and hard kill
+    timeout_sec = max(1, int(timeout)) / 1000
+    proc = subprocess.Popen(
+        ["bash", "-c", command],
+        cwd=resolved_cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
-        timeout=max(1, int(timeout)) / 1000,
-        check=False,
+        start_new_session=True,
     )
-    output = (proc_result.stdout or "") + (
-        (proc_result.stderr or "") if proc_result.stderr else ""
-    )
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout_sec)
+    except subprocess.TimeoutExpired:
+        _kill_process_tree(proc)
+        stdout, stderr = "", ""
+        # Intentional cleanup silence: best-effort drain after hard kill.
+        try:
+            stdout, stderr = proc.communicate(timeout=5)
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+        stdout = stdout or ""
+        stderr = stderr or ""
+        output = (stdout + stderr).strip()
+        return json.dumps(
+            {
+                "cwd": resolved_cwd,
+                "command": command,
+                "returncode": -signal.SIGKILL,
+                "stdout": stdout,
+                "stderr": stderr,
+                "output": output if output else "Command timed out",
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    stdout = stdout or ""
+    stderr = stderr or ""
+    output = (stdout + stderr).strip()
     return json.dumps(
         {
-            "cwd": cwd,
+            "cwd": resolved_cwd,
             "command": command,
-            "returncode": proc_result.returncode,
-            "stdout": proc_result.stdout,
-            "stderr": proc_result.stderr,
-            "output": output.strip(),
+            "returncode": proc.returncode,
+            "stdout": stdout,
+            "stderr": stderr,
+            "output": output,
         },
         ensure_ascii=False,
         indent=2,

@@ -39,23 +39,39 @@ import re
 import threading
 import time
 from dataclasses import dataclass
-from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
-from ..agent_bridge import AgentBridge
-from .._bridge_session import resolve_bridge_session_id
-from ..channel_media import build_channel_request, prepare_channel_delivery_figures
-from ..gateway.routing import GatewaySessionRegistry, SessionKey
+from .channel_core import (
+    command_parts,
+    default_summary,
+    format_save_result_plain,
+    format_status_plain,
+    format_usage_plain,
+    format_workspace_plain,
+    gather_status,
+    gather_usage,
+    gather_workspace,
+    perform_save,
+    strip_local_paths,
+    text_chunks,
+)
+from ..runtime import (
+    AgentBridgeExecutionAdapter,
+    ConversationRoute,
+    DeliveryEvent,
+    MessageEnvelope,
+    MessageRuntime,
+    MessageRouter,
+)
+from ..channel_media import is_image_attachment, prepare_inbound_image, MAX_INBOUND_IMAGES
 from ..media_ingest import (
     PreparedImage,
     build_workspace_note,
     compose_multimodal_user_text,
-    looks_like_image_name,
-    prepare_image_bytes,
 )
 from ..model_help import render_model_help
 
@@ -97,13 +113,6 @@ _OP_RECONNECT = 7
 _OP_INVALID_SESSION = 9
 _OP_HELLO = 10
 _OP_HEARTBEAT_ACK = 11
-
-
-@dataclass
-class RunningTask:
-    task: asyncio.Task
-    request: str
-    started_at: float
 
 
 class QQDeduper:
@@ -479,6 +488,156 @@ class _ImageServer:
         self._server = None
 
 
+# ── Runtime integration helpers ──────────────────────────────────────────────
+
+
+def qq_route_from_target(target: QQTarget) -> ConversationRoute:
+    """Map a QQ message target to a shared ``ConversationRoute``."""
+    return ConversationRoute(
+        channel="qq",
+        scope_type=target.kind,
+        scope_id=target.id,
+    )
+
+
+def qq_runtime_envelope(
+    target: QQTarget,
+    text: str,
+    *,
+    sender_id: str,
+    msg_id: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Optional[MessageEnvelope]:
+    """Build a ``MessageEnvelope`` from a QQ inbound message."""
+    stripped = (text or "").strip()
+    if not stripped:
+        return None
+    route = qq_route_from_target(target)
+    return MessageEnvelope(
+        route=route,
+        text=stripped,
+        sender_id=sender_id,
+        message_id=msg_id or "",
+        trigger="direct" if route.is_direct else "mention",
+        explicit_trigger=True,
+        metadata=dict(metadata or {}),
+    )
+
+
+class QQRuntimePresenter:
+    """``MessagePresenter`` implementation for QQ Bot channels.
+
+    QQ cannot edit sent messages, so draft updates are delivered as new
+    throttled text messages rather than in-place edits.
+    """
+
+    def ack(self, envelope: MessageEnvelope, session: Any) -> List[DeliveryEvent]:
+        if session.adata is not None:
+            a = session.adata
+            text = f"收到请求，开始分析...\n当前数据: {a.n_obs:,} cells x {a.n_vars:,} genes"
+        else:
+            try:
+                h5ad_files = session.list_h5ad_files()
+            except Exception:
+                h5ad_files = []
+            if h5ad_files:
+                names = "  ".join(f.name for f in h5ad_files[:5])
+                text = f"收到请求，开始分析...\n检测到文件: {names}\n使用 /load <文件名> 加载"
+            else:
+                text = "收到请求，开始分析...\n未检测到数据，Agent 将自行加载"
+        image_count = (envelope.metadata or {}).get("image_count", 0)
+        if image_count:
+            text += f"\n检测到图片: {image_count} 张（已保存到 workspace/uploads/qq）"
+        return [DeliveryEvent(route=envelope.route, kind="text", text=text)]
+
+    def queue_started(
+        self, route: ConversationRoute, queued_count: int,
+    ) -> List[DeliveryEvent]:
+        return [DeliveryEvent(
+            route=route,
+            kind="text",
+            text=f"开始执行队列中的 {queued_count} 条请求...",
+        )]
+
+    def draft_open(self, route: ConversationRoute) -> DeliveryEvent:
+        return DeliveryEvent(
+            route=route, kind="text", mode="open",
+            target="analysis-draft", text="💭 思考中…",
+        )
+
+    def draft_update(
+        self, route: ConversationRoute, llm_text: str, progress: str,
+    ) -> DeliveryEvent:
+        if progress:
+            text = f"⚙️ {progress[:200]}"
+        elif llm_text.strip():
+            text = f"💭 {llm_text.strip()[-200:]}"
+        else:
+            text = "💭 思考中…"
+        return DeliveryEvent(route=route, kind="text", mode="send", text=text)
+
+    def draft_cancelled(self, route: ConversationRoute) -> DeliveryEvent:
+        return DeliveryEvent(route=route, kind="text", text="已取消当前分析。")
+
+    def analysis_error(self, route: ConversationRoute, error_text: str) -> DeliveryEvent:
+        return DeliveryEvent(route=route, kind="text", text=f"分析异常: {error_text}")
+
+    def typing(self, route: ConversationRoute) -> Optional[DeliveryEvent]:
+        if route.scope_type == "c2c":
+            return DeliveryEvent(route=route, kind="typing")
+        return None
+
+    def quick_chat_reply(self, route: ConversationRoute, text: str) -> DeliveryEvent:
+        return DeliveryEvent(route=route, kind="text", text=text)
+
+    def quick_chat_fallback(self, route: ConversationRoute) -> DeliveryEvent:
+        return DeliveryEvent(route=route, kind="text", text="正在后台分析，请等待完成。")
+
+    def analysis_status(
+        self,
+        route: ConversationRoute,
+        *,
+        has_media: bool,
+        has_reports: bool,
+        has_artifacts: bool,
+    ) -> Optional[DeliveryEvent]:
+        return None  # QQ delivers items directly without a separate status line
+
+    def final_events(
+        self,
+        route: ConversationRoute,
+        *,
+        session: Any,
+        user_text: str,
+        llm_text: str,
+        result: Any,
+    ) -> List[DeliveryEvent]:
+        events: List[DeliveryEvent] = []
+
+        for report in list(result.reports or []):
+            events.append(DeliveryEvent(
+                route=route, kind="text", text_format="markdown", text=report,
+            ))
+
+        for fig in list(result.figures or []):
+            if isinstance(fig, bytes):
+                events.append(DeliveryEvent(route=route, kind="photo", binary=fig))
+
+        for art in list(result.artifacts or []):
+            events.append(DeliveryEvent(
+                route=route, kind="document",
+                filename=getattr(art, "filename", "artifact"),
+            ))
+
+        summary = strip_local_paths(llm_text or result.summary or "")
+        if not summary.strip() or summary.strip().lower() in _BORING:
+            summary = default_summary(session)
+        events.append(DeliveryEvent(
+            route=route, kind="text", text_format="markdown", text=summary,
+        ))
+        return events
+
+
 # ── QQRuntime ─────────────────────────────────────────────────────────────────
 
 class QQRuntime:
@@ -489,18 +648,25 @@ class QQRuntime:
         image_server: Optional[_ImageServer] = None,
     ) -> None:
         self._client = client
-        self._registry = GatewaySessionRegistry(session_manager)
         self._sm = session_manager
-        self._tasks: Dict[str, RunningTask] = {}
-        self._pending: Dict[str, List[Dict[str, Any]]] = {}
         self._image_server = image_server
         # msg_seq tracking: QQ requires a unique, incrementing seq per msg_id
-        # The ack message and all follow-up messages for the same msg_id share one counter
         self._msg_seqs: Dict[str, int] = {}
+        # Reply context: route_key → inbound msg_id for reply threading
+        self._reply_msg_ids: Dict[str, str] = {}
         self._deduper = QQDeduper(Path.home() / ".ovjarvis" / "qq" / "dedup" / "global.json")
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
+        # Shared runtime wiring — delegates analysis lifecycle, task tracking,
+        # queuing, quick-chat, and result delivery to the shared MessageRuntime.
+        self._runtime = MessageRuntime(
+            router=MessageRouter(session_manager),
+            presenter=QQRuntimePresenter(),
+            execution_adapter=AgentBridgeExecutionAdapter(),
+            deliver=self._deliver_event,
+            web_bridge=getattr(session_manager, "gateway_web_bridge", None),
+        )
 
     def _run_loop(self) -> None:
         asyncio.set_event_loop(self._loop)
@@ -509,34 +675,50 @@ class QQRuntime:
     def submit(self, coro: Any) -> None:
         asyncio.run_coroutine_threadsafe(coro, self._loop)
 
-    def _session_key(self, target: QQTarget) -> SessionKey:
-        return SessionKey(
-            channel="qq",
-            scope_type=target.kind,
-            scope_id=target.id,
-            thread_id=None,
-        )
+    # ── Delivery ────────────────────────────────────────────────────────────
+
+    async def _deliver_event(self, event: DeliveryEvent) -> None:
+        """Send a ``DeliveryEvent`` via the QQ Bot REST API."""
+        target = QQTarget(kind=event.route.scope_type, id=event.route.scope_id)
+        msg_id = self._reply_msg_ids.get(event.route.route_key())
+
+        if event.kind == "typing":
+            if target.kind == "c2c":
+                await asyncio.to_thread(self._client.send_typing_c2c, target.id)
+            return
+
+        if event.kind in ("text", "prose"):
+            text = (event.text or "").strip()
+            if not text:
+                return
+            use_md = event.text_format == "markdown" or event.kind == "prose"
+            for chunk in text_chunks(text, limit=_MAX_TEXT):
+                if use_md:
+                    await asyncio.to_thread(self._send_markdown, target, chunk, msg_id)
+                else:
+                    await asyncio.to_thread(self._send_text, target, chunk, msg_id)
+            return
+
+        if event.kind == "photo":
+            if self._image_server is None or event.binary is None:
+                logger.debug("QQ: skipping photo delivery (no image server or data)")
+                return
+            img_name = f"fig_{int(time.time())}_{id(event) & 0xFFFF}.png"
+            img_url = self._image_server.host_image(event.binary, img_name)
+            seq = self._alloc_seq(msg_id)
+            await asyncio.to_thread(self._client.send_image, target, img_url, msg_id, seq)
+            await asyncio.sleep(10)
+            self._image_server.remove(img_name)
+            return
+
+        if event.kind == "document":
+            logger.info(
+                "QQ: artifact '%s' generated (file send not supported in QQ Bot API)",
+                event.filename or "unknown",
+            )
+            return
 
     # ── Helpers ───────────────────────────────────────────────────────────────
-
-    @staticmethod
-    def _strip_local_paths(text: str) -> str:
-        t = text or ""
-        t = re.sub(r'`[^`\n]*(?:/[^`\n]*){2,}`', '', t)
-        t = re.sub(r'/(?:Users|home|tmp|var|opt|root|data|mnt|private)/\S+', '', t)
-        t = re.sub(r'~[/\\]\S+', '', t)
-        _ext = r"pdf|csv|tsv|txt|xlsx|html|json|h5ad|png|jpg|svg"
-        t = re.sub(rf'\.?/?(?:\w[\w/-]*/)+\w[\w.-]*\.(?:{_ext})', '', t, flags=re.IGNORECASE)
-        t = re.sub(r'[ \t]{2,}', ' ', t)
-        t = re.sub(r'\n{3,}', '\n\n', t)
-        return t.strip()
-
-    def _build_full_request(self, session: Any, text: str) -> str:
-        return build_channel_request(session, text, channel_label="QQ")
-
-    @staticmethod
-    def _looks_like_image_name(name: str) -> bool:
-        return looks_like_image_name(name)
 
     @classmethod
     def _looks_like_image_url(cls, url: str) -> bool:
@@ -544,7 +726,7 @@ class QQRuntime:
         if not lowered.startswith(("http://", "https://", "data:")):
             return False
         stem = lowered.split("?", 1)[0]
-        return cls._looks_like_image_name(stem) or any(
+        return is_image_attachment(stem) or any(
             marker in lowered
             for marker in ("/image", "image/", "content-type=image", "qpic.cn")
         )
@@ -589,7 +771,7 @@ class QQRuntime:
             ).strip()
             if not (
                 mime_type.startswith("image/")
-                or cls._looks_like_image_name(filename)
+                or is_image_attachment(filename)
                 or cls._looks_like_image_url(url)
             ):
                 return
@@ -633,14 +815,13 @@ class QQRuntime:
     def _download_inbound_image(
         self,
         candidate: Dict[str, str],
-        target_dir: Path,
+        session: Any,
         index: int,
     ) -> Optional[PreparedImage]:
         url = candidate.get("url", "").strip()
         if not url:
             return None
 
-        target_dir.mkdir(parents=True, exist_ok=True)
         response = None
         errors: List[str] = []
         for headers in ({}, self._client._headers()):
@@ -669,13 +850,12 @@ class QQRuntime:
             or response.headers.get("Content-Type")
             or "application/octet-stream"
         ).split(";", 1)[0].strip()
-        prepared = prepare_image_bytes(
+        prepared = prepare_inbound_image(
             response.content,
-            target_dir=target_dir,
+            workspace_root=session.workspace,
+            channel_name="qq",
             filename=candidate.get("filename") or f"qq_image_{index}",
             mime_type=mime_type,
-            prefix="qq_image",
-            source="qq",
         )
         logger.info(
             "QQ inbound image stored path=%s size=%d",
@@ -693,53 +873,13 @@ class QQRuntime:
         if not candidates:
             return []
 
-        upload_dir = session.workspace / "uploads" / "qq"
         prepared: List[PreparedImage] = []
-        for index, candidate in enumerate(candidates[:4], start=1):
-            downloaded = self._download_inbound_image(candidate, upload_dir, index)
+        for index, candidate in enumerate(candidates[:MAX_INBOUND_IMAGES], start=1):
+            downloaded = self._download_inbound_image(candidate, session, index)
             if downloaded is None:
                 continue
             prepared.append(downloaded)
         return prepared
-
-    @staticmethod
-    def _coalesce_pending_requests(items: List[Dict[str, Any]]) -> tuple[str, List[Dict[str, Any]]]:
-        parts: List[str] = []
-        request_content: List[Dict[str, Any]] = []
-        for item in items:
-            text = str(item.get("text") or "").strip()
-            if text:
-                parts.append(text)
-            request_content.extend(list(item.get("request_content") or []))
-        return "\n\n".join(parts).strip(), request_content
-
-    @staticmethod
-    def _text_chunks(text: str, limit: int = _MAX_TEXT) -> List[str]:
-        text = (text or "").strip()
-        if not text:
-            return []
-        if len(text) <= limit:
-            return [text]
-        chunks: List[str] = []
-        buf = ""
-        for para in text.split("\n\n"):
-            cand = f"{buf}\n\n{para}".strip() if buf else para
-            if len(cand) <= limit:
-                buf = cand
-                continue
-            if buf:
-                chunks.append(buf)
-            if len(para) <= limit:
-                buf = para
-            else:
-                pos = 0
-                while pos < len(para):
-                    chunks.append(para[pos:pos + limit])
-                    pos += limit
-                buf = ""
-        if buf:
-            chunks.append(buf)
-        return chunks
 
     def _send_markdown(self, target: QQTarget, text: str, msg_id: Optional[str] = None) -> Optional[str]:
         """Send markdown content (mirrors Feishu send_markdown_card).
@@ -765,278 +905,6 @@ class QQRuntime:
         """Send text, automatically allocating the next msg_seq for this msg_id."""
         seq = self._alloc_seq(msg_id)
         return self._client.send_text(target, text, msg_id=msg_id, msg_seq=seq)
-
-    # ── Quick chat ────────────────────────────────────────────────────────────
-
-    async def _quick_chat(
-        self,
-        target: QQTarget,
-        msg_id: Optional[str],
-        session: Any,
-        user_text: str,
-        running_request: str = "",
-        queued: bool = False,
-    ) -> None:
-        try:
-            system_lines = [
-                "You are OmicVerse Jarvis, a bioinformatics AI assistant.",
-                "The user is chatting with you while a background analysis is running.",
-                "Answer concisely. Do NOT execute code or call tools.",
-                "Reply in the same language the user uses.",
-            ]
-            if running_request:
-                system_lines.append(f"\nCurrently running: {running_request[:300]}")
-            if queued:
-                system_lines.append(
-                    "The user's message has been queued and will start after current analysis. Mention this."
-                )
-            if session.adata is not None:
-                a = session.adata
-                system_lines.append(f"Loaded data: {a.n_obs:,} cells x {a.n_vars:,} genes")
-            try:
-                mem = session.get_memory_context()
-                if mem:
-                    system_lines.append(f"\nHistory:\n{mem[:600]}")
-            except Exception:
-                pass
-            messages = [
-                {"role": "system", "content": "\n".join(system_lines)},
-                {"role": "user", "content": user_text},
-            ]
-            response = await session.agent._llm.chat(messages, tools=None, tool_choice=None)
-            reply = (response.content or "").strip() or "正在分析，请稍候..."
-            for chunk in self._text_chunks(reply):
-                await asyncio.to_thread(self._send_text, target, chunk, msg_id)
-        except Exception as exc:
-            logger.warning("QQ quick_chat failed: %s", exc)
-            try:
-                await asyncio.to_thread(self._send_text, target, "正在后台分析，请等待完成。", msg_id)
-            except Exception:
-                pass
-
-    # ── Analysis pipeline ─────────────────────────────────────────────────────
-
-    async def _spawn_analysis(
-        self,
-        target: QQTarget,
-        msg_id: Optional[str],
-        session: Any,
-        user_text: str,
-        request_content: Optional[List[Dict[str, Any]]] = None,
-    ) -> None:
-        full_request = self._build_full_request(session, user_text)
-        route = target.route_key()
-        task = asyncio.create_task(
-            self._analysis_wrapper(
-                target,
-                msg_id,
-                session,
-                user_text,
-                full_request,
-                request_content or [],
-            )
-        )
-        self._tasks[route] = RunningTask(task=task, request=user_text, started_at=time.time())
-
-    async def _analysis_wrapper(
-        self,
-        target: QQTarget,
-        msg_id: Optional[str],
-        session: Any,
-        user_text: str,
-        full_request: str,
-        request_content: List[Dict[str, Any]],
-    ) -> None:
-        route = target.route_key()
-        try:
-            await self._run_analysis(
-                target,
-                msg_id,
-                session,
-                user_text,
-                full_request,
-                request_content,
-            )
-        except asyncio.CancelledError:
-            pass
-        except Exception as exc:
-            logger.exception("QQ analysis wrapper error")
-            try:
-                await asyncio.to_thread(self._send_text, target, f"分析异常: {exc}", msg_id)
-            except Exception:
-                pass
-        finally:
-            self._tasks.pop(route, None)
-            queued = self._pending.pop(route, [])
-            if queued:
-                n = len(queued)
-                coalesced, request_content = self._coalesce_pending_requests(queued)
-                try:
-                    # Use None as msg_id for queued follow-ups: the original msg_id has
-                    # almost certainly expired (>5 min) by now. Proactive send or new msg_id
-                    # from the queued message will be used in the next _dispatch.
-                    await asyncio.to_thread(
-                        self._send_text, target, f"开始执行队列中的 {n} 条请求...", None
-                    )
-                except Exception:
-                    pass
-                asyncio.create_task(
-                    self._spawn_analysis(
-                        target,
-                        None,
-                        session,
-                        coalesced,
-                        request_content=request_content,
-                    )
-                )
-
-    async def _run_analysis(
-        self,
-        target: QQTarget,
-        msg_id: Optional[str],
-        session: Any,
-        user_text: str,
-        full_request: str,
-        request_content: List[Dict[str, Any]],
-    ) -> None:
-        llm_buf = ""
-
-        def _trim(text: str, max_len: int = 1800) -> str:
-            if len(text) <= max_len:
-                return text
-            head = int(max_len * 0.6)
-            tail = max_len - head - 20
-            return text[:head] + "\n...\n" + text[-max(150, tail):]
-
-        last_progress_send: float = 0.0
-        _PROGRESS_GAP = 12.0  # throttle: send progress at most every 12 s
-
-        async def llm_chunk_cb(chunk: str) -> None:
-            nonlocal llm_buf
-            if chunk:
-                llm_buf += chunk
-
-        async def progress_cb(msg: str) -> None:
-            nonlocal last_progress_send
-            # QQ can't edit messages; send throttled progress snapshots instead
-            # (mirrors Feishu's edit_card live updates, just less frequent)
-            now = time.monotonic()
-            if now - last_progress_send < _PROGRESS_GAP:
-                return
-            last_progress_send = now
-            try:
-                await asyncio.to_thread(self._send_text, target, f"⚙️ {msg[:200]}", msg_id)
-            except Exception:
-                pass
-
-        _scope_id = str(target.channel_id if hasattr(target, "channel_id") else target)
-        _wb = getattr(self._sm, "gateway_web_bridge", None)
-        _prior_history = _wb.get_prior_history_simple(
-            "qq",
-            "dm",
-            _scope_id,
-            session_id=resolve_bridge_session_id(session),
-        ) if _wb else []
-
-        bridge = AgentBridge(session.agent, progress_cb=progress_cb, llm_chunk_cb=llm_chunk_cb)
-        try:
-            result = await bridge.run(
-                full_request,
-                session.adata,
-                history=_prior_history,
-                request_content=request_content,
-            )
-        except asyncio.CancelledError:
-            await asyncio.to_thread(self._send_text, target, "已取消当前分析。", msg_id)
-            raise
-        except Exception as exc:
-            logger.exception("QQ analysis failed")
-            await asyncio.to_thread(self._send_text, target, f"分析失败: {exc}", msg_id)
-            return
-
-        if result.adata is not None:
-            session.adata = result.adata
-            try:
-                session.save_adata()
-                session.prompt_count += 1
-            except Exception:
-                pass
-        if result.usage is not None:
-            session.last_usage = result.usage
-        delivery_figures = prepare_channel_delivery_figures(session, result.figures)
-        try:
-            a = session.adata
-            adata_info = f"{a.n_obs:,} cells x {a.n_vars:,} genes" if a is not None else ""
-            session.append_memory_log(
-                request=user_text,
-                summary=(result.summary or "分析完成"),
-                adata_info=adata_info,
-            )
-        except Exception:
-            pass
-
-        # Mirror the completed turn into the web session (gateway mode)
-        _web_bridge = getattr(self._sm, "gateway_web_bridge", None)
-        if _web_bridge is not None:
-            try:
-                scope_id = str(target.channel_id if hasattr(target, "channel_id") else target)
-                _web_bridge.on_turn_complete_simple(
-                    channel="qq",
-                    scope_type="dm",
-                    scope_id=scope_id,
-                    user_text=user_text,
-                    llm_text=llm_buf,
-                    adata=result.adata,
-                    figures=result.figures or [],
-                    session_id=resolve_bridge_session_id(session),
-                )
-            except Exception:
-                pass
-
-        if result.error:
-            err_text = f"分析出错: {result.error}"
-            if result.diagnostics:
-                hints = "\n".join(f"- {x}" for x in result.diagnostics[:4])
-                err_text += f"\n\n诊断:\n{hints}"
-            if llm_buf.strip():
-                err_text += f"\n\n模型输出:\n{_trim(llm_buf, 1200)}"
-            # Use markdown for error detail (mirrors Feishu edit_card red)
-            await asyncio.to_thread(self._send_markdown, target, err_text, msg_id)
-            return
-
-        # Send reports — markdown rendering (mirrors Feishu send_markdown_card "📊 分析报告")
-        for rep in list(result.reports or []):
-            for chunk in self._text_chunks(rep, limit=_MAX_TEXT):
-                await asyncio.to_thread(self._send_markdown, target, chunk, msg_id)
-
-        # Send figures
-        for i, fig in enumerate(delivery_figures, start=1):
-            if self._image_server is None:
-                logger.debug("QQ: no image server configured, skipping figure %s", i)
-                continue
-            try:
-                img_name = f"fig_{int(time.time())}_{i}.png"
-                img_url = self._image_server.host_image(fig, img_name)
-                seq = self._alloc_seq(msg_id)
-                await asyncio.to_thread(self._client.send_image, target, img_url, msg_id, seq)
-                await asyncio.sleep(10)
-                self._image_server.remove(img_name)
-            except Exception:
-                logger.warning("QQ: failed to send figure %s", i)
-
-        # Send artifacts (file send not directly supported by QQ Bot API; log only)
-        for art in list(result.artifacts or []):
-            logger.info("QQ: artifact '%s' generated (file send not supported in QQ Bot API)", art.filename)
-
-        # Send summary
-        summary = self._strip_local_paths(
-            bridge.pick_reply_text(result, llm_buf, max_len=1800)
-        )
-        if not summary and session.adata is not None:
-            a = session.adata
-            summary = f"分析完成\n{a.n_obs:,} cells x {a.n_vars:,} genes"
-        for chunk in self._text_chunks(summary or "分析完成", limit=_MAX_TEXT):
-            await asyncio.to_thread(self._send_markdown, target, chunk, msg_id)
 
     # ── Message dispatcher ────────────────────────────────────────────────────
 
@@ -1073,12 +941,13 @@ class QQRuntime:
         else:
             target = QQTarget(kind="c2c", id=sender_id)
 
-        self.submit(self._dispatch(target, msg_id, content, payload))
+        self.submit(self._dispatch(target, msg_id, sender_id, content, payload))
 
     async def _dispatch(
         self,
         target: QQTarget,
         msg_id: str,
+        sender_id: str,
         raw_text: str,
         payload: Optional[Dict[str, Any]] = None,
     ) -> None:
@@ -1086,14 +955,14 @@ class QQRuntime:
         # Strip @bot mention prefix that QQ injects (e.g. "<@!botid> ")
         text = re.sub(r'^<@!?\w+>\s*', '', text).strip()
 
-        sk = self._session_key(target)
-        session = self._registry.get_or_create(sk)
+        route = qq_route_from_target(target)
+        session = self._runtime.get_session(route)
         inbound_images = await asyncio.to_thread(self._prepare_inbound_images, session, payload)
         if not text and inbound_images:
             text = "请分析这张图片，并提取其中的关键信息。"
         if not text:
             return
-        route = target.route_key()
+
         tokens = text.split()
         cmd = tokens[0].lower() if tokens else ""
         tail = text.split(None, 1)[1].strip() if len(tokens) > 1 else ""
@@ -1142,6 +1011,7 @@ class QQRuntime:
             await self._handle_save(target, msg_id, session)
             return
 
+        # ── Analysis path: delegate to shared MessageRuntime ─────────────
         image_note = build_workspace_note(
             session.workspace,
             inbound_images,
@@ -1150,56 +1020,31 @@ class QQRuntime:
         user_text = compose_multimodal_user_text(text, image_note)
         request_content = [item.request_block for item in inbound_images]
 
-        running = self._tasks.get(route)
-        if running and not running.task.done():
-            self._pending.setdefault(route, []).append(
-                {
-                    "text": user_text,
-                    "request_content": request_content,
-                }
-            )
-            asyncio.create_task(
-                self._quick_chat(target, msg_id, session, text,
-                                 running_request=running.request, queued=True)
-            )
-            return
+        # Store reply context so _deliver_event can thread replies
+        if msg_id:
+            self._reply_msg_ids[route.route_key()] = msg_id
 
-        # Ack before analysis
-        if session.adata is not None:
-            a = session.adata
-            ack = f"收到请求，开始分析...\n当前数据: {a.n_obs:,} cells x {a.n_vars:,} genes"
-        else:
-            try:
-                h5ad_files = session.list_h5ad_files()
-            except Exception:
-                h5ad_files = []
-            if h5ad_files:
-                names = "  ".join(f.name for f in h5ad_files[:5])
-                ack = f"收到请求，开始分析...\n检测到文件: {names}\n使用 /load <文件名> 加载"
-            else:
-                ack = "收到请求，开始分析...\n未检测到数据，Agent 将自行加载"
-        if inbound_images:
-            ack += f"\n检测到图片: {len(inbound_images)} 张（已保存到 workspace/uploads/qq）"
-        await asyncio.to_thread(self._send_text, target, ack, msg_id)
-
-        await self._spawn_analysis(
+        envelope = qq_runtime_envelope(
             target,
-            msg_id,
-            session,
             user_text,
-            request_content=request_content,
+            sender_id=sender_id,
+            msg_id=msg_id,
+            metadata={
+                "image_count": len(inbound_images),
+                "request_content": request_content,
+            },
         )
+        if envelope is not None:
+            await self._runtime.handle_message(envelope)
 
     # ── Command handlers ──────────────────────────────────────────────────────
 
-    async def _handle_cancel(self, target: QQTarget, msg_id: Optional[str], route: str) -> None:
-        self._pending.pop(route, None)
-        running = self._tasks.get(route)
-        if not running or running.task.done():
+    async def _handle_cancel(self, target: QQTarget, msg_id: Optional[str], route: ConversationRoute) -> None:
+        cancelled = await self._runtime.cancel(route)
+        if cancelled:
+            await asyncio.to_thread(self._send_text, target, "已发送取消信号。", msg_id)
+        else:
             await asyncio.to_thread(self._send_text, target, "当前没有正在运行的分析。", msg_id)
-            return
-        running.task.cancel()
-        await asyncio.to_thread(self._send_text, target, "已发送取消信号。", msg_id)
 
     async def _handle_help(self, target: QQTarget, msg_id: Optional[str]) -> None:
         text = (
@@ -1223,59 +1068,23 @@ class QQRuntime:
         )
         await asyncio.to_thread(self._send_text, target, text, msg_id)
 
-    async def _handle_status(self, target: QQTarget, msg_id: Optional[str], session: Any, route: str) -> None:
-        lines: List[str] = []
-        if session.adata is not None:
-            a = session.adata
-            lines.append(f"{a.n_obs:,} cells x {a.n_vars:,} genes")
-            try:
-                cols = ", ".join(list(a.obs.columns[:8]))
-                if cols:
-                    lines.append(f"obs: {cols}")
-            except Exception:
-                pass
-        else:
-            lines.append("暂无数据")
-        try:
-            kname = self._sm.get_active_kernel(session.user_id)
-            lines.append(f"kernel: {kname}")
-        except Exception:
-            pass
-        kst = session.kernel_status()
-        if kst:
-            lines.append(f"prompts: {kst.get('prompt_count', 0)}/{kst.get('max_prompts', '?')}")
-        running = self._tasks.get(route)
-        if running and not running.task.done():
-            lines.append("分析中（可 /cancel）")
-        await asyncio.to_thread(self._send_text, target, "\n".join(lines), msg_id)
+    async def _handle_status(self, target: QQTarget, msg_id: Optional[str], session: Any, route: ConversationRoute) -> None:
+        state = self._runtime.task_state(route)
+        info = gather_status(
+            session,
+            session_manager=self._sm,
+            is_running=state.running,
+        )
+        await asyncio.to_thread(self._send_text, target, format_status_plain(info), msg_id)
 
     async def _handle_workspace(self, target: QQTarget, msg_id: Optional[str], session: Any) -> None:
-        ws = session.workspace
-        h5ad_files = session.list_h5ad_files()
-        agents_md = session.get_agents_md()
-        today_log = session.memory_dir / f"{datetime.now().date()}.md"
-        lines = [f"Workspace: {ws}", ""]
-        if h5ad_files:
-            lines.append(f"数据文件 ({len(h5ad_files)})")
-            for f in h5ad_files[:10]:
-                try:
-                    mb = f.stat().st_size / 1_048_576
-                    lines.append(f"- {f.name} ({mb:.1f} MB)")
-                except OSError:
-                    lines.append(f"- {f.name}")
-        else:
-            lines.append("数据文件 (空)")
-        lines += [
-            "",
-            f"AGENTS.md {'OK' if agents_md else '-'}",
-            f"今日记忆 {'OK' if today_log.exists() else '-'}",
-        ]
-        await asyncio.to_thread(self._send_text, target, "\n".join(lines), msg_id)
+        info = gather_workspace(session)
+        await asyncio.to_thread(self._send_text, target, format_workspace_plain(info), msg_id)
 
     async def _handle_ls(self, target: QQTarget, msg_id: Optional[str], session: Any, subpath: str) -> None:
         cmd = f"ls -lh {subpath}".strip() if subpath else "ls -lh"
         out = session.shell.exec(cmd, cwd=session.workspace)
-        for chunk in self._text_chunks(f"$ {cmd}\n{out}", limit=1800):
+        for chunk in text_chunks(f"$ {cmd}\n{out}", limit=1800):
             await asyncio.to_thread(self._send_text, target, chunk, msg_id)
 
     async def _handle_find(self, target: QQTarget, msg_id: Optional[str], session: Any, pattern: str) -> None:
@@ -1285,7 +1094,7 @@ class QQRuntime:
             return
         cmd = f"find . -name {pattern}"
         out = session.shell.exec(cmd, cwd=session.workspace)
-        for chunk in self._text_chunks(f"$ {cmd}\n{out}", limit=1800):
+        for chunk in text_chunks(f"$ {cmd}\n{out}", limit=1800):
             await asyncio.to_thread(self._send_text, target, chunk, msg_id)
 
     async def _handle_load(self, target: QQTarget, msg_id: Optional[str], session: Any, filename: str) -> None:
@@ -1322,40 +1131,23 @@ class QQRuntime:
             )
             return
         out = session.shell.exec(cmd, cwd=session.workspace)
-        for chunk in self._text_chunks(f"$ {cmd}\n{out}", limit=1800):
+        for chunk in text_chunks(f"$ {cmd}\n{out}", limit=1800):
             await asyncio.to_thread(self._send_text, target, chunk, msg_id)
 
     async def _handle_memory(self, target: QQTarget, msg_id: Optional[str], session: Any) -> None:
         text = session.get_recent_memory_text()
-        for chunk in self._text_chunks(f"分析历史（近两天）\n\n{text}", limit=1800):
+        for chunk in text_chunks(f"分析历史（近两天）\n\n{text}", limit=1800):
             await asyncio.to_thread(self._send_text, target, chunk, msg_id)
 
     async def _handle_usage(self, target: QQTarget, msg_id: Optional[str], session: Any) -> None:
-        usage = session.last_usage
-        if usage is None:
-            await asyncio.to_thread(self._send_text, target, "暂无用量数据，请先进行一次分析。", msg_id)
-            return
-
-        def _attr(obj: Any, *names: str) -> str:
-            for n in names:
-                v = getattr(obj, n, None)
-                if v is not None:
-                    return f"{v:,}" if isinstance(v, int) else str(v)
-            return "?"
-
-        lines = [
-            "Token 用量（最近一次）",
-            f"输入: {_attr(usage, 'input_tokens')}",
-            f"输出: {_attr(usage, 'output_tokens')}",
-            f"合计: {_attr(usage, 'total_tokens')}",
-        ]
-        await asyncio.to_thread(self._send_text, target, "\n".join(lines), msg_id)
+        info = gather_usage(session)
+        await asyncio.to_thread(self._send_text, target, format_usage_plain(info), msg_id)
 
     async def _handle_model(self, target: QQTarget, msg_id: Optional[str], model_name: str) -> None:
         model_name = (model_name or "").strip()
         if not model_name:
             text = render_model_help(getattr(self._sm, "_model", "unknown"))
-            for chunk in self._text_chunks(text, limit=1800):
+            for chunk in text_chunks(text, limit=1800):
                 await asyncio.to_thread(self._send_text, target, chunk, msg_id)
             return
         self._sm._model = model_name
@@ -1370,27 +1162,15 @@ class QQRuntime:
             await asyncio.to_thread(self._send_text, target, "没有数据，请先 /load 或完成分析。", msg_id)
             return
         await asyncio.to_thread(self._send_text, target, "正在保存 current.h5ad...", msg_id)
-        try:
-            path = await asyncio.to_thread(session.save_adata)
-            if not path or not Path(path).exists():
-                await asyncio.to_thread(self._send_text, target, "保存失败，请重试。", msg_id)
-                return
-            a = session.adata
-            # QQ Bot doesn't support raw file uploads; note location only
-            await asyncio.to_thread(
-                self._send_text, target,
-                f"已保存 current.h5ad\n{a.n_obs:,} cells x {a.n_vars:,} genes\n路径: {path}",
-                msg_id,
-            )
-        except Exception as exc:
-            await asyncio.to_thread(self._send_text, target, f"保存失败: {exc}", msg_id)
+        result = await asyncio.to_thread(perform_save, session)
+        await asyncio.to_thread(self._send_text, target, format_save_result_plain(result), msg_id)
 
     async def _handle_kernel(
         self,
         target: QQTarget,
         msg_id: Optional[str],
         session: Any,
-        route: str,
+        route: ConversationRoute,
         args: List[str],
     ) -> None:
         if not args:
@@ -1418,8 +1198,8 @@ class QQRuntime:
                 await asyncio.to_thread(self._send_text, target, "用法: /kernel new 名称 或 /kernel use 名称", msg_id)
                 return
             target_name = args[1]
-            running = self._tasks.get(route)
-            if running and not running.task.done():
+            state = self._runtime.task_state(route)
+            if state.running:
                 await asyncio.to_thread(self._send_text, target, "当前有分析在运行，请先 /cancel 或等待完成。", msg_id)
                 return
             try:

@@ -11,6 +11,7 @@ Usage:
 """
 
 import asyncio
+import inspect
 import json
 import logging
 import os
@@ -19,7 +20,9 @@ import sys
 import threading
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Coroutine, Dict, List, Optional, Tuple, TypeVar, Union
+
+_T = TypeVar("_T")
 
 # Internal LLM backend
 from .agent_backend import OmicVerseLLMBackend, Usage
@@ -82,16 +85,15 @@ from .ovagent.auth import (
     collect_api_key_env as _collect_api_key_env,
     temporary_api_keys as _temporary_api_keys_cm,
     display_backend_info as _display_backend_info,
+    resolve_credentials as _resolve_agent_llm_credentials,
+    # Backward-compat re-exports (moved from this module to ovagent.auth)
+    _normalize_model_for_routing,
 )
 from .ovagent.bootstrap import (
     format_skill_overview as _format_skill_overview,
     initialize_skill_registry as _initialize_skill_registry,
     initialize_notebook_executor as _initialize_notebook_executor,
-    initialize_filesystem_context as _initialize_filesystem_context,
-    initialize_session_history as _initialize_session_history,
-    initialize_tracing as _initialize_tracing,
     initialize_security as _initialize_security,
-    initialize_ov_runtime as _initialize_ov_runtime,
     create_llm_backend as _create_llm_backend,
     display_reflection_config as _display_reflection_config,
 )
@@ -110,14 +112,9 @@ from .ovagent.tool_runtime import (
 )
 from .ovagent.codegen_pipeline import CodegenPipeline as _CodegenPipeline
 from .ovagent.subagent_controller import SubagentController as _SubagentController
-from .ovagent.turn_controller import (
-    TurnController as _TurnController,
-    FollowUpGate as _FollowUpGate,
-)
-from .ovagent.session_context import (
-    SessionService as _SessionService,
-    ContextService as _ContextService,
-)
+from .ovagent.turn_controller import TurnController as _TurnController
+from .ovagent.session_facade import SessionContextFacadeMixin
+from .ovagent.codegen_tool_facade import CodegenToolDispatchFacadeMixin
 from .ovagent.registry_scanner import RegistryScanner as _RegistryScanner
 
 # Session history
@@ -137,218 +134,9 @@ from .skill_registry import (
 
 # Filesystem context management
 from .filesystem_context import FilesystemContextManager
-from ..jarvis.config import load_auth
-from ..jarvis.gemini_cli_oauth import (
-    GOOGLE_CODE_ASSIST_ENDPOINT_PROD,
-    GeminiCliOAuthError,
-    GeminiCliOAuthManager,
-)
-from ..jarvis.openai_oauth import OPENAI_CODEX_BASE_URL, OpenAIOAuthManager
 
 
 logger = logging.getLogger(__name__)
-
-_LEGACY_OPENAI_CODEX_BASE_URL = "https://api.openai.com/v1"
-OPENAI_CODEX_DEFAULT_MODEL = "gpt-5.3-codex"
-_OPENAI_OAUTH_SUPPORTED_MODELS = {
-    "gpt-5.3-codex",
-    "gpt-5.3-codex-spark",
-    "gpt-5.2-codex",
-    "gpt-5.2",
-    "gpt-5.1",
-    "gpt-5.1-codex",
-    "gpt-5.1-codex-mini",
-    "gpt-5.1-codex-max",
-    "gpt-5.4",
-    "gpt-5.4-mini",
-}
-_OPENAI_EXPLICIT_OAUTH_MODELS = {
-    model_name
-    for model_name in _OPENAI_OAUTH_SUPPORTED_MODELS
-    if "codex" in model_name
-}
-
-
-def _normalize_auth_mode(auth_mode: Optional[str]) -> str:
-    if auth_mode == "openai_api_key":
-        return "saved_api_key"
-    if auth_mode == "openai_codex":
-        return "openai_oauth"
-    if auth_mode in {"google_oauth", "gemini_cli_oauth"}:
-        return str(auth_mode)
-    return str(auth_mode or "environment")
-
-
-def _is_openai_oauth_supported_model(model: str) -> bool:
-    return str(model or "").strip().lower() in {
-        name.lower() for name in _OPENAI_OAUTH_SUPPORTED_MODELS
-    }
-
-
-def _is_explicit_openai_oauth_model(model: str) -> bool:
-    return str(model or "").strip().lower() in {
-        name.lower() for name in _OPENAI_EXPLICIT_OAUTH_MODELS
-    }
-
-
-def _normalize_model_for_routing(model: str) -> str:
-    normalized = str(model or "").strip()
-    if not normalized:
-        return normalized
-    try:
-        return ModelConfig.normalize_model_id(normalized)
-    except Exception:
-        return normalized
-
-
-def _is_custom_openai_endpoint(endpoint: Optional[str]) -> bool:
-    normalized = str(endpoint or "").strip().rstrip("/")
-    return bool(normalized) and normalized not in {
-        _LEGACY_OPENAI_CODEX_BASE_URL,
-        OPENAI_CODEX_BASE_URL,
-    }
-
-
-def _looks_like_openai_endpoint(endpoint: Optional[str]) -> bool:
-    normalized = str(endpoint or "").strip().rstrip("/").lower()
-    if not normalized:
-        return False
-    return (
-        normalized == _LEGACY_OPENAI_CODEX_BASE_URL
-        or normalized == OPENAI_CODEX_BASE_URL
-        or "api.openai.com" in normalized
-        or "chatgpt.com/backend-api" in normalized
-    )
-
-
-def _extract_openai_codex_account_id(token: Optional[str]) -> str:
-    try:
-        return OmicVerseLLMBackend._extract_openai_codex_account_id(str(token or ""))
-    except Exception:
-        return ""
-
-
-def _resolve_saved_provider_api_key(provider_name: str, auth_path: Optional[Path]) -> Optional[str]:
-    auth = load_auth(auth_path)
-    providers = dict(auth.get("providers") or {})
-
-    if provider_name == "openai":
-        top_level = str(auth.get("OPENAI_API_KEY") or "").strip()
-        if top_level:
-            return top_level
-
-    provider_auth = dict(providers.get(provider_name) or {})
-    api_key = str(provider_auth.get("api_key") or "").strip()
-    return api_key or None
-
-
-def _resolve_agent_llm_credentials(
-    *,
-    model: str,
-    api_key: Optional[str],
-    endpoint: Optional[str],
-    auth_mode: Optional[str],
-    auth_provider: Optional[str],
-    auth_file: Optional[Union[str, Path]],
-) -> Tuple[str, Optional[str], Optional[str], str]:
-    """Resolve model/auth settings, including OpenAI Codex OAuth fallback."""
-
-    normalized_mode = _normalize_auth_mode(auth_mode)
-    resolved_model = model
-    normalized_model = _normalize_model_for_routing(model)
-    resolved_api_key = api_key
-    api_key_source = "explicit" if resolved_api_key else None
-    resolved_endpoint = endpoint
-    resolved_auth_path = Path(auth_file).expanduser() if auth_file else None
-    normalized_auth_provider = str(auth_provider or "").strip().lower() or "codex"
-
-    provider = ModelConfig.get_provider_from_model(normalized_model or resolved_model, resolved_endpoint)
-    wants_gemini_cli_oauth = provider == "google" and (
-        normalized_mode in {"google_oauth", "gemini_cli_oauth"}
-        or (normalized_mode == "openai_oauth" and normalized_auth_provider == "gemini_cli")
-    )
-    if wants_gemini_cli_oauth:
-        manager = GeminiCliOAuthManager(resolved_auth_path)
-        try:
-            payload = manager.build_api_key_payload(
-                refresh_if_needed=True,
-                import_if_missing=True,
-            )
-        except GeminiCliOAuthError as exc:
-            raise ValueError(
-                "Failed to load saved Gemini CLI OAuth credentials. "
-                "This is an unofficial integration; some users report account restrictions. "
-                "Use at your own risk."
-            ) from exc
-        if not payload:
-            raise ValueError(
-                "No saved Gemini CLI OAuth login found. Complete Gemini CLI OAuth first. "
-                "This is an unofficial integration; some users report account restrictions. "
-                "Use at your own risk."
-            )
-        resolved_api_key = payload
-        if (
-            not resolved_endpoint
-            or _looks_like_openai_endpoint(resolved_endpoint)
-            or "generativelanguage.googleapis.com" in str(resolved_endpoint)
-        ):
-            resolved_endpoint = GOOGLE_CODE_ASSIST_ENDPOINT_PROD
-        api_key_source = "gemini_cli_oauth"
-        return resolved_model, resolved_api_key, resolved_endpoint, "gemini_cli_oauth"
-
-    wants_codex_oauth = provider == "openai" and (
-        normalized_mode == "openai_oauth"
-        or _is_explicit_openai_oauth_model(normalized_model)
-        or str(resolved_endpoint or "").rstrip("/") == OPENAI_CODEX_BASE_URL
-    )
-
-    if provider == "openai" and normalized_mode == "saved_api_key" and not resolved_api_key:
-        resolved_api_key = _resolve_saved_provider_api_key("openai", resolved_auth_path)
-        api_key_source = "saved_api_key" if resolved_api_key else None
-
-    if not wants_codex_oauth:
-        return resolved_model, resolved_api_key, resolved_endpoint, normalized_mode
-
-    normalized_mode = "openai_oauth"
-    preserve_model_id = _is_custom_openai_endpoint(resolved_endpoint)
-    if not resolved_endpoint or resolved_endpoint.rstrip("/") == _LEGACY_OPENAI_CODEX_BASE_URL:
-        resolved_endpoint = OPENAI_CODEX_BASE_URL
-        preserve_model_id = False
-    if _is_openai_oauth_supported_model(normalized_model):
-        if not preserve_model_id:
-            resolved_model = normalized_model
-    elif not preserve_model_id:
-        resolved_model = OPENAI_CODEX_DEFAULT_MODEL
-
-    if resolved_api_key:
-        if _extract_openai_codex_account_id(resolved_api_key):
-            return resolved_model, resolved_api_key, resolved_endpoint, normalized_mode
-        if api_key_source == "explicit":
-            raise ValueError(
-                "OpenAI Codex models require a ChatGPT OAuth access token with "
-                "chatgpt_account_id. Run `omicverse jarvis --codex-login` or "
-                "pass a valid OpenAI OAuth access token."
-            )
-        resolved_api_key = None
-
-    manager = OpenAIOAuthManager(resolved_auth_path)
-    resolved_api_key = manager.ensure_access_token_with_codex_fallback(
-        refresh_if_needed=True,
-        import_codex_if_missing=True,
-    )
-    if resolved_api_key and _extract_openai_codex_account_id(resolved_api_key):
-        return resolved_model, resolved_api_key, resolved_endpoint, normalized_mode
-    if resolved_api_key:
-        raise ValueError(
-            "Saved OpenAI Codex login is missing chatgpt_account_id. "
-            "Run `omicverse jarvis --codex-login` again."
-        )
-
-    raise ValueError(
-        "No saved OpenAI Codex login found. Run `omicverse jarvis --codex-login` "
-        "or pass a valid OpenAI OAuth access token."
-    )
-
 
 def _wire_package_import_compatibility() -> None:
     """Expose parent package references without probing lazy __getattr__ hooks."""
@@ -371,7 +159,53 @@ def _wire_package_import_compatibility() -> None:
 _wire_package_import_compatibility()
 
 
-class OmicVerseAgent:
+def _run_coroutine_sync(coro: Coroutine[Any, Any, _T]) -> _T:
+    """Run *coro* synchronously, preserving exception tracebacks.
+
+    * **No running loop** — delegates to ``asyncio.run()``.
+    * **Running loop detected** (e.g. Jupyter / Jarvis) — spawns a daemon
+      worker thread with its own event loop.  Exceptions are transported via
+      ``sys.exc_info()`` and re-raised with ``with_traceback()`` so the
+      caller sees the full original traceback chain instead of a collapsed
+      single-frame ``raise err`` from a dict container.
+
+    This function never imports or patches ``nest_asyncio``.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop is not None and loop.is_running():
+        _result: list = [None]
+        _exc_info: list = [None]
+
+        def _worker() -> None:
+            try:
+                _result[0] = asyncio.run(coro)
+            except BaseException:
+                _exc_info[0] = sys.exc_info()
+
+        thread = threading.Thread(
+            target=_worker, name="OmicVerseAgentSync", daemon=True,
+        )
+        thread.start()
+        thread.join()
+
+        if _exc_info[0] is not None:
+            _tp, exc, tb = _exc_info[0]
+            _exc_info[0] = None
+            try:
+                raise exc.with_traceback(tb)
+            finally:
+                del exc, tb
+
+        return _result[0]  # type: ignore[return-value]
+
+    return asyncio.run(coro)
+
+
+class OmicVerseAgent(CodegenToolDispatchFacadeMixin, SessionContextFacadeMixin):
     """
     Intelligent agent for OmicVerse function discovery and execution.
 
@@ -386,14 +220,9 @@ class OmicVerseAgent:
     LEGACY_AGENT_TOOLS = _LEGACY_AGENT_TOOLS
     AGENT_TOOLS = get_visible_tool_schemas(get_default_loaded_tool_names()) + _LEGACY_AGENT_TOOLS
 
-    @property
-    def _codegen(self) -> "_CodegenPipeline":
-        """Lazily create CodegenPipeline for agents constructed via __new__."""
-        pipeline = getattr(self, "_codegen_pipeline", None)
-        if pipeline is None:
-            pipeline = _CodegenPipeline(self)
-            self._codegen_pipeline = pipeline
-        return pipeline
+    @staticmethod
+    def _emit(level: "EventLevel", message: str, category: str = "") -> None:
+        """No-op fallback; replaced by ``__init__`` with a reporter-backed emitter."""
 
     def __init__(self, model: str = "gpt-5.2", api_key: Optional[str] = None, endpoint: Optional[str] = None, auth_mode: str = "environment", auth_provider: Optional[str] = None, auth_file: Optional[str] = None, enable_reflection: bool = True, reflection_iterations: int = 1, enable_result_review: bool = True, use_notebook_execution: bool = True, max_prompts_per_session: int = 5, notebook_storage_dir: Optional[str] = None, keep_execution_notebooks: bool = True, notebook_timeout: int = 600, strict_kernel_validation: bool = True, enable_filesystem_context: bool = True, context_storage_dir: Optional[str] = None, approval_mode: str = "never", agent_mode: str = "agentic", max_agent_turns: int = 15, security_level: Optional[str] = None, *, config: Optional[AgentConfig] = None, reporter: Optional[Reporter] = None, verbose: bool = True):
         """
@@ -520,17 +349,17 @@ class OmicVerseAgent:
         # When using a custom endpoint (proxy), keep the model name as-is.
         # Proxies expect the exact model name the user typed.
         if endpoint:
-            print(f"   🔌 Proxy mode: model={model}, endpoint={endpoint}")
+            _emit(EventLevel.INFO, f"Proxy mode: model={model}, endpoint={endpoint}", "init")
         else:
             # Normalize model ID for aliases and variations, then validate
             original_model = model
             try:
                 model = ModelConfig.normalize_model_id(model)  # type: ignore[attr-defined]
-            except Exception:
-                # Older ModelConfig without normalization: proceed as-is
+            except (AttributeError, KeyError, ValueError, TypeError) as exc:
+                logger.debug("Model ID normalization fallback for %r: %s", model, exc)
                 model = model
             if model != original_model:
-                print(f"   📝 Model ID normalized: {original_model} → {model}")
+                _emit(EventLevel.INFO, f"Model ID normalized: {original_model} → {model}", "init")
 
         # --- Auth & backend resolution (ovagent.auth) --------------------------
         backend = _resolve_model_and_provider(model, api_key, endpoint)
@@ -582,7 +411,7 @@ class OmicVerseAgent:
             self._managed_api_env = _collect_api_key_env(
                 self.model, self.endpoint, api_key,
             )
-        except Exception as exc:  # pragma: no cover - defensive logging
+        except (KeyError, ValueError, TypeError, OSError) as exc:  # pragma: no cover - defensive logging
             logger.warning("Failed to collect API key environment variables: %s", exc)
             self._managed_api_env = {}
 
@@ -600,7 +429,7 @@ class OmicVerseAgent:
             with self._temporary_api_keys():
                 self._setup_agent()
             stats = self._get_registry_stats()
-            print(f"   📚 Function registry loaded: {stats['total_functions']} functions in {stats['categories']} categories")
+            _emit(EventLevel.INFO, f"Function registry loaded: {stats['total_functions']} functions in {stats['categories']} categories", "init")
 
             _display_reflection_config(
                 self.enable_reflection,
@@ -621,34 +450,17 @@ class OmicVerseAgent:
                 )
             )
 
-            # Filesystem context
+            # Session, context, tracing, OV runtime (SessionContextFacadeMixin)
             ctx_storage = Path(context_storage_dir) if context_storage_dir else None
-            self.enable_filesystem_context, self._filesystem_context = (
-                _initialize_filesystem_context(
-                    enabled=self.enable_filesystem_context,
-                    storage_dir=ctx_storage,
-                )
-            )
-
-            # Session history
-            self._session_history = _initialize_session_history(self._config)
-
-            # Harness tracing & context compaction
-            self._trace_store, self._context_compactor = _initialize_tracing(
-                self._config, self._llm, self.model,
-            )
+            self._initialize_session_context_tracing(ctx_storage_dir=ctx_storage)
 
             # Security scanner
             self._security_config, self._security_scanner = _initialize_security(
                 self._config,
             )
 
-            # OmicVerse runtime (workflow / run-store bridge)
-            self._ov_runtime = _initialize_ov_runtime(self._detect_repo_root())
-
-            # Extracted module delegates
-            self._session_service = _SessionService(self)
-            self._context_service = _ContextService(self)
+            # Session/context service delegates (SessionContextFacadeMixin)
+            self._wire_session_context_services()
             self._prompt_builder = _PromptBuilder(self)
             self._analysis_executor = _AnalysisExecutor(self)
             self._tool_runtime = _ToolRuntime(self, self._analysis_executor)
@@ -660,10 +472,11 @@ class OmicVerseAgent:
                 self, self._prompt_builder, self._tool_runtime,
             )
             self._codegen_pipeline = _CodegenPipeline(self)
+            self._analysis_executor._set_codegen_pipeline(self._codegen_pipeline)
 
-            print("✅ Smart Agent initialized successfully!")
+            _emit(EventLevel.SUCCESS, "Smart Agent initialized successfully!", "init")
         except Exception as e:
-            print(f"❌ Agent initialization failed: {e}")
+            _emit(EventLevel.ERROR, f"Agent initialization failed: {e}", "init")
             raise
 
     # =====================================================================
@@ -672,7 +485,7 @@ class OmicVerseAgent:
 
     def _get_registry_stats(self) -> dict:
         """Get statistics about the function registry."""
-        static_entries = self._load_static_registry_entries()
+        static_entries = self._scanner.load_static_entries()
         unique_functions = set(e['full_name'] for e in static_entries)
         categories = set(e['category'] for e in static_entries)
 
@@ -687,138 +500,98 @@ class OmicVerseAgent:
             'category_list': list(categories)
         }
 
-    def _get_available_functions_info(self) -> str:
-        """Get formatted information about all available functions."""
-        functions_info = []
-        processed_functions = set()
-        for entry in _global_registry._registry.values():
-            full_name = entry['full_name']
-            if full_name in processed_functions:
-                continue
-            processed_functions.add(full_name)
-            info = {
-                'name': entry['short_name'],
-                'full_name': entry['full_name'],
-                'description': entry['description'],
-                'aliases': entry['aliases'],
-                'category': entry['category'],
-                'signature': entry['signature'],
-                'examples': entry['examples']
-            }
-            functions_info.append(info)
-        return json.dumps(functions_info, indent=2, ensure_ascii=False)
+    def _get_compact_registry_summary(self) -> str:
+        """Build a compact category-level summary of available functions.
+
+        Instead of dumping every function as JSON, returns a concise
+        overview keyed by domain category with representative names.
+        The LLM is directed to ``search_functions`` for details.
+        """
+        category_map: Dict[str, List[str]] = {}
+        seen: set = set()
+
+        # Prefer static entries (always available); fall back to runtime
+        entries = self._scanner.load_static_entries()
+        if not entries:
+            for entry in getattr(_global_registry, "_registry", {}).values():
+                full_name = entry.get("full_name", "")
+                if full_name and full_name not in seen:
+                    seen.add(full_name)
+                    cat = entry.get("category", "other") or "other"
+                    category_map.setdefault(cat, []).append(full_name)
+        else:
+            for entry in entries:
+                full_name = entry.get("full_name", "")
+                if full_name and full_name not in seen:
+                    seen.add(full_name)
+                    cat = entry.get("category", "other") or "other"
+                    category_map.setdefault(cat, []).append(full_name)
+
+        lines: List[str] = []
+        for cat in sorted(category_map):
+            names = category_map[cat]
+            sample = ", ".join(names[:5])
+            suffix = f" (+{len(names) - 5} more)" if len(names) > 5 else ""
+            lines.append(f"- **{cat}** ({len(names)} functions): {sample}{suffix}")
+        return "\n".join(lines) if lines else "No registered functions detected."
 
     def _setup_agent(self):
-        """Setup the internal agent backend with dynamic instructions."""
-        functions_info = self._get_available_functions_info()
+        """Setup the internal agent backend with dynamic instructions.
 
-        instructions = """
-You are an intelligent OmicVerse assistant that can automatically discover and execute functions based on natural language requests.
+        Uses a compact category-level registry summary instead of
+        dumping every function as JSON.  The LLM discovers detailed
+        signatures through the ``search_functions`` tool at runtime.
+        """
+        compact_summary = self._get_compact_registry_summary()
 
-## Available OmicVerse Functions
-
-Here are all the currently registered functions in OmicVerse:
-
-""" + functions_info + """
-
-## Your Task
-
-When given a natural language request and an adata object, you should:
-
-Quick-start examples (non-experts can copy/paste):
-- "basic single-cell QC and clustering" (uses QC → preprocess → neighbors/UMAP → Leiden → markers)
-- "batch integration with harmony on this adata" (uses harmony then neighbors/UMAP/Leiden, use_raw=False)
-- "simple trajectory with DPT, root on paul15_clusters=7MEP, list top genes"
-- "find markers for each Leiden cluster (wilcoxon)".
-- "doublet check and report rate"
-
-1. **Analyze the request** to understand what the user wants to accomplish
-2. **Find the most appropriate function** from the available functions above
-3. **Extract parameters** from the user's request (e.g., "nUMI>500" means min_genes=500)
-4. **Generate and execute Python code** using the appropriate OmicVerse function
-5. **Return the modified adata object**
-
-## Parameter Extraction Rules
-
-Extract parameters dynamically based on patterns in the user request:
-
-- For qc function: Create tresh dict with 'mito_perc', 'nUMIs', 'detected_genes'
-  - "nUMI>X", "umi>X" → tresh={'nUMIs': X, 'detected_genes': 250, 'mito_perc': 0.15}
-  - "mito<X", "mitochondrial<X" → include in tresh dict as 'mito_perc': X
-  - "genes>X" → include in tresh dict as 'detected_genes': X
-  - Always provide complete tresh dict with all three keys
-- "resolution=X" → resolution=X
-- "n_pcs=X", "pca=X" → n_pcs=X
-- "max_value=X" → max_value=X
-- Mode indicators: "seurat", "mads", "pearson" → mode="seurat"
-- Boolean indicators: "no doublets", "skip doublets" → doublets=False
-
-## Code Execution Rules
-
-1. **Always import omicverse as ov** at the start
-2. **Use the exact function signature** from the available functions
-3. **Handle the adata variable** - it will be provided in the context
-4. **Update adata in place** when possible
-5. **Print success messages** and basic info about the result
-
-## Example Workflow
-
-User request: "quality control with nUMI>500, mito<0.2"
-
-1. Find function: Look for functions with aliases containing "qc", "quality", or "质控"
-2. Get function details: Check that qc requires tresh dict with 'mito_perc', 'nUMIs', 'detected_genes'
-3. Extract parameters: nUMI>500 → tresh['nUMIs']=500, mito<0.2 → tresh['mito_perc']=0.2
-4. Generate code:
-   ```python
-   import omicverse as ov
-   # Execute quality control with complete tresh dict
-   adata = ov.pp.qc(adata, tresh={'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250})
-   print("QC completed. Dataset shape: " + str(adata.shape[0]) + " cells × " + str(adata.shape[1]) + " genes")
-   ```
-
-## Important Notes
-
-- Always work with the provided `adata` variable
-- Use the function signatures exactly as shown in the available functions
-- Provide helpful feedback about what was executed
-- Do not create dummy AnnData objects; operate directly on the provided data
-- Prefer `use_raw=False` unless the user explicitly requests raw
-- Handle errors gracefully and suggest alternatives if needed
-
-## CRITICAL CODE PATTERNS - MANDATORY RULES
-
-### Print Statements
-- ALWAYS use string concatenation: `print("Result: " + str(value))`
-- NEVER use f-strings in print statements - they cause format errors
-
-### In-Place Functions (pca, scale, neighbors, leiden, umap, tsne)
-- ALWAYS call without assignment: `ov.pp.pca(adata, n_pcs=50)`
-- NEVER assign result: `adata = ov.pp.pca(adata)` (returns None!)
-- These functions modify adata in-place and return None
-
-### Categorical Column Access
-- ALWAYS check dtype before .cat: `if hasattr(col, 'cat'): col.cat.categories`
-- NEVER assume column is categorical - it may be string or object dtype
-- CORRECT: `adata.obs['col'].value_counts()` (works for any dtype)
-
-### HVG Selection (highly_variable_genes)
-- ALWAYS wrap in try/except with seurat fallback:
-  ```python
-  try:
-      sc.pp.highly_variable_genes(adata, flavor='seurat_v3', n_top_genes=2000)
-  except ValueError:
-      sc.pp.highly_variable_genes(adata, flavor='seurat', n_top_genes=2000)
-  ```
-- NEVER use seurat_v3 without fallback - fails on small datasets
-
-### Batch Column Handling
-- ALWAYS validate batch column before batch operations:
-  ```python
-  if 'batch' in adata.obs.columns:
-      adata.obs['batch'] = adata.obs['batch'].astype(str).fillna('unknown')
-  ```
-- NEVER assume batch column exists or has valid values
-"""
+        instructions = (
+            "You are an intelligent OmicVerse assistant that can automatically "
+            "discover and execute functions based on natural language requests.\n\n"
+            "## OmicVerse Function Registry (compact overview)\n\n"
+            "The following categories of functions are registered.  "
+            "Use the `search_functions` tool to look up signatures, parameters, "
+            "prerequisites, and examples for any function before generating code.\n\n"
+            + compact_summary + "\n\n"
+            "## Your Task\n\n"
+            "When given a natural language request and an adata object, you should:\n\n"
+            "Quick-start examples (non-experts can copy/paste):\n"
+            '- "basic single-cell QC and clustering" (uses QC -> preprocess -> neighbors/UMAP -> Leiden -> markers)\n'
+            '- "batch integration with harmony on this adata" (uses harmony then neighbors/UMAP/Leiden, use_raw=False)\n'
+            '- "simple trajectory with DPT, root on paul15_clusters=7MEP, list top genes"\n'
+            '- "find markers for each Leiden cluster (wilcoxon)"\n'
+            '- "doublet check and report rate"\n\n'
+            "1. **Analyze the request** to understand what the user wants to accomplish\n"
+            "2. **Call `search_functions`** with relevant keywords to find the appropriate function, "
+            "its exact signature, prerequisites, and examples\n"
+            "3. **Extract parameters** from the user's request (e.g., \"nUMI>500\" means min_genes=500)\n"
+            "4. **Generate and execute Python code** using the appropriate OmicVerse function\n"
+            "5. **Return the modified adata object**\n\n"
+            "## Parameter Extraction Rules\n\n"
+            "Extract parameters dynamically based on patterns in the user request:\n\n"
+            "- For qc function: Create tresh dict with 'mito_perc', 'nUMIs', 'detected_genes'\n"
+            "  - \"nUMI>X\", \"umi>X\" -> tresh={'nUMIs': X, 'detected_genes': 250, 'mito_perc': 0.15}\n"
+            "  - \"mito<X\", \"mitochondrial<X\" -> include in tresh dict as 'mito_perc': X\n"
+            "  - \"genes>X\" -> include in tresh dict as 'detected_genes': X\n"
+            "  - Always provide complete tresh dict with all three keys\n"
+            "- \"resolution=X\" -> resolution=X\n"
+            "- \"n_pcs=X\", \"pca=X\" -> n_pcs=X\n"
+            "- \"max_value=X\" -> max_value=X\n"
+            "- Mode indicators: \"seurat\", \"mads\", \"pearson\" -> mode=\"seurat\"\n"
+            "- Boolean indicators: \"no doublets\", \"skip doublets\" -> doublets=False\n\n"
+            "## Code Execution Rules\n\n"
+            "1. **Always import omicverse as ov** at the start\n"
+            "2. **Use the exact function signature** returned by search_functions\n"
+            "3. **Handle the adata variable** - it will be provided in the context\n"
+            "4. **Update adata in place** when possible\n"
+            "5. **Print success messages** and basic info about the result\n\n"
+            "## Important Notes\n\n"
+            "- Always work with the provided `adata` variable\n"
+            "- Use the function signatures exactly as returned by search_functions\n"
+            "- Provide helpful feedback about what was executed\n"
+            "- Do not create dummy AnnData objects; operate directly on the provided data\n"
+            "- Prefer `use_raw=False` unless the user explicitly requests raw\n"
+            "- Handle errors gracefully and suggest alternatives if needed\n\n"
+        ) + _CODE_QUALITY_RULES_EXT
 
         if self._skill_overview_text:
             instructions += (
@@ -855,46 +628,6 @@ User request: "quality control with nUMI>500, mito<0.2"
         with _temporary_api_keys_cm(self._managed_api_env):
             yield
 
-    def _get_session_service(self) -> _SessionService:
-        """Lazily construct SessionService for legacy __new__-based instances."""
-        service = getattr(self, "_session_service", None)
-        if service is None:
-            service = _SessionService(self)
-            self._session_service = service
-        return service
-
-    def _get_context_service(self) -> _ContextService:
-        """Lazily construct ContextService for legacy __new__-based instances."""
-        service = getattr(self, "_context_service", None)
-        if service is None:
-            service = _ContextService(self)
-            self._context_service = service
-        return service
-
-    def _get_harness_session_id(self) -> str:
-        """Best-effort session identifier for harness traces/history."""
-        return self._get_session_service().get_harness_session_id()
-
-    def _get_runtime_session_id(self) -> str:
-        """Return the session key used by the harness runtime registry."""
-        return self._get_session_service().get_runtime_session_id()
-
-    def _get_visible_agent_tools(self, *, allowed_names: Optional[set[str]] = None) -> list[dict[str, Any]]:
-        """Return the currently visible tool schemas."""
-        return self._tool_runtime.get_visible_agent_tools(allowed_names=allowed_names)
-
-    def _get_loaded_tool_names(self) -> list[str]:
-        """Return loaded tool names."""
-        return self._tool_runtime.get_loaded_tool_names()
-
-    def _refresh_runtime_working_directory(self) -> str:
-        """Keep runtime cwd aligned with the active worktree / filesystem context."""
-        return self._get_session_service().refresh_runtime_working_directory()
-
-    def _tool_blocked_in_plan_mode(self, tool_name: str) -> bool:
-        """Check plan-mode blocking."""
-        return self._tool_runtime.tool_blocked_in_plan_mode(tool_name)
-
     def _resolve_local_path(self, file_path: str, *, allow_relative: bool = False) -> Path:
         path = Path(file_path).expanduser()
         if not path.is_absolute():
@@ -930,21 +663,6 @@ User request: "quality control with nUMI>500, mito<0.2"
         approved = self._request_interaction(interaction)
         if not approved:
             raise PermissionError(f"{tool_name} was not approved by the user.")
-
-    def _detect_repo_root(self, cwd: Optional[Path] = None) -> Optional[Path]:
-        current = (cwd or Path(self._refresh_runtime_working_directory())).resolve()
-        for candidate in (current, *current.parents):
-            if (candidate / ".git").exists():
-                return candidate
-        return None
-
-    def _extract_python_code(self, response_text: str) -> str:
-        """Extract executable Python code from the agent response using AST validation."""
-        return self._codegen.extract_python_code(response_text)
-
-    def _normalize_registry_entry_for_codegen(self, entry: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert registry entries to public-facing ov.* names for code generation."""
-        return _RegistryScanner.normalize_entry(entry)
 
     def _build_agentic_system_prompt(self) -> str:
         return self._prompt_builder.build_agentic_system_prompt()
@@ -984,186 +702,6 @@ User request: "quality control with nUMI>500, mito<0.2"
             },
             indent=2,
         )
-
-    # =====================================================================
-    # Registry scanner delegates (thin wrappers over RegistryScanner)
-    # =====================================================================
-
-    @property
-    def _scanner(self) -> _RegistryScanner:
-        """Lazily create RegistryScanner for agents constructed via __new__."""
-        scanner = getattr(self, "_registry_scanner", None)
-        if scanner is None:
-            scanner = _RegistryScanner()
-            self._registry_scanner = scanner
-        return scanner
-
-    def _load_static_registry_entries(self) -> List[Dict[str, Any]]:
-        """Parse @register_function metadata plus nested method/branch capabilities."""
-        return self._scanner.load_static_entries()
-
-    def _collect_relevant_registry_entries(self, request: str, max_entries: int = 8) -> List[Dict[str, Any]]:
-        """Return a compact set of registry entries relevant to a free-form request."""
-        return self._scanner.collect_relevant_entries(request, max_entries)
-
-    def _collect_static_registry_entries(self, request: str, max_entries: int = 8) -> List[Dict[str, Any]]:
-        """Search the static AST-derived registry snapshot."""
-        return self._scanner.collect_static_entries(request, max_entries)
-
-    def _score_registry_entry_for_codegen(self, request: str, entry: Dict[str, Any]) -> float:
-        """Score a registry entry for lightweight code generation retrieval."""
-        return _RegistryScanner.score_entry(request, entry)
-
-    # =====================================================================
-    # FollowUp gate delegates (used by tests via agent instance)
-    # =====================================================================
-
-    def _request_requires_tool_action(self, request: str, adata: Any) -> bool:
-        return _FollowUpGate.request_requires_tool_action(request, adata)
-
-    def _response_is_promissory(self, content: str) -> bool:
-        return _FollowUpGate.response_is_promissory(content)
-
-    def _select_agent_tool_choice(self, *, request, adata, turn_index, had_meaningful_tool_call, forced_retry) -> str:
-        return _FollowUpGate.select_tool_choice(
-            request=request, adata=adata, turn_index=turn_index,
-            had_meaningful_tool_call=had_meaningful_tool_call, forced_retry=forced_retry,
-        )
-
-    # =====================================================================
-    # Tool dispatch delegates
-    # =====================================================================
-
-    async def _dispatch_tool(self, tool_call, current_adata: Any, request: str):
-        return await self._tool_runtime.dispatch_tool(tool_call, current_adata, request)
-
-    # =====================================================================
-    # Codegen pipeline delegates
-    # =====================================================================
-
-    def _capture_code_only_snippet(self, code: str, description: str = "") -> None:
-        """Store the latest code snippet captured from execute_code in code-only mode."""
-        self._codegen.capture_code_only_snippet(code, description)
-
-    def _select_codegen_skill_matches(self, request: str, top_k: int = 2) -> List[SkillMatch]:
-        return self._codegen.select_codegen_skill_matches(request, top_k)
-
-    def _format_registry_context_for_codegen(self, entries: List[Dict[str, Any]]) -> str:
-        return self._codegen.format_registry_context_for_codegen(entries)
-
-    @staticmethod
-    def _format_prerequisites_for_codegen_entry(entry: Dict[str, Any]) -> str:
-        return _CodegenPipeline.format_prerequisites_for_codegen_entry(entry)
-
-    def _build_code_generation_system_prompt(self, adata: Any) -> str:
-        return self._codegen.build_code_generation_system_prompt(adata)
-
-    @staticmethod
-    def _build_code_generation_user_prompt(request: str, adata: Any) -> str:
-        return _CodegenPipeline.build_code_generation_user_prompt(request, adata)
-
-    @staticmethod
-    def _contains_forbidden_scanpy_usage(code: str) -> bool:
-        return _CodegenPipeline.contains_forbidden_scanpy_usage(code)
-
-    def _rewrite_scanpy_calls_with_registry(self, code: str, entries: List[Dict[str, Any]]) -> str:
-        return self._codegen.rewrite_scanpy_calls_with_registry(code, entries)
-
-    async def _rewrite_code_without_scanpy(self, code: str, request: str, adata: Any, registry_context: str = "", skill_guidance: str = "") -> tuple:
-        return await self._codegen.rewrite_code_without_scanpy(code, request, adata, registry_context, skill_guidance)
-
-    async def _review_generated_code_lightweight(self, code: str, request: str, adata: Any) -> tuple:
-        return await self._codegen.review_generated_code_lightweight(code, request, adata)
-
-    @staticmethod
-    def _build_code_only_agentic_request(request: str, adata: Any) -> str:
-        return _CodegenPipeline.build_code_only_agentic_request(request, adata)
-
-    async def _generate_code_via_agentic_loop(self, request: str, adata: Any, *, progress_callback: Optional[Callable[[str], None]] = None) -> str:
-        return await self._codegen.generate_code_via_agentic_loop(request, adata, progress_callback=progress_callback)
-
-    def _gather_code_candidates(self, response_text: str) -> List[str]:
-        return self._codegen.gather_code_candidates(response_text)
-
-    @staticmethod
-    def _looks_like_python(code: str) -> bool:
-        return _CodegenPipeline.looks_like_python(code)
-
-    @staticmethod
-    def _extract_inline_python(response_text: str) -> str:
-        return _CodegenPipeline.extract_inline_python(response_text)
-
-    @staticmethod
-    def _normalize_code_candidate(code: str) -> str:
-        return _CodegenPipeline.normalize_code_candidate(code)
-
-    def _extract_python_code_strict(self, response_text: str) -> str:
-        return self._codegen.extract_python_code_strict(response_text)
-
-    async def _review_result(self, original_adata: Any, result_adata: Any, request: str, code: str) -> Dict[str, Any]:
-        return await self._codegen.review_result(original_adata, result_adata, request, code)
-
-    async def _reflect_on_code(self, code: str, request: str, adata: Any, iteration: int = 1) -> Dict[str, Any]:
-        return await self._codegen.reflect_on_code(code, request, adata, iteration)
-
-    def _detect_direct_python_request(self, request: str) -> Optional[str]:
-        return self._codegen.detect_direct_python_request(request)
-
-    @staticmethod
-    def _merge_usage_stats(usages: List[Optional[Usage]]) -> Optional[Usage]:
-        """Merge usage records from multiple lightweight codegen calls."""
-        valid = [usage for usage in usages if usage is not None]
-        if not valid:
-            return None
-        return Usage(
-            input_tokens=sum(max(0, usage.input_tokens) for usage in valid),
-            output_tokens=sum(max(0, usage.output_tokens) for usage in valid),
-            total_tokens=sum(max(0, usage.total_tokens) for usage in valid),
-            model=valid[-1].model,
-            provider=valid[-1].provider,
-        )
-
-    # =====================================================================
-    # Analysis executor delegates
-    # =====================================================================
-
-    def _check_code_prerequisites(self, code: str, adata: Any) -> str:
-        return self._analysis_executor.check_code_prerequisites(code, adata)
-
-    def _apply_execution_error_fix(self, code: str, error_msg: str) -> Optional[str]:
-        return self._analysis_executor.apply_execution_error_fix(code, error_msg)
-
-    @staticmethod
-    def _extract_package_name(error_msg: str) -> Optional[str]:
-        return _AnalysisExecutor.extract_package_name(error_msg)
-
-    def _auto_install_package(self, package_name: str) -> bool:
-        return self._analysis_executor.auto_install_package(package_name)
-
-    async def _diagnose_error_with_llm(self, code: str, error_msg: str, traceback_str: str, adata: Any) -> Optional[str]:
-        return await self._analysis_executor.diagnose_error_with_llm(code, error_msg, traceback_str, adata)
-
-    def _validate_outputs(self, code: str, output_dir: Optional[str] = None) -> List[str]:
-        return self._analysis_executor.validate_outputs(code, output_dir)
-
-    async def _generate_completion_code(self, original_code: str, missing_files: List[str], adata: Any, request: str) -> Optional[str]:
-        return await self._analysis_executor.generate_completion_code(original_code, missing_files, adata, request)
-
-    def _request_approval(self, code: str, violations: list) -> bool:
-        return self._analysis_executor.request_approval(code, violations)
-
-    def _execute_generated_code(self, code: str, adata: Any, capture_stdout: bool = False) -> Any:
-        return self._analysis_executor.execute_generated_code(code, adata, capture_stdout)
-
-    @staticmethod
-    def _normalize_doublet_obs(adata: Any) -> None:
-        _AnalysisExecutor.normalize_doublet_obs(adata)
-
-    def _process_context_directives(self, code: str, local_vars: Dict[str, Any]) -> None:
-        self._analysis_executor.process_context_directives(code, local_vars)
-
-    def _build_sandbox_globals(self) -> Dict[str, Any]:
-        return self._analysis_executor.build_sandbox_globals()
 
     # =====================================================================
     # Skill helpers
@@ -1220,8 +758,8 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
                 matched_slugs = json.loads(json_match.group(0))
                 return [slug for slug in matched_slugs if slug in self.skill_registry.skill_metadata]
             return []
-        except Exception as exc:
-            logger.warning(f"LLM skill matching failed: {exc}")
+        except (RuntimeError, ValueError, TypeError, KeyError, OSError, json.JSONDecodeError) as exc:
+            logger.warning("LLM skill matching failed: %s", exc)
             return []
 
     def _format_skill_guidance(self, matches: List[SkillMatch]) -> str:
@@ -1258,6 +796,68 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         )
 
     # =====================================================================
+    # Direct-Python seams (overridable by test doubles)
+    # =====================================================================
+
+    def _detect_direct_python_request(self, request: str) -> Optional[str]:
+        """Detect explicit Python code in *request*.
+
+        Default implementation delegates to the codegen pipeline subsystem.
+        Tests may override this at instance level to inject fake behaviour
+        without requiring `_codegen_pipeline` / `_analysis_executor` to exist.
+        """
+        return self._codegen.detect_direct_python_request(request)
+
+    def _execute_generated_code(self, code: str, adata: Any) -> Any:
+        """Execute *code* against *adata* and return the (possibly mutated) result.
+
+        Default implementation delegates to the analysis executor subsystem.
+        Overridable at instance level for lightweight test doubles.
+        """
+        return self._analysis_executor.execute_generated_code(code, adata)
+
+    # =====================================================================
+    # Legacy thin delegation seams (codegen / tool-runtime / code-only)
+    # =====================================================================
+
+    def _extract_python_code(self, response: str) -> str:
+        """Delegate to CodegenPipeline.extract_python_code."""
+        return self._codegen.extract_python_code(response)
+
+    def _extract_python_code_strict(self, response: str) -> str:
+        """Delegate to CodegenPipeline.extract_python_code_strict."""
+        return self._codegen.extract_python_code_strict(response)
+
+    def _normalize_code_candidate(self, code: str) -> str:
+        """Delegate to CodegenPipeline.normalize_code_candidate."""
+        return self._codegen.normalize_code_candidate(code)
+
+    def _gather_code_candidates(self, response: str) -> list:
+        """Delegate to CodegenPipeline.gather_code_candidates."""
+        return self._codegen.gather_code_candidates(response)
+
+    def _looks_like_python(self, text: str) -> bool:
+        """Delegate to CodegenPipeline.looks_like_python."""
+        return self._codegen.looks_like_python(text)
+
+    def _get_visible_agent_tools(self, *, allowed_names=None):
+        """Delegate to ToolRuntime.get_visible_agent_tools."""
+        return self._tool_runtime.get_visible_agent_tools(allowed_names=allowed_names)
+
+    def _tool_blocked_in_plan_mode(self, tool_name: str) -> bool:
+        """Delegate to ToolRuntime.tool_blocked_in_plan_mode."""
+        return self._tool_runtime.tool_blocked_in_plan_mode(tool_name)
+
+    def _capture_code_only_snippet(self, code: str, description: str = "") -> None:
+        """Store code snippet captured during code-only mode."""
+        history = getattr(self, "_code_only_captured_history", None)
+        if history is None:
+            history = []
+            self._code_only_captured_history = history
+        history.append({"code": code, "description": description or ""})
+        self._code_only_captured_code = code
+
+    # =====================================================================
     # Public API: run / stream
     # =====================================================================
 
@@ -1277,30 +877,26 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         Any
             Processed adata object.
         """
-        print(f"\n{'=' * 70}")
-        print(f"🤖 OmicVerse Agent Processing Request")
-        print(f"{'=' * 70}")
-        print(f"Request: \"{request}\"")
         if adata is not None and hasattr(adata, 'shape'):
-            print(f"Dataset: {adata.shape[0]} cells × {adata.shape[1]} genes")
+            dataset_desc = f"{adata.shape[0]} cells × {adata.shape[1]} genes"
         else:
-            print(f"Dataset: None (knowledge query)")
-        print(f"{'=' * 70}\n")
+            dataset_desc = "None (knowledge query)"
+        self._emit(EventLevel.INFO, f"Processing request: \"{request}\" | Dataset: {dataset_desc}", "execution")
 
         # Direct execution path for explicit Python snippets (no LLM required)
         direct_code = self._detect_direct_python_request(request)
         if direct_code:
-            print(f"🧪 Direct Python detected → executing without model calls")
+            self._emit(EventLevel.INFO, "Direct Python detected → executing without model calls", "execution")
             self.last_usage = None
             self.last_usage_breakdown = {
                 'generation': None, 'reflection': [], 'review': [], 'total': None
             }
             try:
                 result_adata = self._execute_generated_code(direct_code, adata)
-                print(f"✅ Python code executed directly.")
+                self._emit(EventLevel.SUCCESS, "Python code executed directly.", "execution")
                 return result_adata
             except Exception as exc:
-                print(f"❌ Direct Python execution failed: {exc}")
+                self._emit(EventLevel.ERROR, f"Direct Python execution failed: {exc}", "execution")
                 raise
 
         if self.provider == "python":
@@ -1310,23 +906,16 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
 
     async def _run_agentic_mode(self, request: str, adata: Any) -> Any:
         """Agentic loop mode: LLM autonomously calls tools to complete the task."""
-        print(f"🤖 Mode: Agentic Loop (tool-calling)")
-        print()
+        self._emit(EventLevel.INFO, "Mode: Agentic Loop (tool-calling)", "execution")
 
         try:
             result = await self._run_agentic_loop(request, adata)
             self._turn_controller._persist_harness_history(request)
-            print()
-            print(f"{'=' * 70}")
-            print(f"✅ SUCCESS - Agentic loop completed!")
-            print(f"{'=' * 70}\n")
+            self._emit(EventLevel.SUCCESS, "Agentic loop completed!", "execution")
             return result
         except Exception as e:
             self._turn_controller._persist_harness_history(request)
-            print()
-            print(f"{'=' * 70}")
-            print(f"❌ ERROR - Agentic loop failed: {e}")
-            print(f"{'=' * 70}\n")
+            self._emit(EventLevel.ERROR, f"Agentic loop failed: {e}", "execution")
             raise
 
     async def generate_code_async(self, request: str, adata: Any = None, *, max_functions: int = 8, progress_callback: Optional[Callable[[str], None]] = None) -> str:
@@ -1337,8 +926,11 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
 
     def generate_code(self, request: str, adata: Any = None, *, max_functions: int = 8, progress_callback: Optional[Callable[[str], None]] = None) -> str:
         """Synchronous wrapper for code-only OmicVerse generation."""
-        return self._codegen.generate_code(
-            request, adata, max_functions=max_functions, progress_callback=progress_callback,
+        return _run_coroutine_sync(
+            self.generate_code_async(
+                request, adata, max_functions=max_functions,
+                progress_callback=progress_callback,
+            )
         )
 
     async def stream_async(self, request: str, adata: Any,
@@ -1437,101 +1029,29 @@ IMPORTANT: Respond with ONLY the JSON array, nothing else."""
         >>> agent = ov.Agent(model="gpt-4o-mini")
         >>> result = agent.run("quality control with nUMI>500, mito<0.2", adata)
         """
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = None
-
-        if loop and loop.is_running():
-            result_container: Dict[str, Any] = {}
-            error_container: Dict[str, BaseException] = {}
-
-            def _run_in_thread() -> None:
-                try:
-                    result_container["value"] = asyncio.run(self.run_async(request, adata))
-                except BaseException as exc:  # pragma: no cover - propagate to caller
-                    error_container["error"] = exc
-
-            thread = threading.Thread(target=_run_in_thread, name="OmicVerseAgentRunner")
-            thread.start()
-            thread.join()
-
-            if "error" in error_container:
-                raise error_container["error"]
-
-            return result_container.get("value")
-
-        return asyncio.run(self.run_async(request, adata))
-
-    # ===================================================================
-    # Session Management Methods (delegated to SessionService)
-    # ===================================================================
-
-    def get_current_session_info(self) -> Optional[Dict[str, Any]]:
-        """Get information about current notebook session."""
-        return self._get_session_service().get_current_session_info()
-
-    def restart_session(self):
-        """Manually restart notebook session (clear memory, start fresh)."""
-        self._get_session_service().restart_session()
-
-    def get_session_history(self) -> List[Dict[str, Any]]:
-        """Get history of all archived notebook sessions."""
-        return self._get_session_service().get_session_history()
-
-    # ===================================================================
-    # Filesystem Context Management (delegated to ContextService)
-    # ===================================================================
-
-    @property
-    def filesystem_context(self) -> Optional[FilesystemContextManager]:
-        """Get the filesystem context manager."""
-        return self._get_context_service().filesystem_context
-
-    def write_note(self, key: str, content: Union[str, Dict[str, Any]], category: str = "notes", metadata: Optional[Dict[str, Any]] = None) -> Optional[str]:
-        """Write a note to the filesystem context workspace."""
-        return self._get_context_service().write_note(key, content, category, metadata)
-
-    def search_context(self, pattern: str, match_type: str = "glob", max_results: int = 10) -> List[Dict[str, Any]]:
-        """Search the filesystem context for relevant notes."""
-        return self._get_context_service().search_context(pattern, match_type, max_results)
-
-    def get_relevant_context(self, query: str, max_tokens: int = 1000) -> str:
-        """Get context relevant to a query."""
-        return self._get_context_service().get_relevant_context(query, max_tokens)
-
-    def save_plan(self, steps: List[Dict[str, Any]]) -> Optional[str]:
-        """Save an execution plan."""
-        return self._get_context_service().save_plan(steps)
-
-    def update_plan_step(self, step_index: int, status: str, result: Optional[str] = None) -> None:
-        """Update the status of a plan step."""
-        self._get_context_service().update_plan_step(step_index, status, result)
-
-    def get_workspace_summary(self) -> str:
-        """Get a summary of the filesystem context workspace."""
-        return self._get_context_service().get_workspace_summary()
-
-    def get_context_stats(self) -> Dict[str, Any]:
-        """Get statistics about the filesystem context workspace."""
-        return self._get_context_service().get_context_stats()
+        return _run_coroutine_sync(self.run_async(request, adata))
 
     # ===================================================================
     # Cleanup
     # ===================================================================
 
     def __del__(self):
-        """Cleanup on agent deletion."""
+        """Cleanup on agent deletion.
+
+        Uses broad ``except Exception`` to avoid surfacing teardown noise —
+        __del__ runs in unpredictable interpreter states where any subsystem
+        may already be partially torn down.
+        """
         if hasattr(self, '_notebook_executor') and self._notebook_executor:
             try:
                 self._notebook_executor.shutdown()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("__del__: notebook executor shutdown failed: %s", exc)
         if hasattr(self, '_filesystem_context') and self._filesystem_context:
             try:
                 self._filesystem_context.cleanup_session(keep_summary=True)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("__del__: filesystem context cleanup failed: %s", exc)
 
 
 # =====================================================================
@@ -1561,145 +1081,51 @@ def list_supported_models(show_all: bool = False) -> str:
     """
     return ModelConfig.list_supported_models(show_all)
 
+# Canonical default values derived from OmicVerseAgent.__init__ so the
+# Agent() factory stays in sync without duplicating them.  Computed once
+# at module load time; the dict is keyed by parameter name.
+_INIT_DEFAULTS: Dict[str, Any] = {
+    name: param.default
+    for name, param in inspect.signature(OmicVerseAgent.__init__).parameters.items()
+    if name != "self" and param.default is not inspect.Parameter.empty
+}
+_D = _INIT_DEFAULTS  # short alias used in the Agent() signature below
+
+
 def Agent(
-    model: str = "gpt-5.2", 
-    api_key: Optional[str] = None, 
-    endpoint: Optional[str] = None, 
-    auth_mode: str = "environment", 
-    auth_provider: Optional[str] = None,
-    auth_file: Optional[str] = None, 
-    enable_reflection: bool = True, 
-    reflection_iterations: int = 1, 
-    enable_result_review: bool = True, 
-    use_notebook_execution: bool = True, 
-    max_prompts_per_session: int = 5, 
-    notebook_storage_dir: Optional[str] = None, 
-    keep_execution_notebooks: bool = True, 
-    notebook_timeout: int = 600, 
-    strict_kernel_validation: bool = True, 
-    enable_filesystem_context: bool = True, 
-    context_storage_dir: Optional[str] = None, 
-    approval_mode: str = "never", agent_mode: str = "agentic", 
-    max_agent_turns: int = 15, 
-    security_level: Optional[str] = None, *, 
-    config: Optional[AgentConfig] = None, 
-    reporter: Optional[Reporter] = None, 
-    verbose: bool = True
+    model: str = _D["model"],
+    api_key: Optional[str] = _D["api_key"],
+    endpoint: Optional[str] = _D["endpoint"],
+    auth_mode: str = _D["auth_mode"],
+    auth_provider: Optional[str] = _D["auth_provider"],
+    auth_file: Optional[str] = _D["auth_file"],
+    enable_reflection: bool = _D["enable_reflection"],
+    reflection_iterations: int = _D["reflection_iterations"],
+    enable_result_review: bool = _D["enable_result_review"],
+    use_notebook_execution: bool = _D["use_notebook_execution"],
+    max_prompts_per_session: int = _D["max_prompts_per_session"],
+    notebook_storage_dir: Optional[str] = _D["notebook_storage_dir"],
+    keep_execution_notebooks: bool = _D["keep_execution_notebooks"],
+    notebook_timeout: int = _D["notebook_timeout"],
+    strict_kernel_validation: bool = _D["strict_kernel_validation"],
+    enable_filesystem_context: bool = _D["enable_filesystem_context"],
+    context_storage_dir: Optional[str] = _D["context_storage_dir"],
+    approval_mode: str = _D["approval_mode"],
+    agent_mode: str = _D["agent_mode"],
+    max_agent_turns: int = _D["max_agent_turns"],
+    security_level: Optional[str] = _D["security_level"],
+    *,
+    config: Optional[AgentConfig] = _D["config"],
+    reporter: Optional[Reporter] = _D["reporter"],
+    verbose: bool = _D["verbose"],
 ) -> OmicVerseAgent:
+    """Convenience factory — creates an :class:`OmicVerseAgent`.
+
+    Accepts the same parameters as :meth:`OmicVerseAgent.__init__`.
+    Defaults are derived from the constructor at import time so they
+    cannot drift.
     """
-    Create an OmicVerse Smart Agent instance.
-
-    This function creates and returns a smart agent that can execute OmicVerse functions
-    based on natural language descriptions.
-
-    Parameters
-    ----------
-    model : str, optional
-        LLM model to use (default: "gpt-5.2"). Use list_supported_models() to see all options
-    api_key : str, optional
-        API key for the model provider. If not provided, will use environment variable
-    endpoint : str, optional
-        Custom API endpoint. If not provided, will use default for the provider
-    auth_mode : str, optional
-        Authentication mode. Use ``"openai_oauth"`` to reuse saved Jarvis/Codex login state.
-    auth_provider : str, optional
-        OAuth provider identifier. Currently only ``"codex"`` is supported.
-    auth_file : str, optional
-        Path to the saved Jarvis auth file. Defaults to ``~/.ovjarvis/auth.json``.
-    enable_reflection : bool, optional
-        Enable reflection step to review and improve generated code (default: True)
-    reflection_iterations : int, optional
-        Maximum number of reflection iterations (default: 1, range: 1-3)
-    enable_result_review : bool, optional
-        Enable result review to validate output matches user intent (default: True)
-    use_notebook_execution : bool, optional
-        Execute code in separate Jupyter notebook for isolation and debugging (default: True).
-    max_prompts_per_session : int, optional
-        Number of prompts to execute in same notebook session before restart (default: 5).
-    notebook_storage_dir : str, optional
-        Directory to store session notebooks. Defaults to ~/.ovagent/sessions
-    keep_execution_notebooks : bool, optional
-        Whether to keep session notebooks after execution (default: True)
-    notebook_timeout : int, optional
-        Execution timeout in seconds (default: 600)
-    strict_kernel_validation : bool, optional
-        If True, raise error if kernel not found. If False, fall back to python3 (default: True)
-    enable_filesystem_context : bool, optional
-        Enable filesystem-based context management. Default: True.
-    context_storage_dir : str, optional
-        Directory for storing context files. Defaults to ~/.ovagent/context/
-    approval_mode : str, optional
-        When to prompt the user before executing generated code.
-    config : AgentConfig, optional
-        Grouped configuration object.
-    reporter : Reporter, optional
-        Structured event reporter.
-    verbose : bool, optional
-        Whether to emit events to stdout (default: True).
-
-    Returns
-    -------
-    OmicVerseAgent
-        Configured agent instance ready for use
-
-    Examples
-    --------
-    >>> import omicverse as ov
-    >>> agent = ov.Agent(model="gpt-5", api_key="your-key")
-    >>>
-    >>> # Reuse a saved ChatGPT/Codex login
-    >>> agent = ov.Agent(model="gpt-5.3-codex", auth_mode="openai_oauth")
-    >>>
-    >>> # Create agent with multiple reflection iterations
-    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", reflection_iterations=2)
-    >>>
-    >>> # Create agent without validation (fastest execution)
-    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", enable_reflection=False, enable_result_review=False)
-    >>>
-    >>> # Disable notebook execution (use legacy in-process execution)
-    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", use_notebook_execution=False)
-    >>>
-    >>> # Maximum isolation (new session per prompt)
-    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", max_prompts_per_session=1)
-    >>>
-    >>> # Longer sessions for complex workflows
-    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", max_prompts_per_session=10)
-    >>>
-    >>> # Custom storage directory
-    >>> agent = ov.Agent(model="gpt-5", api_key="your-key", notebook_storage_dir="~/my_project/sessions")
-    >>>
-    >>> # Load data
-    >>> adata = sc.datasets.pbmc3k()
-    >>>
-    >>> # Use agent for quality control
-    >>> adata = agent.run("quality control with nUMI>500, mito<0.2", adata)
-    """
-    return OmicVerseAgent(
-        model=model,
-        api_key=api_key,
-        endpoint=endpoint,
-        auth_mode=auth_mode,
-        auth_provider=auth_provider,
-        auth_file=auth_file,
-        enable_reflection=enable_reflection,
-        reflection_iterations=reflection_iterations,
-        enable_result_review=enable_result_review,
-        use_notebook_execution=use_notebook_execution,
-        max_prompts_per_session=max_prompts_per_session,
-        notebook_storage_dir=notebook_storage_dir,
-        keep_execution_notebooks=keep_execution_notebooks,
-        notebook_timeout=notebook_timeout,
-        strict_kernel_validation=strict_kernel_validation,
-        enable_filesystem_context=enable_filesystem_context,
-        context_storage_dir=context_storage_dir,
-        approval_mode=approval_mode,
-        agent_mode=agent_mode,
-        max_agent_turns=max_agent_turns,
-        security_level=security_level,
-        config=config,
-        reporter=reporter,
-        verbose=verbose,
-    )
+    return OmicVerseAgent(**locals())
 
 
 __all__ = [

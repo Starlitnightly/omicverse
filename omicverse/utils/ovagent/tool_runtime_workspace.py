@@ -8,12 +8,15 @@ plan-mode checker or read callback) as explicit parameters.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
 from ..harness.runtime_state import runtime_state
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from .protocol import AgentContext
@@ -265,8 +268,8 @@ def handle_search_skills(ctx: "AgentContext", query: str) -> str:
                     max_chars=4000, provider=provider
                 )
                 results.append(f"=== {full_skill.name} ===\n{body}")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to load skill %s: %s", meta.slug, exc)
 
     if not results:
         return "Skills matched but content could not be loaded."

@@ -17,11 +17,14 @@ Reference: https://blog.langchain.com/how-agents-can-use-filesystems-for-context
 from typing import Dict, List, Optional, Any, Set, TYPE_CHECKING
 from dataclasses import dataclass, field
 from datetime import datetime
-from anndata import AnnData
+import logging
+
+logger = logging.getLogger(__name__)
 
 from .inspector import DataStateInspector
 
 if TYPE_CHECKING:
+    from anndata import AnnData
     from ..filesystem_context import FilesystemContextManager
 
 
@@ -111,16 +114,19 @@ class AgentContextInjector:
 
     def __init__(
         self,
-        adata: AnnData,
-        registry: Any,
+        adata: Optional['AnnData'] = None,
+        registry: Any = None,
         filesystem_context: Optional['FilesystemContextManager'] = None,
         enable_filesystem_context: bool = True,
     ):
         """Initialize the context injector.
 
         Args:
-            adata: AnnData object to inspect and track.
-            registry: Function registry with prerequisite metadata.
+            adata: AnnData object to inspect and track.  Pass ``None`` (or
+                omit) to create a no-dataset injector suitable for pure
+                knowledge queries that do not require a live dataset.
+            registry: Function registry with prerequisite metadata.  May be
+                ``None`` when *adata* is also ``None``.
             filesystem_context: Optional FilesystemContextManager for persistent context.
                 If not provided and enable_filesystem_context is True, one will be created.
             enable_filesystem_context: Whether to enable filesystem-based context management.
@@ -128,7 +134,13 @@ class AgentContextInjector:
         """
         self.adata = adata
         self.registry = registry
-        self.inspector = DataStateInspector(adata, registry)
+
+        # Only create the data-state inspector when a dataset is available.
+        if adata is not None:
+            self.inspector: Optional[DataStateInspector] = DataStateInspector(adata, registry)
+        else:
+            self.inspector = None
+
         self.conversation_state = ConversationState()
 
         # Filesystem context management
@@ -142,9 +154,10 @@ class AgentContextInjector:
                 # Lazy initialization - create on first use
                 pass
 
-        # Take initial snapshot
-        initial_state = self._get_current_state()
-        self.conversation_state.snapshot_data_state(initial_state)
+        # Take initial snapshot only when a dataset is present.
+        if adata is not None:
+            initial_state = self._get_current_state()
+            self.conversation_state.snapshot_data_state(initial_state)
 
         # Store session ID if filesystem context is available
         if self._filesystem_context is not None:
@@ -237,12 +250,24 @@ class AgentContextInjector:
 
         return enhanced_prompt
 
+    @property
+    def has_dataset(self) -> bool:
+        """Return True when a live AnnData instance is available."""
+        return self.adata is not None
+
     def _build_general_state_section(self) -> str:
         """Build general data state section.
 
         Returns:
             Formatted section describing current data state.
         """
+        if not self.has_dataset:
+            return (
+                "## Data State\n\n"
+                "No dataset is currently loaded. "
+                "You are operating in knowledge-query mode."
+            )
+
         state = self._get_current_state()
         executed_funcs = self._detect_executed_functions()
 
@@ -300,6 +325,13 @@ class AgentContextInjector:
             Formatted section with function prerequisites and requirements.
         """
         lines = [f"## Target Function: {target_function}\n"]
+
+        if self.inspector is None:
+            lines.append(
+                "No dataset loaded — prerequisite validation is unavailable. "
+                "Load an AnnData object to enable prerequisite checking."
+            )
+            return "\n".join(lines)
 
         # Validate prerequisites
         result = self.inspector.validate_prerequisites(target_function)
@@ -394,8 +426,20 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
         """Get current AnnData state.
 
         Returns:
-            Dictionary with current data structures.
+            Dictionary with current data structures, or an empty-state dict
+            when no dataset is loaded.
         """
+        if self.adata is None:
+            return {
+                'shape': (0, 0),
+                'obsm': [],
+                'obsp': [],
+                'uns': {},
+                'layers': [],
+                'obs_columns': [],
+                'var_columns': [],
+            }
+
         return {
             'shape': (self.adata.n_obs, self.adata.n_vars),
             'obsm': list(self.adata.obsm.keys()),
@@ -410,10 +454,14 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
         """Detect which functions have been executed.
 
         Uses PrerequisiteChecker to detect executed functions with confidence scores.
+        Returns an empty dict when no dataset/inspector is available.
 
         Returns:
             Dict mapping function names to confidence scores.
         """
+        if self.inspector is None:
+            return {}
+
         # Get common function names to check
         common_functions = [
             'qc', 'preprocess', 'scale', 'pca',
@@ -426,8 +474,8 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
                 result = self.inspector.prerequisite_checker.check_function_executed(func_name)
                 if result.executed or result.confidence >= 0.5:
                     executed[func_name] = result.confidence
-            except Exception:
-                # Function not in registry or error checking
+            except Exception as exc:
+                logger.debug("Skipping function %r during detection: %s", func_name, exc)
                 continue
 
         return executed
@@ -436,7 +484,8 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
         """Update state after a function has been executed.
 
         Call this after executing any OmicVerse function to keep the context
-        injector's state synchronized.
+        injector's state synchronized.  Works in no-dataset mode too — execution
+        history is tracked even without a live AnnData.
 
         Args:
             function_name: Name of the function that was just executed.
@@ -447,7 +496,7 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
         """
         self.conversation_state.add_execution(function_name)
 
-        # Take new snapshot
+        # Take new snapshot (safe even without dataset — returns empty state)
         state = self._get_current_state()
         self.conversation_state.snapshot_data_state(state)
 
@@ -491,9 +540,10 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
         """
         self.conversation_state = ConversationState()
 
-        # Take fresh snapshot
-        initial_state = self._get_current_state()
-        self.conversation_state.snapshot_data_state(initial_state)
+        # Take fresh snapshot only when a dataset is available.
+        if self.has_dataset:
+            initial_state = self._get_current_state()
+            self.conversation_state.snapshot_data_state(initial_state)
 
     # =========================================================================
     # Filesystem Context Methods
@@ -539,8 +589,8 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
 
             return f"## Workspace Context\n\n{context}"
 
-        except Exception:
-            # Silently fail - filesystem context is optional
+        except Exception as exc:
+            logger.debug("Filesystem context query failed (optional): %s", exc)
             return ""
 
     def write_to_context(
@@ -579,7 +629,8 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
             path = fs_ctx.write_note(key, content, category, metadata)
             self.conversation_state.filesystem_notes.append(f"{category}/{key}")
             return path
-        except Exception:
+        except Exception as exc:
+            logger.debug("write_to_context failed for key=%r: %s", key, exc)
             return None
 
     def search_context(
@@ -617,7 +668,8 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
                 }
                 for r in results
             ]
-        except Exception:
+        except Exception as exc:
+            logger.debug("search_context failed for pattern=%r: %s", pattern, exc)
             return []
 
     def save_execution_plan(self, steps: List[Dict[str, Any]]) -> Optional[str]:
@@ -642,7 +694,8 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
 
         try:
             return fs_ctx.write_plan(steps)
-        except Exception:
+        except Exception as exc:
+            logger.debug("save_execution_plan failed: %s", exc)
             return None
 
     def update_plan_step(
@@ -664,8 +717,8 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
 
         try:
             fs_ctx.update_plan_step(step_index, status, result)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("update_plan_step failed for step %d: %s", step_index, exc)
 
     def save_data_snapshot(
         self,
@@ -688,7 +741,8 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
         try:
             state = self._get_current_state()
             return fs_ctx.write_snapshot(state, step_number, description)
-        except Exception:
+        except Exception as exc:
+            logger.debug("save_data_snapshot failed: %s", exc)
             return None
 
     def get_workspace_summary(self) -> str:
@@ -703,17 +757,19 @@ REMEMBER: The user should be able to run your generated code WITHOUT errors!
 
         try:
             return fs_ctx.get_session_summary()
-        except Exception:
+        except Exception as exc:
+            logger.debug("get_workspace_summary failed: %s", exc)
             return "Error getting workspace summary."
 
     def create_sub_agent_injector(
         self,
-        adata: Optional[AnnData] = None,
+        adata: Optional['AnnData'] = None,
     ) -> 'AgentContextInjector':
         """Create a context injector for a sub-agent that shares the workspace.
 
         Args:
-            adata: AnnData to use for the sub-agent. If None, uses the same adata.
+            adata: AnnData to use for the sub-agent.  If ``None``, inherits the
+                parent's adata (which itself may be ``None`` in no-dataset mode).
 
         Returns:
             New AgentContextInjector that shares the filesystem workspace.

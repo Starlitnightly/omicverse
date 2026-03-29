@@ -9,6 +9,7 @@ import concurrent.futures as _cf
 import logging
 import os
 import random
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, TypeVar
@@ -69,7 +70,7 @@ _STREAM_DISPATCH = {
     WireAPI.ANTHROPIC_MESSAGES: "_stream_anthropic",
     WireAPI.GEMINI_GENERATE:    "_stream_gemini",
     WireAPI.DASHSCOPE:          "_stream_dashscope",
-    # LOCAL handled specially (non-streaming fallback)
+    WireAPI.LOCAL:              "_run_python_local",  # non-streaming; handled specially in _stream_async
 }
 
 # ---------------------------------------------------------------------------
@@ -78,6 +79,7 @@ _STREAM_DISPATCH = {
 
 _SHARED_EXECUTOR: Optional[_cf.ThreadPoolExecutor] = None
 _EXECUTOR_ATEXIT_REGISTERED: bool = False
+_EXECUTOR_LOCK = threading.Lock()
 
 
 def _shutdown_shared_executor() -> None:
@@ -87,20 +89,27 @@ def _shutdown_shared_executor() -> None:
     if exc is not None:
         try:
             exc.shutdown(wait=False)
-        except Exception:
-            pass
+        except (RuntimeError, OSError) as shutdown_exc:
+            logger.debug("Shared executor shutdown error: %s", shutdown_exc)
 
 
 def _get_shared_executor() -> _cf.ThreadPoolExecutor:
+    """Return the module-level shared executor, creating it if needed.
+
+    Uses double-checked locking to avoid duplicate construction under
+    concurrent access from multiple threads.
+    """
     global _SHARED_EXECUTOR, _EXECUTOR_ATEXIT_REGISTERED
     if _SHARED_EXECUTOR is None:
-        _SHARED_EXECUTOR = _cf.ThreadPoolExecutor(
-            max_workers=4, thread_name_prefix="ovagent-stream",
-        )
-        if not _EXECUTOR_ATEXIT_REGISTERED:
-            import atexit
-            atexit.register(_shutdown_shared_executor)
-            _EXECUTOR_ATEXIT_REGISTERED = True
+        with _EXECUTOR_LOCK:
+            if _SHARED_EXECUTOR is None:
+                _SHARED_EXECUTOR = _cf.ThreadPoolExecutor(
+                    max_workers=4, thread_name_prefix="ovagent-stream",
+                )
+                if not _EXECUTOR_ATEXIT_REGISTERED:
+                    import atexit
+                    atexit.register(_shutdown_shared_executor)
+                    _EXECUTOR_ATEXIT_REGISTERED = True
     return _SHARED_EXECUTOR
 
 
@@ -180,7 +189,8 @@ def _coerce_int(value: Any) -> Optional[int]:
             return int(value)
         if isinstance(value, str) and value.isdigit():
             return int(value)
-    except Exception:
+    except (TypeError, ValueError, OverflowError) as exc:
+        logger.debug("_coerce_int fallback for %r: %s", value, exc)
         return None
     return None
 
@@ -265,40 +275,41 @@ def _retry_with_backoff(
     base_delay: float = 1.0,
     factor: float = 2.0,
     jitter: float = 0.5,
-    *args,
-    **kwargs
 ) -> T:
-    """Retry a function call with exponential backoff and jitter.
+    """Retry a callable with exponential backoff and jitter.
+
+    *func* must be a **zero-argument** callable (bind any arguments before
+    passing, e.g. via ``lambda`` or ``functools.partial``).  Retry
+    configuration can be passed positionally or by keyword.
 
     Parameters
     ----------
-    func : Callable
-        Function to retry
+    func : Callable[..., T]
+        Zero-argument callable to retry.
     max_attempts : int
-        Maximum number of attempts (default: 3)
+        Maximum number of attempts (default: 3).
     base_delay : float
-        Base delay in seconds (default: 1.0)
+        Base delay in seconds (default: 1.0).
     factor : float
-        Exponential backoff factor (default: 2.0)
+        Exponential backoff factor (default: 2.0).
     jitter : float
-        Maximum jitter factor as proportion of delay (default: 0.5)
-    *args, **kwargs
-        Arguments to pass to func
+        Maximum jitter factor as proportion of delay (default: 0.5).
 
     Returns
     -------
-    Result of func(*args, **kwargs)
+    T
+        Result of ``func()``.
 
     Raises
     ------
-    Exception
-        Last exception encountered if all retries fail
+    RuntimeError
+        If all retry attempts are exhausted.
     """
     last_exception = None
 
     for attempt in range(max_attempts):
         try:
-            return func(*args, **kwargs)
+            return func()
         except Exception as exc:
             last_exception = exc
 

@@ -244,8 +244,8 @@ class TestFacadeSize:
         """Facade should be well under the original 3128 lines."""
         facade_path = UTILS_DIR / "agent_backend.py"
         line_count = len(facade_path.read_text().splitlines())
-        assert line_count < 750, (
-            f"agent_backend.py is {line_count} lines; expected <750 for a facade "
+        assert line_count < 700, (
+            f"agent_backend.py is {line_count} lines; expected <700 for a facade "
             "(down from 3128)"
         )
 
@@ -254,6 +254,82 @@ class TestFacadeSize:
         source = (UTILS_DIR / "agent_backend.py").read_text()
         for sdk in ["import openai", "import anthropic", "import google.generativeai", "import dashscope"]:
             assert sdk not in source, f"Facade still contains '{sdk}'"
+
+
+# ---------------------------------------------------------------------------
+# 4b. Delegation registry covers all providers
+# ---------------------------------------------------------------------------
+
+
+class TestDelegationRegistry:
+    """Verify the _PROVIDER_DELEGATES registry and _CHAT_DISPATCH table."""
+
+    def test_provider_delegates_registry_exists(self):
+        from omicverse.utils.agent_backend import _PROVIDER_DELEGATES
+        assert isinstance(_PROVIDER_DELEGATES, list)
+        assert len(_PROVIDER_DELEGATES) >= 60, (
+            f"Expected at least 60 delegate entries, got {len(_PROVIDER_DELEGATES)}"
+        )
+
+    def test_provider_delegates_all_tuples(self):
+        from omicverse.utils.agent_backend import _PROVIDER_DELEGATES
+        for entry in _PROVIDER_DELEGATES:
+            assert isinstance(entry, tuple) and len(entry) == 3, (
+                f"Each entry must be (name, module, kind); got {entry!r}"
+            )
+            name, mod, kind = entry
+            assert isinstance(name, str) and name.startswith("_")
+            assert kind in ("instance", "static", "async_gen"), (
+                f"Unknown kind {kind!r} for delegate {name}"
+            )
+
+    def test_chat_dispatch_table_exists(self):
+        from omicverse.utils.agent_backend import _CHAT_DISPATCH
+        from omicverse.utils.model_config import WireAPI
+        for wire in [WireAPI.CHAT_COMPLETIONS, WireAPI.ANTHROPIC_MESSAGES,
+                     WireAPI.GEMINI_GENERATE, WireAPI.DASHSCOPE]:
+            assert wire in _CHAT_DISPATCH, f"{wire} missing from _CHAT_DISPATCH"
+
+    def test_all_delegates_installed_on_class(self):
+        """Every registry entry should be accessible on OmicVerseLLMBackend."""
+        from omicverse.utils.agent_backend import OmicVerseLLMBackend, _PROVIDER_DELEGATES
+        for name, _mod, _kind in _PROVIDER_DELEGATES:
+            assert hasattr(OmicVerseLLMBackend, name), (
+                f"Delegate {name!r} not installed on OmicVerseLLMBackend"
+            )
+
+    def test_delegates_cover_expected_providers(self):
+        """Registry should have entries from all five adapter modules."""
+        from omicverse.utils.agent_backend import _PROVIDER_DELEGATES
+        from omicverse.utils import (
+            agent_backend_openai as oai,
+            agent_backend_anthropic as ant,
+            agent_backend_gemini as gem,
+            agent_backend_dashscope as ds,
+            agent_backend_streaming as st,
+        )
+        modules_used = {mod for _, mod, _ in _PROVIDER_DELEGATES}
+        assert oai in modules_used, "OpenAI module missing from delegates"
+        assert ant in modules_used, "Anthropic module missing from delegates"
+        assert gem in modules_used, "Gemini module missing from delegates"
+        assert ds in modules_used, "DashScope module missing from delegates"
+        assert st in modules_used, "Streaming module missing from delegates"
+
+    def test_no_handwritten_forwarding_methods_in_class_body(self):
+        """The class body should not contain inline forwarding methods."""
+        source = (UTILS_DIR / "agent_backend.py").read_text()
+        # Find the class body (between 'class OmicVerseLLMBackend' and the
+        # registry section that lives outside the class).
+        class_start = source.index("class OmicVerseLLMBackend")
+        registry_start = source.index("_PROVIDER_DELEGATES")
+        class_body = source[class_start:registry_start]
+        # The class body should not contain any direct forwarding patterns
+        # like 'return _oai.' or 'return _ant.' or 'return _gem.'
+        for pattern in ["return _oai.", "return _ant.", "return _gem.",
+                        "return _ds.", "return _stream."]:
+            assert pattern not in class_body, (
+                f"Class body still contains forwarding pattern '{pattern}'"
+            )
 
 
 # ---------------------------------------------------------------------------

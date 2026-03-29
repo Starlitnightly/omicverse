@@ -373,8 +373,8 @@ class CodegenPipeline:
                 return
             try:
                 progress_callback(message)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Progress callback failed (best-effort): %s", exc)
 
         async def _event_callback(event: Dict[str, Any]) -> None:
             event_type = str(event.get("type") or "")
@@ -547,9 +547,11 @@ class CodegenPipeline:
         if not code:
             return code
 
+        from .registry_scanner import RegistryScanner
+
         lookup: Dict[str, str] = {}
         for raw_entry in entries:
-            entry = self._ctx._normalize_registry_entry_for_codegen(raw_entry)
+            entry = RegistryScanner.normalize_entry(raw_entry)
             public_name = str(entry.get("full_name", "") or "")
             short_name = str(entry.get("short_name") or entry.get("name") or "").strip()
             if not public_name.startswith("ov.") or not short_name:
