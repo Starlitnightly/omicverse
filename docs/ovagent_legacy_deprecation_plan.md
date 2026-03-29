@@ -4,7 +4,10 @@
 > All legacy Priority 1/2 methods have been removed (~1,182 lines deleted).
 > `execute_code` enhanced with pattern-based auto-recovery.
 > `stream_async` rewritten to wrap the agentic loop.
-> `agent_mode` config removed; backward-compat deprecation warning added.
+> `agent_mode` parameter retained for backward compatibility but deprecated
+> and ignored — passing any value other than `"agentic"` emits a
+> `DeprecationWarning`.  The agentic tool-calling loop is the sole
+> execution mode.
 
 ## Scope
 
@@ -16,14 +19,14 @@ This plan deprecates and removes legacy Priority 1/2 execution paths in `omicver
 
 Primary target module: `omicverse/utils/smart_agent.py`
 
-## Current Problem
+## Original Problem (resolved)
 
-`OmicVerseAgent` currently mixes two architectures:
+`OmicVerseAgent` previously mixed two architectures:
 
-- Agentic tool loop (current default, desired long-term architecture)
+- Agentic tool loop (now the sole execution mode)
 - Legacy single-shot code generation and fallback workflows (Priority 1/2)
 
-This increases maintenance cost, creates behavior divergence (`run()` vs `stream_async()`), and leaves stale docs/tests.
+This increased maintenance cost, created behavior divergence (`run()` vs `stream_async()`), and left stale docs/tests.  All legacy paths have since been removed; `run()` and `stream_async()` both execute via the agentic tool-calling loop.
 
 ## Goals
 
@@ -36,7 +39,7 @@ This increases maintenance cost, creates behavior divergence (`run()` vs `stream
 
 1. Rewriting provider backend (`agent_backend.py`) protocol layer.
 2. Removing notebook execution or security scanner features.
-3. Changing user-facing `ov.Agent(...)` constructor in this phase.
+3. Changing user-facing `ov.Agent(...)` constructor beyond the `agent_mode` deprecation.
 
 ## Legacy Inventory and Disposition
 
@@ -94,12 +97,12 @@ Move workflow-level knowledge to skills, not runtime branches:
 
 ### Phase 0: Guardrails and Visibility
 
-1. Add structured warnings when `agent_mode='legacy'` is used.
+1. ~~Add structured warnings when `agent_mode='legacy'` is used.~~ **Done** — `DeprecationWarning` emitted when `agent_mode != "agentic"`.
 2. Add telemetry events (`category=deprecation`) for legacy entry points.
-3. Update docs to state: agentic is canonical.
+3. ~~Update docs to state: agentic is canonical.~~ **Done.**
 
 Exit criteria:
-- No hidden legacy path usage in tests or web service.
+- No hidden legacy path usage in tests or web service. **Met.**
 
 ### Phase 1: Behavior Parity in Agentic Mode
 
@@ -158,7 +161,7 @@ Exit criteria:
 
 1. Remove Priority 1/2 architecture language.
 2. Document new agentic tools and recommended invocation patterns.
-3. Update stale API docs that mention `query/query_async`.
+3. ~~Update stale API docs that mention `query/query_async`.~~ **Done** — docs now reference `run`/`run_async`/`stream_async`/`generate_code`.
 
 ## Test Plan
 
@@ -185,14 +188,14 @@ Exit criteria:
 
 ## Review Checklist (for local review)
 
-1. `smart_agent.py` has a single runtime architecture.
-2. No repo references to:
+1. [x] `smart_agent.py` has a single runtime architecture.
+2. [x] No repo references to:
    - “Priority 1”
    - “Priority 2”
    - `run_async_LEGACY`
-3. `stream_async` and `run()` produce consistent behavior.
-4. Web service agent streaming still functions.
-5. Docs reflect real APIs.
+3. [x] `stream_async` and `run()` produce consistent behavior (both use agentic loop).
+4. [x] Web service agent streaming still functions.
+5. [x] Docs reflect real APIs (`run`, `run_async`, `stream_async`, `generate_code`).
 
 ## Risk Notes
 
