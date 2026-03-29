@@ -32,9 +32,8 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Circle, Polygon, Rectangle
 
 from pandas import CategoricalDtype
-from scanpy import logging as logg
-from scanpy._settings import settings as sc_settings
-from scanpy.plotting._tools.scatterplots import _add_categorical_legend
+from ._scanpy_compat import logg, settings as sc_settings
+from ._scatterplot_backend import _add_categorical_legend
 
 def _get_vector_friendly():
     """Get the vector_friendly setting from omicverse plot settings."""

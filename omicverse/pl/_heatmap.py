@@ -2,11 +2,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pandas.api.types import CategoricalDtype, is_numeric_dtype
 import seaborn as sns
-import scanpy as sc
-from scanpy.plotting._anndata import _prepare_dataframe
 import pandas as pd
 from anndata import AnnData
 from ._plot_backend import plotset
+from ._scanpy_compat import _prepare_dataframe, default_palette, obs_df
 from .._registry import register_function
 
 pycomplexheatmap_install=False
@@ -181,7 +180,7 @@ def complexheatmap(adata,
         print('Error, please input marker_genes_dict before run this function.')
     
     keys = list(groupby) + list(np.unique(var_names))
-    obs_tidy = sc.get.obs_df(adata, keys=keys, layer=layer, use_raw=use_raw, gene_symbols=gene_symbols)
+    obs_tidy = obs_df(adata, keys=keys, layer=layer, use_raw=use_raw, gene_symbols=gene_symbols)
     assert np.all(np.array(keys) == np.array(obs_tidy.columns))
 
     if groupby_index is not None:
@@ -418,9 +417,9 @@ def marker_heatmap(
             type_color_all=dict(zip(adata.obs[groupby].cat.categories,adata.uns['{}_colors'.format(groupby)]))
         else:
             if len(adata.obs[groupby].cat.categories)>28:
-                type_color_all=dict(zip(adata.obs[groupby].cat.categories,sc.pl.palettes.default_102))
+                type_color_all=dict(zip(adata.obs[groupby].cat.categories, default_palette(len(adata.obs[groupby].cat.categories))))
             else:
-                type_color_all=dict(zip(adata.obs[groupby].cat.categories,sc.pl.palettes.zeileis_28))
+                type_color_all=dict(zip(adata.obs[groupby].cat.categories, default_palette(len(adata.obs[groupby].cat.categories))))
 
     # Prepare lists to hold gene group labels and positions.
     var_group_labels = []

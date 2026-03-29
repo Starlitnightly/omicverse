@@ -29,10 +29,7 @@ from matplotlib import rcParams
 from matplotlib import patheffects
 from matplotlib.colors import Colormap, Normalize
 from functools import partial
-
-from scanpy.plotting import _utils 
-
-from scanpy.plotting._utils import (
+from ._scanpy_compat import (
     _FontWeight,
     _FontSize,
     ColorLike,
@@ -40,17 +37,22 @@ from scanpy.plotting._utils import (
     circles,
     check_projection,
     check_colornorm,
-)
-from scanpy.plotting._docs import (
     doc_adata_color_etc,
     doc_edges_arrows,
     doc_scatter_embedding,
     doc_scatter_spatial,
     doc_show_save_ax,
+    logg,
+    settings,
+    sanitize_anndata,
+    _doc_params,
+    Empty,
+    _empty,
+    savefig_or_show,
+    plot_edges,
+    plot_arrows,
+    additional_colors,
 )
-from scanpy import logging as logg
-from scanpy._settings import settings
-from scanpy._utils import sanitize_anndata, _doc_params, Empty, _empty
 
 
 def register_function(*args, **kwargs):
@@ -554,9 +556,9 @@ def embedding(
         # 画散点后
 
         if edges:
-            _utils.plot_edges(ax, adata, basis, edges_width, edges_color, neighbors_key)
+            plot_edges(ax, adata, basis, edges_width, edges_color, neighbors_key)
         if arrows:
-            _utils.plot_arrows(ax, adata, basis, arrows_kwds)
+            plot_arrows(ax, adata, basis, arrows_kwds)
 
         if value_to_plot is None:
             # if only dots were plotted without an associated value
@@ -627,7 +629,7 @@ def embedding(
     if return_fig is True:
         return fig
     axs = axs if grid else ax
-    _utils.savefig_or_show(basis, show=show, save=save)
+    savefig_or_show(basis, show=show, save=save)
     if show is False:
         return axs
 
@@ -847,16 +849,11 @@ def diffmap(adata, **kwargs) -> Union[Axes, List[Axes], None]:
     .. plot::
         :context: close-figs
 
-        import scanpy as sc
-        adata = sc.datasets.pbmc68k_reduced()
-        sc.tl.diffmap(adata)
-        sc.pl.diffmap(adata, color='bulk_labels')
-
-    .. currentmodule:: scanpy
+        ov.pl.diffmap(adata, color='bulk_labels')
 
     See also
     --------
-    tl.diffmap
+    ov.pl.embedding
     """
     return embedding(adata, 'diffmap', **kwargs)
 
@@ -893,16 +890,11 @@ def draw_graph(
     .. plot::
         :context: close-figs
 
-        import scanpy as sc
-        adata = sc.datasets.pbmc68k_reduced()
-        sc.tl.draw_graph(adata)
-        sc.pl.draw_graph(adata, color=['phase', 'bulk_labels'])
-
-    .. currentmodule:: scanpy
+        ov.pl.draw_graph(adata, color=['phase', 'bulk_labels'])
 
     See also
     --------
-    tl.draw_graph
+    ov.pl.embedding
     """
     if layout is None:
         layout = str(adata.uns['draw_graph']['params']['layout'])
@@ -981,7 +973,7 @@ def pca(
             else:
                 axs.set_xlabel(label_dict[axs.xaxis.get_label().get_text()])
                 axs.set_ylabel(label_dict[axs.yaxis.get_label().get_text()])
-            _utils.savefig_or_show('pca', show=show, save=save)
+            savefig_or_show('pca', show=show, save=save)
             if show is False:
                 return axs
 
@@ -1050,16 +1042,12 @@ def spatial(
     Examples
     --------
     This function behaves very similarly to other embedding plots like
-    :func:`~scanpy.pl.umap`
+    :func:`~omicverse.pl.umap`
 
-    >>> adata = sc.datasets.visium_sge("Targeted_Visium_Human_Glioblastoma_Pan_Cancer")
-    >>> sc.pp.calculate_qc_metrics(adata, inplace=True)
-    >>> sc.pl.spatial(adata, color="log1p_n_genes_by_counts")
+    >>> ov.pl.spatial(adata, color="log1p_n_genes_by_counts")
 
     See Also
     --------
-    :func:`scanpy.datasets.visium_sge`
-        Example visium data.
     :tutorial:`spatial/basic-analysis`
         Tutorial on spatial analysis.
     """
@@ -1104,7 +1092,7 @@ def spatial(
         else:
             ax.set_xlim(cur_coords[0], cur_coords[1])
             ax.set_ylim(cur_coords[3], cur_coords[2])
-    _utils.savefig_or_show('show', show=show, save=save)
+    savefig_or_show('show', show=show, save=save)
     if show is False or return_fig is True:
         return axs
 
@@ -1457,10 +1445,6 @@ def _get_palette(adata, values_key: str, palette=None):
 
         if isinstance(palette, (list, tuple)):
             try:
-                from scanpy.plotting._utils import additional_colors
-            except Exception:
-                additional_colors = {}
-            try:
                 seq = [(c if is_color_like(c) else additional_colors[c]) for c in palette]
             except Exception as e:
                 raise ValueError(f"Invalid color in palette: {e}") from None
@@ -1530,13 +1514,7 @@ def _get_palette(adata, values_key: str, palette=None):
                 hex_list = [to_hex(c, keep_alpha=True) for c in palette_112[:n_cat]]
             else:
                 hex_list = ["#808080"] * n_cat
-                try:
-                    from scanpy import logging as logg
-                    logg.info(
-                        f"the obs value {values_key!r} has many categories; using uniform grey."
-                    )
-                except Exception:
-                    pass
+                logg.info(f"the obs value {values_key!r} has many categories; using uniform grey.")
         _write_colors(hex_list)
 
     return dict(zip(cats, hex_list))
@@ -1815,20 +1793,6 @@ from cycler import Cycler
 import matplotlib as mpl
 from matplotlib.colors import is_color_like, to_hex
 from natsort import natsorted
-
-# 可选：与 scanpy 的 warning 接口对齐
-try:
-    from scanpy import logging as logg
-except Exception:
-    class _LogStub:
-        def warning(self, *a, **k): pass
-    logg = _LogStub()
-
-# 可选：scanpy 自带的颜色名扩展（没有也不影响）
-try:
-    from scanpy.plotting._utils import additional_colors  # type: ignore
-except Exception:
-    additional_colors: Mapping[str, str] = {}
 
 def _obs_series(adata, key):
     """兼容 pandas/Polars 的 obs 列取值。"""

@@ -7,12 +7,13 @@ from matplotlib import colors, colormaps, rcParams, patheffects
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.colors import Colormap, Normalize
-from typing import Union, Sequence, Optional, Mapping, Any, Tuple, Literal
+from typing import Union, Sequence, Optional, Mapping, Tuple, Literal
 from anndata import AnnData
 from cycler import Cycler
 from scipy.sparse import issparse
 
 from .._registry import register_function
+from ._scanpy_compat import ColorLike, VBound, _FontWeight, _FontSize
 from ._scatterplot_backend import (
     _get_basis,
     _get_color_source_vector,
@@ -23,15 +24,6 @@ from ._scatterplot_backend import (
     _basis2name,
     _components_to_dimensions,
 )
-
-try:
-    from scanpy.plotting._utils import ColorLike, VBound, _FontWeight, _FontSize
-except ImportError:
-    ColorLike = Any
-    VBound = Any
-    _FontWeight = Any
-    _FontSize = Any
-
 
 @register_function(
     aliases=["大规模嵌入可视化", "datashader_embedding", "atlas_plot", "百万细胞可视化"],

@@ -6,7 +6,6 @@ import matplotlib.font_manager as fm
 import matplotlib.patches as mpatches
 from matplotlib import rcParams
 import random
-import scanpy as sc
 import networkx as nx
 import pandas as pd
 import anndata
@@ -23,6 +22,7 @@ from datetime import datetime, timedelta
 import warnings
 import platform
 import os
+from ._scanpy_compat import default_palette, ranking, savefig_or_show, settings
 try:
     import torch  # Optional, used for GPU information
 except ImportError:  # pragma: no cover - optional dependency
@@ -247,7 +247,7 @@ def plot_set(verbosity: int = 3, dpi: int = 80,
 
     # 2) scanpy verbosity & figure params
     #print(f"{EMOJI['settings']} Applying plotting settings (verbosity={verbosity}, dpi={dpi})")
-    sc.settings.verbosity = verbosity
+    settings.verbosity = verbosity
     import builtins
     is_ipython = getattr(builtins, "__IPYTHON__", False)
     if is_ipython:
@@ -950,9 +950,9 @@ def plot_embedding_celltype(adata:anndata.AnnData,figsize:tuple=(6,4),basis:str=
                         adata.uns['{}_colors'.format(celltype_key)]))
     else:
         if len(adata.obs[celltype_key].cat.categories)>28:
-            cell_color_dict=dict(zip(adata.obs[celltype_key].cat.categories,sc.pl.palettes.default_102))
+            cell_color_dict=dict(zip(adata.obs[celltype_key].cat.categories, default_palette(len(adata.obs[celltype_key].cat.categories))))
         else:
-            cell_color_dict=dict(zip(adata.obs[celltype_key].cat.categories,sc.pl.palettes.zeileis_28))
+            cell_color_dict=dict(zip(adata.obs[celltype_key].cat.categories, default_palette(len(adata.obs[celltype_key].cat.categories))))
 
     if figsize==None:
         if len(adata.obs[celltype_key].cat.categories)<10:
@@ -971,13 +971,14 @@ def plot_embedding_celltype(adata:anndata.AnnData,figsize:tuple=(6,4),basis:str=
     #ax4 = fig.add_subplot(grid[2, 0])       # 占据最后一行的第一列
     #ax5 = fig.add_subplot(grid[2, 1])       # 占据最后一行的第二列
 
-    sc.pl.embedding(
+    from ._single import embedding
+
+    embedding(
         adata,
         basis=basis,
         color=[celltype_key],
         title='',
         frameon=False,
-        #wspace=0.65,
         ncols=3,
         ax=ax1,
         legend_loc=False,
@@ -1075,7 +1076,7 @@ def plot_embedding(adata:anndata.AnnData,basis:str,color:str,color_dict=None,
         color: Column name for coloring
         color_dict: Custom color mapping (None)
         figsize: Figure size ((4,4))
-        **kwargs:Additional parameters for sc.pl.embedding
+        **kwargs:Additional parameters for ``ov.pl.embedding``
         
     Returns
     -------
@@ -1092,16 +1093,17 @@ def plot_embedding(adata:anndata.AnnData,basis:str,color:str,color_dict=None,
         type_color_all=dict(zip(adata.obs[color].cat.categories,adata.uns['{}_colors'.format(color)]))
     else:
         if len(adata.obs[color].cat.categories)>28:
-            type_color_all=dict(zip(adata.obs[color].cat.categories,sc.pl.palettes.default_102))
+            type_color_all=dict(zip(adata.obs[color].cat.categories, default_palette(len(adata.obs[color].cat.categories))))
         else:
-            type_color_all=dict(zip(adata.obs[color].cat.categories,sc.pl.palettes.zeileis_28))
+            type_color_all=dict(zip(adata.obs[color].cat.categories, default_palette(len(adata.obs[color].cat.categories))))
     if color_dict is not None:
         for color_key in color_dict.keys():
             type_color_all[color_key]=color_dict[color_key]
     
     adata.uns['{}_colors'.format(color)]=np.array([i for i in type_color_all.values()])
-    sc.pl.embedding(adata,basis=basis,
-                    color=color,ax=ax,**kwargs)
+    from ._single import embedding
+
+    embedding(adata, basis=basis, color=color, ax=ax, **kwargs)
     return fig,ax
 
 from sklearn.preprocessing import MinMaxScaler
@@ -1293,9 +1295,9 @@ def plot_ConvexHull(adata:anndata.AnnData,basis:str,cluster_key:str,
         type_color_all=dict(zip(adata.obs[cluster_key].cat.categories,adata.uns['{}_colors'.format(cluster_key)]))
     else:
         if len(adata.obs[cluster_key].cat.categories)>28:
-            type_color_all=dict(zip(adata.obs[cluster_key].cat.categories,sc.pl.palettes.default_102))
+            type_color_all=dict(zip(adata.obs[cluster_key].cat.categories, default_palette(len(adata.obs[cluster_key].cat.categories))))
         else:
-            type_color_all=dict(zip(adata.obs[cluster_key].cat.categories,sc.pl.palettes.zeileis_28))
+            type_color_all=dict(zip(adata.obs[cluster_key].cat.categories, default_palette(len(adata.obs[cluster_key].cat.categories))))
     
     #color_dict=dict(zip(adata.obs[cluster_key].cat.categories,adata.uns[f'{cluster_key}_colors']))
     points=adata[adata.obs[cluster_key]==hull_cluster].obsm[basis]
@@ -1399,9 +1401,9 @@ class geneset_wordcloud(object):
                             self.adata.uns['{}_colors'.format(self.cluster_key)]))
         else:
             if len(self.adata.obs[self.cluster_key].cat.categories)>28:
-                cell_color_dict=dict(zip(self.adata.obs[self.cluster_key].cat.categories,sc.pl.palettes.default_102))
+                cell_color_dict=dict(zip(self.adata.obs[self.cluster_key].cat.categories, default_palette(len(self.adata.obs[self.cluster_key].cat.categories))))
             else:
-                cell_color_dict=dict(zip(self.adata.obs[self.cluster_key].cat.categories,sc.pl.palettes.zeileis_28))
+                cell_color_dict=dict(zip(self.adata.obs[self.cluster_key].cat.categories, default_palette(len(self.adata.obs[self.cluster_key].cat.categories))))
 
 
         wc_dict={}
@@ -1595,8 +1597,6 @@ class geneset_wordcloud(object):
         return fig
 
 
-from scanpy.plotting._anndata import ranking
-from scanpy.plotting._utils import savefig_or_show
 @register_function(
     aliases=["主成分方差比", "plot_pca_variance_ratio", "pca_variance", "PCA方差", "主成分分析方差"],
     category="utils",

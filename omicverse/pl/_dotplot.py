@@ -604,17 +604,17 @@ def rank_genes_groups_dotplot(
     
     Examples:
         >>> # Basic usage with top genes
-        >>> sc.pl.rank_genes_groups_dotplot(adata, n_genes=5)
+        >>> ov.pl.rank_genes_groups_dotplot(adata, n_genes=5)
     
         >>> # Using logfoldchanges for coloring
-        >>> sc.pl.rank_genes_groups_dotplot(adata, n_genes=5, values_to_plot='logfoldchanges')
+        >>> ov.pl.rank_genes_groups_dotplot(adata, n_genes=5, values_to_plot='logfoldchanges')
     
         >>> # Grouping genes manually
         >>> gene_groups = {
         ...     'Group1': ['gene1', 'gene2'],
         ...     'Group2': ['gene3', 'gene4']
         ... }
-        >>> sc.pl.rank_genes_groups_dotplot(adata, var_names=gene_groups)
+        >>> ov.pl.rank_genes_groups_dotplot(adata, var_names=gene_groups)
     """
     if plot_type != "dotplot":
         raise ValueError("Only 'dotplot' is currently supported")

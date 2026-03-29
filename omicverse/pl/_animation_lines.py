@@ -391,21 +391,19 @@ def animate_streamplot(X_grid, V_grid, adata=None,
     
     # Add background scatter plot if data provided
     if adata is not None:
-        try:
-            import scanpy as sc
-            sc.pl.embedding(
-                adata,
-                basis=basis,
-                color=color,
-                palette=palette,
-                ax=ax,
-                show=False,
-                legend_loc=None,
-                frameon=False,
-                title=''
-            )
-        except ImportError:
-            print("Warning: scanpy not available, skipping background scatter plot")
+        from ._single import embedding
+
+        embedding(
+            adata,
+            basis=basis,
+            color=color,
+            palette=palette,
+            ax=ax,
+            show=False,
+            legend_loc=None,
+            frameon=False,
+            title=''
+        )
     
     # Prepare animation data
     lengths = []

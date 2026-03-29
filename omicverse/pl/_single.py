@@ -34,15 +34,15 @@ from matplotlib.colors import Colormap, Normalize
 from functools import partial
 import matplotlib.pyplot as plt
 import seaborn as sns
-import scanpy as sc
 
-from scanpy.plotting import _utils 
-
-from scanpy.plotting._utils import (
+from ._scanpy_compat import (
     _FontWeight,
     _FontSize,
     ColorLike,
     VBound,
+    default_palette,
+    embedding_density as compute_embedding_density,
+    plot_violin,
 )
 
 def mde(adata: AnnData,convert=True, **kwargs):
@@ -549,9 +549,9 @@ def embedding_celltype(adata:AnnData,figsize:tuple=(6,4),basis:str='umap',
                         adata.uns['{}_colors'.format(celltype_key)]))
     else:
         if len(adata.obs[celltype_key].cat.categories)>28:
-            cell_color_dict=dict(zip(adata.obs[celltype_key].cat.categories,sc.pl.palettes.default_102))
+            cell_color_dict=dict(zip(adata.obs[celltype_key].cat.categories, default_palette(len(adata.obs[celltype_key].cat.categories))))
         else:
-            cell_color_dict=dict(zip(adata.obs[celltype_key].cat.categories,sc.pl.palettes.zeileis_28))
+            cell_color_dict=dict(zip(adata.obs[celltype_key].cat.categories, default_palette(len(adata.obs[celltype_key].cat.categories))))
 
     if figsize==None:
         if len(adata.obs[celltype_key].cat.categories)<10:
@@ -570,13 +570,12 @@ def embedding_celltype(adata:AnnData,figsize:tuple=(6,4),basis:str='umap',
     #ax4 = fig.add_subplot(grid[2, 0])       # 占据最后一行的第一列
     #ax5 = fig.add_subplot(grid[2, 1])       # 占据最后一行的第二列
 
-    sc.pl.embedding(
+    embedding(
         adata,
         basis=basis,
         color=[celltype_key],
         title='',
         frameon=False,
-        #wspace=0.65,
         ncols=3,
         ax=ax1,
         legend_loc=False,
@@ -661,9 +660,9 @@ def ConvexHull(adata:AnnData,basis:str,cluster_key:str,
         type_color_all=dict(zip(adata.obs[cluster_key].cat.categories,adata.uns['{}_colors'.format(cluster_key)]))
     else:
         if len(adata.obs[cluster_key].cat.categories)>28:
-            type_color_all=dict(zip(adata.obs[cluster_key].cat.categories,sc.pl.palettes.default_102))
+            type_color_all=dict(zip(adata.obs[cluster_key].cat.categories, default_palette(len(adata.obs[cluster_key].cat.categories))))
         else:
-            type_color_all=dict(zip(adata.obs[cluster_key].cat.categories,sc.pl.palettes.zeileis_28))
+            type_color_all=dict(zip(adata.obs[cluster_key].cat.categories, default_palette(len(adata.obs[cluster_key].cat.categories))))
     
     #color_dict=dict(zip(adata.obs[cluster_key].cat.categories,adata.uns[f'{cluster_key}_colors']))
     points=adata[adata.obs[cluster_key]==hull_cluster].obsm[basis]
@@ -785,10 +784,10 @@ def embedding_density(adata,basis,groupby,target_clusters,**kwargs):
     """
     if 'X_' in basis:
         basis1=basis.split('_')[1]
-    sc.tl.embedding_density(adata,
-                       basis=basis1,
-                       groupby=groupby,
-                       key_added='temp_density')
+    compute_embedding_density(adata,
+                              basis=basis1,
+                              groupby=groupby,
+                              key_added='temp_density')
     adata.obs.loc[adata.obs[groupby]!=target_clusters,'temp_density']=0
     return embedding(adata,
                   basis=basis,
@@ -910,9 +909,9 @@ def bardotplot(adata,groupby,color,figsize=(8,3),return_values=False,
         color_list_dot=adata.uns['{}_colors'.format(groupby)]
     else:
         if len(adata.obs[groupby].cat.categories)>28:
-            color_list_dot=sc.pl.palettes.default_102
+            color_list_dot=default_palette(len(adata.obs[groupby].cat.categories))
         else:
-            color_list_dot=sc.pl.palettes.zeileis_28
+            color_list_dot=default_palette(len(adata.obs[groupby].cat.categories))
             
     plt.bar(x=plot_data.columns, 
             height=plot_data.describe().loc['mean'], 
@@ -1510,9 +1509,9 @@ def cellstackarea(adata,celltype_clusters:str,groupby:str,
         type_color_all=dict(zip(adata.obs[celltype_clusters].cat.categories,adata.uns['{}_colors'.format(celltype_clusters)]))
     else:
         if len(adata.obs[celltype_clusters].cat.categories)>28:
-            type_color_all=dict(zip(adata.obs[celltype_clusters].cat.categories,sc.pl.palettes.default_102))
+            type_color_all=dict(zip(adata.obs[celltype_clusters].cat.categories, default_palette(len(adata.obs[celltype_clusters].cat.categories))))
         else:
-            type_color_all=dict(zip(adata.obs[celltype_clusters].cat.categories,sc.pl.palettes.zeileis_28))
+            type_color_all=dict(zip(adata.obs[celltype_clusters].cat.categories, default_palette(len(adata.obs[celltype_clusters].cat.categories))))
     
     
     
@@ -1561,7 +1560,7 @@ def violin_old(adata,keys=None,groupby=None,ax=None,figsize=(4,4),fontsize=13,
            ticks_fontsize=None,rotation=90,**kwargs):
     if ax==None:
         fig, ax = plt.subplots(figsize=figsize)
-    sc.pl.violin(adata,keys=keys,groupby=groupby,ax=ax,show=False,**kwargs)
+    plot_violin(adata, keys=keys, groupby=groupby, ax=ax, **kwargs)
     plt.grid(False)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -1851,11 +1850,14 @@ def add_arrow(ax,adata,basis,fontsize=12,
         x_label=basis+'1'
     if y_label is None:
         y_label=basis+'2'
-    
-    x_range=(adata.obsm[basis][:,0].max()-adata.obsm[basis][:,0].min())/6
-    y_range=(adata.obsm[basis][:,1].max()-adata.obsm[basis][:,1].min())/6
-    x_min=adata.obsm[basis][:,0].min()
-    y_min=adata.obsm[basis][:,1].min()
+
+    obsm_key = basis if basis in adata.obsm else f"X_{basis}"
+    coords = adata.obsm[obsm_key]
+
+    x_range=(coords[:,0].max()-coords[:,0].min())/6
+    y_range=(coords[:,1].max()-coords[:,1].min())/6
+    x_min=coords[:,0].min()
+    y_min=coords[:,1].min()
     ax.arrow(x=x_min-x_range/5,y=y_min,dx=x_range+x_range/arrow_scale,dy=0, 
             width=arrow_width, color="k", 
                 head_width=y_range*2/arrow_scale, head_length=x_range*2/arrow_scale, overhang=0.5)
