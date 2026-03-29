@@ -10,7 +10,12 @@ from copy import copy
 from functools import partial
 from numbers import Number
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Optional, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Optional, Union
+
+try:
+    from typing import TypeAlias
+except ImportError:  # pragma: no cover - Python < 3.10
+    TypeAlias = Any
 
 
 import numpy as np
@@ -61,10 +66,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-Palette_t: TypeAlias = str | ListedColormap | None
-_Normalize: TypeAlias = Normalize | Sequence[Normalize]
-_SeqStr: TypeAlias = str | Sequence[str]
-_SeqFloat: TypeAlias = float | Sequence[float]
+Palette_t: TypeAlias = Optional[Union[str, ListedColormap]]
+_Normalize: TypeAlias = Union[Normalize, Sequence[Normalize]]
+_SeqStr: TypeAlias = Union[str, Sequence[str]]
+_SeqFloat: TypeAlias = Union[float, Sequence[float]]
 _CoordTuple: TypeAlias = tuple[int, int, int, int]
 _FontWeight: TypeAlias = Literal["light", "normal", "medium", "semibold", "bold", "heavy", "black"]
 _FontSize: TypeAlias = Literal["xx-small", "x-small", "small", "medium", "large", "x-large", "xx-large"]

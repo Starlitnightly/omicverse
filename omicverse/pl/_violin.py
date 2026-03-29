@@ -18,7 +18,7 @@ except ImportError:
 # Import Colors from settings
 try:
     from .._settings import Colors
-except ImportError:
+except Exception:
     # Fallback Colors class if import fails
     class Colors:
         HEADER = '\033[95m'
