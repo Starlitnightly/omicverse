@@ -339,6 +339,9 @@ __all__ = [
     "make_turn_id",
     # @ verifier
     "verifier",
+    # @ agent_config
+    "AgentConfig",
+    "SandboxFallbackPolicy",
     # @ agent_errors — public compatibility shims and error hierarchy
     "OVAgentError",
     "WorkflowNeedsFallback",
@@ -346,4 +349,17 @@ __all__ = [
     "ConfigError",
     "ExecutionError",
     "SandboxDeniedError",
+    # @ agent_reporter
+    "AgentEvent",
+    "EventLevel",
+    "Reporter",
+    "make_reporter",
+    # @ context_compactor
+    "ContextCompactor",
+    "estimate_tokens",
+    # @ session_history
+    "SessionHistory",
+    "HistoryEntry",
+    # @ _gene_id_conversion (private, re-exported for compatibility)
+    "_infer_species_and_release",
 ]
