@@ -20,11 +20,15 @@ PACKAGE_ROOT = PROJECT_ROOT / "omicverse"
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+# Snapshot ALL omicverse.* modules so we can restore them after stub-phase
+# imports.  Only tracking 3 names left behind agent_backend* entries that
+# poisoned later test files (import-order regression).
 _ORIGINAL_MODULES = {
-    name: sys.modules.get(name)
-    for name in ["omicverse", "omicverse.utils", "omicverse.utils.smart_agent"]
+    name: mod
+    for name, mod in list(sys.modules.items())
+    if name == "omicverse" or name.startswith("omicverse.")
 }
-for name in ["omicverse", "omicverse.utils", "omicverse.utils.smart_agent"]:
+for name in list(_ORIGINAL_MODULES):
     sys.modules.pop(name, None)
 
 omicverse_pkg = types.ModuleType("omicverse")
@@ -65,10 +69,13 @@ from omicverse.utils.ovagent.bootstrap import (
 from omicverse.utils.ovagent.prompt_builder import build_filesystem_context_instructions
 from omicverse.utils.agent_config import AgentConfig
 
-for name, module in _ORIGINAL_MODULES.items():
-    if module is None:
+# Remove ALL omicverse.* entries added during the stub phase, then restore
+# the originals so subsequent test files see a clean sys.modules.
+for name in list(sys.modules):
+    if name == "omicverse" or name.startswith("omicverse."):
         sys.modules.pop(name, None)
-    else:
+for name, module in _ORIGINAL_MODULES.items():
+    if module is not None:
         sys.modules[name] = module
 
 
