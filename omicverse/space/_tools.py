@@ -6,9 +6,8 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.colors import Normalize
 from matplotlib.cm import ScalarMappable
 import scanpy as sc
-import torch
-import torch.nn.functional as F
 from .._registry import register_function
+from .._optional import build_optional_dependency_error
 
 @register_function(
     aliases=["裁剪空间数据", "crop_space_visium", "crop_visium", "空间数据裁剪", "Visium裁剪"],
@@ -384,6 +383,15 @@ def find_image_offset_phase_correlation_torch(image1_tensor, image2_tensor):
         ... )
         >>> print(f"Detected offset: {offset}")
     """
+    try:
+        import torch
+        import torch.nn.functional as F
+    except ImportError as exc:
+        raise build_optional_dependency_error(
+            "omicverse.space.find_image_offset_phase_correlation_torch",
+            ("torch",),
+        ) from exc
+
     device = image1_tensor.device
     
     # 转换为灰度图（如果输入是彩色）
@@ -547,6 +555,13 @@ def _map_spatial_img(adata_rotated, color=None,
         offset, _ = find_image_offset_phase_correlation_array_input(img1_from_memory, img2_from_memory)
         print(f"估计的偏移量 (dx, dy) 使用相位相关 (文件图像): {offset}")
     elif method == 'phase_correlation_torch':
+        try:
+            import torch
+        except ImportError as exc:
+            raise build_optional_dependency_error(
+                "omicverse.space._map_spatial_img(method='phase_correlation_torch')",
+                ("torch",),
+            ) from exc
         # 转换到PyTorch张量 (需要添加的预处理步骤)
         img1_tensor = torch.from_numpy(img1_from_memory).permute(2, 0, 1).float() / 255.0  # [C, H, W] 格式
         img2_tensor = torch.from_numpy(img2_from_memory).permute(2, 0, 1).float() / 255.0  # 归一化到[0,1]
@@ -699,6 +714,13 @@ def map_spatial_auto(adata_rotated, method='phase'):
 
     # 修改后的配准逻辑
     if method == 'torch':
+        try:
+            import torch
+        except ImportError as exc:
+            raise build_optional_dependency_error(
+                "omicverse.space.map_spatial_auto(method='torch')",
+                ("torch",),
+            ) from exc
         # PyTorch处理路径
         img1_tensor = torch.from_numpy(img1_from_memory).permute(2, 0, 1).float() / 255.0
         img2_tensor = torch.from_numpy(img2_from_memory).permute(2, 0, 1).float() / 255.0

@@ -132,7 +132,6 @@ _DEFAULT_CORE_PACKAGES = (
     "matplotlib.pyplot",
     "scipy",
     "sklearn",
-    "torch",
 )
 
 _DEFAULT_OMICVERSE_MODULES = (

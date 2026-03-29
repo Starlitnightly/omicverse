@@ -54,18 +54,54 @@ Examples:
     >>> aligner.spatial_alignment()
 """
 
-from ._cluster import pySTAGATE,clusters,merge_cluster
+from .._optional import bind_optional_symbols
+
 from ._tangram import Tangram
-from ._integrate import pySTAligner,Cal_Spatial_Net
-from ._spaceflow import pySpaceFlow
 from ._spatrio import CellMap,CellLoc
 from ._stt import STT
 from ._svg import svg,spatial_neighbors,spatial_autocorr,moranI
 from ._cast import CAST
 from ._tools import *
-from ._gaston import GASTON
 from ._commot import create_communication_anndata,update_classification_from_database
 from ._deconvolution import Deconvolution,calculate_gene_signature
+
+_TORCH_DEPS = ("torch", "torch_geometric")
+
+bind_optional_symbols(
+    globals(),
+    "._cluster",
+    ["pySTAGATE", "clusters", "merge_cluster"],
+    package=__name__,
+    feature="omicverse.space clustering",
+    dependencies=_TORCH_DEPS,
+)
+
+bind_optional_symbols(
+    globals(),
+    "._integrate",
+    ["pySTAligner", "Cal_Spatial_Net"],
+    package=__name__,
+    feature="omicverse.space integration",
+    dependencies=_TORCH_DEPS,
+)
+
+bind_optional_symbols(
+    globals(),
+    "._spaceflow",
+    ["pySpaceFlow"],
+    package=__name__,
+    feature="omicverse.space.pySpaceFlow",
+    dependencies=_TORCH_DEPS,
+)
+
+bind_optional_symbols(
+    globals(),
+    "._gaston",
+    ["GASTON"],
+    package=__name__,
+    feature="omicverse.space.GASTON",
+    dependencies=("torch",),
+)
 
 
 __all__ = [

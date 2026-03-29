@@ -60,8 +60,29 @@ Notes:
     - Regular updates incorporate latest algorithmic advances
 """
 
+from .._optional import build_optional_dependency_error, missing_optional_dependency
+
 # Cache for lazy-loaded modules
 _lazy_modules = {}
+
+_TORCH_HEAVY_MODULES = {
+    'scSLAT',
+    'CEFCON',
+    'GNTD',
+    'spaceflow',
+    'tosica',
+    'STAGATE_pyG',
+    'STAligner',
+    'PROST',
+    'cytotrace2',
+    'GraphST',
+    'starfysh',
+    'scdiffusion',
+    'BINARY',
+    'gaston',
+    'nocd',
+    'popv',
+}
 
 __all__ = [
     'scSLAT',
@@ -144,6 +165,11 @@ def __getattr__(name):
         _lazy_modules[name] = module
         return module
     except ImportError as e:
+        if name in _TORCH_HEAVY_MODULES and missing_optional_dependency(e, ("torch", "torch_geometric")):
+            raise build_optional_dependency_error(
+                f"omicverse.external.{name}",
+                ("torch", "torch_geometric"),
+            ) from e
         raise AttributeError(
             f"module '{__name__}' has no attribute '{name}'. "
             f"Failed to import: {e}"

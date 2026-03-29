@@ -64,12 +64,27 @@ For legacy compatibility, specific model functions are still available
 but accessed on-demand via SCLLMManager or from model_factory module directly.
 """
 
-# Core imports - always available
-from .base import SCLLMBase, ModelConfig, TaskConfig, ModelExecutionBlockedError
-
-from .model_factory import SCLLMManager, ModelFactory
+from .._optional import bind_optional_symbols
 from . import dr
 from .dr import ResearchManager
+
+bind_optional_symbols(
+    globals(),
+    ".base",
+    ["SCLLMBase", "ModelConfig", "TaskConfig", "ModelExecutionBlockedError"],
+    package=__name__,
+    feature="omicverse.llm",
+    dependencies=("torch",),
+)
+
+bind_optional_symbols(
+    globals(),
+    ".model_factory",
+    ["SCLLMManager", "ModelFactory"],
+    package=__name__,
+    feature="omicverse.llm",
+    dependencies=("torch",),
+)
 
 __all__ = [
     "SCLLMBase",

@@ -44,13 +44,13 @@ Examples:
     >>> mofa.build_mofa()
 """
 import importlib
+from .._optional import bind_optional_symbols
 
 # Heavy functionality lives in submodules and is imported lazily.
 
 # Core gene selection and differential expression
 from ._cosg import cosg
 from ._anno import pySCSA,MetaTiME,scanpy_lazy,scanpy_cellanno_from_dict,get_celltype_marker
-from ._nocd import scnocd
 from ._mofa import (
     pyMOFAART,pyMOFA,GLUE_pair,
     factor_exact,factor_correlation,
@@ -77,27 +77,16 @@ from ._scgsea import (
     pathway_enrichment,pathway_enrichment_plot
 )
 #from ._via import pyVIA,scRNA_hematopoiesis
-from ._simba import pySIMBA
-from ._tosica import pyTOSICA
 from ._atac import atac_concat_get_index,atac_concat_inner,atac_concat_outer
 from ._batch import batch_correction
-from ._cellfategenie import Fate,gene_trends,mellon_density
-from ._ltnn import scLTNN,plot_origin_tesmination,find_related_gene
-from ._traj import TrajInfer,fle
 from ._diffusionmap import diffmap
-try:
-    from ._cefcon import pyCEFCON,convert_human_to_mouse_network,load_human_prior_interaction_network,mouse_hsc_nestorowa16
-except ImportError:
-    pass
 from ._aucell import aucell
 from ._metacell import MetaCell,plot_metacells,get_obs_value
 from ._mdic3 import pyMDIC3
 from ._gptcelltype import gptcelltype,gpt4celltype,get_cluster_celltype
-from ._cytotrace2 import cytotrace2
 from ._gptcelltype_local import gptcelltype_local
 from ._sccaf import SCCAF_assessment,plot_roc,SCCAF_optimize_all,color_long
 from ._multimap import TFIDF_LSI,Wrapper,Integration,Batch
-from ._scdiffusion import scDiffusion
 from ._cellvote import get_cluster_celltype,CellVote
 from ._deg_ct import DCT,DEG
 from ._lazy_function import lazy
@@ -117,6 +106,94 @@ from ._annotation_ref import AnnotationRef
 from ._velo import Velo,velocity_embedding
 from ._milo_dev import Milo
 from ._markers import find_markers, get_markers
+
+_TORCH_DEPS = ("torch", "torch_geometric")
+
+bind_optional_symbols(
+    globals(),
+    "._nocd",
+    ["scnocd"],
+    package=__name__,
+    feature="omicverse.single.scnocd",
+    dependencies=_TORCH_DEPS,
+)
+
+bind_optional_symbols(
+    globals(),
+    "._simba",
+    ["pySIMBA"],
+    package=__name__,
+    feature="omicverse.single.pySIMBA",
+    dependencies=("torch",),
+)
+
+bind_optional_symbols(
+    globals(),
+    "._tosica",
+    ["pyTOSICA"],
+    package=__name__,
+    feature="omicverse.single.pyTOSICA",
+    dependencies=("torch",),
+)
+
+bind_optional_symbols(
+    globals(),
+    "._cellfategenie",
+    ["Fate", "gene_trends", "mellon_density"],
+    package=__name__,
+    feature="omicverse.single.cell fate analysis",
+    dependencies=("torch",),
+)
+
+bind_optional_symbols(
+    globals(),
+    "._ltnn",
+    ["scLTNN", "plot_origin_tesmination", "find_related_gene"],
+    package=__name__,
+    feature="omicverse.single.scLTNN",
+    dependencies=("torch",),
+)
+
+bind_optional_symbols(
+    globals(),
+    "._traj",
+    ["TrajInfer", "fle"],
+    package=__name__,
+    feature="omicverse.single.TrajInfer",
+    dependencies=("torch",),
+)
+
+bind_optional_symbols(
+    globals(),
+    "._cefcon",
+    [
+        "pyCEFCON",
+        "convert_human_to_mouse_network",
+        "load_human_prior_interaction_network",
+        "mouse_hsc_nestorowa16",
+    ],
+    package=__name__,
+    feature="omicverse.single.pyCEFCON",
+    dependencies=_TORCH_DEPS,
+)
+
+bind_optional_symbols(
+    globals(),
+    "._cytotrace2",
+    ["cytotrace2"],
+    package=__name__,
+    feature="omicverse.single.cytotrace2",
+    dependencies=("torch",),
+)
+
+bind_optional_symbols(
+    globals(),
+    "._scdiffusion",
+    ["scDiffusion"],
+    package=__name__,
+    feature="omicverse.single.scDiffusion",
+    dependencies=("torch",),
+)
 
 
 def __getattr__(name):

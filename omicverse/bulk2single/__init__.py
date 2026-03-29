@@ -56,12 +56,38 @@ Examples:
     >>> ov.bulk2single.bulk2single_plot_cellprop(cell_props)
 """
 
-from ._bulk2single import Bulk2Single
-from ._single2spatial import Single2Spatial
-from ._bulktrajblend import BulkTrajBlend
+from .._optional import bind_optional_symbols
+
 from ._utils import bulk2single_plot_cellprop,bulk2single_plot_correlation
 
 from ._scsemi import scSemiProfiler
+
+bind_optional_symbols(
+    globals(),
+    "._bulk2single",
+    ["Bulk2Single"],
+    package=__name__,
+    feature="omicverse.bulk2single.Bulk2Single",
+    dependencies=("torch",),
+)
+
+bind_optional_symbols(
+    globals(),
+    "._single2spatial",
+    ["Single2Spatial"],
+    package=__name__,
+    feature="omicverse.bulk2single.Single2Spatial",
+    dependencies=("torch",),
+)
+
+bind_optional_symbols(
+    globals(),
+    "._bulktrajblend",
+    ["BulkTrajBlend"],
+    package=__name__,
+    feature="omicverse.bulk2single.BulkTrajBlend",
+    dependencies=("torch",),
+)
 
 __all__ = [
     'Bulk2Single',
