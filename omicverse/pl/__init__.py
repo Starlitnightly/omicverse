@@ -48,6 +48,8 @@ Examples:
     >>> ov.pl.spatial(adata, color='total_counts')
     >>> ov.pl.spatial_domains(adata, color='domain')
 """
+from warnings import warn
+
 from ._palette import (
     ForbiddenCity,
     Forbidden_Cmap,
@@ -125,11 +127,16 @@ from ._cpdb import (
     cpdb_interacting_heatmap,
     cpdb_interacting_network,
     cpdb_network,
-    curved_graph,
-    curved_line,
-    plot_curve_network,
+    curved_graph as cpdb_curved_graph,
+    curved_line as cpdb_curved_line,
+    plot_curve_network as cpdb_plot_curve_network,
 )
-from ._flowsig import curved_graph, curved_line, plot_curve_network, plot_flowsig_network
+from ._flowsig import (
+    curved_graph as flowsig_curved_graph,
+    curved_line as flowsig_curved_line,
+    plot_curve_network as flowsig_plot_curve_network,
+    plot_flowsig_network,
+)
 from ._embedding import embedding_atlas
 from ._density import add_density_contour, calculate_gene_density
 from ._cpdbviz import CellChatViz
@@ -165,6 +172,36 @@ from ._plot_backend import (
     plot_pca_variance_ratio1,
     gen_mpl_labels,
 )
+
+
+def curved_graph(*args, **kwargs):
+    warn(
+        "`ov.pl.curved_graph` is deprecated and ambiguous; use `ov.pl.flowsig_curved_graph` "
+        "or `ov.pl.cpdb_curved_graph` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return flowsig_curved_graph(*args, **kwargs)
+
+
+def curved_line(*args, **kwargs):
+    warn(
+        "`ov.pl.curved_line` is deprecated and ambiguous; use `ov.pl.flowsig_curved_line` "
+        "or `ov.pl.cpdb_curved_line` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return flowsig_curved_line(*args, **kwargs)
+
+
+def plot_curve_network(*args, **kwargs):
+    warn(
+        "`ov.pl.plot_curve_network` is deprecated and ambiguous; use `ov.pl.flowsig_plot_curve_network` "
+        "or `ov.pl.cpdb_plot_curve_network` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return flowsig_plot_curve_network(*args, **kwargs)
 
 # Explicit public exports for stable, non-wildcard imports
 __all__ = [
@@ -244,10 +281,17 @@ __all__ = [
     "cpdb_interacting_heatmap",
     "cpdb_interacting_network",
     "cpdb_network",
+    "cpdb_curved_graph",
+    "cpdb_curved_line",
+    "cpdb_plot_curve_network",
+    # deprecated generic aliases
     "curved_graph",
     "curved_line",
     "plot_curve_network",
     # @ _flowsig
+    "flowsig_curved_graph",
+    "flowsig_curved_line",
+    "flowsig_plot_curve_network",
     "plot_flowsig_network",
     # @ _embedding
     "embedding_atlas",

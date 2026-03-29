@@ -1051,50 +1051,26 @@ def spatial(
     :tutorial:`spatial/basic-analysis`
         Tutorial on spatial analysis.
     """
-    # get default image params if available
-    library_id, spatial_data = _check_spatial_data(adata.uns, library_id)
-    img, img_key = _check_img(spatial_data, img, img_key, bw=bw)
-    spot_size = _check_spot_size(spatial_data, spot_size)
-    scale_factor = _check_scale_factor(
-        spatial_data, img_key=img_key, scale_factor=scale_factor
-    )
-    crop_coord = _check_crop_coord(crop_coord, scale_factor)
-    na_color = _check_na_color(na_color, img=img)
+    from ._spatial import spatial as canonical_spatial
 
-    if bw:
-        cmap_img = "gray"
-    else:
-        cmap_img = None
-    circle_radius = size * scale_factor * spot_size * 0.5
-
-    axs = embedding(
+    return canonical_spatial(
         adata,
         basis=basis,
+        img=img,
+        img_key=img_key,
+        library_id=library_id,
+        crop_coord=crop_coord,
+        alpha_img=alpha_img,
+        bw=bw,
+        size=size,
         scale_factor=scale_factor,
-        size=circle_radius,
+        spot_size=spot_size,
         na_color=na_color,
-        show=False,
-        save=False,
+        show=show,
+        return_fig=return_fig,
+        save=save,
         **kwargs,
     )
-    if not isinstance(axs, list):
-        axs = [axs]
-    for ax in axs:
-        cur_coords = np.concatenate([ax.get_xlim(), ax.get_ylim()])
-        if img is not None:
-            ax.imshow(img, cmap=cmap_img, alpha=alpha_img)
-        else:
-            ax.set_aspect("equal")
-            ax.invert_yaxis()
-        if crop_coord is not None:
-            ax.set_xlim(crop_coord[0], crop_coord[1])
-            ax.set_ylim(crop_coord[3], crop_coord[2])
-        else:
-            ax.set_xlim(cur_coords[0], cur_coords[1])
-            ax.set_ylim(cur_coords[3], cur_coords[2])
-    savefig_or_show('show', show=show, save=save)
-    if show is False or return_fig is True:
-        return axs
 
 
 # Helpers
