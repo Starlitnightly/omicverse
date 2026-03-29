@@ -63,7 +63,7 @@ _utils_pkg.__spec__ = importlib.machinery.ModuleSpec(
 sys.modules["omicverse.utils"] = _utils_pkg
 _ov_pkg.utils = _utils_pkg
 
-from omicverse.utils.agent_config import (
+from omicverse.utils.agent_config import (  # noqa: E402
     AgentConfig,
     SUBAGENT_CONFIGS,
     SubagentConfig,
