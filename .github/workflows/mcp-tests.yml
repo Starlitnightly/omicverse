@@ -2,7 +2,7 @@ name: MCP Tests
 
 on:
   push:
-    branches: [master]
+    branches: [master, dev]
     paths:
       - "omicverse/mcp/**"
       - "tests/mcp/**"
@@ -10,7 +10,7 @@ on:
       - "scripts/ci/mcp-report-versions.py"
       - "requirements/mcp-*.txt"
   pull_request:
-    branches: [master]
+    branches: [master, dev]
     paths:
       - "omicverse/mcp/**"
       - "tests/mcp/**"
