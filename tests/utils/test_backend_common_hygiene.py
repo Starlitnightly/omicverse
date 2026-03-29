@@ -12,7 +12,7 @@ from __future__ import annotations
 import concurrent.futures
 import inspect
 import threading
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -398,7 +398,7 @@ class TestNoProviderBehaviorChange:
     """Verify hygiene fixes don't alter provider dispatch or types."""
 
     def test_dispatch_tables_unchanged(self):
-        from omicverse.utils.agent_backend_common import _SYNC_DISPATCH, _STREAM_DISPATCH
+        from omicverse.utils.agent_backend_common import _SYNC_DISPATCH
         from omicverse.utils.model_config import WireAPI
 
         assert _SYNC_DISPATCH[WireAPI.CHAT_COMPLETIONS] == "_chat_via_openai_compatible"
@@ -426,3 +426,69 @@ class TestNoProviderBehaviorChange:
             "_get_shared_executor",
         }
         assert expected == set(exports)
+
+
+# ===================================================================
+# 5. _retry_with_backoff public contract (PR #603 reconciliation)
+# ===================================================================
+
+
+class TestRetryWithBackoffPublicContract:
+    """Explicit regression tests for the _retry_with_backoff public contract.
+
+    These tests freeze the contract that PR #603 was trying to establish:
+    _retry_with_backoff accepts a zero-arg callable and explicit config
+    parameters. No silent arg-forwarding is possible.
+    """
+
+    def test_signature_has_exactly_five_params(self):
+        """_retry_with_backoff has exactly 5 parameters: func + 4 config."""
+        from omicverse.utils.agent_backend_common import _retry_with_backoff
+        sig = inspect.signature(_retry_with_backoff)
+        assert len(sig.parameters) == 5, (
+            f"Expected 5 params (func + 4 config), got {len(sig.parameters)}: "
+            f"{list(sig.parameters.keys())}"
+        )
+
+    def test_func_is_first_parameter(self):
+        """'func' must be the first positional parameter."""
+        from omicverse.utils.agent_backend_common import _retry_with_backoff
+        sig = inspect.signature(_retry_with_backoff)
+        first_param = list(sig.parameters.keys())[0]
+        assert first_param == "func"
+
+    def test_config_params_have_defaults(self):
+        """All config parameters must have defaults (backward-compat)."""
+        from omicverse.utils.agent_backend_common import _retry_with_backoff
+        sig = inspect.signature(_retry_with_backoff)
+        for name in ("max_attempts", "base_delay", "factor", "jitter"):
+            param = sig.parameters[name]
+            assert param.default is not inspect.Parameter.empty, (
+                f"{name} must have a default value"
+            )
+
+    def test_func_invoked_as_zero_arg(self):
+        """func() is called with zero args; positionals are config."""
+        from omicverse.utils.agent_backend_common import _retry_with_backoff
+
+        received_args = []
+
+        def spy(*args):
+            received_args.extend(args)
+            return "done"
+
+        result = _retry_with_backoff(spy, 1)  # 1 = max_attempts
+        assert result == "done"
+        assert received_args == [], (
+            f"func received args {received_args}; "
+            "positional config was silently forwarded"
+        )
+
+    def test_backend_retry_wraps_args_in_closure(self):
+        """_retry wraps func+args into a lambda."""
+        from omicverse.utils.agent_backend import OmicVerseLLMBackend
+        source = inspect.getsource(OmicVerseLLMBackend._retry)
+        # The implementation must use lambda or partial to bind args
+        assert "lambda" in source or "partial" in source, (
+            "OmicVerseLLMBackend._retry must wrap func+args into a closure"
+        )

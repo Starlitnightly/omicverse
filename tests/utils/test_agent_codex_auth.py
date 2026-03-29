@@ -56,7 +56,7 @@ def _load_smart_agent_module():
 
 smart_agent = _load_smart_agent_module()
 # The credential resolver and its dependencies now live in ovagent.auth
-import omicverse.utils.ovagent.auth as _auth_module
+import omicverse.utils.ovagent.auth as _auth_module  # noqa: E402
 
 
 def _make_oauth_token(account_id: str = "acct_test") -> str:
