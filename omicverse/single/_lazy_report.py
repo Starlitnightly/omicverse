@@ -294,7 +294,7 @@ def generate_scRNA_report(adata, output_path="scRNA_analysis_report.html",
             fig, axes = plt.subplots(1, 3, figsize=(15, 5), 
                                     facecolor=color_schemes[mode]["plot_bg"])
             for i,key in enumerate(['detected_genes', 'nUMIs', 'mito_perc']):
-                violin_box(
+                half_violin_boxplot(
                     adata,
                     key,
                     groupby=sample_key,

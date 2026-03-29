@@ -74,3 +74,14 @@ def test_violin_old_warns_and_delegates():
     assert ax.get_xlabel() == "cell_type"
     assert caught
     assert "ov.pl.violin" in str(caught[0].message)
+
+
+def test_violin_box_warns_and_delegates():
+    adata = _toy_adata()
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        ax = ov.pl.violin_box(adata, keys="g1", groupby="cell_type", show=False)
+
+    assert ax.get_xlabel() == "cell_type"
+    assert caught
+    assert "ov.pl.half_violin_boxplot" in str(caught[0].message)

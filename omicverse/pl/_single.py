@@ -1599,7 +1599,7 @@ def violin_old(adata,keys=None,groupby=None,ax=None,figsize=(4,4),fontsize=13,
     #plt.xticks(fontsize=ticks_fontsize,rotation=90)
     #plt.yticks(fontsize=ticks_fontsize)
 
-def violin_box(adata, keys, groupby, ax=None, figsize=(4,4), show=True, max_strip_points=1000):
+def half_violin_boxplot(adata, keys, groupby, ax=None, figsize=(4,4), show=True, max_strip_points=1000):
     import colorcet
     from scipy.sparse import issparse  
     
@@ -1693,6 +1693,24 @@ def violin_box(adata, keys, groupby, ax=None, figsize=(4,4), show=True, max_stri
         plt.show()
     
     return ax
+
+
+def violin_box(adata, keys, groupby, ax=None, figsize=(4,4), show=True, max_strip_points=1000):
+    warn(
+        "`ov.pl.violin_box` is deprecated and will be removed in omicverse 2.2; "
+        "use `ov.pl.half_violin_boxplot` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return half_violin_boxplot(
+        adata,
+        keys=keys,
+        groupby=groupby,
+        ax=ax,
+        figsize=figsize,
+        show=show,
+        max_strip_points=max_strip_points,
+    )
 
 
 import pandas as pd

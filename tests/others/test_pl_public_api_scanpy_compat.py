@@ -137,6 +137,17 @@ def test_public_violin_old_smoke(toy_adata):
     assert ax.get_ylabel() == "g1"
 
 
+def test_public_half_violin_boxplot_smoke(toy_adata):
+    ax = ov.pl.half_violin_boxplot(
+        toy_adata,
+        keys="g1",
+        groupby="cell_type",
+        show=False,
+    )
+    assert ax is not None
+    assert ax.get_xlabel() == "cell_type"
+
+
 def test_public_marker_heatmap_smoke_with_fake_pycomplexheatmap(monkeypatch, toy_adata):
     fake = types.ModuleType("PyComplexHeatmap")
     fake.__version__ = "1.8.0"
