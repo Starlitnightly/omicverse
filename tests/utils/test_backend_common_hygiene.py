@@ -12,7 +12,7 @@ from __future__ import annotations
 import concurrent.futures
 import inspect
 import threading
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -398,7 +398,7 @@ class TestNoProviderBehaviorChange:
     """Verify hygiene fixes don't alter provider dispatch or types."""
 
     def test_dispatch_tables_unchanged(self):
-        from omicverse.utils.agent_backend_common import _SYNC_DISPATCH, _STREAM_DISPATCH
+        from omicverse.utils.agent_backend_common import _SYNC_DISPATCH
         from omicverse.utils.model_config import WireAPI
 
         assert _SYNC_DISPATCH[WireAPI.CHAT_COMPLETIONS] == "_chat_via_openai_compatible"
