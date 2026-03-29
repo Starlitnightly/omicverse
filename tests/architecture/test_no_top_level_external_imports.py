@@ -6,7 +6,19 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PACKAGE_ROOT = REPO_ROOT / "omicverse"
-TARGET_DIRS = ("alignment", "single", "bulk", "io", "space")
+TARGET_DIRS = (
+    "alignment",
+    "single",
+    "bulk",
+    "io",
+    "space",
+    "pp",
+    "pl",
+    "llm",
+    "mcp",
+    "fm",
+    "bulk2single",
+)
 
 
 def _iter_python_files():
@@ -14,14 +26,19 @@ def _iter_python_files():
         yield from sorted((PACKAGE_ROOT / dirname).rglob("*.py"))
 
 
+def _module_targets_external(module: str) -> bool:
+    parts = [part for part in module.split(".") if part]
+    return "external" in parts
+
+
 def _is_external_import(node: ast.AST) -> bool:
     if isinstance(node, ast.Import):
-        return any(alias.name == "external" or ".external" in alias.name for alias in node.names)
+        return any(_module_targets_external(alias.name) for alias in node.names)
     if isinstance(node, ast.ImportFrom):
         module = node.module or ""
-        if module == "external" or ".external" in module:
+        if _module_targets_external(module):
             return True
-        if node.level and module.startswith("external"):
+        if node.level and module == "external":
             return True
     return False
 
@@ -47,6 +64,43 @@ class _TopLevelExternalImportVisitor(ast.NodeVisitor):
         self.generic_visit(node)
         self._scope_depth -= 1
 
+
+def _find_top_level_external_imports_textually(source: str) -> list[tuple[int, int, str]]:
+    violations: list[tuple[int, int, str]] = []
+    lines = source.splitlines()
+    collecting = False
+    current_start = 0
+    current_parts: list[str] = []
+
+    for lineno, line in enumerate(lines, start=1):
+        stripped = line.lstrip()
+        is_top_level = len(line) == len(stripped)
+
+        if collecting:
+            current_parts.append(stripped)
+            if not stripped.endswith(("(", "\\")):
+                stmt = " ".join(part.rstrip("\\") for part in current_parts).strip()
+                module_text = stmt.split(" import ", 1)[0].replace("from ", "").replace("import ", "").strip()
+                if _module_targets_external(module_text):
+                    violations.append((current_start, 0, stmt))
+                collecting = False
+                current_parts = []
+            continue
+
+        if not is_top_level:
+            continue
+        if stripped.startswith("from ") or stripped.startswith("import "):
+            if stripped.endswith(("(", "\\")):
+                collecting = True
+                current_start = lineno
+                current_parts = [stripped]
+                continue
+            module_text = stripped.split(" import ", 1)[0].replace("from ", "").replace("import ", "").strip()
+            if _module_targets_external(module_text):
+                violations.append((lineno, 0, stripped))
+
+    return violations
+
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
         self._scope_depth += 1
         self.generic_visit(node)
@@ -66,16 +120,21 @@ class _TopLevelExternalImportVisitor(ast.NodeVisitor):
 @pytest.mark.parametrize("path", list(_iter_python_files()), ids=lambda p: str(p.relative_to(REPO_ROOT)))
 def test_no_top_level_external_imports_in_core_domains(path: Path):
     source = path.read_text(encoding="utf-8")
-    tree = ast.parse(source, filename=str(path))
-    visitor = _TopLevelExternalImportVisitor()
-    visitor.visit(tree)
+    try:
+        tree = ast.parse(source, filename=str(path))
+    except SyntaxError:
+        violations = _find_top_level_external_imports_textually(source)
+    else:
+        visitor = _TopLevelExternalImportVisitor()
+        visitor.visit(tree)
+        violations = visitor.violations
 
-    if visitor.violations:
+    if violations:
         details = "\n".join(
             f"{path.relative_to(REPO_ROOT)}:{lineno}:{col} -> {stmt}"
-            for lineno, col, stmt in visitor.violations
+            for lineno, col, stmt in violations
         )
         pytest.fail(
-            "Top-level external imports are forbidden in alignment/single/bulk/io/space.\n"
+            "Top-level external imports are forbidden in alignment/single/bulk/io/space/pp/pl/llm/mcp/fm/bulk2single.\n"
             f"{details}"
         )

@@ -13,12 +13,12 @@ import pandas as pd
 from anndata import AnnData
 from scipy import sparse
 
-from ..external.scrublet import Scrublet
-from ..external.scrublet.helper_functions import (
+from ._scrublet_backend import Scrublet
+from ._scrublet_backend.helper_functions import (
     pipeline_mean_center,
     pipeline_normalize_variance,
-    pipeline_zscore,
     pipeline_truncated_svd,
+    pipeline_zscore,
 )
 from .._settings import EMOJI, Colors, settings
 from .._registry import register_function
