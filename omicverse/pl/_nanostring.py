@@ -517,7 +517,7 @@ def nanostring(
         }
 
         if is_categorical:
-            from ..utils._scatterplot import _add_categorical_legend, _color_vector, _get_palette
+            from ._scatterplot_backend import _add_categorical_legend, _color_vector, _get_palette
 
             if not isinstance(color_data.dtype, pd.CategoricalDtype):
                 color_data = pd.Series(
@@ -991,7 +991,7 @@ def nanostringseg(
         }
 
         if is_categorical:
-            from ..utils._scatterplot import _add_categorical_legend, _color_vector, _get_palette
+            from ._scatterplot_backend import _add_categorical_legend, _color_vector, _get_palette
 
             cd = temp_gdf[color_key]
             if not isinstance(cd.dtype, pd.CategoricalDtype):

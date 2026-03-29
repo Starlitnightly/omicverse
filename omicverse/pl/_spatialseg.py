@@ -493,7 +493,7 @@ def spatialseg(
         }
 
         if is_categorical:
-            from ..utils._scatterplot import _add_categorical_legend, _color_vector, _get_palette
+            from ._scatterplot_backend import _add_categorical_legend, _color_vector, _get_palette
 
             color_source_vector = temp_gdf[plot_column]
             if (

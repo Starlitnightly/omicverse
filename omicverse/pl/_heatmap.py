@@ -6,7 +6,7 @@ import scanpy as sc
 from scanpy.plotting._anndata import _prepare_dataframe
 import pandas as pd
 from anndata import AnnData
-from ..utils import plotset
+from ._plot_backend import plotset
 from .._registry import register_function
 
 pycomplexheatmap_install=False

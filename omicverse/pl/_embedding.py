@@ -13,7 +13,7 @@ from cycler import Cycler
 from scipy.sparse import issparse
 
 from .._registry import register_function
-from ..utils._scatterplot import (
+from ._scatterplot_backend import (
     _get_basis,
     _get_color_source_vector,
     _color_vector,

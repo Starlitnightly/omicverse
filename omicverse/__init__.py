@@ -91,11 +91,11 @@ _LAZY_ATTRS = {
     # From io.single
     'read': ('.io.single', 'read'),
 
-    # From utils._plot - Lightweight, but let's be lazy
-    'palette': ('.utils._plot', 'palette'),
-    'ov_plot_set': ('.utils._plot', 'ov_plot_set'),
-    'plot_set': ('.utils._plot', 'plot_set'),
-    'style': ('.utils._plot', 'style'),
+    # From pl - plotting APIs now live there
+    'palette': ('.pl', 'palette'),
+    'ov_plot_set': ('.pl', 'ov_plot_set'),
+    'plot_set': ('.pl', 'plot_set'),
+    'style': ('.pl', 'style'),
 
     # From _registry
     'find_function': ('._registry', 'find_function'),

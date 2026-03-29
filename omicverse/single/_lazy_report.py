@@ -310,7 +310,7 @@ def generate_scRNA_report(adata, output_path="scRNA_analysis_report.html",
             
             # PCA variance ratio
             plt.subplot(1, 2, 1)
-            from ..utils._plot import plot_pca_variance_ratio1
+            from ..pl._plot_backend import plot_pca_variance_ratio1
             plot_pca_variance_ratio1(adata)
             plt.title('PCA Variance Explained', fontsize=12)
             

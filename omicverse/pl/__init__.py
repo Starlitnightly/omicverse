@@ -148,6 +148,23 @@ from ._animation_lines import (
     compute_velocity_on_grid,
     nan_helper,
 )
+from ._plot_backend import (
+    palette,
+    plot_set,
+    plotset,
+    ov_plot_set,
+    style,
+    plot_text_set,
+    ticks_range,
+    plot_boxplot,
+    plot_network,
+    plot_cellproportion,
+    plot_embedding_celltype,
+    geneset_wordcloud,
+    plot_pca_variance_ratio,
+    plot_pca_variance_ratio1,
+    gen_mpl_labels,
+)
 
 # Explicit public exports for stable, non-wildcard imports
 __all__ = [
@@ -262,4 +279,20 @@ __all__ = [
     "animate_streamplot",
     "compute_velocity_on_grid",
     "nan_helper",
+    # @ _plot_backend
+    "palette",
+    "plot_set",
+    "plotset",
+    "ov_plot_set",
+    "style",
+    "plot_text_set",
+    "ticks_range",
+    "plot_boxplot",
+    "plot_network",
+    "plot_cellproportion",
+    "plot_embedding_celltype",
+    "geneset_wordcloud",
+    "plot_pca_variance_ratio",
+    "plot_pca_variance_ratio1",
+    "gen_mpl_labels",
 ]

@@ -391,7 +391,7 @@ def venn(sets={}, out='./', palette='bgrc',
         Axes handle returned by caller/backend context.
     """
     
-    from ..utils import venny4py
+    from ._venn_backend import venny4py
     venny4py(sets=sets,out=out,ce=palette,asax=ax,ext=ext,
              dpi=dpi,size=fontsize,bbox_to_anchor=bbox_to_anchor,
              nc=nc,cs=cs,

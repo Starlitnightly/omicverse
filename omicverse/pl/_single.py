@@ -1,4 +1,4 @@
-from ..utils._scatterplot import _embedding
+from ._scatterplot_backend import _embedding
 from .._registry import register_function
 import collections.abc as cabc
 from copy import copy

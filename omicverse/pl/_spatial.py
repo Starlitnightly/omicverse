@@ -39,7 +39,7 @@ from scanpy.plotting._tools.scatterplots import _add_categorical_legend
 def _get_vector_friendly():
     """Get the vector_friendly setting from omicverse plot settings."""
     try:
-        from ..utils._plot import _vector_friendly
+        from ._plot_backend import _vector_friendly
         return _vector_friendly
     except ImportError:
         try:
