@@ -119,6 +119,12 @@ from ._milo_dev import Milo
 from ._markers import find_markers, get_markers
 
 
+def __getattr__(name):
+    if name == "popv":
+        return importlib.import_module(".popv", package=__name__)
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
+
 __all__ = [
     # Core analysis functions
     'cosg',
@@ -154,6 +160,7 @@ __all__ = [
     'CellVote',
     'CellOntologyMapper',
     'download_cl',
+    'popv',
     
     # Multi-omics integration
     'pyMOFAART',
@@ -264,4 +271,3 @@ __all__ = [
     'find_markers',
     'get_markers',
 ]
-

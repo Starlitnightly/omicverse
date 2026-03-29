@@ -32,19 +32,19 @@ Supported algorithms:
 Examples:
     >>> import omicverse as ov
     >>> # Automated annotation
-    >>> ov.popv.annotation.annotate_cell_types(
+    >>> ov.external.popv.annotation.annotate_cell_types(
     ...     adata, 
     ...     model='best_human_model'
     ... )
     >>> 
     >>> # Batch integration
-    >>> ov.popv.algorithms.harmony_integrate(
+    >>> ov.external.popv.algorithms.harmony_integrate(
     ...     adata,
     ...     batch_key='batch'
     ... )
     >>> 
     >>> # Model evaluation
-    >>> metrics = ov.popv.hub.evaluate_model(
+    >>> metrics = ov.external.popv.hub.evaluate_model(
     ...     adata,
     ...     model_name='my_model'
     ... )
@@ -55,6 +55,8 @@ Notes:
     - Integrates seamlessly with scanpy and other single-cell tools
 """
 
+import importlib
+import logging
 import sys
 import warnings
 
@@ -66,29 +68,34 @@ if sys.version_info[:2] != (3, 10):
         stacklevel=3,
     )
 
-# Set default logging handler to avoid logging with logging.lastResort logger.
-import logging
-
-import scanpy as sc
-
 from ._settings import settings  # isort: skip
-
-# Import order to avoid circular imports
-from . import algorithms, annotation, hub, preprocessing, visualization
-from ._utils import create_ontology_resources
 
 try:
     import importlib.metadata as importlib_metadata
 except ModuleNotFoundError:
     import importlib_metadata
 package_name = "popv"
-__version__ = importlib_metadata.version(package_name)
+try:
+    __version__ = importlib_metadata.version(package_name)
+except Exception:
+    __version__ = "unknown"
 
 settings.verbosity = logging.INFO
 
 # Jax sets the root logger, this prevents double output.
 popv_logger = logging.getLogger("popv")
 popv_logger.propagate = False
+
+
+def create_ontology_resources(*args, **kwargs):
+    from ._utils import create_ontology_resources as _create_ontology_resources
+    return _create_ontology_resources(*args, **kwargs)
+
+
+def __getattr__(name):
+    if name in {"algorithms", "annotation", "hub", "preprocessing", "visualization"}:
+        return importlib.import_module(f".{name}", package=__name__)
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 
 __all__ = [

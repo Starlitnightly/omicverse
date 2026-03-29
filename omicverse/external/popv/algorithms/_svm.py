@@ -9,8 +9,8 @@ import pandas as pd
 from sklearn import svm
 from sklearn.calibration import CalibratedClassifierCV
 
-from popv import settings
-from popv.algorithms._base_algorithm import BaseAlgorithm
+from .. import settings
+from ._base_algorithm import BaseAlgorithm
 
 
 class Support_Vector(BaseAlgorithm):

@@ -1002,6 +1002,42 @@ class FunctionRegistry:
 _global_registry = FunctionRegistry()
 
 
+def get_registry() -> FunctionRegistry:
+    """Return the global function registry singleton."""
+    return _global_registry
+
+
+def _hydrate_registry_for_export() -> None:
+    """Best-effort import of major public modules before registry export.
+
+    OmicVerse relies on module import side effects from ``@register_function``.
+    Without a hydration pass, ``export_registry()`` may only include whichever
+    modules the caller happened to import first.
+    """
+    import importlib
+
+    module_names = (
+        "omicverse._settings",
+        "omicverse.alignment",
+        "omicverse.utils.biocontext",
+        "omicverse.bulk",
+        "omicverse.bulk2single",
+        "omicverse.datasets",
+        "omicverse.io",
+        "omicverse.pl",
+        "omicverse.pp",
+        "omicverse.single",
+        "omicverse.space",
+    )
+    for module_name in module_names:
+        try:
+            importlib.import_module(module_name)
+        except Exception:
+            # Optional dependencies may block some modules; export whatever
+            # could be safely registered in the current environment.
+            continue
+
+
 def register_function(aliases: List[str],
                      category: str,
                      description: str,
@@ -1312,6 +1348,8 @@ def export_registry(filepath: Optional[str] = None,
     >>> # Get as JSON string
     >>> json_str = ov.export_registry(format='json')
     """
+    _hydrate_registry_for_export()
+
     export_data = {}
     
     # Get all unique functions
@@ -1421,6 +1459,7 @@ def import_registry(filepath: str) -> Dict:
 __all__ = [
     'register_function',
     'find_function', 
+    'get_registry',
     'list_functions',
     'get_function_help',
     'recommend_function',

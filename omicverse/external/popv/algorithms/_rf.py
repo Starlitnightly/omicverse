@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 
-from popv import settings
-from popv.algorithms._base_algorithm import BaseAlgorithm
+from .. import settings
+from ._base_algorithm import BaseAlgorithm
 
 
 class Random_Forest(BaseAlgorithm):

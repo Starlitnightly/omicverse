@@ -14,7 +14,6 @@ Main modules:
     pp: Preprocessing utilities for quality control and normalization
     pl: Comprehensive plotting and visualization functions
     utils: Utility functions for data handling and analysis
-    popv: Population-level variation analysis tools
 
 Key features:
     - Unified API for multiple omics data types
@@ -71,7 +70,6 @@ _lazy_attrs = {}
 # Define which modules should be lazy-loaded
 _LAZY_MODULES = {
     'alignment',
-    'biocontext',
     'bulk',
     'single',
     'bulk2single',
@@ -99,13 +97,13 @@ _LAZY_ATTRS = {
     'plot_set': ('.utils._plot', 'plot_set'),
     'style': ('.utils._plot', 'style'),
 
-    # From utils.registry
-    'find_function': ('.utils.registry', 'find_function'),
-    'list_functions': ('.utils.registry', 'list_functions'),
-    'get_function_help': ('.utils.registry', 'get_function_help'),
-    'recommend_function': ('.utils.registry', 'recommend_function'),
-    'export_registry': ('.utils.registry', 'export_registry'),
-    'import_registry': ('.utils.registry', 'import_registry'),
+    # From _registry
+    'find_function': ('._registry', 'find_function'),
+    'list_functions': ('._registry', 'list_functions'),
+    'get_function_help': ('._registry', 'get_function_help'),
+    'recommend_function': ('._registry', 'recommend_function'),
+    'export_registry': ('._registry', 'export_registry'),
+    'import_registry': ('._registry', 'import_registry'),
 
     # From utils.smart_agent
     'Agent': ('.utils.smart_agent', 'Agent'),

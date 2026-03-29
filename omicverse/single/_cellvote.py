@@ -69,15 +69,15 @@ class CellVote(object):
         save_path
             Directory to store intermediate models and predictions.
         prediction_mode
-            Mode to use in PopV preprocessing. See :class:`popv.preprocessing.Process_Query`.
+            Mode to use in PopV preprocessing. See :class:`omicverse.external.popv.preprocessing.Process_Query`.
         methods
             Single algorithm name or list of algorithm names to run. ``None`` selects
             a default set of models based on ``prediction_mode``.
         methods_kwargs
             Dictionary of algorithm specific keyword arguments.
         """
-        from ..popv.preprocessing import Process_Query
-        from ..popv.annotation import annotate_data
+        from ..external.popv.preprocessing import Process_Query
+        from ..external.popv.annotation import annotate_data
 
         pq = Process_Query(
             self.adata,

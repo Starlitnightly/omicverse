@@ -116,7 +116,7 @@ from ._gene_id_conversion import _infer_species_and_release, convert2gene_symbol
 
 # Import smart_agent module to make it accessible and expose key entrypoints
 # Store verifier with a private name first to ensure reference is preserved
-from . import agent_backend, smart_agent
+from . import agent_backend, biocontext, smart_agent
 from . import verifier as _verifier_module
 from .agent_backend import BackendConfig, OmicVerseLLMBackend, Usage
 from .smart_agent import Agent, OmicVerseAgent, list_supported_models
@@ -293,6 +293,7 @@ __all__ = [
     "symbol2id",
     # @ agent_backend
     "agent_backend",
+    "biocontext",
     "BackendConfig",
     "OmicVerseLLMBackend",
     "Usage",

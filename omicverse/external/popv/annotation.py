@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from popv import _utils, algorithms
+from . import _utils
 
 
 @dataclass
@@ -39,6 +39,7 @@ class AlgorithmsNT:
     ALL_ALGORITHMS: tuple[str, ...] = field(init=False)
 
     def __post_init__(self):
+        from . import algorithms
         self.CURRENT_ALGORITHMS = tuple(
             i[0]
             for i in inspect.getmembers(algorithms, inspect.isclass)
@@ -75,6 +76,8 @@ def annotate_data(
         Dictionary, where keys are used methods and values contain non-default parameters.
         Default to empty-dictionary.
     """
+    from . import algorithms
+
     if save_path is not None and not os.path.exists(save_path):
         os.makedirs(save_path, exist_ok=True)
     if isinstance(methods, str):

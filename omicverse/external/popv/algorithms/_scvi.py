@@ -12,8 +12,8 @@ from scvi.model import SCVI
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import make_pipeline
 
-from popv import settings
-from popv.algorithms._base_algorithm import BaseAlgorithm
+from .. import settings
+from ._base_algorithm import BaseAlgorithm
 
 
 class KNN_SCVI(BaseAlgorithm):

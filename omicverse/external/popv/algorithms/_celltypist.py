@@ -10,8 +10,8 @@ import pandas as pd
 import scanpy as sc
 from scipy.stats import mode
 
-from popv import settings
-from popv.algorithms._base_algorithm import BaseAlgorithm
+from .. import settings
+from ._base_algorithm import BaseAlgorithm
 
 
 class CELLTYPIST(BaseAlgorithm):

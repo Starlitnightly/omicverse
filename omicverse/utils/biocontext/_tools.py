@@ -9,7 +9,7 @@ from __future__ import annotations
 import pandas as pd
 from typing import Any, Dict, List, Optional, Union
 
-from .._registry import register_function
+from ..._registry import register_function
 from ._client import get_client
 
 
@@ -22,8 +22,8 @@ from ._client import get_client
     category="biocontext",
     description="Call any BioContext MCP tool by name. Use list_tools() to see all 49 available tools.",
     examples=[
-        "result = ov.biocontext.call_tool('get_uniprot_protein_info', gene_symbol='TP53')",
-        "tools = ov.biocontext.list_tools()",
+        "result = ov.utils.biocontext.call_tool('get_uniprot_protein_info', gene_symbol='TP53')",
+        "tools = ov.utils.biocontext.list_tools()",
     ],
     related=["biocontext.list_tools"],
 )
@@ -49,7 +49,7 @@ def call_tool(tool_name: str, **kwargs: Any) -> Any:
     aliases=["biocontext_tools", "bc_tools", "BioContext工具列表"],
     category="biocontext",
     description="List all available BioContext tools with their parameters and descriptions.",
-    examples=["tools = ov.biocontext.list_tools()"],
+    examples=["tools = ov.utils.biocontext.list_tools()"],
 )
 def list_tools() -> pd.DataFrame:
     r"""List all available BioContext tools.
@@ -81,8 +81,8 @@ def list_tools() -> pd.DataFrame:
     category="biocontext",
     description="Query UniProt for protein information by gene symbol, protein name, or UniProt ID.",
     examples=[
-        "info = ov.biocontext.query_uniprot(gene_symbol='TP53')",
-        "info = ov.biocontext.query_uniprot(protein_id='P04637')",
+        "info = ov.utils.biocontext.query_uniprot(gene_symbol='TP53')",
+        "info = ov.utils.biocontext.query_uniprot(protein_id='P04637')",
     ],
     related=["biocontext.get_uniprot_id", "biocontext.query_kegg"],
 )
@@ -129,7 +129,7 @@ def query_uniprot(
     aliases=["uniprot_id", "蛋白质ID查询"],
     category="biocontext",
     description="Convert protein/gene symbol to UniProt accession ID.",
-    examples=["uid = ov.biocontext.get_uniprot_id('TP53')"],
+    examples=["uid = ov.utils.biocontext.get_uniprot_id('TP53')"],
     related=["biocontext.query_uniprot"],
 )
 def get_uniprot_id(protein_symbol: str, species: str = "9606") -> str:
@@ -157,7 +157,7 @@ def get_uniprot_id(protein_symbol: str, species: str = "9606") -> str:
     aliases=["alphafold_query", "protein_structure", "蛋白质结构"],
     category="biocontext",
     description="Query AlphaFold database for predicted protein structure information.",
-    examples=["af = ov.biocontext.query_alphafold('TP53')"],
+    examples=["af = ov.utils.biocontext.query_alphafold('TP53')"],
     related=["biocontext.query_uniprot"],
 )
 def query_alphafold(protein_symbol: str, species: str = "9606") -> dict:
@@ -185,7 +185,7 @@ def query_alphafold(protein_symbol: str, species: str = "9606") -> dict:
     aliases=["ensembl_query", "gene_id_convert", "基因ID转换"],
     category="biocontext",
     description="Convert gene symbol to Ensembl gene ID.",
-    examples=["eid = ov.biocontext.get_ensembl_id('TP53')"],
+    examples=["eid = ov.utils.biocontext.get_ensembl_id('TP53')"],
     related=["biocontext.get_uniprot_id"],
 )
 def get_ensembl_id(gene_symbol: str, species: str = "homo_sapiens") -> Any:
@@ -214,8 +214,8 @@ def get_ensembl_id(gene_symbol: str, species: str = "homo_sapiens") -> Any:
     category="biocontext",
     description="Query InterPro for protein domain and family information.",
     examples=[
-        "domains = ov.biocontext.query_interpro(protein_id='P04637')",
-        "results = ov.biocontext.search_interpro('kinase')",
+        "domains = ov.utils.biocontext.query_interpro(protein_id='P04637')",
+        "results = ov.utils.biocontext.search_interpro('kinase')",
     ],
     related=["biocontext.query_uniprot", "biocontext.query_alphafold"],
 )
@@ -251,7 +251,7 @@ def query_interpro(
     aliases=["interpro_search", "domain_search"],
     category="biocontext",
     description="Search InterPro entries by keyword.",
-    examples=["results = ov.biocontext.search_interpro('kinase')"],
+    examples=["results = ov.utils.biocontext.search_interpro('kinase')"],
     related=["biocontext.query_interpro"],
 )
 def search_interpro(query: str, entry_type: Optional[str] = None, page_size: int = 10) -> dict:
@@ -281,7 +281,7 @@ def search_interpro(query: str, entry_type: Optional[str] = None, page_size: int
     aliases=["string_query", "ppi_biocontext", "蛋白质互作"],
     category="biocontext",
     description="Query STRING database for protein-protein interactions via BioContext.",
-    examples=["ppi = ov.biocontext.query_string('TP53', species=9606)"],
+    examples=["ppi = ov.utils.biocontext.query_string('TP53', species=9606)"],
     related=["bulk.string_interaction", "biocontext.query_uniprot"],
 )
 def query_string(
@@ -315,7 +315,7 @@ def query_string(
     aliases=["hpa_query", "tissue_expression", "组织表达查询"],
     category="biocontext",
     description="Query Human Protein Atlas for tissue expression data.",
-    examples=["expr = ov.biocontext.query_hpa('TP53')"],
+    examples=["expr = ov.utils.biocontext.query_hpa('TP53')"],
     related=["biocontext.query_uniprot"],
 )
 def query_hpa(gene_symbol: str, gene_id: Optional[str] = None) -> dict:
@@ -364,7 +364,7 @@ def query_hpa(gene_symbol: str, gene_id: Optional[str] = None) -> dict:
     aliases=["reactome_query", "pathway_query", "通路查询"],
     category="biocontext",
     description="Query Reactome for pathway information by gene/protein identifier.",
-    examples=["pathways = ov.biocontext.query_reactome('TP53')"],
+    examples=["pathways = ov.utils.biocontext.query_reactome('TP53')"],
     related=["biocontext.query_go", "biocontext.query_kegg"],
 )
 def query_reactome(identifier: str, species: str = "Homo sapiens", include_disease: bool = True) -> dict:
@@ -394,7 +394,7 @@ def query_reactome(identifier: str, species: str = "Homo sapiens", include_disea
     aliases=["go_query", "gene_ontology", "GO查询", "基因本体"],
     category="biocontext",
     description="Query Gene Ontology terms associated with a gene.",
-    examples=["go = ov.biocontext.query_go('BRCA1')"],
+    examples=["go = ov.utils.biocontext.query_go('BRCA1')"],
     related=["biocontext.query_reactome"],
 )
 def query_go(gene_name: str, size: int = 20) -> dict:
@@ -426,8 +426,8 @@ def query_go(gene_name: str, size: int = 20) -> dict:
     category="biocontext",
     description="Query PanglaoDB for cell type marker genes.",
     examples=[
-        "markers = ov.biocontext.query_panglaodb(species='Hs', cell_type='T cells')",
-        "markers = ov.biocontext.query_panglaodb(species='Hs', gene_symbol='CD3D')",
+        "markers = ov.utils.biocontext.query_panglaodb(species='Hs', cell_type='T cells')",
+        "markers = ov.utils.biocontext.query_panglaodb(species='Hs', gene_symbol='CD3D')",
     ],
     related=["single.cellanno", "single.gptcelltype"],
 )
@@ -488,7 +488,7 @@ def query_panglaodb(
     aliases=["literature_search", "pubmed_search", "文献搜索"],
     category="biocontext",
     description="Search biomedical literature via Europe PMC.",
-    examples=["papers = ov.biocontext.search_literature('single cell RNA-seq heart')"],
+    examples=["papers = ov.utils.biocontext.search_literature('single cell RNA-seq heart')"],
     related=["biocontext.search_preprints", "biocontext.get_fulltext"],
 )
 def search_literature(
@@ -525,7 +525,7 @@ def search_literature(
     aliases=["preprint_search", "biorxiv_search", "预印本搜索"],
     category="biocontext",
     description="Search bioRxiv/medRxiv preprints.",
-    examples=["preprints = ov.biocontext.search_preprints(recent_count=10, category='bioinformatics')"],
+    examples=["preprints = ov.utils.biocontext.search_preprints(recent_count=10, category='bioinformatics')"],
     related=["biocontext.search_literature"],
 )
 def search_preprints(
@@ -581,7 +581,7 @@ def search_preprints(
     aliases=["fulltext_search", "全文获取"],
     category="biocontext",
     description="Get full text XML of a publication from Europe PMC.",
-    examples=["text = ov.biocontext.get_fulltext('PMC1234567')"],
+    examples=["text = ov.utils.biocontext.get_fulltext('PMC1234567')"],
     related=["biocontext.search_literature"],
 )
 def get_fulltext(pmc_id: str) -> str:
@@ -608,7 +608,7 @@ def get_fulltext(pmc_id: str) -> str:
     aliases=["opentargets_query", "drug_target", "药物靶点查询"],
     category="biocontext",
     description="Query Open Targets GraphQL API for drug target information.",
-    examples=["result = ov.biocontext.query_opentargets('{ target(ensemblId: \"ENSG00000141510\") { approvedSymbol } }')"],
+    examples=["result = ov.utils.biocontext.query_opentargets('{ target(ensemblId: \"ENSG00000141510\") { approvedSymbol } }')"],
     related=["biocontext.search_drugs"],
 )
 def query_opentargets(query_string: str, variables: Optional[dict] = None) -> dict:
@@ -636,7 +636,7 @@ def query_opentargets(query_string: str, variables: Optional[dict] = None) -> di
     aliases=["clinical_trials", "临床试验搜索"],
     category="biocontext",
     description="Search ClinicalTrials.gov for clinical trials by condition.",
-    examples=["trials = ov.biocontext.search_clinical_trials('breast cancer')"],
+    examples=["trials = ov.utils.biocontext.search_clinical_trials('breast cancer')"],
     related=["biocontext.search_drugs"],
 )
 def search_clinical_trials(
@@ -670,7 +670,7 @@ def search_clinical_trials(
     aliases=["drug_search", "fda_search", "药物搜索"],
     category="biocontext",
     description="Search FDA drug database.",
-    examples=["drugs = ov.biocontext.search_drugs(active_ingredient='ibuprofen')"],
+    examples=["drugs = ov.utils.biocontext.search_drugs(active_ingredient='ibuprofen')"],
     related=["biocontext.search_clinical_trials"],
 )
 def search_drugs(
@@ -715,7 +715,7 @@ def search_drugs(
     aliases=["efo_query", "disease_ontology", "疾病本体查询"],
     category="biocontext",
     description="Query Experimental Factor Ontology for disease terms.",
-    examples=["efo = ov.biocontext.query_efo('diabetes')"],
+    examples=["efo = ov.utils.biocontext.query_efo('diabetes')"],
     related=["biocontext.query_go"],
 )
 def query_efo(disease_name: str, size: int = 10, exact_match: bool = False) -> dict:
@@ -745,7 +745,7 @@ def query_efo(disease_name: str, size: int = 10, exact_match: bool = False) -> d
     aliases=["chebi_query", "chemical_ontology", "化合物查询"],
     category="biocontext",
     description="Query ChEBI for chemical entity information.",
-    examples=["chebi = ov.biocontext.query_chebi('aspirin')"],
+    examples=["chebi = ov.utils.biocontext.query_chebi('aspirin')"],
     related=["biocontext.search_drugs"],
 )
 def query_chebi(chemical_name: str, size: int = 10, exact_match: bool = False) -> dict:
@@ -775,7 +775,7 @@ def query_chebi(chemical_name: str, size: int = 10, exact_match: bool = False) -
     aliases=["cell_ontology", "细胞本体查询"],
     category="biocontext",
     description="Query Cell Ontology for cell type terms.",
-    examples=["terms = ov.biocontext.query_cell_ontology('T cell')"],
+    examples=["terms = ov.utils.biocontext.query_cell_ontology('T cell')"],
     related=["biocontext.query_panglaodb"],
 )
 def query_cell_ontology(cell_type: str, size: int = 10) -> dict:
@@ -806,7 +806,7 @@ def query_cell_ontology(cell_type: str, size: int = 10) -> dict:
     aliases=["pride_search", "proteomics_search", "蛋白质组学搜索"],
     category="biocontext",
     description="Search PRIDE proteomics repository for projects.",
-    examples=["projects = ov.biocontext.search_pride('single cell proteomics')"],
+    examples=["projects = ov.utils.biocontext.search_pride('single cell proteomics')"],
     related=["biocontext.query_uniprot"],
 )
 def search_pride(keyword: str, page_size: int = 10) -> dict:

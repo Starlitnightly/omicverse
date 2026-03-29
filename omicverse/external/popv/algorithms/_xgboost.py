@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import xgboost as xgb
 
-from popv import settings
-from popv.algorithms._base_algorithm import BaseAlgorithm
+from .. import settings
+from ._base_algorithm import BaseAlgorithm
 
 
 class XGboost(BaseAlgorithm):

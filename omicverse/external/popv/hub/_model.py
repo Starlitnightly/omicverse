@@ -16,9 +16,7 @@ from rich.markdown import Markdown
 from scvi import settings
 from scvi.utils import dependencies
 
-from popv.annotation import AlgorithmsNT, annotate_data
-from popv.hub._metadata import HubMetadata, HubModelCardHelper
-from popv.preprocessing import Process_Query
+from ._metadata import HubMetadata, HubModelCardHelper
 
 if TYPE_CHECKING:
     from anndata import AnnData
@@ -139,6 +137,9 @@ class HubModel:
         AnnData
             The annotated data.
         """
+        from ..annotation import AlgorithmsNT, annotate_data
+        from ..preprocessing import Process_Query
+
         ref_adata = self.adata if prediction_mode == "retrain" else self.minified_adata
         setup_dict = self.metadata.setup_dict
         if gene_symbols is not None:

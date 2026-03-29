@@ -8,8 +8,8 @@ import pandas as pd
 import scanpy as sc
 import scvi
 
-from popv import settings
-from popv.algorithms._base_algorithm import BaseAlgorithm
+from .. import settings
+from ._base_algorithm import BaseAlgorithm
 
 
 class SCANVI_POPV(BaseAlgorithm):

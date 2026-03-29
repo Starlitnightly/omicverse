@@ -31,18 +31,7 @@ Features:
 - Integration with popular single-cell frameworks
 - Comprehensive evaluation metrics
 """
-
-from ._base_algorithm import BaseAlgorithm
-from ._bbknn import KNN_BBKNN
-from ._celltypist import CELLTYPIST
-from ._harmony import KNN_HARMONY
-from ._onclass import ONCLASS
-from ._rf import Random_Forest
-from ._scanorama import KNN_SCANORAMA
-from ._scanvi import SCANVI_POPV
-from ._scvi import KNN_SCVI
-from ._svm import Support_Vector
-from ._xgboost import XGboost
+import importlib
 
 __all__ = [
     "BaseAlgorithm",
@@ -57,3 +46,27 @@ __all__ = [
     "Support_Vector",
     "XGboost",
 ]
+
+_LAZY_ATTRS = {
+    "BaseAlgorithm": ("._base_algorithm", "BaseAlgorithm"),
+    "KNN_BBKNN": ("._bbknn", "KNN_BBKNN"),
+    "CELLTYPIST": ("._celltypist", "CELLTYPIST"),
+    "KNN_HARMONY": ("._harmony", "KNN_HARMONY"),
+    "ONCLASS": ("._onclass", "ONCLASS"),
+    "Random_Forest": ("._rf", "Random_Forest"),
+    "KNN_SCANORAMA": ("._scanorama", "KNN_SCANORAMA"),
+    "SCANVI_POPV": ("._scanvi", "SCANVI_POPV"),
+    "KNN_SCVI": ("._scvi", "KNN_SCVI"),
+    "Support_Vector": ("._svm", "Support_Vector"),
+    "XGboost": ("._xgboost", "XGboost"),
+}
+
+
+def __getattr__(name):
+    if name in _LAZY_ATTRS:
+        module_name, attr_name = _LAZY_ATTRS[name]
+        module = importlib.import_module(module_name, __name__)
+        value = getattr(module, attr_name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

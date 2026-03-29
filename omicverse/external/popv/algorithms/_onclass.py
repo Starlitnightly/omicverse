@@ -8,8 +8,8 @@ import pandas as pd
 import scipy
 from OnClass.OnClassModel import OnClassModel
 
-from popv import settings
-from popv.algorithms._base_algorithm import BaseAlgorithm
+from .. import settings
+from ._base_algorithm import BaseAlgorithm
 
 
 class ONCLASS(BaseAlgorithm):

@@ -20,10 +20,10 @@ MODULE_TO_DOMAIN: Dict[str, str] = {
     "omicverse.single": "single",
     "omicverse.bulk": "bulk",
     "omicverse.space": "space",
+    "omicverse.utils.biocontext": "biocontext",
     "omicverse.utils": "utils",
     "omicverse.external": "external",
     "omicverse.alignment": "alignment",
-    "omicverse.biocontext": "biocontext",
 }
 
 _TOOL_NAME_RE = re.compile(r"^ov\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$")

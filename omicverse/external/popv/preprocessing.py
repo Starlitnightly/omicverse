@@ -15,7 +15,7 @@ import torch
 from pynndescent import NNDescent
 from scanpy._utils import check_nonnegative_integers
 
-from popv import _utils
+from . import _utils
 
 
 class Process_Query:

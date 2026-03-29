@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import os
 
 import matplotlib.backends.backend_pdf
@@ -12,10 +11,9 @@ import pandas as pd
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
 
-from .reproducibility import _alluvial
-
-
 def _sample_report(adata, cell_type_key, score_key, pred_keys):
+    from .reproducibility import _alluvial
+
     adata.obs["counts"] = np.zeros(len(adata.obs))
     _counts_adata = adata.obs.groupby([cell_type_key, score_key]).count()[["counts"]].reset_index()
     counts_adata = _counts_adata.pivot(cell_type_key, score_key, "counts")

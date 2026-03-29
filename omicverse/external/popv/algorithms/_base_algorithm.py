@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 
-from popv import settings
+from .. import settings
 
 
 class BaseAlgorithm:
