@@ -1,0 +1,3407 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="Zehua Zeng" name="author"/>
+<link href="../../Tutorials-space/t_slat/" rel="prev"/>
+<link href="../t_fm/" rel="next"/>
+<link href="../../img/favicon.ico" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.1.2" name="generator"/>
+<title>ov.fm — Foundation Model Module - omicverse Readthedocs</title>
+<link href="../../assets/stylesheets/main.7bf56d0a.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/palette.a0c5b2b5.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<link href="../../css/mkapi-common.css" rel="stylesheet"/>
+<link href="../../css/mkapi-material.css" rel="stylesheet"/>
+<link href="../../css/tags.css" rel="stylesheet"/>
+<link href="../../css/custom.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" rel="stylesheet"/>
+<script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+<link href="../../assets/stylesheets/glightbox.min.css" rel="stylesheet"/><style>
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            
+                .gscrollbar-fixer { padding-right: 15px; }
+                .gdesc-inner { font-size: 0.75rem; }
+                body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color);}
+                body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color);}
+                body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color);}
+                </style><script src="../../assets/javascripts/glightbox.min.js"></script></head>
+<body data-md-color-accent="" data-md-color-primary="" data-md-color-scheme="default" dir="ltr">
+<script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#ovfm-foundation-model-module">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+</div>
+<header class="md-header md-header--shadow" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="omicverse Readthedocs" class="md-header__button md-logo" data-md-component="logo" href="../.." title="omicverse Readthedocs">
+<img alt="logo" src="../../img/ico.png"/>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            omicverse Readthedocs
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              ov.fm — Foundation Model Module
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="" data-md-color-media="(prefers-color-scheme: light)" data-md-color-primary="" data-md-color-scheme="default" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_2" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 6H7c-3.31 0-6 2.69-6 6s2.69 6 6 6h10c3.31 0 6-2.69 6-6s-2.69-6-6-6zm0 10H7c-2.21 0-4-1.79-4-4s1.79-4 4-4h10c2.21 0 4 1.79 4 4s-1.79 4-4 4zM7 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-primary="" data-md-color-scheme="slate" id="__palette_2" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3Z"></path></svg>
+</label>
+</form>
+<div class="md-header__source">
+<a class="md-source" data-md-component="source" href="https://github.com/Starlitnightly/omicverse" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.3.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"></path></svg>
+</div>
+<div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="omicverse Readthedocs" class="md-nav__button md-logo" data-md-component="logo" href="../.." title="omicverse Readthedocs">
+<img alt="logo" src="../../img/ico.png"/>
+</a>
+    omicverse Readthedocs
+  </label>
+<div class="md-nav__source">
+<a class="md-source" data-md-component="source" href="https://github.com/Starlitnightly/omicverse" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.3.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"></path></svg>
+</div>
+<div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+</div>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../..">
+        Index
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Installation_guild/">
+        Installation
+      </a>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          Tutorial
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+          Tutorial
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+          Bulk
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_1">
+<span class="md-nav__icon md-icon"></span>
+          Bulk
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_1" id="__nav_3_1_1_label" tabindex="0">
+          Upstream
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_1_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_1">
+<span class="md-nav__icon md-icon"></span>
+          Upstream
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk/t_mapping_STAR/">
+        Bulk RNA-seq mapping with STAR
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk/t_mapping_kbpython/">
+        Bulk RNA-seq mapping with kb-python
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_2" id="__nav_3_1_2_label" tabindex="0">
+          Preprocessing
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_2">
+<span class="md-nav__icon md-icon"></span>
+          Preprocessing
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk/t_bulk_combat/">
+        Batch correction in Bulk RNA-seq or microarray data
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_3" id="__nav_3_1_3_label" tabindex="0">
+          Downstream
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_3">
+<span class="md-nav__icon md-icon"></span>
+          Downstream
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk/t_deg/">
+        Different Expression Analysis
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk/t_deseq2/">
+        Different Expression Analysis with DEseq2
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk/t_network/">
+        Protein-Protein interaction (PPI) analysis by String-db
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk/t_wgcna/">
+        WGCNA (Weighted gene co-expression network analysis) analysis
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_4" id="__nav_3_1_4_label" tabindex="0">
+          Deconvolution
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_4_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_4">
+<span class="md-nav__icon md-icon"></span>
+          Deconvolution
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk/t_decov_bulk/">
+        Bulk deconvolution with reference scRNA-seq
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_5" id="__nav_3_1_5_label" tabindex="0">
+          Others
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_5_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_5">
+<span class="md-nav__icon md-icon"></span>
+          Others
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk/t_tcga/">
+        TCGA database preprocess
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+          Single
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_2">
+<span class="md-nav__icon md-icon"></span>
+          Single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_1" id="__nav_3_2_1_label" tabindex="0">
+          Alignment
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_1_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_1">
+<span class="md-nav__icon md-icon"></span>
+          Alignment
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_alignment_1k/">
+        Alignment and analysis of single-cell RNA-seq data
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_alignment_velocity/">
+        Alignment and RNA velocity analysis of single-cell RNA-seq data.
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_2" id="__nav_3_2_2_label" tabindex="0">
+          Preprocessing
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_2">
+<span class="md-nav__icon md-icon"></span>
+          Preprocessing
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_preprocess_cpu/">
+        Preprocessing the data of scRNA-seq with omicverse[CPU-GPU-mixed]
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_preprocess_gpu/">
+        Preprocessing the data of scRNA-seq with omicverse[GPU]
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_cluster/">
+        Clustering space
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_single_batch/">
+        Data integration and batch correction
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_cnmf/">
+        GeneModule Identified
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_lazy/">
+        Lazy analysis of scRNA-seq
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_3" id="__nav_3_2_3_label" tabindex="0">
+          Annotation
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_3">
+<span class="md-nav__icon md-icon"></span>
+          Annotation
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_anno_noref/">
+        Reference-free automated single-cell cell type annotation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_anno_ref/">
+        Reference automated single-cell cell type annotation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_gptanno/">
+        Automatic cell type annotation with GPT/Other
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_cellmatch/">
+        Mapping Cell Names to the Cell Ontology/Taxonomy
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_cellanno/">
+        Celltype auto annotation with SCSA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_metatime/">
+        Celltype auto annotation with MetaTiME
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_tosica/">
+        Celltype annotation migration(mapping) with TOSICA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_scmulan/">
+        Celltype auto annotation with scMulan
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_cellvote/">
+        Consensus annotation with CellVote
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_4" id="__nav_3_2_4_label" tabindex="0">
+          Trajectory
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_4_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_4">
+<span class="md-nav__icon md-icon"></span>
+          Trajectory
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_cytotrace/">
+        Prediction of absolute developmental potential using CytoTrace2
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_traj/">
+        Basic Trajectory Inference
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_stavia/">
+        Trajectory Inference with StaVIA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_cellfate_gene/">
+        Timing-associated genes analysis with TimeFateKernel
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_cellfate/">
+        Identify the driver regulators of cell fate decisions
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_5" id="__nav_3_2_5_label" tabindex="0">
+          Cell Structure
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_5_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_5">
+<span class="md-nav__icon md-icon"></span>
+          Cell Structure
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_metacells/">
+        Inference of MetaCell from Single-Cell RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_deg_single/">
+        Differential expression and celltype analysis [All Cell]
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_scdeg/">
+        Differential expression analysis [Meta Cell]
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_scenic/">
+        Gene Regulatory Network Analysis with SCENIC
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_aucell/">
+        Pathway analysis with AUCell
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_cellphonedb/">
+        Cell-cell communication using CellPhoneDBViz
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_scdrug/">
+        Drug response predict with scDrug
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_simba/">
+        Data integration and batch correction with SIMBA
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_6" id="__nav_3_2_6_label" tabindex="0">
+          Velocity
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_6_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_6">
+<span class="md-nav__icon md-icon"></span>
+          Velocity
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-velo/t_velo/">
+        Velocity Basic Calculation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-velo/t_graphvelo/">
+        Velocity Optimization
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_7" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_7" id="__nav_3_2_7_label" tabindex="0">
+          Multi omics
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_7_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_7">
+<span class="md-nav__icon md-icon"></span>
+          Multi omics
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_mofa/">
+        Multi omics analysis by MOFA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_mofa_glue/">
+        Multi omics analysis by MOFA and GLUE
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_anno_trans/">
+        Celltype annotation transfer in multi-omics
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+          Bulk2Single
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_3">
+<span class="md-nav__icon md-icon"></span>
+          Bulk2Single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk2single/t_bulktrajblend/">
+        Bulk RNA-seq generate 'interrupted' cells to interpolate scRNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk2single/t_bulk2single/">
+        Bulk RNA-seq to Single RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk2single/t_single2spatial/">
+        Single RNA-seq to Spatial RNA-seq
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+          Space
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_4_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_4">
+<span class="md-nav__icon md-icon"></span>
+          Space
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_4_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_4_1" id="__nav_3_4_1_label" tabindex="0">
+          Preprocess
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_4_1_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_4_1">
+<span class="md-nav__icon md-icon"></span>
+          Preprocess
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_crop_rotate/">
+        Crop and Rotation of spatial transcriptomic data
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_cellpose/">
+        Cell Segmemtation (10x HD)
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_nanostring_preprocess/">
+        Analyze Nanostring data
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_visium_hd_preprocess/">
+        Analyze Visium HD data
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_cluster_space/">
+        Spatial clustering and denoising expressions
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_staligner/">
+        Spatial integration and clustering
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_4_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_4_2" id="__nav_3_4_2_label" tabindex="0">
+          Deconvolution
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_4_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_4_2">
+<span class="md-nav__icon md-icon"></span>
+          Deconvolution
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_spaceflow/">
+        Identifying Pseudo-Spatial Map
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_decov/">
+        Spatial deconvolution with reference scRNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_flashdeconv/">
+        FlashDeconv: Fast Spatial Deconvolution via Structure-Preserving Sketching
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_starfysh_new/">
+        Spatial deconvolution without reference scRNA-seq
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_4_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_4_3" id="__nav_3_4_3_label" tabindex="0">
+          Downstream
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_4_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_4_3">
+<span class="md-nav__icon md-icon"></span>
+          Downstream
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_stt/">
+        Spatial transition tensor of single cells
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_commot_flowsig/">
+        Spatial Communication
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_gaston/">
+        Spatial IsoDepth Calculation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_slat/">
+        Single cell spatial alignment tools
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_3_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
+          Foundation Model
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_3_5_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_5">
+<span class="md-nav__icon md-icon"></span>
+          Foundation Model
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_3_5_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_1" id="__nav_3_5_1_label" tabindex="0">
+          Overview
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_3_5_1_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_5_1">
+<span class="md-nav__icon md-icon"></span>
+          Overview
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+          ov.fm API Overview
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+        ov.fm API Overview
+      </a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#quick-start">
+    Quick Start
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-6-step-workflow">
+    The 6-Step Workflow
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#api-reference">
+    API Reference
+  </a>
+<nav aria-label="API Reference" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#ovfmlist_models">
+    ov.fm.list_models
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#ovfmdescribe_model">
+    ov.fm.describe_model
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#ovfmprofile_data">
+    ov.fm.profile_data
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#ovfmselect_model">
+    ov.fm.select_model
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#ovfmpreprocess_validate">
+    ov.fm.preprocess_validate
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#ovfmrun">
+    ov.fm.run
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#ovfminterpret_results">
+    ov.fm.interpret_results
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#supported-tasks">
+    Supported Tasks
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#model-catalog">
+    Model Catalog
+  </a>
+<nav aria-label="Model Catalog" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#skill-ready-models-full-adapter">
+    Skill-Ready Models (full adapter)
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#partial-spec-models">
+    Partial-Spec Models
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#data-types-enums">
+    Data Types &amp; Enums
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#plugin-system">
+    Plugin System
+  </a>
+<nav aria-label="Plugin System" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#entry-point-plugin-pip-installable">
+    Entry Point Plugin (pip-installable)
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#local-plugin-development">
+    Local Plugin (development)
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#registry-api">
+    Registry API
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#environment-variables">
+    Environment Variables
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#error-handling">
+    Error Handling
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#hands-on-tutorial">
+    Hands-On Tutorial
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm/">
+        ov.fm — Unified Foundation Model API
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_2" id="__nav_3_5_2_label" tabindex="0">
+          Skill-Ready Models
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_5_2">
+<span class="md-nav__icon md-icon"></span>
+          Skill-Ready Models
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_2_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_2_1" id="__nav_3_5_2_1_label" tabindex="0">
+          scGPT
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_2_1_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_2_1">
+<span class="md-nav__icon md-icon"></span>
+          scGPT
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scgpt_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_scgpt/">
+        scGPT
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_2_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_2_2" id="__nav_3_5_2_2_label" tabindex="0">
+          Geneformer
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_2_2_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_2_2">
+<span class="md-nav__icon md-icon"></span>
+          Geneformer
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_geneformer_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_geneformer/">
+        GeneFormer
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_2_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_2_3" id="__nav_3_5_2_3_label" tabindex="0">
+          UCE
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_2_3_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_2_3">
+<span class="md-nav__icon md-icon"></span>
+          UCE
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_uce_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_uce/">
+        UCE
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_2_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_2_4" id="__nav_3_5_2_4_label" tabindex="0">
+          scFoundation
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_2_4_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_2_4">
+<span class="md-nav__icon md-icon"></span>
+          scFoundation
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scfoundation_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_scfoundation/">
+        scFoundation
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_2_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_2_5" id="__nav_3_5_2_5_label" tabindex="0">
+          CellPLM
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_2_5_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_2_5">
+<span class="md-nav__icon md-icon"></span>
+          CellPLM
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_cellplm_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_cellplm/">
+        CellPLM
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_3" id="__nav_3_5_3_label" tabindex="0">
+          Core Models
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_5_3">
+<span class="md-nav__icon md-icon"></span>
+          Core Models
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_3_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_3_1" id="__nav_3_5_3_1_label" tabindex="0">
+          scBERT
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_3_1_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_3_1">
+<span class="md-nav__icon md-icon"></span>
+          scBERT
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scbert_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scbert/">
+        scBERT — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_3_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_3_2" id="__nav_3_5_3_2_label" tabindex="0">
+          GeneCompass
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_3_2_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_3_2">
+<span class="md-nav__icon md-icon"></span>
+          GeneCompass
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_genecompass_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_genecompass/">
+        GeneCompass — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_3_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_3_3" id="__nav_3_5_3_3_label" tabindex="0">
+          Nicheformer
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_3_3_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_3_3">
+<span class="md-nav__icon md-icon"></span>
+          Nicheformer
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_nicheformer_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_nicheformer/">
+        Nicheformer — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_3_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_3_4" id="__nav_3_5_3_4_label" tabindex="0">
+          scMulan
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_3_4_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_3_4">
+<span class="md-nav__icon md-icon"></span>
+          scMulan
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scmulan_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scmulan/">
+        scMulan — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_4" id="__nav_3_5_4_label" tabindex="0">
+          Specialized Models
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_4_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_5_4">
+<span class="md-nav__icon md-icon"></span>
+          Specialized Models
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_4_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_4_1" id="__nav_3_5_4_1_label" tabindex="0">
+          tGPT
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_4_1_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_4_1">
+<span class="md-nav__icon md-icon"></span>
+          tGPT
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_tgpt_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_tgpt/">
+        tGPT — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_4_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_4_2" id="__nav_3_5_4_2_label" tabindex="0">
+          CellFM
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_4_2_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_4_2">
+<span class="md-nav__icon md-icon"></span>
+          CellFM
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_cellfm_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_cellfm/">
+        CellFM — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_4_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_4_3" id="__nav_3_5_4_3_label" tabindex="0">
+          scCello
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_4_3_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_4_3">
+<span class="md-nav__icon md-icon"></span>
+          scCello
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_sccello_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_sccello/">
+        scCello — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_4_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_4_4" id="__nav_3_5_4_4_label" tabindex="0">
+          scPRINT
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_4_4_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_4_4">
+<span class="md-nav__icon md-icon"></span>
+          scPRINT
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scprint_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scprint/">
+        scPRINT — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_4_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_4_5" id="__nav_3_5_4_5_label" tabindex="0">
+          AIDO.Cell
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_4_5_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_4_5">
+<span class="md-nav__icon md-icon"></span>
+          AIDO.Cell
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_aidocell_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_aidocell/">
+        AIDO.Cell — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_4_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_4_6" id="__nav_3_5_4_6_label" tabindex="0">
+          PULSAR
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_4_6_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_4_6">
+<span class="md-nav__icon md-icon"></span>
+          PULSAR
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_pulsar_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_pulsar/">
+        PULSAR — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_4_7" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_4_7" id="__nav_3_5_4_7_label" tabindex="0">
+          Tabula
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_4_7_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_4_7">
+<span class="md-nav__icon md-icon"></span>
+          Tabula
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_tabula_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_tabula/">
+        Tabula — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_5" id="__nav_3_5_5_label" tabindex="0">
+          Domain-Specific Models
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_5_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_5_5">
+<span class="md-nav__icon md-icon"></span>
+          Domain-Specific Models
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_5_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_5_1" id="__nav_3_5_5_1_label" tabindex="0">
+          ATACformer (ATAC-seq)
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_5_1_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_5_1">
+<span class="md-nav__icon md-icon"></span>
+          ATACformer (ATAC-seq)
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_atacformer_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_atacformer/">
+        ATACformer — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_5_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_5_2" id="__nav_3_5_5_2_label" tabindex="0">
+          scPlantLLM (Plant)
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_5_2_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_5_2">
+<span class="md-nav__icon md-icon"></span>
+          scPlantLLM (Plant)
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scplantllm_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scplantllm/">
+        scPlantLLM — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_5_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_5_3" id="__nav_3_5_5_3_label" tabindex="0">
+          LangCell (Text+Cell)
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_5_3_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_5_3">
+<span class="md-nav__icon md-icon"></span>
+          LangCell (Text+Cell)
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_langcell_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_langcell/">
+        LangCell — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_5_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_5_4" id="__nav_3_5_5_4_label" tabindex="0">
+          Cell2Sentence (LLM Fine-tuning)
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_5_4_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_5_4">
+<span class="md-nav__icon md-icon"></span>
+          Cell2Sentence (LLM Fine-tuning)
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_cell2sentence_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_cell2sentence/">
+        Cell2Sentence — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_5_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_5_5" id="__nav_3_5_5_5_label" tabindex="0">
+          GenePT (Gene Embeddings)
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_5_5_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_5_5">
+<span class="md-nav__icon md-icon"></span>
+          GenePT (Gene Embeddings)
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_genept_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_genept/">
+        GenePT — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_5_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_5_6" id="__nav_3_5_5_6_label" tabindex="0">
+          ChatCell (Conversational)
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_5_6_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_5_6">
+<span class="md-nav__icon md-icon"></span>
+          ChatCell (Conversational)
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_chatcell_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_chatcell/">
+        ChatCell — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+          Plotting
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_6_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_6">
+<span class="md-nav__icon md-icon"></span>
+          Plotting
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-plotting/t_visualize_single/">
+        Visualization of single cell RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-plotting/t_visualize_bulk/">
+        Visualization of Bulk RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-plotting/t_palette/">
+        Palette optimization for publication-quality single-cell &amp; spatial plots
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-plotting/t_visualize_colorsystem/">
+        Color system
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          OmicClaw Tutorial
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_4">
+<span class="md-nav__icon md-icon"></span>
+          OmicClaw Tutorial
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_1" id="__nav_4_1_label" tabindex="0">
+          General[Notebook/pipeline]
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_1_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_4_1">
+<span class="md-nav__icon md-icon"></span>
+          General[Notebook/pipeline]
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_ov_agent_pbmc3k/">
+        J.A.R.V.I.S. with PBMC3k
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../ov_agent_ten_task_suite/">
+        J.A.R.V.I.S. with Ten-Task Suite
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+          Gateway and Channels
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_4_2">
+<span class="md-nav__icon md-icon"></span>
+          Gateway and Channels
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_msg_bot_overview/">
+        Overview
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_setup_auth/">
+        Setup and Auth
+      </a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_2_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_2_3" id="__nav_4_2_3_label" tabindex="0">
+          Channel Entry Points
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_2_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_4_2_3">
+<span class="md-nav__icon md-icon"></span>
+          Channel Entry Points
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_channel_telegram/">
+        Telegram Tutorial
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_channel_feishu/">
+        Feishu Tutorial
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_channel_imessage/">
+        iMessage Tutorial
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_channel_qq/">
+        QQ Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_session_commands/">
+        Session Workflow
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_troubleshooting/">
+        Common Issues
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+          Coding [cli/openclaw]
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_4_3">
+<span class="md-nav__icon md-icon"></span>
+          Coding [cli/openclaw]
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_claw_cli/">
+        Overview and CLI
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_claw_openclaw/">
+        OpenClaw Integration
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+          MCP Server[cli/agent]
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_4_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_4_4">
+<span class="md-nav__icon md-icon"></span>
+          MCP Server[cli/agent]
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_mcp_guide/">
+        Overview
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_mcp_quickstart/">
+        Quick Start
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_mcp_full_start/">
+        Full Start
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_mcp_tools/">
+        Tool Catalog
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_mcp_clients/">
+        Clients and Deployment
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_mcp_runtime/">
+        Runtime and Troubleshooting
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_mcp_reference/">
+        Reference
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_mcp_claude_code/">
+        Claude Code Walkthrough
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../omicverse_web_tutorial_en/">
+        Web Tutorial
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../GPU_supported_registry_functions/">
+        GPU Support
+      </a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/">API documentation</a>
+<label for="__nav_7">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_7">
+<span class="md-nav__icon md-icon"></span>
+          API documentation
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_2" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/agent/">agent</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_2">
+<span class="md-nav__icon md-icon"></span>
+          agent
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_3" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/alignment/">alignment</a>
+<label for="__nav_7_3">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_3">
+<span class="md-nav__icon md-icon"></span>
+          alignment
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/alignment/STAR/">
+        STAR
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/alignment/fastp/">
+        fastp
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/alignment/featureCount/">
+        featureCount
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/alignment/fq_dump/">
+        fq_dump
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/alignment/kb_api/">
+        kb_api
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/alignment/pipeline/">
+        pipeline
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/alignment/prefetch/">
+        prefetch
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_4" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/biocontext/">biocontext</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_4_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_4">
+<span class="md-nav__icon md-icon"></span>
+          biocontext
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_5" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/bulk/">bulk</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_5_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_5">
+<span class="md-nav__icon md-icon"></span>
+          bulk
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_6" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/bulk2single/">bulk2single</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_6_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_6">
+<span class="md-nav__icon md-icon"></span>
+          bulk2single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_7" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/datasets/">datasets</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_7_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_7">
+<span class="md-nav__icon md-icon"></span>
+          datasets
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_8" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/fm/">fm</a>
+<label for="__nav_7_8">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_8_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_8">
+<span class="md-nav__icon md-icon"></span>
+          fm
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_8_2" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/fm/adapters/">adapters</a>
+<label for="__nav_7_8_2">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_8_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_8_2">
+<span class="md-nav__icon md-icon"></span>
+          adapters
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/fm/adapters/base/">
+        base
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/fm/api/">
+        api
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/fm/registry/">
+        registry
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/fm/router/">
+        router
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_9" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/io/">io</a>
+<label for="__nav_7_9">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_9_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_9">
+<span class="md-nav__icon md-icon"></span>
+          io
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_9_2" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/io/bulk/">bulk</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_9_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_9_2">
+<span class="md-nav__icon md-icon"></span>
+          bulk
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_9_3" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/io/general/">general</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_9_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_9_3">
+<span class="md-nav__icon md-icon"></span>
+          general
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_9_4" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/io/single/">single</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_9_4_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_9_4">
+<span class="md-nav__icon md-icon"></span>
+          single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_9_5" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/io/spatial/">spatial</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_9_5_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_9_5">
+<span class="md-nav__icon md-icon"></span>
+          spatial
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_10" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/jarvis/">jarvis</a>
+<label for="__nav_7_10">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_10_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_10">
+<span class="md-nav__icon md-icon"></span>
+          jarvis
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_10_2" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/jarvis/channels/">channels</a>
+<label for="__nav_7_10_2">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_10_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_10_2">
+<span class="md-nav__icon md-icon"></span>
+          channels
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/channels/channel_core/">
+        channel_core
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/channels/discord/">
+        discord
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/channels/feishu/">
+        feishu
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/channels/imessage/">
+        imessage
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/channels/qq/">
+        qq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/channels/telegram/">
+        telegram
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/channels/wechat/">
+        wechat
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_10_3" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/jarvis/gateway/">gateway</a>
+<label for="__nav_7_10_3">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_10_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_10_3">
+<span class="md-nav__icon md-icon"></span>
+          gateway
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/gateway/routing/">
+        routing
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/gateway/web_bridge/">
+        web_bridge
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_10_4" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/jarvis/memory/">memory</a>
+<label for="__nav_7_10_4">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_10_4_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_10_4">
+<span class="md-nav__icon md-icon"></span>
+          memory
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/memory/store/">
+        store
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_10_5" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/jarvis/runtime/">runtime</a>
+<label for="__nav_7_10_5">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_10_5_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_10_5">
+<span class="md-nav__icon md-icon"></span>
+          runtime
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/runtime/execution_adapter/">
+        execution_adapter
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/runtime/models/">
+        models
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/runtime/policy/">
+        policy
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/runtime/router/">
+        router
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/runtime/runtime/">
+        runtime
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/runtime/task_registry/">
+        task_registry
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/agent_bridge/">
+        agent_bridge
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/channel_media/">
+        channel_media
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/cli/">
+        cli
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/config/">
+        config
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/gemini_cli_oauth/">
+        gemini_cli_oauth
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/media_ingest/">
+        media_ingest
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/model_help/">
+        model_help
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/model_registry/">
+        model_registry
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/openai_oauth/">
+        openai_oauth
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/session/">
+        session
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/setup_wizard/">
+        setup_wizard
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_11" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/mcp/">mcp</a>
+<label for="__nav_7_11">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_11_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_11">
+<span class="md-nav__icon md-icon"></span>
+          mcp
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_11_2" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/mcp/adapters/">adapters</a>
+<label for="__nav_7_11_2">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_11_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_11_2">
+<span class="md-nav__icon md-icon"></span>
+          adapters
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/adapters/adata_adapter/">
+        adata_adapter
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/adapters/base/">
+        base
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/adapters/class_adapter/">
+        class_adapter
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/adapters/function_adapter/">
+        function_adapter
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/adata_kernel_runtime/">
+        adata_kernel_runtime
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/availability/">
+        availability
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/class_specs/">
+        class_specs
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/executor/">
+        executor
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/local_oauth/">
+        local_oauth
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/manifest/">
+        manifest
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/naming/">
+        naming
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/overrides/">
+        overrides
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/schema/">
+        schema
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/server/">
+        server
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/session_store/">
+        session_store
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_12" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/pl/">pl</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_12_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_12">
+<span class="md-nav__icon md-icon"></span>
+          pl
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_13" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/pp/">pp</a>
+<label for="__nav_7_13">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_13_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_13">
+<span class="md-nav__icon md-icon"></span>
+          pp
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_13_2" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/pp/experimental/">experimental</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_13_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_13_2">
+<span class="md-nav__icon md-icon"></span>
+          experimental
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/pp/pyg_knn_implementation/">
+        pyg_knn_implementation
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_14" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/single/">single</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_14_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_14">
+<span class="md-nav__icon md-icon"></span>
+          single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_15" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/space/">space</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_15_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_15">
+<span class="md-nav__icon md-icon"></span>
+          space
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_16" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/utils/">utils</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_16_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_16">
+<span class="md-nav__icon md-icon"></span>
+          utils
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/claw/">
+        claw
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/cli/">
+        cli
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Release_notes/">
+        Release notes
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Developer_guild/">
+        Developer guild
+      </a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#quick-start">
+    Quick Start
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-6-step-workflow">
+    The 6-Step Workflow
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#api-reference">
+    API Reference
+  </a>
+<nav aria-label="API Reference" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#ovfmlist_models">
+    ov.fm.list_models
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#ovfmdescribe_model">
+    ov.fm.describe_model
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#ovfmprofile_data">
+    ov.fm.profile_data
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#ovfmselect_model">
+    ov.fm.select_model
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#ovfmpreprocess_validate">
+    ov.fm.preprocess_validate
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#ovfmrun">
+    ov.fm.run
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#ovfminterpret_results">
+    ov.fm.interpret_results
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#supported-tasks">
+    Supported Tasks
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#model-catalog">
+    Model Catalog
+  </a>
+<nav aria-label="Model Catalog" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#skill-ready-models-full-adapter">
+    Skill-Ready Models (full adapter)
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#partial-spec-models">
+    Partial-Spec Models
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#data-types-enums">
+    Data Types &amp; Enums
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#plugin-system">
+    Plugin System
+  </a>
+<nav aria-label="Plugin System" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#entry-point-plugin-pip-installable">
+    Entry Point Plugin (pip-installable)
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#local-plugin-development">
+    Local Plugin (development)
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#registry-api">
+    Registry API
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#environment-variables">
+    Environment Variables
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#error-handling">
+    Error Handling
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#hands-on-tutorial">
+    Hands-On Tutorial
+  </a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="ovfm-foundation-model-module">ov.fm — Foundation Model Module<a class="headerlink" href="#ovfm-foundation-model-module" title="Permanent link">¶</a></h1>
+<p><code>ov.fm</code> provides a <strong>unified API</strong> for discovering, selecting, validating, running, and interpreting single-cell foundation models. It wraps 17+ models (scGPT, Geneformer, UCE, scFoundation, CellPLM, etc.) behind a consistent AnnData-based interface with automatic data profiling and model selection.</p>
+<div class="admonition note">
+<p class="admonition-title">When to use ov.fm</p>
+<p>Use <code>ov.fm</code> when you want to apply a pre-trained foundation model to your single-cell data without manually setting up each model's preprocessing pipeline. It handles gene ID conversion, compatibility checks, and output standardization for you.</p>
+</div>
+<hr/>
+<h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">¶</a></h2>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">omicverse</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ov</span>
+
+<span class="c1"># 1. What models are available?</span>
+<span class="n">models</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">list_models</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="s2">"embed"</span><span class="p">)</span>
+
+<span class="c1"># 2. Profile your data</span>
+<span class="n">profile</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">profile_data</span><span class="p">(</span><span class="s2">"pbmc3k.h5ad"</span><span class="p">)</span>
+
+<span class="c1"># 3. Which model fits best?</span>
+<span class="n">selection</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">select_model</span><span class="p">(</span><span class="s2">"pbmc3k.h5ad"</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">"embed"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">selection</span><span class="p">[</span><span class="s2">"recommended"</span><span class="p">][</span><span class="s2">"name"</span><span class="p">])</span>
+
+<span class="c1"># 4. Is the data ready?</span>
+<span class="n">check</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">preprocess_validate</span><span class="p">(</span><span class="s2">"pbmc3k.h5ad"</span><span class="p">,</span> <span class="s2">"scgpt"</span><span class="p">,</span> <span class="s2">"embed"</span><span class="p">)</span>
+
+<span class="c1"># 5. Run the model</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="s2">"embed"</span><span class="p">,</span> <span class="n">model_name</span><span class="o">=</span><span class="s2">"scgpt"</span><span class="p">,</span> <span class="n">adata_path</span><span class="o">=</span><span class="s2">"pbmc3k.h5ad"</span><span class="p">,</span>
+                   <span class="n">output_path</span><span class="o">=</span><span class="s2">"pbmc3k_embedded.h5ad"</span><span class="p">)</span>
+
+<span class="c1"># 6. Visualize &amp; evaluate</span>
+<span class="n">metrics</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">interpret_results</span><span class="p">(</span><span class="s2">"pbmc3k_embedded.h5ad"</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">"embed"</span><span class="p">)</span>
+</code></pre></div>
+<hr/>
+<h2 id="the-6-step-workflow">The 6-Step Workflow<a class="headerlink" href="#the-6-step-workflow" title="Permanent link">¶</a></h2>
+<p><code>ov.fm</code> is designed around six composable steps. You can use any step independently or chain them all together.</p>
+<div class="highlight"><pre><span></span><code>Discover ──▸ Profile ──▸ Select ──▸ Validate ──▸ Run ──▸ Interpret
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Function</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Discover</strong></td>
+<td><code>list_models()</code>, <code>describe_model()</code></td>
+<td>Browse available models and their capabilities</td>
+</tr>
+<tr>
+<td><strong>Profile</strong></td>
+<td><code>profile_data()</code></td>
+<td>Detect species, gene scheme, modality, and per-model compatibility</td>
+</tr>
+<tr>
+<td><strong>Select</strong></td>
+<td><code>select_model()</code></td>
+<td>Score and rank models for your data + task</td>
+</tr>
+<tr>
+<td><strong>Validate</strong></td>
+<td><code>preprocess_validate()</code></td>
+<td>Check data compatibility, get auto-fix suggestions</td>
+</tr>
+<tr>
+<td><strong>Run</strong></td>
+<td><code>run()</code></td>
+<td>Execute model inference (embeddings, annotation, integration, etc.)</td>
+</tr>
+<tr>
+<td><strong>Interpret</strong></td>
+<td><code>interpret_results()</code></td>
+<td>Compute metrics (silhouette), generate UMAP visualizations</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="api-reference">API Reference<a class="headerlink" href="#api-reference" title="Permanent link">¶</a></h2>
+<h3 id="ovfmlist_models"><code>ov.fm.list_models</code><a class="headerlink" href="#ovfmlist_models" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">list_models</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">skill_ready_only</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
+</code></pre></div>
+<p>List available foundation models with optional filtering.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>task</code></td>
+<td>str | None</td>
+<td><code>None</code></td>
+<td>Filter by task: <code>"embed"</code>, <code>"annotate"</code>, <code>"integrate"</code>, <code>"perturb"</code>, <code>"spatial"</code>, <code>"drug_response"</code></td>
+</tr>
+<tr>
+<td><code>skill_ready_only</code></td>
+<td>bool</td>
+<td><code>False</code></td>
+<td>Only return models with fully implemented adapters</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Dictionary with <code>count</code> (int) and <code>models</code> (list of model summaries).</p>
+<div class="highlight"><pre><span></span><code><span class="n">result</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">list_models</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="s2">"embed"</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">result</span><span class="p">[</span><span class="s2">"models"</span><span class="p">]:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">m</span><span class="p">[</span><span class="s1">'name'</span><span class="p">]</span><span class="si">:</span><span class="s2">15s</span><span class="si">}</span><span class="s2"> status=</span><span class="si">{</span><span class="n">m</span><span class="p">[</span><span class="s1">'status'</span><span class="p">]</span><span class="si">:</span><span class="s2">10s</span><span class="si">}</span><span class="s2"> tasks=</span><span class="si">{</span><span class="n">m</span><span class="p">[</span><span class="s1">'tasks'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
+<hr/>
+<h3 id="ovfmdescribe_model"><code>ov.fm.describe_model</code><a class="headerlink" href="#ovfmdescribe_model" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">describe_model</span><span class="p">(</span><span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
+</code></pre></div>
+<p>Get the complete specification for a single model, including input/output contracts, hardware requirements, and resource links.</p>
+<p><strong>Returns:</strong> Dictionary with keys <code>model</code>, <code>input_contract</code>, <code>output_contract</code>, <code>resources</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="n">spec</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">describe_model</span><span class="p">(</span><span class="s2">"scgpt"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">spec</span><span class="p">[</span><span class="s2">"input_contract"</span><span class="p">][</span><span class="s2">"gene_id_scheme"</span><span class="p">])</span>   <span class="c1"># "symbol"</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">spec</span><span class="p">[</span><span class="s2">"output_contract"</span><span class="p">][</span><span class="s2">"embedding_key"</span><span class="p">])</span>    <span class="c1"># "X_scGPT"</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">spec</span><span class="p">[</span><span class="s2">"output_contract"</span><span class="p">][</span><span class="s2">"embedding_dim"</span><span class="p">])</span>    <span class="c1"># 512</span>
+</code></pre></div>
+<hr/>
+<h3 id="ovfmprofile_data"><code>ov.fm.profile_data</code><a class="headerlink" href="#ovfmprofile_data" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">profile_data</span><span class="p">(</span><span class="n">adata_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
+</code></pre></div>
+<p>Analyze an <code>.h5ad</code> file and return a data profile with automatic species/gene-scheme detection and per-model compatibility assessment.</p>
+<p><strong>Returns:</strong> Dictionary with <code>n_cells</code>, <code>n_genes</code>, <code>species</code>, <code>gene_scheme</code>, <code>modality</code>, <code>has_raw</code>, <code>layers</code>, <code>obs_columns</code>, <code>obsm_keys</code>, <code>batch_columns</code>, <code>celltype_columns</code>, <code>model_compatibility</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="n">profile</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">profile_data</span><span class="p">(</span><span class="s2">"pbmc3k.h5ad"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Species: </span><span class="si">{</span><span class="n">profile</span><span class="p">[</span><span class="s1">'species'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Gene IDs: </span><span class="si">{</span><span class="n">profile</span><span class="p">[</span><span class="s1">'gene_scheme'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+<span class="c1"># Check which models are compatible</span>
+<span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">compat</span> <span class="ow">in</span> <span class="n">profile</span><span class="p">[</span><span class="s2">"model_compatibility"</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="n">status</span> <span class="o">=</span> <span class="s2">"OK"</span> <span class="k">if</span> <span class="n">compat</span><span class="p">[</span><span class="s2">"compatible"</span><span class="p">]</span> <span class="k">else</span> <span class="s2">"ISSUES"</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">status</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
+<hr/>
+<h3 id="ovfmselect_model"><code>ov.fm.select_model</code><a class="headerlink" href="#ovfmselect_model" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">select_model</span><span class="p">(</span>
+    <span class="n">adata_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">task</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">prefer_zero_shot</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">max_vram_gb</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
+</code></pre></div>
+<p>Score and rank models for a given dataset and task.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>adata_path</code></td>
+<td>str</td>
+<td>—</td>
+<td>Path to <code>.h5ad</code> file</td>
+</tr>
+<tr>
+<td><code>task</code></td>
+<td>str</td>
+<td>—</td>
+<td>Task type (required)</td>
+</tr>
+<tr>
+<td><code>prefer_zero_shot</code></td>
+<td>bool</td>
+<td><code>True</code></td>
+<td>Prefer models that don't require fine-tuning</td>
+</tr>
+<tr>
+<td><code>max_vram_gb</code></td>
+<td>int | None</td>
+<td><code>None</code></td>
+<td>Maximum VRAM constraint</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Dictionary with <code>recommended</code> (name + rationale), <code>fallbacks</code> (list), <code>preprocessing_notes</code>, <code>data_profile</code>.</p>
+<p><strong>Scoring logic:</strong></p>
+<ul>
+<li>Skill-ready adapter: +100 (ready), +50 (partial), 0 (reference)</li>
+<li>Zero-shot match: +30</li>
+<li>Gene scheme match: +20</li>
+<li>CPU fallback available: +10</li>
+<li>Low VRAM: +5</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="n">result</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">select_model</span><span class="p">(</span><span class="s2">"pbmc3k.h5ad"</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">"embed"</span><span class="p">,</span> <span class="n">prefer_zero_shot</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Recommended: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">'recommended'</span><span class="p">][</span><span class="s1">'name'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Rationale: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">'recommended'</span><span class="p">][</span><span class="s1">'rationale'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Fallbacks: </span><span class="si">{</span><span class="p">[</span><span class="n">f</span><span class="p">[</span><span class="s1">'name'</span><span class="p">]</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">f</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">result</span><span class="p">[</span><span class="s1">'fallbacks'</span><span class="p">]]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
+<hr/>
+<h3 id="ovfmpreprocess_validate"><code>ov.fm.preprocess_validate</code><a class="headerlink" href="#ovfmpreprocess_validate" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">preprocess_validate</span><span class="p">(</span>
+    <span class="n">adata_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">task</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
+</code></pre></div>
+<p>Validate whether data is compatible with a specific model and task. Returns diagnostic messages and auto-fix suggestions.</p>
+<p><strong>Returns:</strong> Dictionary with <code>status</code> (<code>"ready"</code> | <code>"needs_preprocessing"</code> | <code>"incompatible"</code>), <code>diagnostics</code>, <code>auto_fixes</code>, <code>data_summary</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="n">result</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">preprocess_validate</span><span class="p">(</span><span class="s2">"pbmc3k.h5ad"</span><span class="p">,</span> <span class="s2">"scgpt"</span><span class="p">,</span> <span class="s2">"embed"</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">result</span><span class="p">[</span><span class="s2">"status"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"ready"</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Data is ready for scGPT"</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">diag</span> <span class="ow">in</span> <span class="n">result</span><span class="p">[</span><span class="s2">"diagnostics"</span><span class="p">]:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"[</span><span class="si">{</span><span class="n">diag</span><span class="p">[</span><span class="s1">'severity'</span><span class="p">]</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="n">diag</span><span class="p">[</span><span class="s1">'message'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">fix</span> <span class="ow">in</span> <span class="n">result</span><span class="p">[</span><span class="s2">"auto_fixes"</span><span class="p">]:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Suggested fix: </span><span class="si">{</span><span class="n">fix</span><span class="p">[</span><span class="s1">'action'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s2">"code"</span> <span class="ow">in</span> <span class="n">fix</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">fix</span><span class="p">[</span><span class="s2">"code"</span><span class="p">])</span>
+</code></pre></div>
+<hr/>
+<h3 id="ovfmrun"><code>ov.fm.run</code><a class="headerlink" href="#ovfmrun" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">task</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">adata_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">output_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">batch_key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">label_key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"auto"</span><span class="p">,</span>
+    <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">checkpoint_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
+</code></pre></div>
+<p>Execute a foundation model on your data.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>task</code></td>
+<td>str</td>
+<td>—</td>
+<td>Task type (required)</td>
+</tr>
+<tr>
+<td><code>model_name</code></td>
+<td>str</td>
+<td>—</td>
+<td>Model name (required)</td>
+</tr>
+<tr>
+<td><code>adata_path</code></td>
+<td>str</td>
+<td>—</td>
+<td>Path to input <code>.h5ad</code> (required)</td>
+</tr>
+<tr>
+<td><code>output_path</code></td>
+<td>str | None</td>
+<td><code>None</code></td>
+<td>Path for output (defaults to overwriting input)</td>
+</tr>
+<tr>
+<td><code>batch_key</code></td>
+<td>str | None</td>
+<td><code>None</code></td>
+<td><code>.obs</code> column for batch (needed for <code>integrate</code>)</td>
+</tr>
+<tr>
+<td><code>label_key</code></td>
+<td>str | None</td>
+<td><code>None</code></td>
+<td><code>.obs</code> column for cell type labels</td>
+</tr>
+<tr>
+<td><code>device</code></td>
+<td>str</td>
+<td><code>"auto"</code></td>
+<td><code>"auto"</code>, <code>"cuda"</code>, <code>"cpu"</code>, <code>"mps"</code></td>
+</tr>
+<tr>
+<td><code>batch_size</code></td>
+<td>int | None</td>
+<td><code>None</code></td>
+<td>Override model default batch size</td>
+</tr>
+<tr>
+<td><code>checkpoint_dir</code></td>
+<td>str | None</td>
+<td><code>None</code></td>
+<td>Path to model checkpoint directory</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Dictionary with <code>output_path</code>, <code>output_keys</code>, <code>n_cells</code>, <code>status</code> on success; <code>error</code>, <code>status</code> on failure.</p>
+<p><strong>Execution flow:</strong></p>
+<ol>
+<li>Validates data via <code>preprocess_validate()</code></li>
+<li>Attempts conda subprocess execution (isolated environment)</li>
+<li>Falls back to in-process adapter if conda is unavailable</li>
+<li>Writes results + provenance metadata to output AnnData</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="n">result</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">task</span><span class="o">=</span><span class="s2">"embed"</span><span class="p">,</span>
+    <span class="n">model_name</span><span class="o">=</span><span class="s2">"scgpt"</span><span class="p">,</span>
+    <span class="n">adata_path</span><span class="o">=</span><span class="s2">"pbmc3k.h5ad"</span><span class="p">,</span>
+    <span class="n">output_path</span><span class="o">=</span><span class="s2">"pbmc3k_embedded.h5ad"</span><span class="p">,</span>
+    <span class="n">device</span><span class="o">=</span><span class="s2">"cuda"</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">if</span> <span class="s2">"error"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Output keys: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">'output_keys'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Cells processed: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">'n_cells'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
+<hr/>
+<h3 id="ovfminterpret_results"><code>ov.fm.interpret_results</code><a class="headerlink" href="#ovfminterpret_results" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">interpret_results</span><span class="p">(</span>
+    <span class="n">adata_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">task</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">generate_umap</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">color_by</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
+</code></pre></div>
+<p>Generate quality metrics and visualizations for model outputs.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>adata_path</code></td>
+<td>str</td>
+<td>—</td>
+<td>Path to <code>.h5ad</code> with model results</td>
+</tr>
+<tr>
+<td><code>task</code></td>
+<td>str</td>
+<td>—</td>
+<td>Task that was executed</td>
+</tr>
+<tr>
+<td><code>output_dir</code></td>
+<td>str | None</td>
+<td><code>None</code></td>
+<td>Directory for visualization files</td>
+</tr>
+<tr>
+<td><code>generate_umap</code></td>
+<td>bool</td>
+<td><code>True</code></td>
+<td>Generate UMAP plots</td>
+</tr>
+<tr>
+<td><code>color_by</code></td>
+<td>list | None</td>
+<td><code>None</code></td>
+<td><code>.obs</code> columns to color UMAP by</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Metrics computed:</strong></p>
+<ul>
+<li>Embedding dimensionality and cell count</li>
+<li>Silhouette score (if cell type labels and sklearn are available)</li>
+<li>Annotation column detection</li>
+<li>Provenance metadata from <code>adata.uns["fm"]</code></li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="n">result</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">interpret_results</span><span class="p">(</span>
+    <span class="s2">"pbmc3k_embedded.h5ad"</span><span class="p">,</span>
+    <span class="n">task</span><span class="o">=</span><span class="s2">"embed"</span><span class="p">,</span>
+    <span class="n">generate_umap</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">color_by</span><span class="o">=</span><span class="p">[</span><span class="s2">"louvain"</span><span class="p">],</span>
+<span class="p">)</span>
+<span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">info</span> <span class="ow">in</span> <span class="n">result</span><span class="p">[</span><span class="s2">"metrics"</span><span class="p">][</span><span class="s2">"embeddings"</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: dim=</span><span class="si">{</span><span class="n">info</span><span class="p">[</span><span class="s1">'dim'</span><span class="p">]</span><span class="si">}</span><span class="s2">, silhouette=</span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'silhouette'</span><span class="p">,</span><span class="w"> </span><span class="s1">'N/A'</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
+<hr/>
+<h2 id="supported-tasks">Supported Tasks<a class="headerlink" href="#supported-tasks" title="Permanent link">¶</a></h2>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Description</th>
+<th>Example Models</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>embed</code></td>
+<td>Generate cell embeddings for downstream analysis</td>
+<td>scGPT, Geneformer, UCE, CellPLM</td>
+</tr>
+<tr>
+<td><code>annotate</code></td>
+<td>Predict cell type labels</td>
+<td>scGPT (fine-tuned), sccello, ChatCell</td>
+</tr>
+<tr>
+<td><code>integrate</code></td>
+<td>Batch integration across datasets</td>
+<td>scGPT, Geneformer, UCE</td>
+</tr>
+<tr>
+<td><code>perturb</code></td>
+<td>Perturbation response prediction</td>
+<td>scFoundation, Tabula</td>
+</tr>
+<tr>
+<td><code>spatial</code></td>
+<td>Spatial transcriptomics analysis</td>
+<td>Nicheformer</td>
+</tr>
+<tr>
+<td><code>drug_response</code></td>
+<td>Drug response modeling</td>
+<td>scFoundation</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="model-catalog">Model Catalog<a class="headerlink" href="#model-catalog" title="Permanent link">¶</a></h2>
+<h3 id="skill-ready-models-full-adapter">Skill-Ready Models (full adapter)<a class="headerlink" href="#skill-ready-models-full-adapter" title="Permanent link">¶</a></h3>
+<p>These models have fully implemented adapters and can be executed directly via <code>ov.fm.run()</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Version</th>
+<th>Tasks</th>
+<th>Species</th>
+<th>Gene IDs</th>
+<th>GPU</th>
+<th>Min VRAM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>scGPT</strong></td>
+<td>whole-human-2024</td>
+<td>embed, integrate</td>
+<td>human, mouse</td>
+<td>symbol</td>
+<td>Yes</td>
+<td>8 GB</td>
+</tr>
+<tr>
+<td><strong>Geneformer</strong></td>
+<td>v2-106M</td>
+<td>embed, integrate</td>
+<td>human</td>
+<td>ensembl</td>
+<td>No (CPU OK)</td>
+<td>4 GB</td>
+</tr>
+<tr>
+<td><strong>UCE</strong></td>
+<td>4-layer</td>
+<td>embed, integrate</td>
+<td>7 species</td>
+<td>symbol</td>
+<td>Yes</td>
+<td>16 GB</td>
+</tr>
+</tbody>
+</table>
+<h3 id="partial-spec-models">Partial-Spec Models<a class="headerlink" href="#partial-spec-models" title="Permanent link">¶</a></h3>
+<p>These models have partial specifications. They can be used for model selection and profiling; execution depends on adapter availability.</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Tasks</th>
+<th>Modalities</th>
+<th>Key Differentiator</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>scFoundation</strong></td>
+<td>embed, integrate</td>
+<td>RNA</td>
+<td>19K gene vocabulary, perturbation pretraining</td>
+</tr>
+<tr>
+<td><strong>scBERT</strong></td>
+<td>embed, integrate</td>
+<td>RNA</td>
+<td>BERT-style masked language modeling</td>
+</tr>
+<tr>
+<td><strong>GeneCompass</strong></td>
+<td>embed, integrate</td>
+<td>RNA</td>
+<td>120M cell pretraining corpus</td>
+</tr>
+<tr>
+<td><strong>CellPLM</strong></td>
+<td>embed, integrate</td>
+<td>RNA</td>
+<td>Cell-centric (not gene-centric), high throughput</td>
+</tr>
+<tr>
+<td><strong>Nicheformer</strong></td>
+<td>embed, integrate, spatial</td>
+<td>RNA, Spatial</td>
+<td>Niche-aware spatial modeling</td>
+</tr>
+<tr>
+<td><strong>scMulan</strong></td>
+<td>embed, integrate</td>
+<td>RNA, ATAC, Protein, Multi-omics</td>
+<td>Native multi-omics</td>
+</tr>
+<tr>
+<td><strong>Tabula</strong></td>
+<td>embed, annotate, integrate, perturb</td>
+<td>RNA</td>
+<td>Federated learning + FlashAttention</td>
+</tr>
+<tr>
+<td><strong>tGPT</strong></td>
+<td>embed, integrate</td>
+<td>RNA</td>
+<td>Autoregressive next-token prediction</td>
+</tr>
+<tr>
+<td><strong>CellFM</strong></td>
+<td>embed, integrate</td>
+<td>RNA</td>
+<td>MLP architecture, 126M cells</td>
+</tr>
+<tr>
+<td><strong>sccello</strong></td>
+<td>embed, integrate, annotate</td>
+<td>RNA</td>
+<td>Zero-shot annotation via cell ontology</td>
+</tr>
+<tr>
+<td><strong>scPRINT</strong></td>
+<td>embed, integrate</td>
+<td>RNA</td>
+<td>Denoising + protein-coding focus</td>
+</tr>
+<tr>
+<td><strong>ATACformer</strong></td>
+<td>embed, integrate</td>
+<td>ATAC</td>
+<td>ATAC-seq native (peak-based)</td>
+</tr>
+<tr>
+<td><strong>scPlantLLM</strong></td>
+<td>embed, integrate</td>
+<td>RNA</td>
+<td>Plant-specific (Arabidopsis, rice, maize)</td>
+</tr>
+<tr>
+<td><strong>LangCell</strong></td>
+<td>embed, integrate</td>
+<td>RNA</td>
+<td>Text+cell alignment, natural language queries</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition tip">
+<p class="admonition-title">Model Selection Cheat Sheet</p>
+<ul>
+<li><strong>Default (RNA, human):</strong> scGPT</li>
+<li><strong>Ensembl IDs / CPU-only:</strong> Geneformer</li>
+<li><strong>Cross-species:</strong> UCE (supports 7 species)</li>
+<li><strong>Multi-omics (RNA+ATAC+Protein):</strong> scMulan</li>
+<li><strong>Spatial transcriptomics:</strong> Nicheformer</li>
+<li><strong>ATAC-seq only:</strong> ATACformer</li>
+<li><strong>Plant data:</strong> scPlantLLM</li>
+<li><strong>Large-scale (1M+ cells):</strong> CellPLM</li>
+</ul>
+</div>
+<hr/>
+<h2 id="data-types-enums">Data Types &amp; Enums<a class="headerlink" href="#data-types-enums" title="Permanent link">¶</a></h2>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">omicverse.fm</span><span class="w"> </span><span class="kn">import</span> <span class="n">TaskType</span><span class="p">,</span> <span class="n">Modality</span><span class="p">,</span> <span class="n">GeneIDScheme</span><span class="p">,</span> <span class="n">SkillReadyStatus</span>
+</code></pre></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:4"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio"><input id="__tabbed_1_2" name="__tabbed_1" type="radio"><input id="__tabbed_1_3" name="__tabbed_1" type="radio"><input id="__tabbed_1_4" name="__tabbed_1" type="radio"><div class="tabbed-labels"><label for="__tabbed_1_1">TaskType</label><label for="__tabbed_1_2">Modality</label><label for="__tabbed_1_3">GeneIDScheme</label><label for="__tabbed_1_4">SkillReadyStatus</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="n">TaskType</span><span class="o">.</span><span class="n">EMBED</span>          <span class="c1"># "embed"</span>
+<span class="n">TaskType</span><span class="o">.</span><span class="n">ANNOTATE</span>       <span class="c1"># "annotate"</span>
+<span class="n">TaskType</span><span class="o">.</span><span class="n">INTEGRATE</span>      <span class="c1"># "integrate"</span>
+<span class="n">TaskType</span><span class="o">.</span><span class="n">PERTURB</span>        <span class="c1"># "perturb"</span>
+<span class="n">TaskType</span><span class="o">.</span><span class="n">SPATIAL</span>        <span class="c1"># "spatial"</span>
+<span class="n">TaskType</span><span class="o">.</span><span class="n">DRUG_RESPONSE</span>  <span class="c1"># "drug_response"</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="n">Modality</span><span class="o">.</span><span class="n">RNA</span>         <span class="c1"># "RNA"</span>
+<span class="n">Modality</span><span class="o">.</span><span class="n">ATAC</span>        <span class="c1"># "ATAC"</span>
+<span class="n">Modality</span><span class="o">.</span><span class="n">SPATIAL</span>     <span class="c1"># "Spatial"</span>
+<span class="n">Modality</span><span class="o">.</span><span class="n">PROTEIN</span>     <span class="c1"># "Protein"</span>
+<span class="n">Modality</span><span class="o">.</span><span class="n">MULTIOMICS</span>  <span class="c1"># "Multi-omics"</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="n">GeneIDScheme</span><span class="o">.</span><span class="n">SYMBOL</span>   <span class="c1"># "symbol"  — HGNC symbols (e.g., TP53)</span>
+<span class="n">GeneIDScheme</span><span class="o">.</span><span class="n">ENSEMBL</span>  <span class="c1"># "ensembl" — Ensembl IDs (e.g., ENSG00000141510)</span>
+<span class="n">GeneIDScheme</span><span class="o">.</span><span class="n">CUSTOM</span>   <span class="c1"># "custom"  — Model-specific vocabulary</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="n">SkillReadyStatus</span><span class="o">.</span><span class="n">READY</span>      <span class="c1"># Full adapter implemented</span>
+<span class="n">SkillReadyStatus</span><span class="o">.</span><span class="n">PARTIAL</span>    <span class="c1"># Partial spec, needs validation</span>
+<span class="n">SkillReadyStatus</span><span class="o">.</span><span class="n">REFERENCE</span>  <span class="c1"># Reference docs only</span>
+</code></pre></div>
+</div>
+</div>
+</input></input></input></input></div>
+<hr/>
+<h2 id="plugin-system">Plugin System<a class="headerlink" href="#plugin-system" title="Permanent link">¶</a></h2>
+<p>You can register custom foundation models by writing a plugin.</p>
+<h3 id="entry-point-plugin-pip-installable">Entry Point Plugin (pip-installable)<a class="headerlink" href="#entry-point-plugin-pip-installable" title="Permanent link">¶</a></h3>
+<p>In your <code>pyproject.toml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="k">[project.entry-points.</span><span class="s2">"omicverse.fm"</span><span class="k">]</span>
+<span class="n">my_model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_package.fm_plugin:register"</span>
+</code></pre></div>
+<h3 id="local-plugin-development">Local Plugin (development)<a class="headerlink" href="#local-plugin-development" title="Permanent link">¶</a></h3>
+<p>Create a file at <code>~/.omicverse/plugins/fm/my_model.py</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">omicverse.fm</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelSpec</span><span class="p">,</span> <span class="n">SkillReadyStatus</span><span class="p">,</span> <span class="n">TaskType</span><span class="p">,</span> <span class="n">Modality</span><span class="p">,</span> <span class="n">GeneIDScheme</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">omicverse.fm.adapters</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseAdapter</span>
+
+<span class="n">MY_SPEC</span> <span class="o">=</span> <span class="n">ModelSpec</span><span class="p">(</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">"my_model"</span><span class="p">,</span>
+    <span class="n">version</span><span class="o">=</span><span class="s2">"v1.0"</span><span class="p">,</span>
+    <span class="n">skill_ready</span><span class="o">=</span><span class="n">SkillReadyStatus</span><span class="o">.</span><span class="n">PARTIAL</span><span class="p">,</span>
+    <span class="n">tasks</span><span class="o">=</span><span class="p">[</span><span class="n">TaskType</span><span class="o">.</span><span class="n">EMBED</span><span class="p">],</span>
+    <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="n">Modality</span><span class="o">.</span><span class="n">RNA</span><span class="p">],</span>
+    <span class="n">species</span><span class="o">=</span><span class="p">[</span><span class="s2">"human"</span><span class="p">],</span>
+    <span class="n">gene_id_scheme</span><span class="o">=</span><span class="n">GeneIDScheme</span><span class="o">.</span><span class="n">SYMBOL</span><span class="p">,</span>
+    <span class="n">zero_shot_embedding</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">embedding_dim</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">MyAdapter</span><span class="p">(</span><span class="n">BaseAdapter</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">task</span><span class="p">,</span> <span class="n">adata_path</span><span class="p">,</span> <span class="n">output_path</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="o">...</span>  <span class="c1"># Your implementation</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_load_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">):</span>
+        <span class="o">...</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_preprocess</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">adata</span><span class="p">,</span> <span class="n">task</span><span class="p">):</span>
+        <span class="o">...</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_postprocess</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">adata</span><span class="p">,</span> <span class="n">embeddings</span><span class="p">,</span> <span class="n">task</span><span class="p">):</span>
+        <span class="o">...</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">register</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Return (spec, adapter_class) tuple."""</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">MY_SPEC</span><span class="p">,</span> <span class="n">MyAdapter</span><span class="p">)</span>
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Plugins cannot override built-in models. If a name conflict occurs, the plugin is skipped with a warning.</p>
+</div>
+<hr/>
+<h2 id="registry-api">Registry API<a class="headerlink" href="#registry-api" title="Permanent link">¶</a></h2>
+<p>For advanced use, you can query the model registry directly:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">omicverse.fm</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_registry</span>
+
+<span class="n">registry</span> <span class="o">=</span> <span class="n">get_registry</span><span class="p">()</span>
+
+<span class="c1"># Get a specific model's spec</span>
+<span class="n">spec</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"scgpt"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">spec</span><span class="o">.</span><span class="n">embedding_dim</span><span class="p">)</span>       <span class="c1"># 512</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">spec</span><span class="o">.</span><span class="n">supports_task</span><span class="p">(</span><span class="s2">"embed"</span><span class="p">))</span>  <span class="c1"># True</span>
+
+<span class="c1"># Find models matching criteria</span>
+<span class="n">matches</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">find_models</span><span class="p">(</span>
+    <span class="n">task</span><span class="o">=</span><span class="s2">"embed"</span><span class="p">,</span>
+    <span class="n">species</span><span class="o">=</span><span class="s2">"human"</span><span class="p">,</span>
+    <span class="n">gene_scheme</span><span class="o">=</span><span class="s2">"symbol"</span><span class="p">,</span>
+    <span class="n">zero_shot</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">max_vram_gb</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">matches</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">m</span><span class="o">.</span><span class="n">version</span><span class="p">)</span>
+</code></pre></div>
+<hr/>
+<h2 id="environment-variables">Environment Variables<a class="headerlink" href="#environment-variables" title="Permanent link">¶</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OV_FM_CHECKPOINT_DIR</code></td>
+<td>Base directory for model checkpoints (<code>&lt;base&gt;/&lt;model_name&gt;/</code>)</td>
+</tr>
+<tr>
+<td><code>OV_FM_CHECKPOINT_DIR_SCGPT</code></td>
+<td>Model-specific checkpoint directory (works for any model name in uppercase)</td>
+</tr>
+<tr>
+<td><code>OV_FM_DISABLE_CONDA_SUBPROCESS</code></td>
+<td>Disable conda subprocess execution, use in-process adapters only</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Checkpoint resolution order:</strong></p>
+<ol>
+<li><code>checkpoint_dir</code> parameter in <code>ov.fm.run()</code></li>
+<li><code>OV_FM_CHECKPOINT_DIR_&lt;MODEL&gt;</code> environment variable</li>
+<li><code>OV_FM_CHECKPOINT_DIR/&lt;model_name&gt;/</code></li>
+<li>Default cache: <code>~/.omicverse/models/&lt;model_name&gt;/</code></li>
+</ol>
+<hr/>
+<h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">¶</a></h2>
+<p>All functions return error information in the result dictionary rather than raising exceptions:</p>
+<div class="highlight"><pre><span></span><code><span class="n">result</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">fm</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="s2">"embed"</span><span class="p">,</span> <span class="n">model_name</span><span class="o">=</span><span class="s2">"scgpt"</span><span class="p">,</span> <span class="n">adata_path</span><span class="o">=</span><span class="s2">"data.h5ad"</span><span class="p">)</span>
+<span class="k">if</span> <span class="s2">"error"</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Error: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">'error'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Status: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">'status'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>  <span class="c1"># "not_implemented", "incompatible", etc.</span>
+</code></pre></div>
+<p>Common error messages:</p>
+<table>
+<thead>
+<tr>
+<th>Error</th>
+<th>Cause</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Model 'xxx' not found</code></td>
+<td>Model name not in registry</td>
+</tr>
+<tr>
+<td><code>File not found: xxx</code></td>
+<td>Invalid file path</td>
+</tr>
+<tr>
+<td><code>Expected .h5ad file</code></td>
+<td>Wrong file format</td>
+</tr>
+<tr>
+<td><code>No compatible models found</code></td>
+<td>No models match the task/data constraints</td>
+</tr>
+<tr>
+<td><code>No adapter implemented for model 'xxx'</code></td>
+<td>Model is reference-only</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="hands-on-tutorial">Hands-On Tutorial<a class="headerlink" href="#hands-on-tutorial" title="Permanent link">¶</a></h2>
+<p>For a step-by-step walkthrough with real data (PBMC 3K + scGPT), see the
+<a href="../t_fm/">Foundation Model Tutorial Notebook</a>.</p>
+</article>
+</div>
+</div>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+<div class="md-copyright__highlight">
+      Copyright © 2019-2025, 112 Lab, USTB
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.indexes"], "search": "../../assets/javascripts/workers/search.208ed371.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+<script src="../../assets/javascripts/bundle.fc8c2696.min.js"></script>
+<script src="../../javascript/mkapi.js"></script>
+<script src="../../javascripts/config.js"></script>
+<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script>document$.subscribe(() => {const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});})</script></body>
+</html>

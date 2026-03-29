@@ -1,0 +1,2914 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="Zehua Zeng" name="author"/>
+<link href="../t_mcp_quickstart/" rel="prev"/>
+<link href="../t_mcp_tools/" rel="next"/>
+<link href="../../img/favicon.ico" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.1.2" name="generator"/>
+<title>OmicVerse MCP Full Start - omicverse Readthedocs</title>
+<link href="../../assets/stylesheets/main.7bf56d0a.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/palette.a0c5b2b5.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<link href="../../css/mkapi-common.css" rel="stylesheet"/>
+<link href="../../css/mkapi-material.css" rel="stylesheet"/>
+<link href="../../css/tags.css" rel="stylesheet"/>
+<link href="../../css/custom.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" rel="stylesheet"/>
+<script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+<link href="../../assets/stylesheets/glightbox.min.css" rel="stylesheet"/><style>
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            
+                .gscrollbar-fixer { padding-right: 15px; }
+                .gdesc-inner { font-size: 0.75rem; }
+                body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color);}
+                body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color);}
+                body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color);}
+                </style><script src="../../assets/javascripts/glightbox.min.js"></script></head>
+<body data-md-color-accent="" data-md-color-primary="" data-md-color-scheme="default" dir="ltr">
+<script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#omicverse-mcp-full-start">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+</div>
+<header class="md-header md-header--shadow" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="omicverse Readthedocs" class="md-header__button md-logo" data-md-component="logo" href="../.." title="omicverse Readthedocs">
+<img alt="logo" src="../../img/ico.png"/>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            omicverse Readthedocs
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              OmicVerse MCP Full Start
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="" data-md-color-media="(prefers-color-scheme: light)" data-md-color-primary="" data-md-color-scheme="default" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_2" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 6H7c-3.31 0-6 2.69-6 6s2.69 6 6 6h10c3.31 0 6-2.69 6-6s-2.69-6-6-6zm0 10H7c-2.21 0-4-1.79-4-4s1.79-4 4-4h10c2.21 0 4 1.79 4 4s-1.79 4-4 4zM7 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-primary="" data-md-color-scheme="slate" id="__palette_2" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3Z"></path></svg>
+</label>
+</form>
+<div class="md-header__source">
+<a class="md-source" data-md-component="source" href="https://github.com/Starlitnightly/omicverse" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.3.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"></path></svg>
+</div>
+<div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="omicverse Readthedocs" class="md-nav__button md-logo" data-md-component="logo" href="../.." title="omicverse Readthedocs">
+<img alt="logo" src="../../img/ico.png"/>
+</a>
+    omicverse Readthedocs
+  </label>
+<div class="md-nav__source">
+<a class="md-source" data-md-component="source" href="https://github.com/Starlitnightly/omicverse" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.3.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"></path></svg>
+</div>
+<div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+</div>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../..">
+        Index
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Installation_guild/">
+        Installation
+      </a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          Tutorial
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+          Tutorial
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+          Bulk
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_1">
+<span class="md-nav__icon md-icon"></span>
+          Bulk
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_1" id="__nav_3_1_1_label" tabindex="0">
+          Upstream
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_1_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_1">
+<span class="md-nav__icon md-icon"></span>
+          Upstream
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk/t_mapping_STAR/">
+        Bulk RNA-seq mapping with STAR
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk/t_mapping_kbpython/">
+        Bulk RNA-seq mapping with kb-python
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_2" id="__nav_3_1_2_label" tabindex="0">
+          Preprocessing
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_2">
+<span class="md-nav__icon md-icon"></span>
+          Preprocessing
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk/t_bulk_combat/">
+        Batch correction in Bulk RNA-seq or microarray data
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_3" id="__nav_3_1_3_label" tabindex="0">
+          Downstream
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_3">
+<span class="md-nav__icon md-icon"></span>
+          Downstream
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk/t_deg/">
+        Different Expression Analysis
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk/t_deseq2/">
+        Different Expression Analysis with DEseq2
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk/t_network/">
+        Protein-Protein interaction (PPI) analysis by String-db
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk/t_wgcna/">
+        WGCNA (Weighted gene co-expression network analysis) analysis
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_4" id="__nav_3_1_4_label" tabindex="0">
+          Deconvolution
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_4_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_4">
+<span class="md-nav__icon md-icon"></span>
+          Deconvolution
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk/t_decov_bulk/">
+        Bulk deconvolution with reference scRNA-seq
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_1_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_1_5" id="__nav_3_1_5_label" tabindex="0">
+          Others
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_1_5_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_1_5">
+<span class="md-nav__icon md-icon"></span>
+          Others
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk/t_tcga/">
+        TCGA database preprocess
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+          Single
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_2">
+<span class="md-nav__icon md-icon"></span>
+          Single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_1" id="__nav_3_2_1_label" tabindex="0">
+          Alignment
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_1_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_1">
+<span class="md-nav__icon md-icon"></span>
+          Alignment
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_alignment_1k/">
+        Alignment and analysis of single-cell RNA-seq data
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_alignment_velocity/">
+        Alignment and RNA velocity analysis of single-cell RNA-seq data.
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_2" id="__nav_3_2_2_label" tabindex="0">
+          Preprocessing
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_2">
+<span class="md-nav__icon md-icon"></span>
+          Preprocessing
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_preprocess_cpu/">
+        Preprocessing the data of scRNA-seq with omicverse[CPU-GPU-mixed]
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_preprocess_gpu/">
+        Preprocessing the data of scRNA-seq with omicverse[GPU]
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_cluster/">
+        Clustering space
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_single_batch/">
+        Data integration and batch correction
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_cnmf/">
+        GeneModule Identified
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_lazy/">
+        Lazy analysis of scRNA-seq
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_3" id="__nav_3_2_3_label" tabindex="0">
+          Annotation
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_3">
+<span class="md-nav__icon md-icon"></span>
+          Annotation
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_anno_noref/">
+        Reference-free automated single-cell cell type annotation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_anno_ref/">
+        Reference automated single-cell cell type annotation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_gptanno/">
+        Automatic cell type annotation with GPT/Other
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_cellmatch/">
+        Mapping Cell Names to the Cell Ontology/Taxonomy
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_cellanno/">
+        Celltype auto annotation with SCSA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_metatime/">
+        Celltype auto annotation with MetaTiME
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_tosica/">
+        Celltype annotation migration(mapping) with TOSICA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_scmulan/">
+        Celltype auto annotation with scMulan
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_cellvote/">
+        Consensus annotation with CellVote
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_4" id="__nav_3_2_4_label" tabindex="0">
+          Trajectory
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_4_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_4">
+<span class="md-nav__icon md-icon"></span>
+          Trajectory
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_cytotrace/">
+        Prediction of absolute developmental potential using CytoTrace2
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_traj/">
+        Basic Trajectory Inference
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_stavia/">
+        Trajectory Inference with StaVIA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_cellfate_gene/">
+        Timing-associated genes analysis with TimeFateKernel
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_cellfate/">
+        Identify the driver regulators of cell fate decisions
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_5" id="__nav_3_2_5_label" tabindex="0">
+          Cell Structure
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_5_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_5">
+<span class="md-nav__icon md-icon"></span>
+          Cell Structure
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_metacells/">
+        Inference of MetaCell from Single-Cell RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_deg_single/">
+        Differential expression and celltype analysis [All Cell]
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_scdeg/">
+        Differential expression analysis [Meta Cell]
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_scenic/">
+        Gene Regulatory Network Analysis with SCENIC
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_aucell/">
+        Pathway analysis with AUCell
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_cellphonedb/">
+        Cell-cell communication using CellPhoneDBViz
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_scdrug/">
+        Drug response predict with scDrug
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_simba/">
+        Data integration and batch correction with SIMBA
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_6" id="__nav_3_2_6_label" tabindex="0">
+          Velocity
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_6_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_6">
+<span class="md-nav__icon md-icon"></span>
+          Velocity
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-velo/t_velo/">
+        Velocity Basic Calculation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-velo/t_graphvelo/">
+        Velocity Optimization
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_2_7" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_2_7" id="__nav_3_2_7_label" tabindex="0">
+          Multi omics
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_2_7_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_2_7">
+<span class="md-nav__icon md-icon"></span>
+          Multi omics
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_mofa/">
+        Multi omics analysis by MOFA
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_mofa_glue/">
+        Multi omics analysis by MOFA and GLUE
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-single/t_anno_trans/">
+        Celltype annotation transfer in multi-omics
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+          Bulk2Single
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_3">
+<span class="md-nav__icon md-icon"></span>
+          Bulk2Single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk2single/t_bulktrajblend/">
+        Bulk RNA-seq generate 'interrupted' cells to interpolate scRNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk2single/t_bulk2single/">
+        Bulk RNA-seq to Single RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-bulk2single/t_single2spatial/">
+        Single RNA-seq to Spatial RNA-seq
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+          Space
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_4_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_4">
+<span class="md-nav__icon md-icon"></span>
+          Space
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_4_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_4_1" id="__nav_3_4_1_label" tabindex="0">
+          Preprocess
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_4_1_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_4_1">
+<span class="md-nav__icon md-icon"></span>
+          Preprocess
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_crop_rotate/">
+        Crop and Rotation of spatial transcriptomic data
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_cellpose/">
+        Cell Segmemtation (10x HD)
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_nanostring_preprocess/">
+        Analyze Nanostring data
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_visium_hd_preprocess/">
+        Analyze Visium HD data
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_cluster_space/">
+        Spatial clustering and denoising expressions
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_staligner/">
+        Spatial integration and clustering
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_4_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_4_2" id="__nav_3_4_2_label" tabindex="0">
+          Deconvolution
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_4_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_4_2">
+<span class="md-nav__icon md-icon"></span>
+          Deconvolution
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_spaceflow/">
+        Identifying Pseudo-Spatial Map
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_decov/">
+        Spatial deconvolution with reference scRNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_flashdeconv/">
+        FlashDeconv: Fast Spatial Deconvolution via Structure-Preserving Sketching
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_starfysh_new/">
+        Spatial deconvolution without reference scRNA-seq
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_4_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_4_3" id="__nav_3_4_3_label" tabindex="0">
+          Downstream
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_4_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_4_3">
+<span class="md-nav__icon md-icon"></span>
+          Downstream
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_stt/">
+        Spatial transition tensor of single cells
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_commot_flowsig/">
+        Spatial Communication
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_gaston/">
+        Spatial IsoDepth Calculation
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-space/t_slat/">
+        Single cell spatial alignment tools
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
+          Foundation Model
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_5">
+<span class="md-nav__icon md-icon"></span>
+          Foundation Model
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_1" id="__nav_3_5_1_label" tabindex="0">
+          Overview
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_1_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_5_1">
+<span class="md-nav__icon md-icon"></span>
+          Overview
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_guide/">
+        ov.fm API Overview
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm/">
+        ov.fm — Unified Foundation Model API
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_2" id="__nav_3_5_2_label" tabindex="0">
+          Skill-Ready Models
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_5_2">
+<span class="md-nav__icon md-icon"></span>
+          Skill-Ready Models
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_2_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_2_1" id="__nav_3_5_2_1_label" tabindex="0">
+          scGPT
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_2_1_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_2_1">
+<span class="md-nav__icon md-icon"></span>
+          scGPT
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scgpt_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_scgpt/">
+        scGPT
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_2_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_2_2" id="__nav_3_5_2_2_label" tabindex="0">
+          Geneformer
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_2_2_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_2_2">
+<span class="md-nav__icon md-icon"></span>
+          Geneformer
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_geneformer_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_geneformer/">
+        GeneFormer
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_2_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_2_3" id="__nav_3_5_2_3_label" tabindex="0">
+          UCE
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_2_3_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_2_3">
+<span class="md-nav__icon md-icon"></span>
+          UCE
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_uce_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_uce/">
+        UCE
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_2_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_2_4" id="__nav_3_5_2_4_label" tabindex="0">
+          scFoundation
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_2_4_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_2_4">
+<span class="md-nav__icon md-icon"></span>
+          scFoundation
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scfoundation_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_scfoundation/">
+        scFoundation
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_2_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_2_5" id="__nav_3_5_2_5_label" tabindex="0">
+          CellPLM
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_2_5_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_2_5">
+<span class="md-nav__icon md-icon"></span>
+          CellPLM
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_cellplm_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_cellplm/">
+        CellPLM
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_3" id="__nav_3_5_3_label" tabindex="0">
+          Core Models
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_5_3">
+<span class="md-nav__icon md-icon"></span>
+          Core Models
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_3_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_3_1" id="__nav_3_5_3_1_label" tabindex="0">
+          scBERT
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_3_1_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_3_1">
+<span class="md-nav__icon md-icon"></span>
+          scBERT
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scbert_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scbert/">
+        scBERT — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_3_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_3_2" id="__nav_3_5_3_2_label" tabindex="0">
+          GeneCompass
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_3_2_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_3_2">
+<span class="md-nav__icon md-icon"></span>
+          GeneCompass
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_genecompass_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_genecompass/">
+        GeneCompass — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_3_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_3_3" id="__nav_3_5_3_3_label" tabindex="0">
+          Nicheformer
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_3_3_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_3_3">
+<span class="md-nav__icon md-icon"></span>
+          Nicheformer
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_nicheformer_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_nicheformer/">
+        Nicheformer — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_3_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_3_4" id="__nav_3_5_3_4_label" tabindex="0">
+          scMulan
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_3_4_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_3_4">
+<span class="md-nav__icon md-icon"></span>
+          scMulan
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scmulan_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scmulan/">
+        scMulan — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_4" id="__nav_3_5_4_label" tabindex="0">
+          Specialized Models
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_4_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_5_4">
+<span class="md-nav__icon md-icon"></span>
+          Specialized Models
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_4_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_4_1" id="__nav_3_5_4_1_label" tabindex="0">
+          tGPT
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_4_1_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_4_1">
+<span class="md-nav__icon md-icon"></span>
+          tGPT
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_tgpt_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_tgpt/">
+        tGPT — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_4_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_4_2" id="__nav_3_5_4_2_label" tabindex="0">
+          CellFM
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_4_2_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_4_2">
+<span class="md-nav__icon md-icon"></span>
+          CellFM
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_cellfm_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_cellfm/">
+        CellFM — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_4_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_4_3" id="__nav_3_5_4_3_label" tabindex="0">
+          scCello
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_4_3_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_4_3">
+<span class="md-nav__icon md-icon"></span>
+          scCello
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_sccello_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_sccello/">
+        scCello — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_4_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_4_4" id="__nav_3_5_4_4_label" tabindex="0">
+          scPRINT
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_4_4_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_4_4">
+<span class="md-nav__icon md-icon"></span>
+          scPRINT
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scprint_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scprint/">
+        scPRINT — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_4_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_4_5" id="__nav_3_5_4_5_label" tabindex="0">
+          AIDO.Cell
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_4_5_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_4_5">
+<span class="md-nav__icon md-icon"></span>
+          AIDO.Cell
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_aidocell_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_aidocell/">
+        AIDO.Cell — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_4_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_4_6" id="__nav_3_5_4_6_label" tabindex="0">
+          PULSAR
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_4_6_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_4_6">
+<span class="md-nav__icon md-icon"></span>
+          PULSAR
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_pulsar_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_pulsar/">
+        PULSAR — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_4_7" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_4_7" id="__nav_3_5_4_7_label" tabindex="0">
+          Tabula
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_4_7_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_4_7">
+<span class="md-nav__icon md-icon"></span>
+          Tabula
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_tabula_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_tabula/">
+        Tabula — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_5" id="__nav_3_5_5_label" tabindex="0">
+          Domain-Specific Models
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_5_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_3_5_5">
+<span class="md-nav__icon md-icon"></span>
+          Domain-Specific Models
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_5_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_5_1" id="__nav_3_5_5_1_label" tabindex="0">
+          ATACformer (ATAC-seq)
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_5_1_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_5_1">
+<span class="md-nav__icon md-icon"></span>
+          ATACformer (ATAC-seq)
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_atacformer_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_atacformer/">
+        ATACformer — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_5_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_5_2" id="__nav_3_5_5_2_label" tabindex="0">
+          scPlantLLM (Plant)
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_5_2_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_5_2">
+<span class="md-nav__icon md-icon"></span>
+          scPlantLLM (Plant)
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scplantllm_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_scplantllm/">
+        scPlantLLM — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_5_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_5_3" id="__nav_3_5_5_3_label" tabindex="0">
+          LangCell (Text+Cell)
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_5_3_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_5_3">
+<span class="md-nav__icon md-icon"></span>
+          LangCell (Text+Cell)
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_langcell_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_langcell/">
+        LangCell — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_5_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_5_4" id="__nav_3_5_5_4_label" tabindex="0">
+          Cell2Sentence (LLM Fine-tuning)
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_5_4_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_5_4">
+<span class="md-nav__icon md-icon"></span>
+          Cell2Sentence (LLM Fine-tuning)
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_cell2sentence_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_cell2sentence/">
+        Cell2Sentence — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_5_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_5_5" id="__nav_3_5_5_5_label" tabindex="0">
+          GenePT (Gene Embeddings)
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_5_5_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_5_5">
+<span class="md-nav__icon md-icon"></span>
+          GenePT (Gene Embeddings)
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_genept_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_genept/">
+        GenePT — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_5_5_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_5_5_6" id="__nav_3_5_5_6_label" tabindex="0">
+          ChatCell (Conversational)
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_5_5_6_label" class="md-nav" data-md-level="4">
+<label class="md-nav__title" for="__nav_3_5_5_6">
+<span class="md-nav__icon md-icon"></span>
+          ChatCell (Conversational)
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_chatcell_guide/">
+        Guide
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_fm_chatcell/">
+        ChatCell — Foundation Model Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_3_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+          Plotting
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_6_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_3_6">
+<span class="md-nav__icon md-icon"></span>
+          Plotting
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-plotting/t_visualize_single/">
+        Visualization of single cell RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-plotting/t_visualize_bulk/">
+        Visualization of Bulk RNA-seq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-plotting/t_palette/">
+        Palette optimization for publication-quality single-cell &amp; spatial plots
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-plotting/t_visualize_colorsystem/">
+        Color system
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          OmicClaw Tutorial
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_4">
+<span class="md-nav__icon md-icon"></span>
+          OmicClaw Tutorial
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_1" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_1" id="__nav_4_1_label" tabindex="0">
+          General[Notebook/pipeline]
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_1_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_4_1">
+<span class="md-nav__icon md-icon"></span>
+          General[Notebook/pipeline]
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_ov_agent_pbmc3k/">
+        J.A.R.V.I.S. with PBMC3k
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../ov_agent_ten_task_suite/">
+        J.A.R.V.I.S. with Ten-Task Suite
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+          Gateway and Channels
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_4_2">
+<span class="md-nav__icon md-icon"></span>
+          Gateway and Channels
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_msg_bot_overview/">
+        Overview
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_setup_auth/">
+        Setup and Auth
+      </a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_2_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_2_3" id="__nav_4_2_3_label" tabindex="0">
+          Channel Entry Points
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_2_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_4_2_3">
+<span class="md-nav__icon md-icon"></span>
+          Channel Entry Points
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_channel_telegram/">
+        Telegram Tutorial
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_channel_feishu/">
+        Feishu Tutorial
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_channel_imessage/">
+        iMessage Tutorial
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_channel_qq/">
+        QQ Tutorial
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_session_commands/">
+        Session Workflow
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_troubleshooting/">
+        Common Issues
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_4_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+          Coding [cli/openclaw]
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_4_3">
+<span class="md-nav__icon md-icon"></span>
+          Coding [cli/openclaw]
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_claw_cli/">
+        Overview and CLI
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Tutorials-jarvis/t_claw_openclaw/">
+        OpenClaw Integration
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_4_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+          MCP Server[cli/agent]
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_4_4_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_4_4">
+<span class="md-nav__icon md-icon"></span>
+          MCP Server[cli/agent]
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_mcp_guide/">
+        Overview
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_mcp_quickstart/">
+        Quick Start
+      </a>
+</li>
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+          Full Start
+          <span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+        Full Start
+      </a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#who-this-is-for">
+    Who This Is For
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#what-you-will-end-up-with">
+    What You Will End Up With
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-1-install">
+    Step 1: Install
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-2-choose-a-transport">
+    Step 2: Choose a Transport
+  </a>
+<nav aria-label="Step 2: Choose a Transport" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#common-phase-selections">
+    Common phase selections
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#option-a-stdio">
+    Option A: stdio
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#option-b-streamable-http">
+    Option B: streamable-http
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#default-recommendation">
+    Default Recommendation
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-3-connect-a-client">
+    Step 3: Connect a Client
+  </a>
+<nav aria-label="Step 3: Connect a Client" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#claude-code-with-stdio">
+    Claude Code with stdio
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#claude-code-with-local-http">
+    Claude Code with local HTTP
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-4-understand-what-crosses-the-boundary">
+    Step 4: Understand What Crosses the Boundary
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-5-load-data">
+    Step 5: Load Data
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-6-inspect-before-you-analyze">
+    Step 6: Inspect Before You Analyze
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-7-run-the-standard-workflow">
+    Step 7: Run the Standard Workflow
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-8-plot-and-interpret">
+    Step 8: Plot and Interpret
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-9-marker-analysis-and-enrichment">
+    Step 9: Marker Analysis and Enrichment
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-10-persist-and-restore">
+    Step 10: Persist and Restore
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#optional-step-11-move-to-p2">
+    Optional Step 11: Move to P2
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#troubleshooting-checklist">
+    Troubleshooting Checklist
+  </a>
+<nav aria-label="Troubleshooting Checklist" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#tools-are-missing">
+    Tools are missing
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#a-tool-is-unavailable">
+    A tool is unavailable
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-dataset-handle-is-gone">
+    The dataset handle is gone
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#a-long-running-task-is-confusing-to-debug">
+    A long-running task is confusing to debug
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#tips-and-best-practices">
+    Tips and Best Practices
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#where-to-go-next">
+    Where to Go Next
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_mcp_tools/">
+        Tool Catalog
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_mcp_clients/">
+        Clients and Deployment
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_mcp_runtime/">
+        Runtime and Troubleshooting
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_mcp_reference/">
+        Reference
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../t_mcp_claude_code/">
+        Claude Code Walkthrough
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../omicverse_web_tutorial_en/">
+        Web Tutorial
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../GPU_supported_registry_functions/">
+        GPU Support
+      </a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/">API documentation</a>
+<label for="__nav_7">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_7">
+<span class="md-nav__icon md-icon"></span>
+          API documentation
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_2" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/agent/">agent</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_2">
+<span class="md-nav__icon md-icon"></span>
+          agent
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_3" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/alignment/">alignment</a>
+<label for="__nav_7_3">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_3">
+<span class="md-nav__icon md-icon"></span>
+          alignment
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/alignment/STAR/">
+        STAR
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/alignment/fastp/">
+        fastp
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/alignment/featureCount/">
+        featureCount
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/alignment/fq_dump/">
+        fq_dump
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/alignment/kb_api/">
+        kb_api
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/alignment/pipeline/">
+        pipeline
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/alignment/prefetch/">
+        prefetch
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_4" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/biocontext/">biocontext</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_4_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_4">
+<span class="md-nav__icon md-icon"></span>
+          biocontext
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_5" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/bulk/">bulk</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_5_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_5">
+<span class="md-nav__icon md-icon"></span>
+          bulk
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_6" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/bulk2single/">bulk2single</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_6_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_6">
+<span class="md-nav__icon md-icon"></span>
+          bulk2single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_7" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/datasets/">datasets</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_7_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_7">
+<span class="md-nav__icon md-icon"></span>
+          datasets
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_8" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/fm/">fm</a>
+<label for="__nav_7_8">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_8_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_8">
+<span class="md-nav__icon md-icon"></span>
+          fm
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_8_2" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/fm/adapters/">adapters</a>
+<label for="__nav_7_8_2">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_8_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_8_2">
+<span class="md-nav__icon md-icon"></span>
+          adapters
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/fm/adapters/base/">
+        base
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/fm/api/">
+        api
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/fm/registry/">
+        registry
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/fm/router/">
+        router
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_9" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/io/">io</a>
+<label for="__nav_7_9">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_9_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_9">
+<span class="md-nav__icon md-icon"></span>
+          io
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_9_2" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/io/bulk/">bulk</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_9_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_9_2">
+<span class="md-nav__icon md-icon"></span>
+          bulk
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_9_3" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/io/general/">general</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_9_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_9_3">
+<span class="md-nav__icon md-icon"></span>
+          general
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_9_4" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/io/single/">single</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_9_4_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_9_4">
+<span class="md-nav__icon md-icon"></span>
+          single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_9_5" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/io/spatial/">spatial</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_9_5_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_9_5">
+<span class="md-nav__icon md-icon"></span>
+          spatial
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_10" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/jarvis/">jarvis</a>
+<label for="__nav_7_10">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_10_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_10">
+<span class="md-nav__icon md-icon"></span>
+          jarvis
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_10_2" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/jarvis/channels/">channels</a>
+<label for="__nav_7_10_2">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_10_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_10_2">
+<span class="md-nav__icon md-icon"></span>
+          channels
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/channels/channel_core/">
+        channel_core
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/channels/discord/">
+        discord
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/channels/feishu/">
+        feishu
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/channels/imessage/">
+        imessage
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/channels/qq/">
+        qq
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/channels/telegram/">
+        telegram
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/channels/wechat/">
+        wechat
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_10_3" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/jarvis/gateway/">gateway</a>
+<label for="__nav_7_10_3">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_10_3_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_10_3">
+<span class="md-nav__icon md-icon"></span>
+          gateway
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/gateway/routing/">
+        routing
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/gateway/web_bridge/">
+        web_bridge
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_10_4" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/jarvis/memory/">memory</a>
+<label for="__nav_7_10_4">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_10_4_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_10_4">
+<span class="md-nav__icon md-icon"></span>
+          memory
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/memory/store/">
+        store
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_10_5" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/jarvis/runtime/">runtime</a>
+<label for="__nav_7_10_5">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_10_5_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_10_5">
+<span class="md-nav__icon md-icon"></span>
+          runtime
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/runtime/execution_adapter/">
+        execution_adapter
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/runtime/models/">
+        models
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/runtime/policy/">
+        policy
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/runtime/router/">
+        router
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/runtime/runtime/">
+        runtime
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/runtime/task_registry/">
+        task_registry
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/agent_bridge/">
+        agent_bridge
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/channel_media/">
+        channel_media
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/cli/">
+        cli
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/config/">
+        config
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/gemini_cli_oauth/">
+        gemini_cli_oauth
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/media_ingest/">
+        media_ingest
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/model_help/">
+        model_help
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/model_registry/">
+        model_registry
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/openai_oauth/">
+        openai_oauth
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/session/">
+        session
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/jarvis/setup_wizard/">
+        setup_wizard
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_11" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/mcp/">mcp</a>
+<label for="__nav_7_11">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_11_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_11">
+<span class="md-nav__icon md-icon"></span>
+          mcp
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_11_2" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/mcp/adapters/">adapters</a>
+<label for="__nav_7_11_2">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_11_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_11_2">
+<span class="md-nav__icon md-icon"></span>
+          adapters
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/adapters/adata_adapter/">
+        adata_adapter
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/adapters/base/">
+        base
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/adapters/class_adapter/">
+        class_adapter
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/adapters/function_adapter/">
+        function_adapter
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/adata_kernel_runtime/">
+        adata_kernel_runtime
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/availability/">
+        availability
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/class_specs/">
+        class_specs
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/executor/">
+        executor
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/local_oauth/">
+        local_oauth
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/manifest/">
+        manifest
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/naming/">
+        naming
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/overrides/">
+        overrides
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/schema/">
+        schema
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/server/">
+        server
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/mcp/session_store/">
+        session_store
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_12" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/pl/">pl</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_12_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_12">
+<span class="md-nav__icon md-icon"></span>
+          pl
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_13" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/pp/">pp</a>
+<label for="__nav_7_13">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_13_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_13">
+<span class="md-nav__icon md-icon"></span>
+          pp
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_13_2" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/pp/experimental/">experimental</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_13_2_label" class="md-nav" data-md-level="3">
+<label class="md-nav__title" for="__nav_7_13_2">
+<span class="md-nav__icon md-icon"></span>
+          experimental
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/pp/pyg_knn_implementation/">
+        pyg_knn_implementation
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_14" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/single/">single</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_14_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_14">
+<span class="md-nav__icon md-icon"></span>
+          single
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_15" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/space/">space</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_15_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_15">
+<span class="md-nav__icon md-icon"></span>
+          space
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_7_16" type="checkbox"/>
+<div class="md-nav__link md-nav__link--index">
+<a href="../../api/omicverse/utils/">utils</a>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_7_16_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_7_16">
+<span class="md-nav__icon md-icon"></span>
+          utils
+        </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/claw/">
+        claw
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/omicverse/cli/">
+        cli
+      </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Release_notes/">
+        Release notes
+      </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../Developer_guild/">
+        Developer guild
+      </a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#who-this-is-for">
+    Who This Is For
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#what-you-will-end-up-with">
+    What You Will End Up With
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-1-install">
+    Step 1: Install
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-2-choose-a-transport">
+    Step 2: Choose a Transport
+  </a>
+<nav aria-label="Step 2: Choose a Transport" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#common-phase-selections">
+    Common phase selections
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#option-a-stdio">
+    Option A: stdio
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#option-b-streamable-http">
+    Option B: streamable-http
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#default-recommendation">
+    Default Recommendation
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-3-connect-a-client">
+    Step 3: Connect a Client
+  </a>
+<nav aria-label="Step 3: Connect a Client" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#claude-code-with-stdio">
+    Claude Code with stdio
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#claude-code-with-local-http">
+    Claude Code with local HTTP
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-4-understand-what-crosses-the-boundary">
+    Step 4: Understand What Crosses the Boundary
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-5-load-data">
+    Step 5: Load Data
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-6-inspect-before-you-analyze">
+    Step 6: Inspect Before You Analyze
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-7-run-the-standard-workflow">
+    Step 7: Run the Standard Workflow
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-8-plot-and-interpret">
+    Step 8: Plot and Interpret
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-9-marker-analysis-and-enrichment">
+    Step 9: Marker Analysis and Enrichment
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-10-persist-and-restore">
+    Step 10: Persist and Restore
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#optional-step-11-move-to-p2">
+    Optional Step 11: Move to P2
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#troubleshooting-checklist">
+    Troubleshooting Checklist
+  </a>
+<nav aria-label="Troubleshooting Checklist" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#tools-are-missing">
+    Tools are missing
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#a-tool-is-unavailable">
+    A tool is unavailable
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-dataset-handle-is-gone">
+    The dataset handle is gone
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#a-long-running-task-is-confusing-to-debug">
+    A long-running task is confusing to debug
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#tips-and-best-practices">
+    Tips and Best Practices
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#where-to-go-next">
+    Where to Go Next
+  </a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="omicverse-mcp-full-start">OmicVerse MCP Full Start<a class="headerlink" href="#omicverse-mcp-full-start" title="Permanent link">¶</a></h1>
+<p>This page is the complete getting-started path for OmicVerse MCP. It sits between the short <a href="../t_mcp_quickstart/">Quick Start</a> and the more specialized reference pages.</p>
+<h2 id="who-this-is-for">Who This Is For<a class="headerlink" href="#who-this-is-for" title="Permanent link">¶</a></h2>
+<p>Read this page if:</p>
+<ul>
+<li>the quick start feels too compressed</li>
+<li>you want one continuous setup-to-analysis walkthrough</li>
+<li>you want both the commands and the reasoning behind the default choices</li>
+</ul>
+<h2 id="what-you-will-end-up-with">What You Will End Up With<a class="headerlink" href="#what-you-will-end-up-with" title="Permanent link">¶</a></h2>
+<p>By the end of this page, you will have:</p>
+<ul>
+<li>an OmicVerse MCP server running</li>
+<li>a client connected through <code>stdio</code> or local HTTP</li>
+<li>a dataset loaded as an <code>adata_id</code></li>
+<li>a standard preprocessing workflow completed</li>
+<li>a plot and marker analysis generated</li>
+<li>a persisted <code>.h5ad</code> you can restore later</li>
+</ul>
+<h2 id="step-1-install">Step 1: Install<a class="headerlink" href="#step-1-install" title="Permanent link">¶</a></h2>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>omicverse<span class="o">[</span>mcp<span class="o">]</span>
+python<span class="w"> </span>-m<span class="w"> </span>omicverse.mcp<span class="w"> </span>--version
+</code></pre></div>
+<p>If you are working from a clone:</p>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">".[mcp]"</span>
+</code></pre></div>
+<h2 id="step-2-choose-a-transport">Step 2: Choose a Transport<a class="headerlink" href="#step-2-choose-a-transport" title="Permanent link">¶</a></h2>
+<p>OmicVerse MCP supports two local transports.</p>
+<h3 id="common-phase-selections">Common phase selections<a class="headerlink" href="#common-phase-selections" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Core only</span>
+python<span class="w"> </span>-m<span class="w"> </span>omicverse.mcp<span class="w"> </span>--phase<span class="w"> </span>P0
+
+<span class="c1"># Default</span>
+python<span class="w"> </span>-m<span class="w"> </span>omicverse.mcp<span class="w"> </span>--phase<span class="w"> </span>P0+P0.5
+
+<span class="c1"># Include advanced P2 tools</span>
+python<span class="w"> </span>-m<span class="w"> </span>omicverse.mcp<span class="w"> </span>--phase<span class="w"> </span>P0+P0.5+P2
+</code></pre></div>
+<h3 id="option-a-stdio">Option A: <code>stdio</code><a class="headerlink" href="#option-a-stdio" title="Permanent link">¶</a></h3>
+<p>Use this when you want the simplest setup and want Claude to own the MCP process lifecycle.</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>omicverse.mcp<span class="w"> </span>--phase<span class="w"> </span>P0+P0.5
+</code></pre></div>
+<h3 id="option-b-streamable-http">Option B: <code>streamable-http</code><a class="headerlink" href="#option-b-streamable-http" title="Permanent link">¶</a></h3>
+<p>Use this when you want a separately managed MCP process, clearer logs, or easier reconnect behavior.</p>
+<div class="highlight"><pre><span></span><code><span class="nv">NUMBA_CACHE_DIR</span><span class="o">=</span>/tmp/numba_cache<span class="w"> </span><span class="nv">MPLCONFIGDIR</span><span class="o">=</span>/tmp/mpl<span class="w"> </span><span class="se">\</span>
+python<span class="w"> </span>-m<span class="w"> </span>omicverse.mcp<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--transport<span class="w"> </span>streamable-http<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--host<span class="w"> </span><span class="m">127</span>.0.0.1<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--port<span class="w"> </span><span class="m">8765</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--http-path<span class="w"> </span>/mcp<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--phase<span class="w"> </span>P0+P0.5
+</code></pre></div>
+<h3 id="default-recommendation">Default Recommendation<a class="headerlink" href="#default-recommendation" title="Permanent link">¶</a></h3>
+<p>Start with <code>stdio</code>. Move to local HTTP when debugging, using larger datasets, or keeping one MCP process alive across reconnects.</p>
+<h2 id="step-3-connect-a-client">Step 3: Connect a Client<a class="headerlink" href="#step-3-connect-a-client" title="Permanent link">¶</a></h2>
+<h3 id="claude-code-with-stdio">Claude Code with <code>stdio</code><a class="headerlink" href="#claude-code-with-stdio" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"mcpServers"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"omicverse"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"command"</span><span class="p">:</span><span class="w"> </span><span class="s2">"python"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"args"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"-m"</span><span class="p">,</span><span class="w"> </span><span class="s2">"omicverse.mcp"</span><span class="p">,</span><span class="w"> </span><span class="s2">"--phase"</span><span class="p">,</span><span class="w"> </span><span class="s2">"P0+P0.5"</span><span class="p">]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>If you want Claude Code to launch the full P2 rollout directly:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"mcpServers"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"omicverse"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"command"</span><span class="p">:</span><span class="w"> </span><span class="s2">"python"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"args"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"-m"</span><span class="p">,</span><span class="w"> </span><span class="s2">"omicverse.mcp"</span><span class="p">,</span><span class="w"> </span><span class="s2">"--phase"</span><span class="p">,</span><span class="w"> </span><span class="s2">"P0+P0.5+P2"</span><span class="p">]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="claude-code-with-local-http">Claude Code with local HTTP<a class="headerlink" href="#claude-code-with-local-http" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"mcpServers"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"omicverse"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"http"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"http://127.0.0.1:8765/mcp"</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>If you use Claude Code, you can also read the <a href="../t_mcp_claude_code/">Claude Code walkthrough</a>.</p>
+<h2 id="step-4-understand-what-crosses-the-boundary">Step 4: Understand What Crosses the Boundary<a class="headerlink" href="#step-4-understand-what-crosses-the-boundary" title="Permanent link">¶</a></h2>
+<p><code>AnnData</code> objects stay on the server side. The client does not receive the full in-memory object. Instead, it receives lightweight handles such as:</p>
+<ul>
+<li><code>adata_id</code> for datasets</li>
+<li><code>artifact_id</code> for plots and files</li>
+<li><code>instance_id</code> for P2 class-backed tools</li>
+</ul>
+<p>That means a typical successful load looks like:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"tool_name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ov.utils.read"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"outputs"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"object_ref"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"ref_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"adata"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"ref_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"adata_a1b2c3d4e5f6"</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
+<h2 id="step-5-load-data">Step 5: Load Data<a class="headerlink" href="#step-5-load-data" title="Permanent link">¶</a></h2>
+<p>You can start from a built-in dataset:</p>
+<div class="highlight"><pre><span></span><code>Load the built-in pbmc3k dataset
+</code></pre></div>
+<p>or from a local file:</p>
+<div class="highlight"><pre><span></span><code>Load the pbmc3k.h5ad file
+</code></pre></div>
+<p>Built-in loaders currently include:</p>
+<ul>
+<li><code>ov.datasets.pbmc3k</code></li>
+<li><code>ov.datasets.pbmc8k</code></li>
+<li><code>ov.datasets.seqfish</code></li>
+</ul>
+<h2 id="step-6-inspect-before-you-analyze">Step 6: Inspect Before You Analyze<a class="headerlink" href="#step-6-inspect-before-you-analyze" title="Permanent link">¶</a></h2>
+<p>Before asking for preprocessing, inspect the current dataset. This is important because it lets the model see what is actually present in <code>obs</code>, <code>var</code>, <code>obsm</code>, and <code>uns</code>.</p>
+<p>Useful prompts:</p>
+<div class="highlight"><pre><span></span><code>Describe the current adata
+What is the first gene in var?
+Does CD3D exist in var_names?
+Inspect adata.obsm
+Inspect adata.uns
+Show value counts for leiden
+</code></pre></div>
+<p>These route to:</p>
+<ul>
+<li><code>ov.adata.describe</code></li>
+<li><code>ov.adata.peek</code></li>
+<li><code>ov.adata.find_var</code></li>
+<li><code>ov.adata.inspect</code></li>
+<li><code>ov.adata.value_counts</code></li>
+</ul>
+<h2 id="step-7-run-the-standard-workflow">Step 7: Run the Standard Workflow<a class="headerlink" href="#step-7-run-the-standard-workflow" title="Permanent link">¶</a></h2>
+<p>The default analysis chain is:</p>
+<ol>
+<li><code>ov.pp.qc</code></li>
+<li><code>ov.pp.scale</code></li>
+<li><code>ov.pp.pca</code></li>
+<li><code>ov.pp.neighbors</code></li>
+<li><code>ov.pp.umap</code></li>
+<li><code>ov.pp.leiden</code></li>
+</ol>
+<p>Natural-language request:</p>
+<div class="highlight"><pre><span></span><code>Run QC, scale, PCA with 50 components, build neighbors, compute UMAP, and run Leiden clustering at resolution 1.0
+</code></pre></div>
+<p>The server enforces prerequisites. For example, PCA requires the <code>scaled</code> layer, and neighbors requires <code>X_pca</code>.</p>
+<h2 id="step-8-plot-and-interpret">Step 8: Plot and Interpret<a class="headerlink" href="#step-8-plot-and-interpret" title="Permanent link">¶</a></h2>
+<p>After the embedding and clustering are ready, ask for plots:</p>
+<div class="highlight"><pre><span></span><code>Plot the UMAP colored by leiden
+Show me a violin plot of n_genes grouped by leiden cluster
+Create a dot plot for genes CD3D, CD79A, LYZ, NKG7 grouped by leiden
+</code></pre></div>
+<p>This typically uses:</p>
+<ul>
+<li><code>ov.pl.embedding</code></li>
+<li><code>ov.pl.violin</code></li>
+<li><code>ov.pl.dotplot</code></li>
+</ul>
+<p>Plot outputs are registered as artifacts.</p>
+<h2 id="step-9-marker-analysis-and-enrichment">Step 9: Marker Analysis and Enrichment<a class="headerlink" href="#step-9-marker-analysis-and-enrichment" title="Permanent link">¶</a></h2>
+<p>Once clusters exist, ask for marker analysis:</p>
+<div class="highlight"><pre><span></span><code>Find marker genes for each Leiden cluster and show me the top 5 per cluster
+Plot a marker gene dotplot
+Run COSG to rank marker genes
+Perform pathway enrichment on the marker genes
+Plot the pathway enrichment results
+</code></pre></div>
+<p>This can use:</p>
+<ul>
+<li><code>ov.single.find_markers</code></li>
+<li><code>ov.single.get_markers</code></li>
+<li><code>ov.pl.markers_dotplot</code></li>
+<li><code>ov.single.cosg</code></li>
+<li><code>ov.single.pathway_enrichment</code></li>
+<li><code>ov.single.pathway_enrichment_plot</code></li>
+</ul>
+<h2 id="step-10-persist-and-restore">Step 10: Persist and Restore<a class="headerlink" href="#step-10-persist-and-restore" title="Permanent link">¶</a></h2>
+<p>The analysis state is in memory until you persist it.</p>
+<p>Save:</p>
+<div class="highlight"><pre><span></span><code>Save the current dataset to disk
+</code></pre></div>
+<p>Restore later:</p>
+<div class="highlight"><pre><span></span><code>Restore the dataset from /path/to/file.h5ad
+</code></pre></div>
+<p>Under the hood this uses:</p>
+<ul>
+<li><code>ov.persist_adata</code></li>
+<li><code>ov.restore_adata</code></li>
+</ul>
+<h2 id="optional-step-11-move-to-p2">Optional Step 11: Move to P2<a class="headerlink" href="#optional-step-11-move-to-p2" title="Permanent link">¶</a></h2>
+<p>If you need advanced class-backed tools such as DEG, annotation, metacells, DCT, or topic modeling, start the server with:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>omicverse.mcp<span class="w"> </span>--phase<span class="w"> </span>P0+P0.5+P2
+</code></pre></div>
+<p>P2 tools may appear in tool listings but still be unavailable if their optional dependencies are not installed.</p>
+<h2 id="troubleshooting-checklist">Troubleshooting Checklist<a class="headerlink" href="#troubleshooting-checklist" title="Permanent link">¶</a></h2>
+<h3 id="tools-are-missing">Tools are missing<a class="headerlink" href="#tools-are-missing" title="Permanent link">¶</a></h3>
+<ul>
+<li>verify the <code>--phase</code></li>
+<li>ask the client to run <code>ov.list_tools</code></li>
+</ul>
+<h3 id="a-tool-is-unavailable">A tool is unavailable<a class="headerlink" href="#a-tool-is-unavailable" title="Permanent link">¶</a></h3>
+<ul>
+<li>ask the client to run <code>ov.describe_tool</code></li>
+<li>check missing optional dependencies</li>
+</ul>
+<h3 id="the-dataset-handle-is-gone">The dataset handle is gone<a class="headerlink" href="#the-dataset-handle-is-gone" title="Permanent link">¶</a></h3>
+<ul>
+<li>the server may have restarted</li>
+<li>reload the data or use <code>ov.restore_adata</code></li>
+</ul>
+<h3 id="a-long-running-task-is-confusing-to-debug">A long-running task is confusing to debug<a class="headerlink" href="#a-long-running-task-is-confusing-to-debug" title="Permanent link">¶</a></h3>
+<ul>
+<li>prefer local HTTP mode</li>
+<li>inspect <code>ov.list_traces</code>, <code>ov.get_trace</code>, <code>ov.list_events</code>, and <code>ov.get_health</code></li>
+</ul>
+<h2 id="tips-and-best-practices">Tips and Best Practices<a class="headerlink" href="#tips-and-best-practices" title="Permanent link">¶</a></h2>
+<ol>
+<li>Start with <code>P0+P0.5</code>. Only add <code>+P2</code> when you need advanced class-backed tools.</li>
+<li>Use <code>--persist-dir</code> if you want saved datasets to survive across sessions.</li>
+<li>Let the client track <code>adata_id</code> for you instead of managing handles manually.</li>
+<li>Use <code>ov.adata.*</code> inspection tools before asking for interpretation of <code>obs</code>, <code>var</code>, <code>obsm</code>, or <code>uns</code>.</li>
+<li>Use <code>ov.describe_tool</code> when you want prerequisite or availability details.</li>
+<li>Use remote deployment when the dataset or dependency stack outgrows your local machine.</li>
+<li>Persist before stopping if you plan to continue later.</li>
+</ol>
+<h2 id="where-to-go-next">Where to Go Next<a class="headerlink" href="#where-to-go-next" title="Permanent link">¶</a></h2>
+<ul>
+<li>Shortest path: <a href="../t_mcp_quickstart/">Quick Start</a></li>
+<li>Full tool inventory: <a href="../t_mcp_tools/">Tool Catalog</a></li>
+<li>Deployment patterns: <a href="../t_mcp_clients/">Clients &amp; Deployment</a></li>
+<li>Runtime details: <a href="../t_mcp_runtime/">Runtime &amp; Troubleshooting</a></li>
+<li>Exact flags and envelopes: <a href="../t_mcp_reference/">Reference</a></li>
+</ul>
+</article>
+</div>
+</div>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+<div class="md-copyright__highlight">
+      Copyright © 2019-2025, 112 Lab, USTB
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.indexes"], "search": "../../assets/javascripts/workers/search.208ed371.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+<script src="../../assets/javascripts/bundle.fc8c2696.min.js"></script>
+<script src="../../javascript/mkapi.js"></script>
+<script src="../../javascripts/config.js"></script>
+<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script>document$.subscribe(() => {const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});})</script></body>
+</html>

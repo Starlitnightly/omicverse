@@ -1,0 +1,33 @@
+[data-md-color-scheme="default"],
+[data-md-color-scheme="slate"] {
+  --mkapi-object-border-color: var(--md-default-fg-color--lightest);
+  --mkapi-object-kind-color: var(--md-default-fg-color--light);
+  --mkapi-object-name-color: var(--md-code-hl-name-color);
+  --mkapi-object-name-font-family: var(--md-code-font-family);
+  --mkapi-object-bg-color: var(--md-code-bg-color);
+  --mkapi-arg-color: var(--md-code-hl-name-color);
+  --mkapi-punctuation-color: var(--md-code-hl-punctuation-color);
+  --mkapi-variable-color: var(--md-code-hl-variable-color);
+  --mkapi-bases-color: var(--md-default-fg-color--light);
+  --mkapi-section-name-color: var(--md-default-fg-color);
+  --mkapi-section-border-color: var(--md-default-fg-color--light);
+  --mkapi-type-color: var(--md-code-hl-variable-color);
+  --mkapi-item-name-color: var(--md-default-fg-color);
+  --mkapi-example-bg-color: var(--md-code-bg-color);
+  --mkapi-docs-link-font-family: var(--md-text-font-family);
+}
+
+.md-typeset .admonition.deprecated,
+.md-typeset details.deprecated {
+  border-color: #ff5252;
+}
+.md-typeset .deprecated > .admonition-title,
+.md-typeset .deprecated > summary {
+  background-color: #ff52521a;
+}
+.md-typeset .deprecated > .admonition-title::before,
+.md-typeset .deprecated > summary::before {
+  background-color: #ff5252;
+  -webkit-mask-image: var(--md-admonition-icon--info);
+  mask-image: var(--md-admonition-icon--info);
+}
