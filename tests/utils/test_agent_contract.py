@@ -67,13 +67,8 @@ Agent = smart_agent_module.Agent
 OmicVerseAgent = smart_agent_module.OmicVerseAgent
 list_supported_models = smart_agent_module.list_supported_models
 
-from omicverse.utils.harness import build_stream_event
-from omicverse.utils.ovagent.runtime import OmicVerseRuntime
-from omicverse.utils.ovagent.workflow import (
-    WorkflowConfig,
-    WorkflowDocument,
-    load_workflow_document,
-)
+from omicverse.utils.harness import build_stream_event  # noqa: E402
+from omicverse.utils.ovagent.runtime import OmicVerseRuntime  # noqa: E402
 
 for name, module in _ORIGINAL_MODULES.items():
     if module is None:
@@ -511,3 +506,78 @@ class TestListSupportedModels:
         default = list_supported_models(show_all=False)
         full = list_supported_models(show_all=True)
         assert len(full) >= len(default)
+
+
+# ===================================================================
+# 8. __new__-constructed agent safety (PR #603 reconciliation)
+# ===================================================================
+
+class TestNewConstructedAgentSafety:
+    """__new__-constructed agents must tolerate missing __init__ state.
+
+    These tests make the _emit no-op fallback contract explicit.
+    Previously this was only implicitly tested by tests that happened
+    to pass because _emit didn't raise.
+    """
+
+    def test_emit_fallback_is_static_method(self):
+        """The class-level _emit must be a staticmethod (no-op fallback)."""
+        assert isinstance(OmicVerseAgent.__dict__["_emit"], staticmethod)
+
+    def test_emit_noop_callable_on_bare_agent(self):
+        """_emit must be callable without raising on __new__-constructed agents."""
+        agent = _bare_agent()
+        # Import the level enum needed by _emit callers
+        from omicverse.utils.agent_reporter import EventLevel
+        # Must not raise — the static method is a no-op
+        agent._emit(EventLevel.INFO, "test message", "test")
+        agent._emit(EventLevel.ERROR, "another message")
+
+    def test_bare_agent_has_no_reporter(self):
+        """__new__-constructed agents must not have _reporter (no __init__)."""
+        agent = _bare_agent()
+        assert not hasattr(agent, "_reporter")
+
+    def test_run_async_emit_does_not_crash_on_bare_agent(self):
+        """run_async tolerates _emit being the class-level no-op."""
+        agent = _bare_agent()
+
+        async def _fake_agentic_mode(self, request, adata):
+            return adata
+
+        agent._run_agentic_mode = MethodType(_fake_agentic_mode, agent)
+        agent._detect_direct_python_request = MethodType(
+            lambda self, req: None, agent
+        )
+
+        # run_async calls self._emit(...) multiple times; must not crash
+        sentinel = object()
+        result = asyncio.run(agent.run_async("test query", sentinel))
+        assert result is sentinel
+
+
+# ===================================================================
+# 9. resolve_credentials alias contract (PR #603 reconciliation)
+# ===================================================================
+
+class TestResolveCredentialsContract:
+    """resolve_credentials must have a single, clean import in smart_agent."""
+
+    def test_resolve_credentials_accessible_via_module(self):
+        """smart_agent exposes _resolve_agent_llm_credentials."""
+        assert hasattr(smart_agent_module, "_resolve_agent_llm_credentials")
+        assert callable(smart_agent_module._resolve_agent_llm_credentials)
+
+    def test_resolve_credentials_source_has_single_alias(self):
+        """smart_agent.py must import resolve_credentials exactly once."""
+        source = inspect.getsource(smart_agent_module)
+        # Count import lines with resolve_credentials (not usages)
+        import_count = sum(
+            1 for line in source.splitlines()
+            if "resolve_credentials" in line
+            and ("import" in line or "as _resolve" in line)
+        )
+        # Exactly one import alias
+        assert import_count == 1, (
+            f"Expected exactly 1 resolve_credentials import, found {import_count}"
+        )

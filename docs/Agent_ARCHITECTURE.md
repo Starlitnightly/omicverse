@@ -69,35 +69,59 @@ search_skills → execute_code → delegate → finish) → Final Response
 **Purpose:** Main orchestration layer that handles the complete user interaction lifecycle.
 
 **Key Responsibilities:**
+- Agentic tool-calling loop orchestration (inspect, search, execute, delegate, finish)
 - Skill matching via LLM or algorithmic methods
 - Code generation with progressive skill disclosure
-- Code extraction and validation
-- Code execution in isolated namespace
+- Code execution in isolated notebook namespace
 - Result review and reflection mechanisms
 - Error handling and retry logic
+- Subagent delegation for multi-step workflows
 
 **Class Signature:**
 ```python
 class OmicVerseAgent:
     def __init__(
         self,
-        model: str = "gpt-4o",
-        temperature: float = 0.1,
+        model: str = "gpt-5.2",
         api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
-        api_version: Optional[str] = None,
-        **kwargs
+        endpoint: Optional[str] = None,
+        auth_mode: str = "environment",
+        auth_provider: Optional[str] = None,
+        auth_file: Optional[str] = None,
+        enable_reflection: bool = True,
+        reflection_iterations: int = 1,
+        enable_result_review: bool = True,
+        use_notebook_execution: bool = True,
+        max_prompts_per_session: int = 5,
+        notebook_storage_dir: Optional[str] = None,
+        keep_execution_notebooks: bool = True,
+        notebook_timeout: int = 600,
+        strict_kernel_validation: bool = True,
+        enable_filesystem_context: bool = True,
+        context_storage_dir: Optional[str] = None,
+        approval_mode: str = "never",
+        agent_mode: str = "agentic",   # deprecated, ignored
+        max_agent_turns: int = 15,
+        security_level: Optional[str] = None,
+        *,
+        config: Optional[AgentConfig] = None,
+        reporter: Optional[Reporter] = None,
+        verbose: bool = True,
     )
 ```
 
-**Main Methods:**
-- `query(query: str, adata: Any, **kwargs) -> Dict[str, Any]` - Synchronous query execution
-- `query_async(query: str, adata: Any, **kwargs) -> Dict[str, Any]` - Async query execution
-- `stream_async(query: str, adata: Any, **kwargs) -> AsyncIterator[Dict]` - Streaming execution
-- `_extract_python_code(response_text: str) -> str` - Code extraction with AST validation
-- `_reflect_on_code(code: str, error_msg: str) -> str` - Self-reflection for error correction
+The `agent_mode` parameter is accepted for backward compatibility but
+deprecated and ignored — the agentic tool-calling loop is now the only
+execution mode.  Passing any value other than `"agentic"` emits a
+`DeprecationWarning`.
 
-**File Location:** Lines 69-1561 in `omicverse/utils/smart_agent.py`
+**Public Methods:**
+- `run(request: str, adata: Any) -> Any` — Synchronous execution (main entry point)
+- `run_async(request: str, adata: Any) -> Any` — Async execution via the agentic tool-calling loop
+- `stream_async(request: str, adata: Any, ...) -> AsyncIterator[dict]` — Stream agentic-loop events in real time
+- `generate_code(request: str, adata: Any = None, ...) -> str` — Generate OmicVerse Python code without executing it
+
+**File Location:** `omicverse/utils/smart_agent.py`
 
 ---
 
@@ -765,95 +789,95 @@ def _review_result(
 ```python
 async def stream_async(
     self,
-    query: str,
+    request: str,
     adata: Any,
-    **kwargs
-) -> AsyncIterator[Dict[str, Any]]:
+    cancel_event=None,
+    history=None,
+    approval_handler=None,
+    request_content=None,
+) -> AsyncIterator[dict]:
     """
-    Stream agent execution with real-time updates.
+    Stream agentic-loop events as the agent processes a request.
+
+    Wraps ``_run_agentic_loop`` with an event callback so callers
+    can observe tool calls, code execution, results, and completion
+    in real time.
 
     Yields:
-        Dict[str, Any]: Event objects with keys:
-            - event_type: 'skill_match' | 'llm_chunk' | 'code' |
-                         'result' | 'error' | 'usage'
-            - data: Event-specific data
+        dict: Event dictionaries with ``'type'`` and ``'content'``
+              keys, plus metadata such as ``turn_id``, ``trace_id``,
+              ``session_id``, and ``category``.
     """
 ```
 
-**File Location:** Lines 1288-1428 in `smart_agent.py`
+**File Location:** `omicverse/utils/smart_agent.py`
 
 ---
 
 ### Event Stream Format
 
-#### 1. Skill Match Event
+Events are dictionaries produced by `build_stream_event()` with at
+minimum `type` and `content` keys.  Additional metadata fields
+(`turn_id`, `trace_id`, `session_id`, `category`) are attached
+automatically.
+
+#### 1. Tool Call Event
 ```python
 {
-    "event_type": "skill_match",
-    "data": {
-        "matched_skills": ["single-cell-preprocessing", "clustering"],
-        "skill_scores": {"single-cell-preprocessing": 0.95, ...}
-    }
+    "type": "tool_call",
+    "content": "inspect_data",
+    "turn_id": "...",
+    "trace_id": "...",
+    "session_id": "...",
+    "category": "tool"
 }
 ```
 
-#### 2. LLM Chunk Event
+#### 2. Code Event
 ```python
 {
-    "event_type": "llm_chunk",
-    "data": {
-        "chunk": "import omicverse as ov\n",
-        "cumulative_text": "import omicverse as ov\n"
-    }
+    "type": "code",
+    "content": "import omicverse as ov\n\nadata = ov.pp.preprocess(...)",
+    "turn_id": "...",
+    "trace_id": "...",
+    "session_id": "...",
+    "category": "execution"
 }
 ```
 
-#### 3. Code Event
+#### 3. Result Event
 ```python
 {
-    "event_type": "code",
-    "data": {
-        "code": "import omicverse as ov\n\nadata = ov.pp.preprocess(...)",
-        "validated": True
-    }
+    "type": "result",
+    "content": "Code executed successfully.",
+    "turn_id": "...",
+    "trace_id": "...",
+    "session_id": "...",
+    "category": "execution"
 }
 ```
 
-#### 4. Result Event
+#### 4. Error Event
 ```python
 {
-    "event_type": "result",
-    "data": {
-        "success": True,
-        "result": {"adata": AnnData_object, ...},
-        "execution_time": 2.5
-    }
+    "type": "error",
+    "content": "NameError: name 'ov' is not defined",
+    "turn_id": "...",
+    "trace_id": "...",
+    "session_id": "...",
+    "category": "runtime"
 }
 ```
 
-#### 5. Error Event
+#### 5. Done Event
 ```python
 {
-    "event_type": "error",
-    "data": {
-        "error_type": "ExecutionError",
-        "message": "NameError: name 'ov' is not defined",
-        "code": "...",
-        "recoverable": True
-    }
-}
-```
-
-#### 6. Usage Event
-```python
-{
-    "event_type": "usage",
-    "data": {
-        "prompt_tokens": 1234,
-        "completion_tokens": 567,
-        "total_tokens": 1801,
-        "model": "openai/gpt-4o"
-    }
+    "type": "done",
+    "content": "Agentic loop completed.",
+    "turn_id": "...",
+    "trace_id": "...",
+    "session_id": "...",
+    "category": "lifecycle"
 }
 ```
 
@@ -1053,26 +1077,17 @@ Code Generation → Execution → Error → Reflection → Corrected Code →
 Re-execution → Success/Reflection Again (max 3 iterations)
 ```
 
-**Implementation:**
+**Implementation (agentic loop):**
+
+The reflection mechanism is now handled internally by the agentic
+tool-calling loop.  When `execute_code` fails, the loop feeds the error
+back to the LLM which autonomously decides whether to retry with
+corrected code, inspect data, or finish with an error report.
+
 ```python
-# smart_agent.py lines 282-380
-def query(self, query: str, adata: Any, **kwargs) -> Dict[str, Any]:
-    max_reflection_iterations = kwargs.get('max_reflections', 3)
-
-    for iteration in range(max_reflection_iterations):
-        # Generate code
-        code = self._generate_code(query, adata, **kwargs)
-
-        # Execute
-        try:
-            result = self._execute_code(code, adata)
-            return result
-        except Exception as e:
-            if iteration < max_reflection_iterations - 1:
-                # Reflect and try again
-                code = self._reflect_on_code(code, str(e), query)
-            else:
-                raise
+# Simplified view — the agentic loop drives this automatically:
+result = await agent._run_agentic_loop(request, adata)
+# Inside the loop: tool calls → execute_code → error → LLM reflects → retry
 ```
 
 **Reflection Prompt Template:**
@@ -1349,9 +1364,9 @@ agent_claude = OmicVerseAgent(model="claude-4-5-sonnet")
 agent_gemini = OmicVerseAgent(model="gemini-2.5-flash")
 
 # Identical API
-result_gpt = agent_gpt.query("Preprocess my data", adata)
-result_claude = agent_claude.query("Preprocess my data", adata)
-result_gemini = agent_gemini.query("Preprocess my data", adata)
+result_gpt = agent_gpt.run("Preprocess my data", adata)
+result_claude = agent_claude.run("Preprocess my data", adata)
+result_gemini = agent_gemini.run("Preprocess my data", adata)
 ```
 
 ---
@@ -1448,14 +1463,14 @@ agent = OmicVerseAgent(
     verbose=True  # Enables detailed logging
 )
 
-result = agent.query("Cluster my cells", adata)
+result = agent.run("Cluster my cells", adata)
 # Logs:
-# [SKILL MATCH] Selected: single-cell-clustering
-# [CODE GENERATION] Calling OpenAI API...
-# [CODE EXTRACTED] 15 lines of Python code
-# [EXECUTION] Running code in isolated namespace...
-# [SUCCESS] Code executed successfully
-# [TOKENS] Used 3,421 tokens (prompt: 2,154, completion: 1,267)
+# [INFO] Processing request: "Cluster my cells" | Dataset: 2638 cells × 1838 genes
+# [INFO] Mode: Agentic Loop (tool-calling)
+# [INFO] Turn 1/15 — LLM call ...
+# [INFO] Tool call: inspect_data
+# [INFO] Tool call: execute_code
+# [SUCCESS] Agentic loop completed!
 ```
 
 ---
