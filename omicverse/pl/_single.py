@@ -42,7 +42,6 @@ from ._scanpy_compat import (
     VBound,
     default_palette,
     embedding_density as compute_embedding_density,
-    plot_violin,
 )
 
 def mde(adata: AnnData,convert=True, **kwargs):
@@ -428,6 +427,7 @@ def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
     if legend_awargs is None:
         legend_awargs = {'ncol':1}
 
+    created_ax = ax is None
     if ax==None:
         fig, ax = plt.subplots(figsize=figsize)
     #用ax控制图片
@@ -489,7 +489,7 @@ def cellproportion(adata:AnnData,celltype_clusters:str,groupby:str,
     #fig.tight_layout()
     if save:
         plt.savefig(save, bbox_inches="tight")
-    if ax==None:
+    if created_ax:
         return fig,ax
     
 
@@ -1558,9 +1558,26 @@ def cellstackarea(adata,celltype_clusters:str,groupby:str,
 
 def violin_old(adata,keys=None,groupby=None,ax=None,figsize=(4,4),fontsize=13,
            ticks_fontsize=None,rotation=90,**kwargs):
+    warn(
+        "`ov.pl.violin_old` is deprecated and will be removed in omicverse 2.2; "
+        "use `ov.pl.violin` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    from ._violin import violin
+
     if ax==None:
         fig, ax = plt.subplots(figsize=figsize)
-    plot_violin(adata, keys=keys, groupby=groupby, ax=ax, **kwargs)
+    violin(
+        adata,
+        keys=keys,
+        groupby=groupby,
+        ax=ax,
+        figsize=figsize,
+        show=False,
+        fontsize=fontsize,
+        **kwargs,
+    )
     plt.grid(False)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)

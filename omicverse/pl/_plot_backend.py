@@ -843,71 +843,29 @@ def plot_cellproportion(adata:anndata.AnnData,celltype_clusters:str,visual_clust
         Tuple of (figure, axes) objects
     """
 
-    b=pd.DataFrame(columns=['cell_type','value','Week'])
-    
-    if visual_li==None:
-        adata.obs[visual_clusters]=adata.obs[visual_clusters].astype('category')
-        visual_li=adata.obs[visual_clusters].cat.categories
-    
-    for i in visual_li:
-        b1=pd.DataFrame()
-        test=adata.obs.loc[adata.obs[visual_clusters]==i,celltype_clusters].value_counts()
-        b1['cell_type']=test.index
-        b1['value']=test.values/test.sum()
-        b1['Week']=i.replace('Retinoblastoma_','')
-        b=pd.concat([b,b1])
-    
-    plt_data2=adata.obs[celltype_clusters].value_counts()
-    plot_data2_color_dict=dict(zip(adata.obs[celltype_clusters].cat.categories,adata.uns['{}_colors'.format(celltype_clusters)]))
-    plt_data3=adata.obs[visual_clusters].value_counts()
-    plot_data3_color_dict=dict(zip([i.replace('Retinoblastoma_','') for i in adata.obs[visual_clusters].cat.categories],adata.uns['{}_colors'.format(visual_clusters)]))
-    b['cell_type_color'] = b['cell_type'].map(plot_data2_color_dict)
-    b['stage_color']=b['Week'].map(plot_data3_color_dict)
-    
-    fig, ax = plt.subplots(figsize=figsize)
-    #用ax控制图片
-    #sns.set_theme(style="whitegrid")
-    #sns.set_theme(style="ticks")
-    n=0
-    all_celltype=adata.obs[celltype_clusters].cat.categories
-    for i in all_celltype:
-        if n==0:
-            test1=b[b['cell_type']==i]
-            ax.bar(x=test1['Week'],height=test1['value'],width=0.8,color=list(set(test1['cell_type_color']))[0], label=i)
-            bottoms=test1['value'].values
-        else:
-            test2=b[b['cell_type']==i]
-            ax.bar(x=test2['Week'],height=test2['value'],bottom=bottoms,width=0.8,color=list(set(test2['cell_type_color']))[0], label=i)
-            test1=test2
-            bottoms+=test1['value'].values
-        n+=1
-    if legend!=False:
-        plt.legend(bbox_to_anchor=(1.05, -0.05), loc=3, borderaxespad=0,fontsize=10)
-    
-    plt.grid(False)
-    
-    plt.grid(False)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['bottom'].set_visible(True)
-    ax.spines['left'].set_visible(True)
+    warnings.warn_explicit(
+        "`ov.pl.plot_cellproportion` is deprecated and will be removed in omicverse 2.2; "
+        "use `ov.pl.cellproportion` instead.",
+        category=DeprecationWarning,
+        filename=__file__,
+        lineno=846,
+    )
+    from ._single import cellproportion
 
-    # 设置左边和下边的坐标刻度为透明色
-    #ax.yaxis.tick_left()
-    #ax.xaxis.tick_bottom()
-    #ax.xaxis.set_tick_params(color='none')
-    #ax.yaxis.set_tick_params(color='none')
-
-    # 设置左边和下边的坐标轴线为独立的线段
-    ax.spines['left'].set_position(('outward', 10))
-    ax.spines['bottom'].set_position(('outward', 10))
-
-    plt.xticks(fontsize=ticks_fontsize,rotation=90)
-    plt.yticks(fontsize=ticks_fontsize)
-    plt.xlabel(visual_name,fontsize=labels_fontsize)
-    plt.ylabel('Cells per Stage',fontsize=labels_fontsize)
-    fig.tight_layout()
-    return fig,ax
+    fig, ax = cellproportion(
+        adata,
+        celltype_clusters=celltype_clusters,
+        groupby=visual_clusters,
+        groupby_li=visual_li,
+        figsize=figsize,
+        ticks_fontsize=ticks_fontsize,
+        labels_fontsize=labels_fontsize,
+        legend=legend,
+        ax=None,
+    )
+    if visual_name:
+        ax.set_xlabel(visual_name, fontsize=labels_fontsize)
+    return fig, ax
 
 @register_function(
     aliases=['细胞类型嵌入图', 'plot_embedding_celltype', 'embedding celltype visualization'],
@@ -942,67 +900,25 @@ def plot_embedding_celltype(adata:anndata.AnnData,figsize:tuple=(6,4),basis:str=
     -------
         Tuple of (figure, [embedding_axis, celltype_axis])
     """
-
-    adata.obs[celltype_key]=adata.obs[celltype_key].astype('category')
-    cell_num_pd=pd.DataFrame(adata.obs[celltype_key].value_counts())
-    if '{}_colors'.format(celltype_key) in adata.uns.keys():
-        cell_color_dict=dict(zip(adata.obs[celltype_key].cat.categories.tolist(),
-                        adata.uns['{}_colors'.format(celltype_key)]))
-    else:
-        if len(adata.obs[celltype_key].cat.categories)>28:
-            cell_color_dict=dict(zip(adata.obs[celltype_key].cat.categories, default_palette(len(adata.obs[celltype_key].cat.categories))))
-        else:
-            cell_color_dict=dict(zip(adata.obs[celltype_key].cat.categories, default_palette(len(adata.obs[celltype_key].cat.categories))))
-
-    if figsize==None:
-        if len(adata.obs[celltype_key].cat.categories)<10:
-            fig = plt.figure(figsize=(6,4))
-        else:
-            print('The number of cell types is too large, please set the figsize parameter')
-            return
-    else:
-        fig = plt.figure(figsize=figsize)
-    grid = plt.GridSpec(10, 10)
-    ax1 = fig.add_subplot(grid[:, embedding_range[0]:embedding_range[1]])       # 占据第一行的所有列
-    ax2 = fig.add_subplot(grid[celltype_range[0]:celltype_range[1], :2]) 
-    # 定义子图的大小和位置
-         # 占据第二行的前两列
-    #ax3 = fig.add_subplot(grid[1:, 2])      # 占据第二行及以后的最后一列
-    #ax4 = fig.add_subplot(grid[2, 0])       # 占据最后一行的第一列
-    #ax5 = fig.add_subplot(grid[2, 1])       # 占据最后一行的第二列
-
-    from ._single import embedding
-
-    embedding(
-        adata,
-        basis=basis,
-        color=[celltype_key],
-        title='',
-        frameon=False,
-        ncols=3,
-        ax=ax1,
-        legend_loc=False,
-        show=False
+    warnings.warn_explicit(
+        "`ov.pl.plot_embedding_celltype` is deprecated and will be removed in omicverse 2.2; "
+        "use `ov.pl.embedding_celltype` instead.",
+        category=DeprecationWarning,
+        filename=__file__,
+        lineno=923,
     )
+    from ._single import embedding_celltype
 
-    for idx,cell in zip(range(cell_num_pd.shape[0]),
-                        adata.obs[celltype_key].cat.categories):
-        ax2.scatter(100,
-                cell,c=cell_color_dict[cell],s=50)
-        ax2.plot((100,cell_num_pd.loc[cell,'count']),(idx,idx),
-                c=cell_color_dict[cell],lw=4)
-        ax2.text(100,idx+0.2,
-                cell+'('+str("{:,}".format(cell_num_pd.loc[cell,'count']))+')',fontsize=11)
-    ax2.set_xlim(xlim,cell_num_pd.iloc[1].values[0]) 
-    ax2.text(xlim,idx+1,title,fontsize=12)
-    ax2.grid(False)
-    ax2.spines['top'].set_visible(False)
-    ax2.spines['right'].set_visible(False)
-    ax2.spines['bottom'].set_visible(False)
-    ax2.spines['left'].set_visible(False)
-    ax2.axis('off')
-
-    return fig,[ax1,ax2]
+    return embedding_celltype(
+        adata,
+        figsize=figsize,
+        basis=basis,
+        celltype_key=celltype_key,
+        title=title,
+        celltype_range=celltype_range,
+        embedding_range=embedding_range,
+        xlim=xlim,
+    )
 
 @register_function(
     aliases=["标签生成", "gen_mpl_labels", "cluster_labels", "添加标签", "embedding_labels"],
