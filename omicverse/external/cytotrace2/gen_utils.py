@@ -8,6 +8,7 @@ import torch
 import scipy
 import random
 import warnings
+from importlib import resources
 from sklearn.preprocessing import MinMaxScaler
 
 from .models import *
@@ -71,15 +72,14 @@ def top_var_genes(ranked_data):
 
 
 def build_mapping_dict():
-    import pkg_resources
-    fn_mart_export = pkg_resources.resource_filename("omicverse", "data_files/mart_export.txt")
+    fn_mart_export = resources.files("omicverse.datasets").joinpath("data_files/mart_export.txt").__fspath__()
     human_mapping = pd.read_csv(fn_mart_export,sep='\t').dropna().reset_index()
-    fn_features = pkg_resources.resource_filename("omicverse", "data_files/features_model_training_17.csv")
+    fn_features = resources.files("omicverse.datasets").joinpath("data_files/features_model_training_17.csv").__fspath__()
     features = pd.read_csv(fn_features)['0']
     mapping_unique = human_mapping.groupby('Gene name').apply(top_hit_human)
     mapping_unique = mapping_unique.groupby('Mouse gene name').apply(top_hit_mouse)
     mt_dict = dict(zip(mapping_unique['Gene name'].values,mapping_unique['Mouse gene name'].values))
-    fn_alias_list = pkg_resources.resource_filename("omicverse", "data_files/human_alias_list.txt")
+    fn_alias_list = resources.files("omicverse.datasets").joinpath("data_files/human_alias_list.txt").__fspath__()
     human_mapping_alias_and_previous_symbols = pd.read_csv(fn_alias_list,sep='\t')
     mt_dict_alias_and_previous_symbols = dict(zip(human_mapping_alias_and_previous_symbols['Alias or Previous Gene name'].values,
                                                   human_mapping_alias_and_previous_symbols['Mouse gene name'].values))

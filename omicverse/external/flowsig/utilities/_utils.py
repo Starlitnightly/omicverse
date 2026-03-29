@@ -2,14 +2,14 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 from typing import Union, Sequence
+from importlib import resources
 
 def get_top_nmf_genes(adata: sc.AnnData,
                       gems: Union[str, Sequence[str]],
                       n_genes: int,
                       gene_type: str = 'all',
                       model_organism: str = 'human'):
-    import pkg_resources
-    tf_path=pkg_resources.resource_filename("omicverse", 'data_files/TF/allTFs_' + model_organism + '.txt')
+    tf_path = resources.files("omicverse.datasets").joinpath(f"data_files/TF/allTFs_{model_organism}.txt").__fspath__()
     gene_types = ['all', 'tf']
 
     if gene_type not in gene_types:
@@ -74,9 +74,7 @@ def get_top_pyliger_genes(adata: sc.AnnData,
                         n_genes: int,
                         gene_type: str = 'all',
                         model_organism: str = 'human'):
-    
-    import pkg_resources
-    tf_path=pkg_resources.resource_filename("omicverse", 'data_files/TF/allTFs_' + model_organism + '.txt')
+    tf_path = resources.files("omicverse.datasets").joinpath(f"data_files/TF/allTFs_{model_organism}.txt").__fspath__()
 
     gene_types = ['all', 'tf']
 
@@ -154,8 +152,7 @@ def get_top_nsf_genes(adata: sc.AnnData,
                       n_genes: int,
                       gene_type: str = 'all',
                       model_organism: str = 'human'):
-    import pkg_resources
-    tf_path=pkg_resources.resource_filename("omicverse", 'data_files/TF/allTFs_' + model_organism + '.txt')
+    tf_path = resources.files("omicverse.datasets").joinpath(f"data_files/TF/allTFs_{model_organism}.txt").__fspath__()
     
     gene_types = ['all', 'tf']
 
