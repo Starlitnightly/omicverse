@@ -19,6 +19,13 @@ PACKAGE_ROOT = PROJECT_ROOT / "omicverse"
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+# Snapshot ALL omicverse.* modules so we can restore after stub-phase imports.
+_ORIGINAL_MODULES = {
+    name: mod
+    for name, mod in list(sys.modules.items())
+    if name == "omicverse" or name.startswith("omicverse.")
+}
+
 # Ensure ovagent subpackage can resolve relative imports by
 # registering minimal parent stubs if not already present.
 _stubs_installed: dict = {}
@@ -57,6 +64,14 @@ _derive_static_signature = _scanner_mod._derive_static_signature
 _branch_subject_name = _scanner_mod._branch_subject_name
 _branch_string_values = _scanner_mod._branch_string_values
 _literal_eval_or_default = _scanner_mod._literal_eval_or_default
+
+# Restore sys.modules to pre-stub state so later test files see a clean namespace.
+for _name in list(sys.modules):
+    if _name == "omicverse" or _name.startswith("omicverse."):
+        sys.modules.pop(_name, None)
+for _name, _mod in _ORIGINAL_MODULES.items():
+    if _mod is not None:
+        sys.modules[_name] = _mod
 
 
 class TestRegistryScannerInit:

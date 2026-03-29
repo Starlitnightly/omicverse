@@ -116,7 +116,8 @@ from ._gene_id_conversion import _infer_species_and_release, convert2gene_symbol
 
 # Import smart_agent module to make it accessible and expose key entrypoints
 # Store verifier with a private name first to ensure reference is preserved
-from . import agent_backend, biocontext, smart_agent
+from . import agent_backend, agent_backend_streaming, biocontext, smart_agent
+from . import ovagent  # ensure ovagent subpackage is a direct attribute
 from . import verifier as _verifier_module
 from .agent_backend import BackendConfig, OmicVerseLLMBackend, Usage
 from .smart_agent import Agent, OmicVerseAgent, list_supported_models
@@ -148,12 +149,29 @@ from .harness import (
 # Python 3.10 compatibility: Provide __getattr__ to dynamically return verifier
 # This ensures getattr(omicverse.utils, 'verifier') works in unittest.mock.patch
 def __getattr__(name):
-    """Dynamically return module attributes for Python 3.10 compatibility.
+    """Dynamically return module attributes for submodule and symbol resolution.
 
-    This is required because unittest.mock.patch uses getattr() to resolve
-    module paths, and in Python 3.10 submodule imports don't automatically
-    become accessible as attributes of the parent module.
+    Handles two cases that arise when sys.modules is manipulated (e.g. by test
+    isolation stubs) and Python's normal import-time attribute-setting on the
+    parent package is skipped:
+
+    1. Submodule lookup: if ``omicverse.utils.<name>`` is in ``sys.modules``
+       but was never set as an attribute on *this* module object (common when a
+       test replaces ``sys.modules['omicverse.utils']`` with a fresh stub),
+       return and cache the submodule so that ``getattr(omicverse.utils, name)``
+       and ``monkeypatch.setattr("omicverse.utils.<name>.<sym>", ...)`` work.
+    2. Legacy symbol forwarding for ``verifier`` and smart-agent entrypoints.
     """
+    import sys as _sys
+
+    # Fast-path: check if a submodule with this name is already imported
+    fqn = f"{__name__}.{name}"
+    submod = _sys.modules.get(fqn)
+    if submod is not None:
+        # Cache it on the module so future lookups are O(1)
+        globals()[name] = submod
+        return submod
+
     if name == 'verifier':
         return _verifier_module
     if name in {'Agent', 'OmicVerseAgent', 'list_supported_models'}:
@@ -293,10 +311,13 @@ __all__ = [
     "symbol2id",
     # @ agent_backend
     "agent_backend",
+    "agent_backend_streaming",
     "biocontext",
     "BackendConfig",
     "OmicVerseLLMBackend",
     "Usage",
+    # @ ovagent
+    "ovagent",
     # @ smart_agent
     "smart_agent",
     "Agent",
