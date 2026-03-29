@@ -85,6 +85,7 @@ def violin(
     jitter_method: str = 'uniform',  # 'uniform', 't_dist'
     jitter_alpha: float = 0.4,
     violin_alpha: float = 0.8,
+    rasterized: bool = False,
     background_color: str = 'white',
     alternating_background: bool = True,
     alternating_background_colors: Sequence[str] = ("white", "#e8e8e8"),
@@ -332,7 +333,7 @@ def violin(
     if multi_panel and groupby is None and len(y_cols) == 1:
         return _create_multi_panel_plot(
             obs_tidy, keys, y_cols[0], colors, log, stripplot, jitter, 
-            size, density_norm, enhanced_style, **kwds
+            size, density_norm, enhanced_style, rasterized=rasterized, **kwds
         )
     
     # Create single or multiple axis plots
@@ -394,7 +395,7 @@ def violin(
         if stripplot:
             _add_strip_plot(
                 current_ax, plot_data, group_categories, jitter, jitter_method, 
-                size, jitter_alpha, colors
+                size, jitter_alpha, colors, rasterized
             )
         
         # Add mean annotations
@@ -711,7 +712,7 @@ def _add_box_plots(ax, plot_data, group_categories):
         boxprops=boxprops
     )
 
-def _add_strip_plot(ax, plot_data, group_categories, jitter, jitter_method, size, jitter_alpha, colors):
+def _add_strip_plot(ax, plot_data, group_categories, jitter, jitter_method, size, jitter_alpha, colors, rasterized=False):
     """Add jittered strip plot."""
     jitter_width = 0.04 if isinstance(jitter, bool) and jitter else float(jitter) * 0.04
     
@@ -731,7 +732,16 @@ def _add_strip_plot(ax, plot_data, group_categories, jitter, jitter_method, size
             x_jittered = x_base + np.random.uniform(-jitter_width, jitter_width, n_points)
         
         # Plot jittered points
-        ax.scatter(x_jittered, y_data, s=size, color=color, alpha=jitter_alpha, edgecolors='black', linewidth=0.5)
+        ax.scatter(
+            x_jittered,
+            y_data,
+            s=size,
+            color=color,
+            alpha=jitter_alpha,
+            edgecolors='black',
+            linewidth=0.5,
+            rasterized=rasterized,
+        )
 
 def _add_mean_annotations(ax, plot_data, group_categories):
     """Add mean value annotations."""
@@ -875,7 +885,7 @@ def _customize_axis(ax, group_categories, xlabel, ylabel, groupby, rotation, log
     if log:
         ax.set_yscale('log')
 
-def _create_multi_panel_plot(obs_tidy, keys, y_col, colors, log, stripplot, jitter, size, density_norm, enhanced_style, **kwds):
+def _create_multi_panel_plot(obs_tidy, keys, y_col, colors, log, stripplot, jitter, size, density_norm, enhanced_style, rasterized=False, **kwds):
     """Create multi-panel plot for multiple keys."""
     n_panels = len(keys)
     fig, axes = plt.subplots(1, n_panels, figsize=(4*n_panels, 6), sharey=False)
@@ -900,7 +910,14 @@ def _create_multi_panel_plot(obs_tidy, keys, y_col, colors, log, stripplot, jitt
         if stripplot:
             y_data = key_data['value'].values
             x_jittered = np.random.uniform(-0.1, 0.1, len(y_data))
-            ax_panel.scatter(x_jittered, y_data, s=size*20, color='black', alpha=0.6)
+            ax_panel.scatter(
+                x_jittered,
+                y_data,
+                s=size * 20,
+                color='black',
+                alpha=0.6,
+                rasterized=rasterized,
+            )
         
         # Set title and labels
         ax_panel.set_title(key)

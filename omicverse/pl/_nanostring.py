@@ -85,6 +85,13 @@ def _validate_basis(adata, basis: str) -> str:
     return basis
 
 
+def _validate_img_extent_mode(img_extent_mode: str) -> str:
+    """Validate how image extents are computed."""
+    if img_extent_mode not in ("cells", "panel"):
+        raise ValueError("`img_extent_mode` must be either 'cells' or 'panel'.")
+    return img_extent_mode
+
+
 def _metadata_numeric(metadata, *candidates) -> Optional[float]:
     """Return the first numeric metadata value matching candidate keys."""
     if not isinstance(metadata, dict):
@@ -167,12 +174,71 @@ def _compute_fov_geometry_transform(adata, fov_id: str, fov_col: str, basis: str
     return sx, sy, tx, ty
 
 
-def _compute_fov_image_extent(adata, fov_id: str, fov_col: str, basis: str):
+def _compute_fov_image_extent(adata, fov_id: str, fov_col: str, basis: str, img_extent_mode: str):
     """Compute `[xmin, xmax, ymin, ymax]` for one FOV image in the chosen basis."""
+    _validate_img_extent_mode(img_extent_mode)
     return _compute_basis_bbox(adata, fov_id, fov_col, basis)
 
 
-def _place_fov_images(ax, adata, fovs_to_plot, fov_col, basis, img_key, alpha_img, bw):
+def _rasterize_new_collections(ax, start_idx: int) -> None:
+    """Rasterize collections added to an axis after `start_idx`."""
+    for coll in ax.collections[start_idx:]:
+        try:
+            coll.set_rasterized(True)
+        except Exception:
+            continue
+
+
+def _resolve_vbound(values: np.ndarray, bound) -> float:
+    """Resolve numeric or percentile-string bounds such as `p99.2`."""
+    if bound is None:
+        return float(np.nanmin(values))
+    if isinstance(bound, str):
+        if bound.startswith("p"):
+            try:
+                return float(np.nanpercentile(values, q=float(bound[1:])))
+            except ValueError as exc:
+                raise ValueError(
+                    f"Invalid percentile bound `{bound}`. Use syntax like `p99` or `p99.2`."
+                ) from exc
+        try:
+            return float(bound)
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid bound `{bound}`. Use a float or percentile string like `p99.2`."
+            ) from exc
+    return float(bound)
+
+
+def _resolve_cmap(cmap):
+    """Resolve either a colormap name or a matplotlib colormap object."""
+    if isinstance(cmap, mcolors.Colormap):
+        return cmap
+    return plt.get_cmap(cmap)
+
+
+def _scale_rgba_alpha(colors, alpha: float):
+    """Scale the alpha channel of RGBA colors without discarding existing transparency."""
+    rgba = np.asarray(colors, dtype=float).copy()
+    if rgba.ndim == 1:
+        rgba = rgba.reshape(1, -1)
+    if rgba.shape[1] == 4:
+        rgba[:, 3] = np.clip(rgba[:, 3] * float(alpha), 0.0, 1.0)
+    return rgba
+
+
+def _place_fov_images(
+    ax,
+    adata,
+    fovs_to_plot,
+    fov_col,
+    basis,
+    img_key,
+    alpha_img,
+    bw,
+    img_extent_mode,
+    panel_extent=None,
+):
     """Draw each FOV's background image at its position in the chosen basis."""
     for fov_id in fovs_to_plot:
         fov_info = adata.uns.get("spatial", {}).get(fov_id, {})
@@ -180,7 +246,10 @@ def _place_fov_images(ax, adata, fovs_to_plot, fov_col, basis, img_key, alpha_im
         if img is None:
             continue
 
-        extent = _compute_fov_image_extent(adata, fov_id, fov_col, basis)
+        if img_extent_mode == "panel" and panel_extent is not None:
+            extent = panel_extent
+        else:
+            extent = _compute_fov_image_extent(adata, fov_id, fov_col, basis, img_extent_mode)
         if extent is None:
             continue
         img = np.asarray(img)
@@ -200,45 +269,20 @@ def _place_fov_images(ax, adata, fovs_to_plot, fov_col, basis, img_key, alpha_im
         )
 
 
-def _global_bounding_box(adata, fovs_to_plot, fov_col, basis, pad_frac=0.02):
+def _global_bounding_box(adata, fovs_to_plot, fov_col, basis, img_extent_mode, pad_frac=0.02):
     """Return (xlim, ylim) covering all selected FOV cells in the chosen basis."""
-    bounds = []
-
     mask = adata.obs[fov_col].astype(str).isin(set(fovs_to_plot))
-    if mask.any() and basis in adata.obsm:
-        xy = adata.obsm[basis][mask.to_numpy(), :2]
-        bounds.append((
-            float(xy[:, 0].min()),
-            float(xy[:, 1].min()),
-            float(xy[:, 0].max()),
-            float(xy[:, 1].max()),
-        ))
-
-    for fov_id in fovs_to_plot:
-        fov_info = adata.uns.get("spatial", {}).get(fov_id, {})
-        if not fov_info:
-            continue
-        img = None
-        for candidate in ("hires", "lowres", "segmentation"):
-            img = fov_info.get("images", {}).get(candidate)
-            if img is not None:
-                break
-        if img is None:
-            continue
-
-        extent = _compute_fov_image_extent(adata, fov_id, fov_col, basis)
-        if extent is None:
-            continue
-        bounds.append(extent)
-
-    if not bounds:
+    if not mask.any() or basis not in adata.obsm:
         return (0.0, 1.0), (1.0, 0.0)
 
-    all_bounds = np.asarray(bounds, dtype=float)
-    x_min = float(all_bounds[:, 0].min())
-    y_min = float(all_bounds[:, 1].min())
-    x_max = float(all_bounds[:, 2].max())
-    y_max = float(all_bounds[:, 3].max())
+    xy = np.asarray(adata.obsm[basis][mask.to_numpy(), :2], dtype=float)
+    if xy.shape[0] == 0 or not np.isfinite(xy).all():
+        return (0.0, 1.0), (1.0, 0.0)
+
+    x_min = float(np.nanmin(xy[:, 0]))
+    y_min = float(np.nanmin(xy[:, 1]))
+    x_max = float(np.nanmax(xy[:, 0]))
+    y_max = float(np.nanmax(xy[:, 1]))
 
     dx = (x_max - x_min) * pad_frac or 1.0
     dy = (y_max - y_min) * pad_frac or 1.0
@@ -258,10 +302,12 @@ def nanostring(
     basis: str = "spatial_fov",
     figsize: Optional[tuple] = None,
     img_key: Optional[str] = "hires",
+    img_extent_mode: str = "cells",
     bw: bool = False,
+    rasterized: bool = False,
     scale_factor: Optional[float] = None,
     alpha_img: float = 1.0,
-    cmap: str = "viridis",
+    cmap: Union[str, mcolors.Colormap] = "viridis",
     palette: Optional[Union[dict, list, np.ndarray]] = None,
     vmin: Optional[float] = None,
     vmax: Optional[float] = None,
@@ -301,8 +347,15 @@ def nanostring(
     img_key : str, optional
         Key in ``uns['spatial'][fov]['images']`` for the background image
         (default ``'hires'``).
+    img_extent_mode : str
+        Strategy used to place each FOV image. ``'cells'`` fits image extent to
+        the selected basis bbox of the FOV's cells. ``'panel'`` stretches a
+        single selected FOV image to the full panel extent.
     bw : bool
         If ``True``, render the background image in grayscale.
+    rasterized : bool
+        If ``True``, rasterize the point layer while keeping the overall figure
+        in vector format when saving to SVG/PDF.
     scale_factor : float, optional
         Override the scale factor stored per FOV.
     alpha_img : float
@@ -347,6 +400,7 @@ def nanostring(
     matplotlib.axes.Axes or list of matplotlib.axes.Axes
     """
     basis = _validate_basis(adata, basis)
+    img_extent_mode = _validate_img_extent_mode(img_extent_mode)
     if "spatial" not in adata.uns or not adata.uns["spatial"]:
         raise ValueError("`nanostring` requires non-empty `adata.uns['spatial']`.")
 
@@ -401,7 +455,7 @@ def nanostring(
             )
             colors_to_plot = [colors_to_plot[0]]
 
-    xlim, ylim = _global_bounding_box(adata, fovs_to_plot, fov_col, basis)
+    xlim, ylim = _global_bounding_box(adata, fovs_to_plot, fov_col, basis, img_extent_mode)
     fov_mask = adata.obs[fov_col].astype(str).isin(set(fovs_to_plot))
     cells_in_fovs = adata.obs_names[fov_mask]
     cell_xy = np.asarray(adata.obsm[basis][fov_mask.to_numpy(), :2], dtype=float)
@@ -413,7 +467,16 @@ def nanostring(
         # Background images
         img_alpha = alpha_img if color_key is None else alpha_img
         _place_fov_images(
-            current_ax, adata, fovs_to_plot, fov_col, basis, img_key, img_alpha, bw
+            current_ax,
+            adata,
+            fovs_to_plot,
+            fov_col,
+            basis,
+            img_key,
+            img_alpha,
+            bw,
+            img_extent_mode,
+            panel_extent=(xlim[0], xlim[1], ylim[1], ylim[0]),
         )
 
         if color_key is None:
@@ -472,7 +535,7 @@ def nanostring(
 
             current_ax.scatter(
                 cell_xy[:, 0], cell_xy[:, 1],
-                c=face_colors, s=size, zorder=2, **safe_scatter_kwargs,
+                c=face_colors, s=size, zorder=2, rasterized=rasterized, **safe_scatter_kwargs,
             )
 
             if legend:
@@ -495,8 +558,8 @@ def nanostring(
                 )
         else:
             vals = pd.to_numeric(color_data, errors="coerce").to_numpy()
-            vmin_val = float(np.nanmin(vals)) if vmin is None else float(vmin)
-            vmax_val = float(np.nanmax(vals)) if vmax is None else float(vmax)
+            vmin_val = float(np.nanmin(vals)) if vmin is None else _resolve_vbound(vals, vmin)
+            vmax_val = float(np.nanmax(vals)) if vmax is None else _resolve_vbound(vals, vmax)
             if not (np.isfinite(vmin_val) and np.isfinite(vmax_val)):
                 vmin_val, vmax_val = 0.0, 1.0
 
@@ -504,11 +567,11 @@ def nanostring(
             current_ax.scatter(
                 cell_xy[:, 0], cell_xy[:, 1],
                 c=vals, cmap=cmap, norm=norm_obj,
-                s=size, zorder=2, **safe_scatter_kwargs,
+                s=size, zorder=2, rasterized=rasterized, **safe_scatter_kwargs,
             )
 
             if legend and colorbar_loc is not None:
-                sm = plt.cm.ScalarMappable(norm=norm_obj, cmap=plt.get_cmap(cmap))
+                sm = plt.cm.ScalarMappable(norm=norm_obj, cmap=_resolve_cmap(cmap))
                 sm.set_array([])
                 try:
                     cb = plt.colorbar(sm, ax=current_ax, pad=0.01, fraction=0.08,
@@ -552,10 +615,12 @@ def nanostringseg(
     groupby: Optional[str] = None,
     figsize: Optional[tuple] = None,
     img_key: Optional[str] = "hires",
+    img_extent_mode: str = "cells",
     bw: bool = False,
+    rasterized: bool = False,
     scale_factor: Optional[float] = None,
     alpha_img: float = 0.5,
-    cmap: str = "viridis",
+    cmap: Union[str, mcolors.Colormap] = "viridis",
     palette: Optional[Union[dict, list, np.ndarray]] = None,
     vmin: Optional[float] = None,
     vmax: Optional[float] = None,
@@ -607,8 +672,15 @@ def nanostringseg(
     img_key : str, optional
         Key for the background image in ``uns['spatial'][fov]['images']``
         (default ``'hires'``).
+    img_extent_mode : str
+        Strategy used to place each FOV image. ``'cells'`` fits image extent to
+        the selected basis bbox of the FOV's cells. ``'panel'`` stretches a
+        single selected FOV image to the full panel extent.
     bw : bool
         If ``True``, render the background image in grayscale.
+    rasterized : bool
+        If ``True``, rasterize the segmentation polygon layer while keeping the
+        overall figure in vector format when saving to SVG/PDF.
     scale_factor : float, optional
         Override the per-FOV scale factor.
     alpha_img : float
@@ -670,6 +742,7 @@ def nanostringseg(
     if "spatial" not in adata.uns or not adata.uns["spatial"]:
         raise ValueError("`nanostringseg` requires non-empty `adata.uns['spatial']`.")
     basis = _validate_basis(adata, basis)
+    img_extent_mode = _validate_img_extent_mode(img_extent_mode)
 
     gpd, wkt_mod = _require_geopandas()
 
@@ -741,7 +814,7 @@ def nanostringseg(
             )
             colors_to_plot = [colors_to_plot[0]]
 
-    xlim, ylim = _global_bounding_box(adata, fovs_to_plot, fov_col, basis)
+    xlim, ylim = _global_bounding_box(adata, fovs_to_plot, fov_col, basis, img_extent_mode)
 
     # Maps fov_id -> `(sx, sy, tx, ty)` needed to place local polygons in the chosen basis.
     fov_affines: dict = {}
@@ -835,8 +908,16 @@ def nanostringseg(
 
         # Background images
         _place_fov_images(
-            current_ax, adata, fovs_to_plot, fov_col, basis, img_key,
-            1.0 if color_key is None else alpha_img, bw,
+            current_ax,
+            adata,
+            fovs_to_plot,
+            fov_col,
+            basis,
+            img_key,
+            1.0 if color_key is None else alpha_img,
+            bw,
+            img_extent_mode,
+            panel_extent=(xlim[0], xlim[1], ylim[1], ylim[0]),
         )
 
         if color_key is None:
@@ -905,7 +986,6 @@ def nanostringseg(
             "ax": current_ax,
             "edgecolor": edges_color,
             "linewidth": edges_width,
-            "alpha": alpha,
             **{k: v for k, v in kwargs.items()
                if k not in ("column", "cmap", "color", "legend", "aspect")},
         }
@@ -931,7 +1011,9 @@ def nanostringseg(
                 plot_kw["edgecolor"] = face_colors
             else:
                 plot_kw["color"] = face_colors
+                plot_kw["alpha"] = alpha
             plot_kw["legend"] = False
+            collection_start = len(current_ax.collections)
 
             try:
                 temp_gdf.plot(**plot_kw)
@@ -941,6 +1023,8 @@ def nanostringseg(
                     temp_gdf.plot(**plot_kw)
                 else:
                     raise
+            if rasterized:
+                _rasterize_new_collections(current_ax, collection_start)
 
             if legend:
                 path_effect = (
@@ -973,22 +1057,26 @@ def nanostringseg(
                 )
         else:
             vals = pd.to_numeric(temp_gdf[color_key], errors="coerce").to_numpy()
-            vmin_val = float(np.nanmin(vals)) if vmin is None else float(vmin)
-            vmax_val = float(np.nanmax(vals)) if vmax is None else float(vmax)
+            vmin_val = float(np.nanmin(vals)) if vmin is None else _resolve_vbound(vals, vmin)
+            vmax_val = float(np.nanmax(vals)) if vmax is None else _resolve_vbound(vals, vmax)
             if not (np.isfinite(vmin_val) and np.isfinite(vmax_val)) or vmax_val <= vmin_val:
                 vmin_val, vmax_val = 0.0, 1.0
 
-            cmap_obj = plt.get_cmap(cmap)
+            cmap_obj = _resolve_cmap(cmap)
             norm_obj = mcolors.Normalize(vmin=vmin_val, vmax=vmax_val)
 
             if outline_only:
-                edge_colors = [
-                    na_color if pd.isna(v) else cmap_obj(norm_obj(float(v)))
-                    for v in vals
-                ]
+                edge_colors = []
+                for v in vals:
+                    if pd.isna(v):
+                        edge_colors.append(na_color)
+                    else:
+                        edge_colors.append(cmap_obj(norm_obj(float(v))))
+                edge_colors = _scale_rgba_alpha(edge_colors, alpha)
                 plot_kw["facecolor"] = "none"
                 plot_kw["edgecolor"] = edge_colors
                 plot_kw["legend"] = False
+                collection_start = len(current_ax.collections)
                 try:
                     temp_gdf.plot(**plot_kw)
                 except ValueError as exc:
@@ -997,12 +1085,19 @@ def nanostringseg(
                         temp_gdf.plot(**plot_kw)
                     else:
                         raise
+                if rasterized:
+                    _rasterize_new_collections(current_ax, collection_start)
             else:
-                plot_kw["column"] = color_key
-                plot_kw["cmap"] = cmap
-                plot_kw["vmin"] = vmin_val
-                plot_kw["vmax"] = vmax_val
+                face_colors = []
+                for v in vals:
+                    if pd.isna(v):
+                        face_colors.append(na_color)
+                    else:
+                        face_colors.append(cmap_obj(norm_obj(float(v))))
+                face_colors = _scale_rgba_alpha(face_colors, alpha)
+                plot_kw["color"] = face_colors
                 plot_kw["legend"] = False
+                collection_start = len(current_ax.collections)
                 try:
                     temp_gdf.plot(**plot_kw)
                 except ValueError as exc:
@@ -1011,6 +1106,8 @@ def nanostringseg(
                         temp_gdf.plot(**plot_kw)
                     else:
                         raise
+                if rasterized:
+                    _rasterize_new_collections(current_ax, collection_start)
 
             if legend and colorbar_loc is not None:
                 sm = plt.cm.ScalarMappable(norm=norm_obj, cmap=cmap_obj)
