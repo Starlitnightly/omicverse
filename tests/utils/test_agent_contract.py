@@ -67,13 +67,8 @@ Agent = smart_agent_module.Agent
 OmicVerseAgent = smart_agent_module.OmicVerseAgent
 list_supported_models = smart_agent_module.list_supported_models
 
-from omicverse.utils.harness import build_stream_event
-from omicverse.utils.ovagent.runtime import OmicVerseRuntime
-from omicverse.utils.ovagent.workflow import (
-    WorkflowConfig,
-    WorkflowDocument,
-    load_workflow_document,
-)
+from omicverse.utils.harness import build_stream_event  # noqa: E402
+from omicverse.utils.ovagent.runtime import OmicVerseRuntime  # noqa: E402
 
 for name, module in _ORIGINAL_MODULES.items():
     if module is None:
