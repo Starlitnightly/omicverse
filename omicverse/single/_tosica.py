@@ -1,9 +1,4 @@
 
-
-from ..external.tosica import fit_model
-from ..external.tosica.TOSICA_model import scTrans_model as create_model
-from ..external.tosica.train import set_seed,splitDataSet,get_gmt,read_gmt,create_pathway_mask,train_one_epoch,evaluate,MyDataSet
-from ..external.tosica.pre import predict,predicted,todense
 import random
 import torch.nn.functional as F
 import numpy as np
@@ -28,6 +23,38 @@ import time
 import anndata
 from .._settings import add_reference
 from .._registry import register_function
+
+
+def _get_tosica_backend():
+    from ..external.tosica import fit_model
+    from ..external.tosica.TOSICA_model import scTrans_model as create_model
+    from ..external.tosica.pre import predict, predicted, todense
+    from ..external.tosica.train import (
+        MyDataSet,
+        create_pathway_mask,
+        evaluate,
+        get_gmt,
+        read_gmt,
+        set_seed,
+        splitDataSet,
+        train_one_epoch,
+    )
+
+    return {
+        "fit_model": fit_model,
+        "create_model": create_model,
+        "set_seed": set_seed,
+        "splitDataSet": splitDataSet,
+        "get_gmt": get_gmt,
+        "read_gmt": read_gmt,
+        "create_pathway_mask": create_pathway_mask,
+        "train_one_epoch": train_one_epoch,
+        "evaluate": evaluate,
+        "MyDataSet": MyDataSet,
+        "predict": predict,
+        "predicted": predicted,
+        "todense": todense,
+    }
 
 
 
@@ -125,6 +152,7 @@ class pyTOSICA(object):
         
         """
 
+        tosica_backend = _get_tosica_backend()
 
         self.adata=adata 
         self.gmt_path=gmt_path
@@ -134,7 +162,7 @@ class pyTOSICA(object):
         self.embed_dim=embed_dim
 
         GLOBAL_SEED = 1
-        set_seed(GLOBAL_SEED)
+        tosica_backend["set_seed"](GLOBAL_SEED)
         from torch.utils.tensorboard import SummaryWriter
         #device = 'cuda:0'
         device = torch.device(device if torch.cuda.is_available() else "cpu")
@@ -147,7 +175,7 @@ class pyTOSICA(object):
         if os.path.exists(project_path) is False:
             os.makedirs(project_path)
         self.tb_writer = SummaryWriter()
-        exp_train, label_train, exp_valid, label_valid, inverse,genes = splitDataSet(adata,label_name)
+        exp_train, label_train, exp_valid, label_valid, inverse,genes = tosica_backend["splitDataSet"](adata,label_name)
         if gmt_path is None:
             mask = np.random.binomial(1,mask_ratio,size=(len(genes), max_gs))
             pathway = list()
@@ -159,12 +187,12 @@ class pyTOSICA(object):
             if '.gmt' in gmt_path:
                 gmt_path = gmt_path
             else:
-                gmt_path = get_gmt(gmt_path)
+                gmt_path = tosica_backend["get_gmt"](gmt_path)
                 if gmt_path=="Error":
                     print("You need to download the gene sets first using ov.utils.download_tosica_gmt()")
             
-            reactome_dict = read_gmt(gmt_path, min_g=0, max_g=max_g)
-            mask,pathway = create_pathway_mask(feature_list=genes,
+            reactome_dict = tosica_backend["read_gmt"](gmt_path, min_g=0, max_g=max_g)
+            mask,pathway = tosica_backend["create_pathway_mask"](feature_list=genes,
                                             dict_pathway=reactome_dict,
                                             add_missing=n_unannotated,
                                             fully_connected=True)
@@ -183,8 +211,8 @@ class pyTOSICA(object):
 
         num_classes = np.int64(torch.max(label_train)+1)
 
-        train_dataset = MyDataSet(exp_train, label_train)
-        valid_dataset = MyDataSet(exp_valid, label_valid)
+        train_dataset = tosica_backend["MyDataSet"](exp_train, label_train)
+        valid_dataset = tosica_backend["MyDataSet"](exp_valid, label_valid)
         self.train_loader = torch.utils.data.DataLoader(train_dataset,
                                                 batch_size=batch_size,
                                                 shuffle=True,
@@ -194,7 +222,7 @@ class pyTOSICA(object):
                                                 shuffle=False,
                                                 pin_memory=True,drop_last=True)
 
-        self.model = create_model(num_classes=num_classes, 
+        self.model = tosica_backend["create_model"](num_classes=num_classes, 
                                   num_genes=len(exp_train[0]),  
                                   mask = mask,embed_dim=embed_dim,
                                   depth=depth,num_heads=num_heads,
@@ -221,6 +249,7 @@ class pyTOSICA(object):
             Trained TOSICA model.
         
         """
+        tosica_backend = _get_tosica_backend()
         if pre_weights != "":
             assert os.path.exists(pre_weights), "pre_weights file: '{}' not exist.".format(pre_weights)
             preweights_dict = torch.load(pre_weights, map_location=self.device)
@@ -234,13 +263,13 @@ class pyTOSICA(object):
         lf = lambda x: ((1 + math.cos(x * math.pi / epochs)) / 2) * (1 - lrf) + lrf  
         scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
         for epoch in range(epochs):
-            train_loss, train_acc = train_one_epoch(model=self.model,
+            train_loss, train_acc = tosica_backend["train_one_epoch"](model=self.model,
                                                     optimizer=optimizer,
                                                     data_loader=self.train_loader,
                                                     device=self.device,
                                                     epoch=epoch)
             scheduler.step() 
-            val_loss, val_acc = evaluate(model=self.model,
+            val_loss, val_acc = tosica_backend["evaluate"](model=self.model,
                                         data_loader=self.valid_loader,
                                         device=self.device,
                                         epoch=epoch)
@@ -309,6 +338,7 @@ class pyTOSICA(object):
             Query AnnData augmented with predicted labels and model outputs.
         
         """
+        tosica_backend = _get_tosica_backend()
 
         mask_path = os.getcwd()+'/%s'%self.project_path+'/mask.npy'
         dictionary = pd.read_table(self.project_path+'/label_dictionary.csv', sep=',',header=0,index_col=0)
@@ -342,13 +372,13 @@ class pyTOSICA(object):
         adata_list = []
         while (n_line) <= all_line:
             if (all_line-n_line)%batch_size != 1:
-                expdata = pd.DataFrame(todense(pre_adata[n_line:n_line+min(n_step,(all_line-n_line))]),
+                expdata = pd.DataFrame(tosica_backend["todense"](pre_adata[n_line:n_line+min(n_step,(all_line-n_line))]),
                                        index=np.array(pre_adata[n_line:n_line+min(n_step,(all_line-n_line))].obs_names).tolist(), 
                                        columns=np.array(pre_adata.var_names).tolist())
                 print(n_line)
                 n_line = n_line+n_step
             else:
-                expdata = pd.DataFrame(todense(pre_adata[n_line:n_line+min(n_step,(all_line-n_line-2))]),
+                expdata = pd.DataFrame(tosica_backend["todense"](pre_adata[n_line:n_line+min(n_step,(all_line-n_line-2))]),
                                        index=np.array(pre_adata[n_line:n_line+min(n_step,(all_line-n_line-2))].obs_names).tolist(), 
                                        columns=np.array(pre_adata.var_names).tolist())
                 n_line = (all_line-n_line-2)
@@ -434,10 +464,10 @@ def train(adata, gmt_path, project=None,pre_weights='',
         ./pathway.csv: Gene set list
         ./label_dictionary.csv: Label list
         ./weights20220603/: Weights
-    
-    """
 
-    fit_model(adata, gmt_path, project=project,pre_weights=pre_weights, label_name=label_name,
+    """
+    tosica_backend = _get_tosica_backend()
+    tosica_backend["fit_model"](adata, gmt_path, project=project,pre_weights=pre_weights, label_name=label_name,
               max_g=max_g,max_gs=max_gs,mask_ratio=mask_ratio, n_unannotated = n_unannotated,batch_size=batch_size, 
               embed_dim=embed_dim,depth=depth,num_heads=num_heads,lr=lr, epochs= epochs, lrf=lrf)
 
@@ -475,6 +505,7 @@ def pre(adata,model_weight_path,project,laten=False,save_att = 'X_att',
     """
     
     mask_path = os.getcwd()+'/%s'%project+'/mask.npy'
-    adata = predict(adata,model_weight_path,project=project,mask_path = mask_path,laten=laten,
+    tosica_backend = _get_tosica_backend()
+    adata = tosica_backend["predict"](adata,model_weight_path,project=project,mask_path = mask_path,laten=laten,
              save_att = save_att, save_lantent = save_lantent,n_step=n_step,cutoff=cutoff,n_unannotated = n_unannotated,batch_size=batch_size,embed_dim=embed_dim,depth=depth,num_heads=num_heads)
     return(adata)

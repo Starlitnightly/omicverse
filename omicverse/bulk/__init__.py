@@ -37,7 +37,6 @@ Examples:
     """
 
 # Heavy functionality lives in submodules and is imported lazily.
-from ._Gene_module import pyWGCNA,readWGCNA
 from ._Enrichment import pyGSEA,pyGSE,geneset_enrichment,geneset_plot,geneset_enrichment_GSEA,geneset_plot_multi,enrichment_multi_concat
 from ._network import pyPPI,string_interaction,string_map,generate_G
 from ._chm13 import get_chm13_gene,find_chm13_gene
@@ -45,6 +44,14 @@ from ._Deseq2 import pyDEG,deseq2_normalize,estimateSizeFactors,estimateDispersi
 from ._tcga import pyTCGA
 from ._combat import batch_correction
 from ._decov import Deconvolution
+
+
+def __getattr__(name):
+    if name in {"pyWGCNA", "readWGCNA"}:
+        from . import _Gene_module as gene_module
+
+        return getattr(gene_module, name)
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 __all__ = [
 

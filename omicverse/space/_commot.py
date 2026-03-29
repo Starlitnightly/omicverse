@@ -11,9 +11,10 @@ from tqdm import tqdm
 from itertools import combinations_with_replacement
 from .._registry import register_function
 
-# Get the optimized function
-#from omicverse.external.commot.tools._spatial_communication import summarize_cluster_gpu
-from ..external.commot.tools._spatial_communication import summarize_cluster_gpu
+def _get_summarize_cluster_gpu():
+    from ..external.commot.tools._spatial_communication import summarize_cluster_gpu
+
+    return summarize_cluster_gpu
 
 @register_function(
     aliases=["通信AnnData", "create_communication_anndata", "cellchat格式转换", "commot汇总", "细胞通信汇总"],
@@ -61,6 +62,8 @@ def create_communication_anndata(adata, clustering_column, n_permutations=100):
         - layers: 'pvalues' and 'means'
     """
     
+    summarize_cluster_gpu = _get_summarize_cluster_gpu()
+
     # Get cluster info
     celltypes = list(adata.obs[clustering_column].unique())
     celltypes.sort()

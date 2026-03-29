@@ -1,5 +1,3 @@
-from ..external import mofapy2
-from ..external.mofapy2.run.entry_point import entry_point
 from ..utils import pyomic_palette
 from ..single import get_celltype_marker
 import numpy as np
@@ -16,6 +14,12 @@ from typing import Union,Tuple,Optional
 import matplotlib
 from .._settings import add_reference
 from .._registry import register_function
+
+
+def _get_mofa_entry_point():
+    from ..external.mofapy2.run.entry_point import entry_point
+
+    return entry_point
 
 
 mofax_install=False
@@ -567,6 +571,7 @@ class pyMOFA(object):
             Writes trained model to ``outfile`` and records MOFA reference in
             each input omics object.
         """
+        entry_point = _get_mofa_entry_point()
         ent1 = entry_point()
         ent1.set_data_options(
             scale_groups = scale_groups, 

@@ -14,10 +14,25 @@ from .._settings import add_reference
 from .._registry import register_function
 
 from ._cosg import cosg
-from ..external.palantir.plot import plot_palantir_results,plot_branch_selection,plot_gene_trends
-from ..external.palantir.utils import run_diffusion_maps,determine_multiscale_space,run_magic_imputation
-from ..external.palantir.core import run_palantir
-from ..external.palantir.presults import select_branch_cells,compute_gene_trends
+
+
+def _get_palantir_backend():
+    from ..external.palantir.core import run_palantir
+    from ..external.palantir.plot import plot_branch_selection, plot_gene_trends, plot_palantir_results
+    from ..external.palantir.presults import compute_gene_trends, select_branch_cells
+    from ..external.palantir.utils import determine_multiscale_space, run_diffusion_maps, run_magic_imputation
+
+    return {
+        "plot_palantir_results": plot_palantir_results,
+        "plot_branch_selection": plot_branch_selection,
+        "plot_gene_trends": plot_gene_trends,
+        "run_diffusion_maps": run_diffusion_maps,
+        "determine_multiscale_space": determine_multiscale_space,
+        "run_magic_imputation": run_magic_imputation,
+        "run_palantir": run_palantir,
+        "select_branch_cells": select_branch_cells,
+        "compute_gene_trends": compute_gene_trends,
+    }
 
 
 @register_function(
@@ -150,12 +165,13 @@ class TrajInfer(object):
         """
         
         if method=='palantir':
+            palantir = _get_palantir_backend()
 
-            dm_res = run_diffusion_maps(self.adata,
+            dm_res = palantir["run_diffusion_maps"](self.adata,
                                                        pca_key=self.use_rep, 
                                                        n_components=self.n_comps)
-            ms_data = determine_multiscale_space(self.adata)
-            imputed_X = run_magic_imputation(self.adata)
+            ms_data = palantir["determine_multiscale_space"](self.adata)
+            imputed_X = palantir["run_magic_imputation"](self.adata)
 
             sc.tl.rank_genes_groups(self.adata, groupby=self.groupby, 
                         method='t-test',use_rep=self.use_rep,)
@@ -181,7 +197,7 @@ class TrajInfer(object):
             origin_cell_index=self.adata[self.adata.obs[self.groupby]==origin_cell].to_df()[gene].sort_values().index[-1]
             
             start_cell = origin_cell_index
-            pr_res = run_palantir(
+            pr_res = palantir["run_palantir"](
                 self.adata, early_cell=start_cell, terminal_states=terminal_states,
                 **kwargs
             )
@@ -249,7 +265,8 @@ class TrajInfer(object):
         -------
         None
         """
-        plot_palantir_results(self.adata,**kwargs)
+        palantir = _get_palantir_backend()
+        palantir["plot_palantir_results"](self.adata,**kwargs)
         
     def palantir_cal_branch(self,**kwargs):
         r"""Calculate and plot branch selection for Palantir results.
@@ -264,8 +281,9 @@ class TrajInfer(object):
         -------
         None
         """
-        masks = select_branch_cells(self.adata, **kwargs)
-        plot_branch_selection(self.adata)
+        palantir = _get_palantir_backend()
+        masks = palantir["select_branch_cells"](self.adata, **kwargs)
+        palantir["plot_branch_selection"](self.adata)
 
     def palantir_cal_gene_trends(self,layers:str="MAGIC_imputed_data"):
         r"""Calculate gene expression trends along Palantir trajectories.
@@ -281,7 +299,8 @@ class TrajInfer(object):
             Gene-trend result object containing trajectory-associated expression
             patterns.
         """
-        gene_trends = compute_gene_trends(
+        palantir = _get_palantir_backend()
+        gene_trends = palantir["compute_gene_trends"](
             self.adata,
             expression_key=layers,
         )
@@ -301,7 +320,8 @@ class TrajInfer(object):
             Matplotlib figure/axes object returned by ``plot_gene_trends``.
         """
         #genes = ['Cdca3','Rasl10a','Mog','Aqp4']
-        return plot_gene_trends(self.adata, genes)
+        palantir = _get_palantir_backend()
+        return palantir["plot_gene_trends"](self.adata, genes)
     
 import networkx as nx
 from scipy.sparse import csr_matrix

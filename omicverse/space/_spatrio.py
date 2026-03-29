@@ -3,8 +3,13 @@ from typing import Any
 import pandas as pd
 import numpy as np
 import scanpy as sc
-from ..external.spatrio.spatrio import ot_alignment,assign_coord
 from .._registry import register_function
+
+
+def _get_spatrio_functions():
+    from ..external.spatrio.spatrio import assign_coord, ot_alignment
+
+    return ot_alignment, assign_coord
 
 @register_function(
     aliases=["CellMap", "空间映射", "细胞映射到空间", "spatrio_cellmap", "OT映射"],
@@ -145,6 +150,8 @@ class CellMap(object):
         pandas.DataFrame
             Transport assignments with spot, cell and mapping score columns.
         """
+        ot_alignment, _ = _get_spatrio_functions()
+
         ##spatial type
         if sp_type=='leiden' and 'leiden' not in self.adata_sp.obs.columns:
             sc.pp.neighbors(self.adata_sp,n_neighbors=15,use_rep=self.use_rep_sp)
@@ -186,6 +193,7 @@ class CellMap(object):
             Filtered copy of ``adata_sc`` containing mapped cells with
             coordinates in ``obsm['spatial']`` and mapping metadata in ``obs``.
         """
+        _, assign_coord = _get_spatrio_functions()
         spatrio_map = assign_coord(adata1 = self.adata_sp,adata2 = self.adata_sc,
                                    out_data = self.spatrio_decon,**kwargs)
         #self.adata_sp.obs=self.adata_sp.obs.join(spatrio_map.set_index('cell'))
@@ -348,6 +356,8 @@ class CellLoc(object):
         pandas.DataFrame
             Raw cell-to-spot transport mapping table.
         """
+        ot_alignment, _ = _get_spatrio_functions()
+
         ##spatial type
         if sp_type=='leiden' and 'leiden' not in self.adata_sp.obs.columns:
             sc.pp.neighbors(self.adata_sp,n_neighbors=15,use_rep=self.use_rep_sp)
@@ -549,6 +559,7 @@ class CellLoc(object):
         anndata.AnnData
             Single-cell AnnData with mapped spatial coordinates and spot metadata.
         """
+        _, assign_coord = _get_spatrio_functions()
         spatrio_map = assign_coord(adata1 = self.adata_sp,adata2 = self.adata_sc,
                                    out_data = self.spatrio_decon,**kwargs)
         #self.adata_sp.obs=self.adata_sp.obs.join(spatrio_map.set_index('cell'))

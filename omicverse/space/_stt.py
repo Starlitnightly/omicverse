@@ -1,11 +1,16 @@
 r"""Module providing encapsulation of STT for spatial transition tensor analysis."""
-from ..external.STT import tl,pl
 from typing import Any
 import scanpy as sc
 import numpy as np
 import pandas as pd
 from .._settings import add_reference
 from .._registry import register_function
+
+
+def _get_stt_modules():
+    from ..external.STT import pl, tl
+
+    return tl, pl
 
 @register_function(
     aliases=["STT空间转换张量", "STT", "spatial_transition_tensor", "空间转换分析", "空间动力学"],
@@ -182,6 +187,7 @@ class STT(object):
             - Results are stored in self.adata_aggr
             - Spatial coordinates are preserved in obsm
         """
+        tl, _ = _get_stt_modules()
         self.adata_aggr = tl.dynamical_iteration(self.adata,n_states = n_states,
                                     n_iter = n_iter, weight_connectivities = weight_connectivities,
                                     n_neighbors = n_neighbors,thresh_ms_gene = thresh_ms_gene,
@@ -242,6 +248,7 @@ class STT(object):
             - Results can be visualized using plot_pathway()
             - Considers both spatial and transcriptional information
         """
+        tl, _ = _get_stt_modules()
         return tl.compute_pathway(self.adata,self.adata_aggr,pathway_dict,n_components=n_components)
 
     def plot_pathway(self,label_fontsize=20,**kwargs):
@@ -268,6 +275,7 @@ class STT(object):
             - Arrows show direction of transitions
             - Spatial coordinates are preserved in visualization
         """
+        _, pl = _get_stt_modules()
         fig = pl.plot_pathway(self.adata,**kwargs)
         for ax in fig.axes:
             ax.set_xlabel('Embedding 1', fontsize=label_fontsize)
@@ -299,6 +307,7 @@ class STT(object):
             - Colors represent different cell states
             - Spatial arrangement reflects tissue organization
         """
+        _, pl = _get_stt_modules()
         ax=pl.plot_tensor_pathway(self.adata,self.adata_aggr,
                                   pathway_name = pathway_name,**kwargs)
         return ax
@@ -327,6 +336,7 @@ class STT(object):
             - Spatial relationships are encoded in tensor structure
             - Can be used to identify major transition paths
         """
+        _, pl = _get_stt_modules()
         return pl.plot_tensor(self.adata, self.adata_aggr, 
                           list_attractor = list_attractor,basis = self.spatial_loc,**kwargs)
 
@@ -354,6 +364,7 @@ class STT(object):
             - Ridges represent transition barriers
             - Coordinates preserve both spatial and state information
         """
+        tl, _ = _get_stt_modules()
         tl.construct_landscape(self.adata, coord_key = coord_key,**kwargs)
         self.adata.obsm['trans_coord'] = self.adata.uns['land_out']['trans_coord']
 
@@ -379,6 +390,7 @@ class STT(object):
             - Considers transition probabilities between states
             - Results can be visualized with plot_landscape()
         """
+        _, pl = _get_stt_modules()
         return pl.infer_lineage(self.adata,**kwargs)
 
     def plot_landscape(self,**kwargs):
@@ -403,6 +415,7 @@ class STT(object):
             - Arrows indicate preferred transition directions
             - Spatial relationships are preserved in layout
         """
+        _, pl = _get_stt_modules()
         return pl.plot_landscape(self.adata,**kwargs)
 
     def plot_sankey(self,vector1, vector2):
@@ -429,6 +442,7 @@ class STT(object):
             - Useful for visualizing state changes
             - Shows conservation of cell numbers
         """
+        _, pl = _get_stt_modules()
         return pl.plot_sankey(vector1, vector2)
 
     def plot_top_genes(self,**kwargs):
@@ -453,5 +467,6 @@ class STT(object):
             - Useful for identifying key regulators
             - Can reveal transition mechanisms
         """
+        _, pl = _get_stt_modules()
         return pl.plot_top_genes(self.adata,**kwargs)
     # End-of-file (EOF)

@@ -1,8 +1,19 @@
-from ..external.SEACells import SEACells, summarize_by_SEACell,summarize_by_soft_SEACell
-from ..external.SEACells import compute_celltype_purity,separation,compactness
 from .._settings import add_reference
 from .._registry import register_function
 import pandas as pd
+
+
+def _get_seacells_backend():
+    from ..external.SEACells import (
+        SEACells,
+        compactness,
+        compute_celltype_purity,
+        separation,
+        summarize_by_SEACell,
+        summarize_by_soft_SEACell,
+    )
+
+    return SEACells, summarize_by_SEACell, summarize_by_soft_SEACell, compute_celltype_purity, separation, compactness
 
 
 @register_function(
@@ -87,6 +98,7 @@ class MetaCell(object):
         if n_metacells is None:
             n_metacells=adata.shape[0]//75
 
+        SEACells, _, _, _, _, _ = _get_seacells_backend()
 
         self.model=SEACells(adata, 
                   build_kernel_on=use_rep, 
@@ -165,6 +177,7 @@ class MetaCell(object):
         anndata.AnnData
             Metacell-level AnnData object.
         """
+        _, summarize_by_SEACell, summarize_by_soft_SEACell, _, _, _ = _get_seacells_backend()
         if method=='soft':
             ad=summarize_by_soft_SEACell(self.adata, self.model.A_, 
                                         celltype_label=celltype_label,
@@ -242,6 +255,7 @@ class MetaCell(object):
         if self.metacells_ad is None:
             raise ValueError('Please run .predicted() first')
         else:
+            _, _, _, compute_celltype_purity, _, _ = _get_seacells_backend()
             return compute_celltype_purity(self.adata,
                                            celltype_label)
     
@@ -249,6 +263,7 @@ class MetaCell(object):
         if self.metacells_ad is None:
             raise ValueError('Please run .predicted() first')
         else:
+            _, _, _, _, separation, _ = _get_seacells_backend()
             return separation(self.adata,
                                            use_rep,nth_nbr=nth_nbr,**kwargs)
         
@@ -256,6 +271,7 @@ class MetaCell(object):
         if self.metacells_ad is None:
             raise ValueError('Please run .predicted() first')
         else:
+            _, _, _, _, _, compactness = _get_seacells_backend()
             return compactness(self.adata,
                                            use_rep,**kwargs)
 

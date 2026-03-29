@@ -21,12 +21,29 @@ from scipy.cluster.hierarchy import linkage,dendrogram
 from ..utils import pyomic_palette,plot_network
 import os
 
-try:
-    from ..external.PyWGCNA.wgcna import pyWGCNA
-    from ..external.PyWGCNA.utils import readWGCNA
-except Exception:  # pragma: no cover - optional dependency
-    pyWGCNA = None
-    readWGCNA = None
+
+def _get_pywgcna_backend():
+    try:
+        from ..external.PyWGCNA.utils import readWGCNA
+        from ..external.PyWGCNA.wgcna import pyWGCNA
+    except Exception:  # pragma: no cover - optional dependency
+        return None, None
+    return pyWGCNA, readWGCNA
+
+
+def __getattr__(name):
+    if name in {"pyWGCNA", "readWGCNA"}:
+        pywgcna_cls, read_wgcna_fn = _get_pywgcna_backend()
+        mapping = {
+            "pyWGCNA": pywgcna_cls,
+            "readWGCNA": read_wgcna_fn,
+        }
+        value = mapping[name]
+        if value is None:
+            raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 class pyWGCNA_old(object):

@@ -1,5 +1,7 @@
-from ..external.starfysh import (AA, utils, plot_utils, post_analysis)
-from ..external.starfysh import _starfysh as sf_model
+def _get_starfysh_modules():
+    from ..external.starfysh import AA, _starfysh as sf_model, plot_utils, post_analysis, utils
+
+    return AA, utils, plot_utils, post_analysis, sf_model
 
 class STARFYSH:
     """
@@ -40,4 +42,5 @@ class STARFYSH:
                 Annotated data matrix containing spatial transcriptomics data.
                 Must contain spatial coordinates in adata.obsm['spatial'].
         """
-        pass
+        self.adata = adata
+        self.AA, self.utils, self.plot_utils, self.post_analysis, self.sf_model = _get_starfysh_modules()

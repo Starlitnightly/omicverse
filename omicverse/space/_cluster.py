@@ -3,7 +3,6 @@ import torch
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 import torch.nn.functional as F
-from ..external.STAGATE_pyG import Batch_Data,Cal_Spatial_Net,Transfer_pytorch_Data,Stats_Spatial_Net,STAGATE
 import scanpy as sc
 from anndata import AnnData
 import numpy as np
@@ -12,6 +11,18 @@ from scipy.sparse import csr_matrix
 from .._settings import add_reference
 from .._registry import register_function
 from .._settings import Colors
+
+
+def _get_stagate_backend():
+    from ..external.STAGATE_pyG import (
+        Batch_Data,
+        Cal_Spatial_Net,
+        STAGATE,
+        Stats_Spatial_Net,
+        Transfer_pytorch_Data,
+    )
+
+    return Batch_Data, Cal_Spatial_Net, Transfer_pytorch_Data, Stats_Spatial_Net, STAGATE
 
 
 @register_function(
@@ -144,6 +155,7 @@ class pySTAGATE:
         # Initialize device
         device = torch.device(device if torch.cuda.is_available() else 'cpu')
         self.device=device
+        Batch_Data, Cal_Spatial_Net, Transfer_pytorch_Data, Stats_Spatial_Net, STAGATE = _get_stagate_backend()
 
         # Create batches
         batch_list = Batch_Data(adata, num_batch_x=num_batch_x, num_batch_y=num_batch_y,

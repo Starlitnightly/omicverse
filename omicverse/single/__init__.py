@@ -43,6 +43,7 @@ Examples:
     >>> mofa = ov.single.pyMOFA(data_dict)
     >>> mofa.build_mofa()
 """
+import importlib
 
 # Heavy functionality lives in submodules and is imported lazily.
 
@@ -91,7 +92,6 @@ except ImportError:
 from ._aucell import aucell
 from ._metacell import MetaCell,plot_metacells,get_obs_value
 from ._mdic3 import pyMDIC3
-from ._cnmf import *
 from ._gptcelltype import gptcelltype,gpt4celltype,get_cluster_celltype
 from ._cytotrace2 import cytotrace2
 from ._gptcelltype_local import gptcelltype_local
@@ -122,6 +122,10 @@ from ._markers import find_markers, get_markers
 def __getattr__(name):
     if name == "popv":
         return importlib.import_module(".popv", package=__name__)
+    if name in {"cNMF", "Hotspot"}:
+        from . import _cnmf as cnmf_module
+
+        return getattr(cnmf_module, name)
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 
@@ -257,6 +261,8 @@ __all__ = [
     
     # Additional analysis tools  
     'cnmf',
+    'cNMF',
+    'Hotspot',
     'generate_scRNA_report',
     'SCENIC',
     'build_correlation_network_umap_layout',

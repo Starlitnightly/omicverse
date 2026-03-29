@@ -20,9 +20,6 @@ __author__ = "Xiang Zhou"
 __email__ = "xzhou@amss.ac.cn"
 __citation__ = "Zhou, X., Dong, K. & Zhang, S. Integrating spatial transcriptomics data across different conditions, technologies and developmental stages. Nat Comput Sci 3, 894–906 (2023)"
 
-from ..external.STAligner.mnn_utils import create_dictionary_mnn
-from ..external.STAligner.STALIGNER import STAligner
-
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -41,6 +38,13 @@ from torch_geometric.loader import DataLoader
 
 from .._settings import add_reference
 from .._registry import register_function
+
+
+def _get_staligner_backend():
+    from ..external.STAligner.STALIGNER import STAligner
+    from ..external.STAligner.mnn_utils import create_dictionary_mnn
+
+    return STAligner, create_dictionary_mnn
 
 
 @register_function(
@@ -371,6 +375,7 @@ class pySTAligner(object):
         self.knn_neigh = knn_neigh
         self.Batch_list = Batch_list
         self.batch_key = batch_key
+        STAligner, _ = _get_staligner_backend()
         self.model = STAligner(hidden_dims=[adata.X.shape[1], hidden_dims[0],
                                             hidden_dims[1]]).to(device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr,
@@ -439,6 +444,7 @@ class pySTAligner(object):
         self.model = self.model.to(self.device)
 
 
+        _, create_dictionary_mnn = _get_staligner_backend()
         print('Train with STAligner...')
         for epoch in tqdm(range(500, self.n_epochs)):
             if epoch % 100 == 0 or epoch == 500:

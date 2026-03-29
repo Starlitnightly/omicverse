@@ -1,8 +1,3 @@
-
-
-from ..external.VIA.core import VIA
-from ..external.VIA.datasets_via import scRNA_hematopoiesis
-
 import anndata
 import numpy as np
 import scanpy as sc
@@ -12,12 +7,25 @@ import igraph as ig
 import pygam as pg
 from datetime import datetime
 from typing import Union,Tuple
-
-from ..external.VIA.utils_via import *
-from ..external.VIA.plotting_via import *
 from .._settings import add_reference
 from .._registry import register_function
 #from ..via.utils_via import sc_loc_ofsuperCluster_PCAspace,compute_velocity_on_grid
+
+
+def _load_via_modules():
+    import importlib
+
+    core_module = importlib.import_module("..external.VIA.core", __package__)
+    datasets_module = importlib.import_module("..external.VIA.datasets_via", __package__)
+    utils_module = importlib.import_module("..external.VIA.utils_via", __package__)
+    plotting_module = importlib.import_module("..external.VIA.plotting_via", __package__)
+
+    globals()["VIA"] = core_module.VIA
+    globals()["scRNA_hematopoiesis"] = datasets_module.scRNA_hematopoiesis
+    for module in (utils_module, plotting_module):
+        names = getattr(module, "__all__", [name for name in dir(module) if not name.startswith("_")])
+        for name in names:
+            globals().setdefault(name, getattr(module, name))
 
 @register_function(
     aliases=["造血数据集", "hematopoiesis", "scRNA_hematopoiesis", "造血发育数据", "血细胞发育"],
@@ -46,6 +54,7 @@ def hematopoiesis()->anndata.AnnData:
         >>> adata = ov.single.scRNA_hematopoiesis()
         >>> print(adata.shape)
     """
+    _load_via_modules()
     return scRNA_hematopoiesis()
 
 @register_function(
@@ -254,7 +263,7 @@ class pyVIA(object):
         working_dir_fp : str, default='/home/shobi/Trajectory/Datasets/'
             Working directory used by VIA for intermediate files.
         """
-        
+        _load_via_modules()
         self.adata = adata
         #self.adata_key = adata_key
         data = adata.obsm[adata_key][:, 0:adata_ncomps]
@@ -890,6 +899,7 @@ def draw_trajectory_gams_pyomic(adata,clusters,via_object, via_fine=None, embedd
                          title_str:str= "Pseudotime", draw_all_curves:bool=True, arrow_width_scale_factor:float=15.0,
                          scatter_size:float=50, scatter_alpha:float=0.5,figsize:tuple=(8,4),
                          linewidth:float=1.5, marker_edgewidth:float=1, cmap_pseudotime:str='viridis_r',dpi:int=80,highlight_terminal_states:bool=True, use_maxout_edgelist:bool =False):
+    _load_via_modules()
     '''
 
     projects the graph based coarse trajectory onto a umap/tsne embedding
@@ -1339,6 +1349,7 @@ def draw_piechart_graph_pyomic(adata,clusters,via_object, type_data='pt',
 def get_gene_expression_pyomic(via0, gene_exp:pd.DataFrame, cmap:str='jet', figsize=(8,4),
                         dpi:int=150, marker_genes:list = [], linewidth:float = 2.0,
                         n_splines:int=10, spline_order:int=4, fontsize_:int=10, marker_lineages=[]):
+    _load_via_modules()
     '''
     :param gene_exp: dataframe where columns are features (gene) and rows are single cells
     :param cmap: default: 'jet'
@@ -1559,6 +1570,7 @@ def draw_clustergraph_pyomic(via_object, type_data='gene', gene_exp='', gene_lis
 def plot_gene_trend_heatmaps_pyomic(via_object, df_gene_exp:pd.DataFrame, marker_lineages:list = [], 
                              fontsize:int=8,cmap:str='viridis', normalize:bool=True, ytick_labelrotation:int = 0, 
                              figsize:tuple=(2,4)):
+    _load_via_modules()
     '''
 
     Plot the gene trends on heatmap: a heatmap is generated for each lineage (identified by terminal cluster number). Default selects all lineages

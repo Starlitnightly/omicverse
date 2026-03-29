@@ -2,12 +2,17 @@ import scanpy as sc
 import os
 import torch
 import numpy as np
-from ..external.gaston import neural_net,process_NN_output,dp_related,cluster_plotting
 from scipy.sparse import issparse, csr_matrix
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from .._settings import add_reference
 from .._registry import register_function
+
+
+def _get_gaston_modules():
+    from ..external.gaston import cluster_plotting, dp_related, neural_net, process_NN_output
+
+    return neural_net, process_NN_output, dp_related, cluster_plotting
 
 @register_function(
     aliases=["GASTON空间深度分析", "GASTON", "spatial_depth_analysis", "空间深度建模", "组织空间组织"],
@@ -264,6 +269,7 @@ class GASTON(object):
             - Training progress is shown with a progress bar
         """
         os.makedirs(out_dir, exist_ok=True)
+        neural_net, _, _, _ = _get_gaston_modules()
 
         seed_list=range(num_restarts)
         for seed in tqdm(seed_list):
@@ -303,6 +309,7 @@ class GASTON(object):
             - Stores selected model in self.model
             - Required before calling cal_iso_depth()
         """
+        _, process_NN_output, _, _ = _get_gaston_modules()
         gaston_model, A, S= process_NN_output.process_files(out_dir)
         self.model=gaston_model
         self.A=A
@@ -333,6 +340,7 @@ class GASTON(object):
             - Results are stored in self.gaston_isodepth and self.gaston_labels
             - Values are adjusted so higher numbers indicate deeper layers
         """
+        _, _, dp_related, _ = _get_gaston_modules()
         gaston_isodepth, gaston_labels=dp_related.get_isodepth_labels(self.model,
                                                                       self.A,
                                                                       self.S,
@@ -417,6 +425,7 @@ class GASTON(object):
             - Spots are colored by their domain assignment
             - Useful for visualizing discrete spatial structure
         """
+        _, _, _, cluster_plotting = _get_gaston_modules()
         rotate = np.radians(rotate_angle)
         cluster_plotting.plot_clusters(self.gaston_labels, self.S, figsize=figsize, 
                                colors=domain_colors, s=s, lgd=lgd, 
@@ -460,6 +469,7 @@ class GASTON(object):
             - Maintains domain color scheme from plot_clusters()
             - Helps visualize layer-specific patterns
         """
+        _, _, _, cluster_plotting = _get_gaston_modules()
         rotate = np.radians(rotate_angle)
         cluster_plotting.plot_clusters_restrict(self.gaston_labels, self.S, self.gaston_isodepth, 
                                                 isodepth_min=isodepth_min, isodepth_max=isodepth_max, figsize=figsize, 

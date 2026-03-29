@@ -17,9 +17,14 @@ import requests
 import os
 import scanpy as sc
 import zipfile
-from ..external.CEFCON.cell_lineage_GRN import NetModel
-from ..external.CEFCON.utils import data_preparation
 from .._registry import register_function
+
+
+def _get_cefcon_backend():
+    from ..external.CEFCON.cell_lineage_GRN import NetModel
+    from ..external.CEFCON.utils import data_preparation
+
+    return NetModel, data_preparation
 
 biomart_install = False
 
@@ -458,6 +463,7 @@ class pyCEFCON(object):
         self.topK_drivers = topK_drivers
         self.solver = solver
 
+        NetModel, _ = _get_cefcon_backend()
         self.cefcon_GRN_model = NetModel(hidden_dim=self.hidden_dim,
                                 output_dim=self.output_dim,
                                 heads=self.heads,
@@ -471,6 +477,7 @@ class pyCEFCON(object):
 
     def preprocess(self):
         print('Start data preparation\n')
+        _, data_preparation = _get_cefcon_backend()
         self.data = data_preparation(self.input_expData, self.input_priorNet, genes_DE=self.input_genesDE,
                             additional_edges_pct=self.additional_edges_pct)
         
