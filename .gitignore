@@ -50,3 +50,4 @@ docs*
 # Multi-agent worktrees
 .worktrees/
 .orchestrator/
+uv.lock

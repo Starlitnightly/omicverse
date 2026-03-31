@@ -84,7 +84,7 @@ def _try_load_leaf_module(mod_path: str) -> bool:
         parent_path = ".".join(parts[:depth])
         try:
             parent = importlib.import_module(parent_path)
-        except ImportError:
+        except Exception:
             continue
 
         # Build the .py path for the remaining segments
