@@ -41,10 +41,8 @@ jobs:
     - name: Install dependencies
       run: |
         uv venv .venv --python ${{ matrix.python-version }}
-        uv pip install --python .venv/bin/python flake8 pytest pytest-asyncio torch tensorboard scrublet mellon torch_geometric POT wget
-        if [ -f requirements.txt ]; then uv pip install --python .venv/bin/python -r requirements.txt; fi
-        # Install local package in editable mode (overrides PyPI version from requirements.txt)
-        uv pip install --python .venv/bin/python -e .
+        uv pip install --python .venv/bin/python flake8 torch tensorboard mellon torch_geometric POT wget lifelines boltons ctxcore ktplotspy leidenalg datashader graphtools phate python-dotplot metatime pydeseq2 bioservices tomli wandb munch datasets
+        uv pip install --python .venv/bin/python -e ".[tests,mcp]"
     - name: Lint with flake8
       run: |
         source .venv/bin/activate

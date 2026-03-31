@@ -10,6 +10,8 @@ from __future__ import annotations
 import subprocess
 import sys
 import textwrap
+import importlib.abc
+import importlib.machinery
 
 
 # ---------------------------------------------------------------------------
@@ -18,12 +20,21 @@ import textwrap
 
 _MCP_BLOCKER_PREAMBLE = textwrap.dedent("""\
     import sys
+    import importlib.abc
+    import importlib.machinery
 
-    class _McpBlocker:
+    class _McpBlocker(importlib.abc.MetaPathFinder, importlib.abc.Loader):
         \"\"\"Meta-path finder that makes 'mcp' unimportable.\"\"\"
+        def find_spec(self, fullname, path=None, target=None):
+            if fullname == "mcp" or fullname.startswith("mcp."):
+                return importlib.machinery.ModuleSpec(fullname, self)
         def find_module(self, name, path=None):
             if name == "mcp" or name.startswith("mcp."):
                 return self
+        def create_module(self, spec):
+            return None
+        def exec_module(self, module):
+            raise ImportError(f"Simulated: No module named '{module.__name__}'")
         def load_module(self, name):
             raise ImportError(f"Simulated: No module named '{name}'")
 
