@@ -49,9 +49,9 @@ jobs:
       run: |
         source .venv/bin/activate
         # stop the build if there are Python syntax errors
-        uv run flake8 . --count --select=E9,F63,F7 --show-source --statistics
+        uv run flake8 . --exclude=.venv --count --select=E9,F63,F7 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        uv run flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        uv run flake8 . --exclude=.venv --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
         source .venv/bin/activate
