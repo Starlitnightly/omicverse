@@ -2,10 +2,12 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import textwrap
 from scipy import sparse
 import networkx as nx
 from matplotlib.patches import FancyBboxPatch, ConnectionPatch
 import matplotlib.patches as mpatches
+from matplotlib import patheffects
 from sklearn.cluster import KMeans
 from sklearn.metrics.pairwise import cosine_similarity
 import warnings
@@ -19,6 +21,99 @@ try:
     MARSILEA_AVAILABLE = True
 except ImportError:
     MARSILEA_AVAILABLE = False
+
+
+def _nudge_texts_from_axis_center(ax, texts, *, x_scale=0.018, y_scale=0.024):
+    text_items = [text for text in texts if str(text.get_text()).strip()]
+    if not text_items:
+        return
+
+    x_min, x_max = ax.get_xlim()
+    y_min, y_max = ax.get_ylim()
+    x_span = max(float(abs(x_max - x_min)), 1e-6)
+    y_span = max(float(abs(y_max - y_min)), 1e-6)
+    center_x = float((x_min + x_max) / 2.0)
+    center_y = float((y_min + y_max) / 2.0)
+
+    for idx, text in enumerate(text_items):
+        x_pos, y_pos = text.get_position()
+        dx = float(x_pos - center_x)
+        dy = float(y_pos - center_y)
+        if np.isclose(dx, 0.0):
+            dx = 1.0 if idx % 2 == 0 else -1.0
+        if np.isclose(dy, 0.0):
+            dy = 1.0 if idx % 3 != 0 else -1.0
+        norm = max(np.hypot(dx, dy), 1e-6)
+        text.set_position((x_pos + (dx / norm) * x_span * x_scale, y_pos + (dy / norm) * y_span * y_scale))
+
+
+def _constrain_texts_to_axes(ax, texts, *, x_pad=0.03, y_pad=0.04):
+    text_items = [text for text in texts if str(text.get_text()).strip()]
+    if not text_items:
+        return
+
+    x0, x1 = ax.get_xlim()
+    y0, y1 = ax.get_ylim()
+    x_min, x_max = (float(min(x0, x1)), float(max(x0, x1)))
+    y_min, y_max = (float(min(y0, y1)), float(max(y0, y1)))
+    x_span = max(x_max - x_min, 1e-6)
+    y_span = max(y_max - y_min, 1e-6)
+    x_low = x_min + x_span * x_pad
+    x_high = x_max - x_span * x_pad
+    y_low = y_min + y_span * y_pad
+    y_high = y_max - y_span * y_pad
+    x_align_low = x_min + x_span * (x_pad + 0.04)
+    x_align_high = x_max - x_span * (x_pad + 0.04)
+    y_align_low = y_min + y_span * (y_pad + 0.05)
+    y_align_high = y_max - y_span * (y_pad + 0.05)
+
+    for text in text_items:
+        x_pos, y_pos = text.get_position()
+        x_new = min(max(float(x_pos), x_low), x_high)
+        y_new = min(max(float(y_pos), y_low), y_high)
+        text.set_position((x_new, y_new))
+        text.set_clip_on(True)
+
+        if x_new >= x_align_high:
+            text.set_ha("right")
+        elif x_new <= x_align_low:
+            text.set_ha("left")
+        else:
+            text.set_ha("center")
+
+        if y_new >= y_align_high:
+            text.set_va("top")
+        elif y_new <= y_align_low:
+            text.set_va("bottom")
+        else:
+            text.set_va("center")
+
+
+def _repel_texts(ax, texts, *, font_stroke=2.6):
+    text_items = [text for text in texts if str(text.get_text()).strip()]
+    if not text_items:
+        return
+
+    _nudge_texts_from_axis_center(ax, text_items)
+    try:
+        from adjustText import adjust_text
+    except ImportError:
+        warnings.warn("adjustText library not found. Using deterministic fallback label offsets instead.")
+    else:
+        adjust_text(
+            text_items,
+            ax=ax,
+            expand_points=(1.2, 1.3),
+            expand_text=(1.18, 1.35),
+            force_points=0.5,
+            force_text=0.5,
+            ensure_inside_axes=False,
+            arrowprops=None,
+        )
+
+    _constrain_texts_to_axes(ax, text_items)
+    for text in text_items:
+        text.set_path_effects([patheffects.withStroke(linewidth=font_stroke, foreground='white')])
 
 
 class CellChatVizPlus:
@@ -2044,9 +2139,17 @@ class CellChatVizPlus:
         fig, ax = plt.subplots(figsize=(width, height))
         
         # Draw heatmap using CellChat-style configuration
+        annot = False
+        annot_kws = None
+        if show_values:
+            annot = df_centrality.map(
+                lambda val: "" if np.isclose(float(val), 1.0, atol=1e-8) else f"{float(val):.2f}"
+            )
+            annot_kws = {"fontsize": max(font_size - 1, 8), "color": "#1F1F1F"}
+
         sns.heatmap(df_centrality, 
-                   annot=show_values, 
-                   fmt='.2f' if show_values else '',  # Use 2 decimal places since it's 0-1 range
+                   annot=annot, 
+                   fmt='',
                    cmap=color_heatmap,
                    cbar_kws={'label': 'Importance'},  # CellChat-style label
                    square=False,
@@ -2055,7 +2158,8 @@ class CellChatVizPlus:
                    xticklabels=True,
                    yticklabels=True,
                    vmin=0,  # Ensure color range starts from 0
-                   vmax=1)  # Ensure color range ends at 1
+                   vmax=1,
+                   annot_kws=annot_kws)  # Ensure color range ends at 1
         
         # Set labels and title
         ax.set_xlabel('Cell Groups', fontsize=font_size + 2)  # Use CellChat-style label
@@ -2151,7 +2255,6 @@ class CellChatVizPlus:
                            edgecolors='black', linewidths=0.5)
         
         # Add cell type labels
-        
         try:
             from adjustText import adjust_text
             
@@ -2177,7 +2280,7 @@ class CellChatVizPlus:
                 ax.annotate(cell_type, (x_data[i], y_data[i]),
                            xytext=(5, 5), textcoords='offset points',
                            fontsize=10, alpha=0.8)
-        
+
         # Set labels and title
         measure_labels = {
             'outdegree': 'Outdegree (Sender Role)',
@@ -2875,9 +2978,15 @@ class CellChatVizPlus:
         if show_values:
             try:
                 # 尝试添加文本层显示数值
-                text_matrix = df_centrality.values
-                text_array = np.array([[f"{val:.2f}" for val in row] for row in text_matrix])
-                h.add_layer(ma.plotter.TextMesh(text_array, fontsize=font_size-2, color="white"))
+                text_matrix = df_centrality.values.astype(float)
+                text_array = np.array(
+                    [
+                        ["" if np.isclose(val, 1.0, atol=1e-8) else f"{val:.2f}" for val in row]
+                        for row in text_matrix
+                    ],
+                    dtype=object,
+                )
+                h.add_layer(ma.plotter.TextMesh(text_array, fontsize=font_size-2, color="#1F1F1F"))
             except:
                 print("Warning: Failed to add text values to heatmap")
         
@@ -2907,7 +3016,8 @@ class CellChatVizPlus:
                     ma.plotter.Numbers(
                         max_importance_per_measure,
                         color="#E74C3C",
-                        label="Max\nImportance"
+                        label="Max\nImportance",
+                        show_value=False,
                     ),
                     size=0.2,
                     pad=0.05
@@ -2920,7 +3030,8 @@ class CellChatVizPlus:
                     ma.plotter.Numbers(
                         avg_importance_per_cell,
                         color="#3498DB",
-                        label="Avg Importance"
+                        label="Avg Importance",
+                        show_value=False,
                     ),
                     size=0.2,
                     pad=0.02
@@ -3496,10 +3607,18 @@ class CellChatVizPlus:
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
         
         # 左图：贡献百分比条形图
+        display_labels = (
+            top_df['ligand_receptor']
+            .astype(str)
+            .str.replace('complex:', '', regex=False)
+            .str.replace('_complex', '', regex=False)
+            .str.replace('_', ' ', regex=False)
+            .map(lambda item: textwrap.fill(item, width=22, break_long_words=False, break_on_hyphens=False))
+        )
         bars = ax1.barh(range(len(top_df)), top_df['contribution_percent'], 
                        color='skyblue', alpha=0.7, edgecolor='navy')
         ax1.set_yticks(range(len(top_df)))
-        ax1.set_yticklabels(top_df['ligand_receptor'], fontsize=10)
+        ax1.set_yticklabels(display_labels, fontsize=9)
         ax1.set_xlabel('Contribution Percentage (%)')
         ax1.set_title(f'L-R Pair Contribution\n{" & ".join(signaling)}')
         ax1.grid(axis='x', alpha=0.3)
@@ -3510,26 +3629,47 @@ class CellChatVizPlus:
                     f'{percent:.1f}%', va='center', fontsize=9)
         
         # 右图：显著性 vs 强度散点图
+        active_pairs = top_df['active_pairs'].astype(float).to_numpy()
+        if active_pairs.size and float(active_pairs.max()) > 0.0:
+            bubble_sizes = 80.0 + 260.0 * (active_pairs / float(active_pairs.max()))
+        else:
+            bubble_sizes = np.repeat(120.0, len(top_df.index))
         scatter = ax2.scatter(top_df['total_strength'], top_df['significant_pairs'], 
-                            s=top_df['active_pairs']*20, 
+                            s=bubble_sizes, 
                             c=top_df['contribution_percent'], 
                             cmap='viridis', alpha=0.7, edgecolors='black')
         
         # 添加L-R对标签
+        texts = []
         for _, row in top_df.iterrows():
-            ax2.annotate(row['ligand_receptor'], 
-                        (row['total_strength'], row['significant_pairs']),
-                        xytext=(5, 5), textcoords='offset points', 
-                        fontsize=8, alpha=0.8)
-        
+            label = (
+                str(row['ligand_receptor'])
+                .replace('complex:', '')
+                .replace('_complex', '')
+                .replace('_', ' ')
+            )
+            text = ax2.text(
+                row['total_strength'],
+                row['significant_pairs'],
+                textwrap.fill(label, width=18, break_long_words=False, break_on_hyphens=False),
+                fontsize=7.5,
+                alpha=0.88,
+                ha='center',
+                va='center',
+            )
+            texts.append(text)
+
         ax2.set_xlabel('Total Expression Strength')
         ax2.set_ylabel('Number of Significant Cell Pairs')
         ax2.set_title('L-R Pair Activity vs Significance')
+        ax2.margins(x=0.12, y=0.18)
+        _repel_texts(ax2, texts, font_stroke=2.5)
         
         # 添加colorbar
         cbar = plt.colorbar(scatter, ax=ax2)
         cbar.set_label('Contribution %')
         
+        fig.subplots_adjust(wspace=0.38)
         plt.tight_layout()
         
         if save:
