@@ -16,10 +16,10 @@ submodules:
   recursive: true
 
 sphinx:
-  configuration: omicverse_guide/docs/conf.py
+  configuration: ../omicverse_guide/docs/conf.py
   fail_on_warning: false
 
 python:
   install:
   - requirements: requirements.txt
-  - requirements: omicverse_guide/requirements.txt
+  - requirements: ../omicverse_guide/requirements.txt
