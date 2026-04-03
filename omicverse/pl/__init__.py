@@ -102,11 +102,16 @@ from ._general import (
 from ._heatmap import (
     check_pycomplexheatmap,
     complexheatmap,
-    global_imports,
     marker_heatmap,
+    pycomplexheatmap_install,
 )
-# Import pycomplexheatmap_install as a module-level variable, not a function
-from ._heatmap import pycomplexheatmap_install
+from ._heatmap_marsilea import (
+    cell_cor_heatmap,
+    dynamic_heatmap,
+    feature_heatmap,
+    global_imports,
+    group_heatmap,
+)
 from ._multi import embedding_multi
 from ._bulk import boxplot, plot_grouped_fractions, venn, volcano
 from ._space import (
@@ -254,8 +259,12 @@ __all__ = [
     "create_custom_colormap",
     "create_transparent_gradient_colormap",
     # @ _heatmap
+    "cell_cor_heatmap",
     "check_pycomplexheatmap",
     "complexheatmap",
+    "dynamic_heatmap",
+    "feature_heatmap",
+    "group_heatmap",
     "global_imports",
     "marker_heatmap",
     "pycomplexheatmap_install",

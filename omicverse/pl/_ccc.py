@@ -21,7 +21,12 @@ from scipy.cluster.hierarchy import leaves_list, linkage
 from scipy.spatial.distance import pdist
 
 from .._registry import register_function
-from ._heatmap import _attach_post_render_hook, _import_marsilea, _render_plot, _style_heatmap_axes
+from ._heatmap_marsilea import (
+    _attach_post_render_hook,
+    _import_marsilea,
+    _render_plot,
+    _style_heatmap_axes,
+)
 from ._palette import palette_28, palette_56, palette_112
 
 

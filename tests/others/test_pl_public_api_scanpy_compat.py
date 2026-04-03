@@ -178,3 +178,37 @@ def test_public_marker_heatmap_smoke_with_fake_pycomplexheatmap(monkeypatch, toy
 
     assert fig is not None
     assert ax is not None
+
+
+def test_public_complexheatmap_smoke_with_fake_pycomplexheatmap(monkeypatch, toy_adata):
+    fake = types.ModuleType("PyComplexHeatmap")
+    fake.__version__ = "1.8.0"
+
+    class DummyClusterMapPlotter:
+        def __init__(self, *args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+
+    def _dummy(*args, **kwargs):
+        return object()
+
+    fake.ClusterMapPlotter = DummyClusterMapPlotter
+    fake.HeatmapAnnotation = _dummy
+    fake.anno_simple = _dummy
+    fake.anno_label = _dummy
+    monkeypatch.setitem(sys.modules, "PyComplexHeatmap", fake)
+
+    palette = {"A": "#1f77b4", "B": "#ff7f0e"}
+    cm = ov.pl.complexheatmap(
+        toy_adata,
+        groupby="cell_type",
+        var_names=["g1", "g2"],
+        marker_genes_dict={"A": ["g1"], "B": ["g2"]},
+        col_color_bars=palette,
+        col_color_labels=palette,
+        left_color_bars=palette,
+        left_color_labels=palette,
+        use_raw=False,
+    )
+
+    assert cm is not None
