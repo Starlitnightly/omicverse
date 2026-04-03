@@ -1,0 +1,33 @@
+# .readthedocs_zh.yaml
+# ReadTheDocs configuration for the Chinese (zh_CN) translation project.
+#
+# How to use:
+# 1. Go to https://readthedocs.org/dashboard/
+# 2. Create a new project → connect to github.com/Starlitnightly/omicverse
+# 3. In project Advanced Settings:
+#    - Documentation type: Sphinx HTML
+#    - Configuration file: .readthedocs_zh.yaml   (set this in Project Admin → Advanced Settings → "Path for .readthedocs.yaml file")
+# 4. In the MAIN omicverse project settings → Translations → Add translation
+#    - Select language: Simplified Chinese (zh_CN)
+#    - Project: <this new project>
+# RTD will then serve: omicverse.readthedocs.io/zh_CN/latest/
+
+version: 2
+
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.10"
+
+submodules:
+  include: all
+  recursive: true
+
+sphinx:
+  configuration: omicverse_guide/docs_zh/conf.py
+  fail_on_warning: false
+
+python:
+  install:
+  - requirements: requirements.txt
+  - requirements: omicverse_guide/requirements.txt
