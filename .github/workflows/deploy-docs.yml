@@ -6,7 +6,7 @@ on:
   workflow_dispatch:   # allow manual trigger from the Actions tab
 
 permissions:
-  contents: write      # needed for mkdocs gh-deploy to push to gh-pages branch
+  contents: write      # needed to push to gh-pages branch
 
 jobs:
   deploy:
@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-          fetch-depth: 1   # shallow clone is sufficient for docs deployment
+          fetch-depth: 0   # full history needed by sphinx.ext.linkcode
 
       # ── 2. Python ────────────────────────────────────────────────────────
       - uses: actions/setup-python@v5
@@ -28,26 +28,36 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: docs-pip-${{ hashFiles('requirements.txt') }}
+          key: docs-pip-${{ hashFiles('omicverse_guide/requirements.txt', 'pyproject.toml') }}
           restore-keys: docs-pip-
 
-      # ── 4. Install all dependencies (mirrors what readthedocs does) ───
+      # ── 4. Install dependencies ────────────────────────────────────────
+      # Install omicverse from the local checkout (editable) so autodoc uses
+      # the latest source, then install the Sphinx stack.
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -e .
+          pip install -r omicverse_guide/requirements.txt
 
-      # ── 5. Configure git identity for gh-deploy push ──────────────────
+      # ── 5. Build Sphinx HTML ───────────────────────────────────────────
+      - name: Build docs
+        run: |
+          sphinx-build -b html \
+            omicverse_guide/docs \
+            omicverse_guide/docs/_build/html \
+            -q
+
+      # ── 6. Configure git identity for gh-deploy push ──────────────────
       - name: Configure git
         run: |
           git config --global user.name  "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      # ── 6. Build & deploy ─────────────────────────────────────────────
-      # Run from the repo root, pointing --config-file at the submodule.
-      # This ensures gh-deploy pushes to the main repo's gh-pages branch
-      # rather than the submodule (omicverse-tutorials) repo.
+      # ── 7. Deploy to gh-pages branch ──────────────────────────────────
       - name: Deploy to GitHub Pages
-        run: |
-          mkdocs gh-deploy --force --no-history \
-            --config-file omicverse_guide/mkdocs.yml \
-            --remote-branch gh-pages \
-            --message "docs: auto-deploy from {sha}"
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: omicverse_guide/docs/_build/html
+          force_orphan: true
+          commit_message: "docs: auto-deploy from ${{ github.sha }}"
