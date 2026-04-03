@@ -897,7 +897,11 @@ def validate_cpdb_database(cpdb_file_path):
     description="Run CellPhoneDB v5 statistical ligand-receptor analysis to identify significant cell-cell communication pairs.",
     prerequisites={'optional_functions': ['pp.qc', 'pp.preprocess']},
     requires={'obs': ['celltype labels'], 'var': ['gene symbols']},
-    produces={'uns': ['cellphonedb_results']},
+    produces={
+        'layers': ['means', 'pvalues'],
+        'obs': ['sender', 'receiver'],
+        'var': ['interaction metadata'],
+    },
     auto_fix='escalate',
     examples=['ov.single.run_cellphonedb_v5(adata, cpdb_file_path="./cellphonedb.zip", celltype_key="cell_labels", iterations=1000, pvalue=0.05)'],
     related=['pl.CellChatViz', 'single.pathway_enrichment']

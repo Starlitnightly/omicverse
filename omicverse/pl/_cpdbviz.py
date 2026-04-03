@@ -28,7 +28,11 @@ from ._cpdbviz_plus import CellChatVizPlus
     category="pl",
     description="Visualization class for CellPhoneDB communication outputs, including interaction networks and pathway-centric summaries.",
     prerequisites={'functions': ['run_cellphonedb_v5']},
-    requires={'uns': ['cellphonedb_results']},
+    requires={
+        'layers': ['means', 'pvalues'],
+        'obs': ['sender', 'receiver'],
+        'var': ['interaction metadata'],
+    },
     produces={},
     auto_fix='none',
     examples=['viz = ov.pl.CellChatViz(adata_cpdb, palette=color_dict)', 'viz.plot_interactions()'],
