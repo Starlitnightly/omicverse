@@ -62,11 +62,14 @@ def test_registry_lookup_delegates_with_scanner_context(monkeypatch):
         def collect_static_entries(self, request, max_entries=8):
             return [{"full_name": "ov.pp.qc", "request": request, "limit": max_entries}]
 
+        def collect_relevant_entries(self, request, max_entries=8):
+            return [{"full_name": "ov.pp.qc", "request": request, "limit": max_entries}]
+
     def _fake_create_registry_scanner():
         return _FakeScanner()
 
     def _fake_delegate(ctx, query):
-        entries = ctx._collect_static_registry_entries(query, max_entries=3)
+        entries = ctx._collect_relevant_registry_entries(query, max_entries=3)
         return json.dumps({"query": query, "entries": entries})
 
     monkeypatch.setattr(_lookup_mod, "_create_registry_scanner", _fake_create_registry_scanner)
@@ -121,3 +124,19 @@ def test_skill_lookup_uses_initialized_registry_and_max_chars(monkeypatch):
 
     assert payload["name"] == "Skill A"
     assert payload["instructions"] == "max_chars=123;provider=None"
+
+
+def test_registry_summary_uses_shared_compact_summary(monkeypatch):
+    sentinel = object()
+
+    def _fake_create_registry_scanner():
+        return sentinel
+
+    def _fake_summary(scanner):
+        assert scanner is sentinel
+        return "summary-text"
+
+    monkeypatch.setattr(_lookup_mod, "_create_registry_scanner", _fake_create_registry_scanner)
+    monkeypatch.setattr(_lookup_mod, "build_compact_registry_summary", _fake_summary)
+
+    assert _lookup_mod.registry_summary() == "summary-text"

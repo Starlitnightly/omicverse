@@ -75,3 +75,10 @@ class CodegenToolDispatchFacadeMixin:
         this via ``getattr(ctx, "_collect_static_registry_entries", None)``.
         """
         return self._scanner.collect_static_entries(request, max_entries)
+
+    def _collect_relevant_registry_entries(
+        self, request: str, max_entries: int = 8
+    ) -> List[Dict[str, Any]]:
+        """Search the merged runtime/static registry with unified re-ranking."""
+
+        return self._scanner.collect_relevant_entries(request, max_entries)

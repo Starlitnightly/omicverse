@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from ..._registry import _global_registry
+from ..._registry import _global_registry, _hydrate_registry_for_export
 
 logger = logging.getLogger(__name__)
 
@@ -50,33 +50,30 @@ class RegistryScanner:
 
         self.ensure_runtime_registry()
 
-        runtime_entries = self.collect_runtime_entries(
-            request, max_entries=max_entries * 3,
-        )
-        static_entries = self.collect_static_entries(
-            request, max_entries=max_entries * 3,
-        )
-
-        merged: Dict[str, Tuple[float, int, Dict[str, Any]]] = {}
-        for raw_entry in [*runtime_entries, *static_entries]:
+        merged: Dict[str, Dict[str, Any]] = {}
+        for raw_entry in [*self._iter_runtime_entries(), *self.load_static_entries()]:
             entry = self.normalize_entry(raw_entry)
-            full_name = entry.get("full_name", "")
+            full_name = str(entry.get("full_name", "") or "")
             if not full_name:
                 continue
-            score = self.score_entry(request, entry)
-            if score <= 0:
-                continue
-            source_rank = 1 if entry.get("source") == "runtime" else 0
             current = merged.get(full_name)
-            if current is None or (score, source_rank) > (current[0], current[1]):
-                merged[full_name] = (score, source_rank, entry)
+            if current is None:
+                merged[full_name] = entry
+            else:
+                merged[full_name] = self._merge_entries(current, entry)
 
-        ranked = sorted(
-            merged.values(),
-            key=lambda item: (item[0], item[1], item[2].get("full_name", "")),
+        ranked: List[Tuple[Tuple[float, ...], Dict[str, Any]]] = []
+        for entry in merged.values():
+            sort_key = self.rank_entry(request, entry)
+            if sort_key is None:
+                continue
+            ranked.append((sort_key, entry))
+
+        ranked.sort(
+            key=lambda item: (item[0], item[1].get("full_name", "")),
             reverse=True,
         )
-        return [entry for _, _, entry in ranked[:max_entries]]
+        return [entry for _, entry in ranked[:max_entries]]
 
     # ------------------------------------------------------------------
     # Runtime registry helpers
@@ -84,54 +81,62 @@ class RegistryScanner:
 
     @staticmethod
     def ensure_runtime_registry() -> None:
-        """Hydrate the runtime registry when a partial lazy-import state is insufficient."""
+        """Hydrate the runtime registry.
+
+        Prefer the same broad hydration path used by ``ov.Agent`` registry
+        export helpers so lookup wrappers see the full public registry rather
+        than only MCP rollout-whitelisted modules. Fall back to MCP manifest
+        hydration when broad package imports are unavailable in the current
+        runtime.
+        """
+
+        if getattr(_global_registry, "_registry", None):
+            return
+
+        try:
+            _hydrate_registry_for_export()
+        except Exception:
+            logger.warning(
+                "Failed to hydrate the runtime registry via full package import",
+                exc_info=True,
+            )
 
         if getattr(_global_registry, "_registry", None):
             return
 
         try:
             from ...mcp.manifest import ensure_registry_populated
+
             ensure_registry_populated()
         except Exception:
-            logger.warning("Failed to hydrate the runtime registry from MCP manifest", exc_info=True)
+            logger.warning(
+                "Failed to hydrate the runtime registry from MCP manifest",
+                exc_info=True,
+            )
 
     @staticmethod
     def collect_runtime_entries(
         request: str,
         max_entries: int = 8,
     ) -> List[Dict[str, Any]]:
-        """Query the in-memory registry when it has been hydrated."""
+        """Search hydrated runtime registry entries using unified scoring."""
 
-        if not getattr(_global_registry, "_registry", None):
+        if max_entries <= 0:
             return []
 
-        seen: set = set()
-        entries: List[Dict[str, Any]] = []
+        ranked: List[Tuple[Tuple[float, ...], Dict[str, Any]]] = []
+        for raw_entry in RegistryScanner._iter_runtime_entries():
+            entry = RegistryScanner.normalize_entry(raw_entry)
+            sort_key = RegistryScanner.rank_entry(request, entry)
+            if sort_key is None:
+                continue
+            ranked.append((sort_key, entry))
 
-        def _add_matches(query: str) -> None:
-            if not query or len(entries) >= max_entries:
-                return
-            for entry in _global_registry.find(query):
-                full_name = entry.get("full_name", "")
-                if not full_name or full_name in seen:
-                    continue
-                seen.add(full_name)
-                entries.append(entry)
-                if len(entries) >= max_entries:
-                    return
-
-        _add_matches(request)
-
-        keywords = [
-            token for token in re.findall(r"[A-Za-z_][A-Za-z0-9_\\.\\-]*", request or "")
-            if len(token) >= 2
-        ]
-        for keyword in keywords[:12]:
-            _add_matches(keyword)
-            if len(entries) >= max_entries:
-                break
-
-        return entries
+        ranked.sort(
+            key=lambda item: (item[0], item[1].get("full_name", "")),
+            reverse=True,
+        )
+        return [entry for _, entry in ranked[:max_entries]]
 
     # ------------------------------------------------------------------
     # Normalization / scoring
@@ -149,18 +154,41 @@ class RegistryScanner:
         normalized["registry_full_name"] = original_full_name
 
         public_name = original_full_name
-        short_name = str(normalized.get("short_name") or normalized.get("name") or "")
+        parent_full_name = str(normalized.get("parent_full_name", "") or "")
 
         if original_full_name.startswith("omicverse."):
-            parts = original_full_name.split(".")
-            if len(parts) >= 2:
-                domain = parts[1]
-                if domain == "_settings":
-                    public_name = f"ov.core.{short_name or parts[-1]}"
-                elif domain:
-                    public_name = f"ov.{domain}.{short_name or parts[-1]}"
+            branch_suffix = ""
+            stem = original_full_name
+            if "[" in original_full_name and original_full_name.endswith("]"):
+                stem, branch_suffix = original_full_name.split("[", 1)
+                branch_suffix = "[" + branch_suffix
+
+            if parent_full_name and stem.startswith(parent_full_name + "."):
+                parent_public = RegistryScanner.normalize_entry(
+                    {"full_name": parent_full_name}
+                ).get("full_name", parent_full_name)
+                method_name = stem[len(parent_full_name) + 1 :]
+                public_name = f"{parent_public}.{method_name}{branch_suffix}"
+            elif parent_full_name and stem == parent_full_name:
+                parent_public = RegistryScanner.normalize_entry(
+                    {"full_name": parent_full_name}
+                ).get("full_name", parent_full_name)
+                public_name = f"{parent_public}{branch_suffix}"
+            else:
+                parts = stem.split(".")
+                if len(parts) >= 2:
+                    domain = parts[1]
+                    leaf_name = parts[-1]
+                    if domain == "_settings":
+                        public_name = f"ov.core.{leaf_name}{branch_suffix}"
+                    elif domain:
+                        public_name = f"ov.{domain}.{leaf_name}{branch_suffix}"
 
         normalized["full_name"] = public_name
+        if parent_full_name:
+            normalized["parent_full_name"] = RegistryScanner.normalize_entry(
+                {"full_name": parent_full_name}
+            ).get("full_name", parent_full_name)
         return normalized
 
     @staticmethod
@@ -168,63 +196,139 @@ class RegistryScanner:
         request: str,
         entry: Dict[str, Any],
     ) -> float:
-        """Score a registry entry for lightweight code generation retrieval."""
+        """Return a scalar score preserving the same ordering as ``rank_entry``."""
+
+        sort_key = RegistryScanner.rank_entry(request, entry)
+        if sort_key is None:
+            return 0.0
+
+        exact_rank, alias_score, name_score, kind_score, weak_score, contract_score, source_rank = sort_key
+        return (
+            exact_rank * 1000.0
+            + alias_score * 100.0
+            + name_score * 10.0
+            + kind_score
+            + weak_score * 0.1
+            + contract_score * 0.01
+            + source_rank * 0.001
+        )
+
+    @staticmethod
+    def rank_entry(
+        request: str,
+        entry: Dict[str, Any],
+    ) -> Optional[Tuple[float, float, float, float, float, float, float]]:
+        """Return a structured sort key for unified runtime/static ranking."""
 
         query = (request or "").strip().lower()
         if not query:
-            return 0.0
+            return None
 
-        tokens = [
-            token for token in re.findall(r"[a-z0-9_\\.\\-]+", query)
-            if len(token) >= 2
+        normalized = RegistryScanner.normalize_entry(entry)
+        tokens = RegistryScanner._query_tokens(query)
+
+        full_name = str(normalized.get("full_name", "") or "").lower()
+        registry_full_name = str(normalized.get("registry_full_name", "") or "").lower()
+        short_name = str(
+            normalized.get("short_name") or normalized.get("name") or ""
+        ).lower()
+        aliases = [
+            str(alias).strip().lower()
+            for alias in (normalized.get("aliases") or [])
+            if str(alias).strip()
         ]
-        aliases = [str(alias).lower() for alias in (entry.get("aliases") or [])]
-        haystack_parts = [
-            entry.get("name", ""),
-            entry.get("short_name", ""),
-            entry.get("full_name", ""),
-            entry.get("registry_full_name", ""),
-            entry.get("category", ""),
-            entry.get("description", ""),
-            " ".join(aliases),
-            " ".join(entry.get("examples", []) or []),
-            " ".join(entry.get("imports", []) or []),
+
+        exact_rank = 0.0
+        if query == full_name or query == registry_full_name:
+            exact_rank = 4.0
+        elif query == short_name:
+            exact_rank = 3.0
+        elif query in aliases:
+            exact_rank = 3.0
+
+        alias_score = 0.0
+        strong_fields = [full_name, registry_full_name, short_name]
+        if query and any(query in field for field in strong_fields if field):
+            alias_score += 2.0
+        if query:
+            alias_score += max(
+                (
+                    RegistryScanner._token_overlap_score(query, alias)
+                    for alias in aliases
+                ),
+                default=0.0,
+            )
+            if any(query in alias for alias in aliases):
+                alias_score += 1.0
+
+        name_score = 0.0
+        for field in strong_fields:
+            if not field:
+                continue
+            name_score = max(
+                name_score,
+                RegistryScanner._token_overlap_score(query, field),
+            )
+            if query in field:
+                name_score += 1.0
+        if any(token == short_name for token in tokens if short_name):
+            name_score += 1.0
+
+        kind_score = float(RegistryScanner._entry_kind_rank(normalized))
+
+        weak_fields = [
+            str(normalized.get("category", "") or ""),
+            str(normalized.get("description", "") or ""),
+            str(normalized.get("docstring", "") or ""),
+            " ".join(normalized.get("examples", []) or []),
+            " ".join(normalized.get("related", []) or []),
+            " ".join(normalized.get("imports", []) or []),
         ]
-        haystack = " ".join(str(part) for part in haystack_parts).lower()
+        weak_score = sum(
+            RegistryScanner._token_overlap_score(query, field)
+            for field in weak_fields
+            if field
+        )
 
-        score = 0.0
-        if query == str(entry.get("full_name", "")).lower():
-            score += 10.0
-        if query == str(entry.get("short_name", "")).lower():
-            score += 9.0
-        if query in haystack:
-            score += 4.0
+        contract_fields = [
+            RegistryScanner._flatten_contract_map(normalized.get("prerequisites")),
+            RegistryScanner._flatten_contract_map(normalized.get("requires")),
+            RegistryScanner._flatten_contract_map(normalized.get("produces")),
+        ]
+        contract_score = 0.0
+        for field in contract_fields:
+            if not field:
+                continue
+            contract_score += min(
+                RegistryScanner._token_overlap_score(query, field),
+                1.5,
+            )
+            if query in field.lower():
+                contract_score += 0.25
 
-        for alias in aliases:
-            if alias == query:
-                score += 8.0
-            elif alias and alias in query:
-                score += 2.0
-
-        for token in tokens:
-            if token in haystack:
-                score += 1.25
-
-        public_name = str(entry.get("full_name", ""))
-        if public_name.startswith(("ov.pp.", "ov.single.", "ov.pl.", "ov.bulk.", "ov.space.")):
-            score += 0.5
-
+        public_name = full_name
         if public_name.startswith("ov.datasets.") and not any(
             word in query for word in ("dataset", "download", "read", "load", "example", "demo")
         ):
-            score -= 2.0
+            weak_score -= 1.0
 
         if public_name.startswith("ov.core.") and not any(
             word in query for word in ("reference", "table", "gpu", "cpu", "settings")
         ):
-            score -= 2.0
+            weak_score -= 1.0
 
-        return score
+        source_rank = 1.0 if normalized.get("source") == "runtime" else 0.0
+        if max(exact_rank, alias_score, name_score, weak_score, contract_score) <= 0:
+            return None
+        return (
+            exact_rank,
+            alias_score,
+            name_score,
+            kind_score,
+            weak_score,
+            contract_score,
+            source_rank,
+        )
 
     # ------------------------------------------------------------------
     # Static AST scanning
@@ -283,53 +387,175 @@ class RegistryScanner:
     ) -> List[Dict[str, Any]]:
         """Search the static AST-derived registry snapshot."""
 
-        query = (request or "").strip().lower()
-        if not query:
+        if not request or max_entries <= 0:
             return []
 
-        tokens = [token for token in re.findall(r"[a-z0-9_\\.\\-]+", query) if len(token) >= 2]
         entries = self.load_static_entries()
-        scored: List[Tuple[float, Dict[str, Any]]] = []
+        scored: List[Tuple[Tuple[float, ...], Dict[str, Any]]] = []
 
         for entry in entries:
-            aliases = entry.get("aliases", []) or []
-            haystack = " ".join(
-                [
-                    entry.get("name", ""),
-                    entry.get("short_name", ""),
-                    entry.get("full_name", ""),
-                    entry.get("category", ""),
-                    entry.get("description", ""),
-                    " ".join(aliases),
-                    " ".join(entry.get("examples", []) or []),
-                    " ".join(entry.get("imports", []) or []),
-                ]
-            ).lower()
+            sort_key = self.rank_entry(request, entry)
+            if sort_key is not None:
+                scored.append((sort_key, entry))
 
-            score = 0.0
-            if query == entry.get("name", "").lower():
-                score += 8.0
-            if query == entry.get("short_name", "").lower():
-                score += 8.0
-            if query == entry.get("full_name", "").lower():
-                score += 9.0
-            if query in haystack:
-                score += 4.0
-            for alias in aliases:
-                alias_lower = str(alias).lower()
-                if query == alias_lower:
-                    score += 8.0
-                elif alias_lower and alias_lower in query:
-                    score += 2.0
-            for token in tokens:
-                if token and token in haystack:
-                    score += 1.0
-
-            if score > 0:
-                scored.append((score, entry))
-
-        scored.sort(key=lambda item: item[0], reverse=True)
+        scored.sort(
+            key=lambda item: (item[0], item[1].get("full_name", "")),
+            reverse=True,
+        )
         return [entry for _, entry in scored[:max_entries]]
+
+    @staticmethod
+    def _iter_runtime_entries() -> List[Dict[str, Any]]:
+        """Return unique runtime registry entries keyed by canonical full name."""
+
+        if not getattr(_global_registry, "_registry", None):
+            return []
+
+        unique: Dict[str, Dict[str, Any]] = {}
+        for entry in getattr(_global_registry, "_registry", {}).values():
+            full_name = str(entry.get("full_name", "") or "")
+            if full_name and full_name not in unique:
+                unique[full_name] = entry
+        return list(unique.values())
+
+    @staticmethod
+    def _merge_entries(primary: Dict[str, Any], secondary: Dict[str, Any]) -> Dict[str, Any]:
+        """Merge duplicate runtime/static entries under one public-facing name."""
+
+        merged = dict(primary)
+
+        list_fields = ("aliases", "examples", "related", "imports", "parameters")
+        dict_fields = ("prerequisites", "requires", "produces")
+
+        for field in list_fields:
+            values: List[Any] = []
+            for source in (primary, secondary):
+                values.extend(source.get(field) or [])
+            if values:
+                merged[field] = list(dict.fromkeys(values))
+
+        for field in dict_fields:
+            combined: Dict[str, List[Any]] = {}
+            for source in (primary, secondary):
+                for key, values in (source.get(field) or {}).items():
+                    combined.setdefault(str(key), [])
+                    combined[str(key)].extend(values or [])
+            if combined:
+                merged[field] = {
+                    key: list(dict.fromkeys(values))
+                    for key, values in combined.items()
+                }
+
+        for field in (
+            "description",
+            "docstring",
+            "signature",
+            "module",
+            "parent_full_name",
+            "branch_parameter",
+            "branch_value",
+            "category",
+            "registry_full_name",
+        ):
+            primary_value = merged.get(field)
+            secondary_value = secondary.get(field)
+            if (not primary_value) and secondary_value:
+                merged[field] = secondary_value
+
+        if primary.get("source") != "runtime" and secondary.get("source") == "runtime":
+            merged["source"] = "runtime"
+
+        return merged
+
+    @staticmethod
+    def _query_tokens(text: str) -> List[str]:
+        """Tokenize mixed English/CJK queries for lightweight lexical retrieval."""
+
+        tokens = [
+            token
+            for token in re.findall(r"[a-z0-9_\\.\\-]+|[\u4e00-\u9fff]+", text.lower())
+            if token.strip()
+        ]
+        return list(dict.fromkeys(tokens))
+
+    @staticmethod
+    def _token_overlap_score(query: str, field: str) -> float:
+        """Return a normalized token-overlap score between query and one field."""
+
+        field_lower = str(field).lower()
+        if not field_lower:
+            return 0.0
+
+        tokens = RegistryScanner._query_tokens(query)
+        if not tokens:
+            return 0.0
+
+        score = 0.0
+        for token in tokens:
+            if token == field_lower:
+                score += 2.0
+            elif token in field_lower:
+                score += 1.0
+        return score
+
+    @staticmethod
+    def _entry_kind_rank(entry: Dict[str, Any]) -> int:
+        """Prefer parent functions over methods, and methods over branches."""
+
+        source = str(entry.get("source", "") or "")
+        if entry.get("branch_parameter") or source.endswith("branch"):
+            return 0
+        if entry.get("parent_full_name") or source.endswith("method"):
+            return 1
+        return 2
+
+    @staticmethod
+    def _flatten_contract_map(value: Any) -> str:
+        """Flatten prerequisite/contract metadata into lightweight search text."""
+
+        if isinstance(value, dict):
+            parts: List[str] = []
+            for key, items in value.items():
+                if isinstance(items, list):
+                    parts.append(f"{key} {' '.join(str(item) for item in items)}")
+                else:
+                    parts.append(f"{key} {items}")
+            return " ".join(parts)
+        return str(value or "")
+
+
+def build_compact_registry_summary(
+    scanner: Optional["RegistryScanner"] = None,
+) -> str:
+    """Return the compact category-level registry summary used by ``ov.Agent``."""
+
+    active_scanner = scanner or RegistryScanner()
+    category_map: Dict[str, List[str]] = {}
+    seen: set[str] = set()
+
+    entries = active_scanner.load_static_entries()
+    if not entries:
+        for entry in getattr(_global_registry, "_registry", {}).values():
+            full_name = entry.get("full_name", "")
+            if full_name and full_name not in seen:
+                seen.add(full_name)
+                cat = entry.get("category", "other") or "other"
+                category_map.setdefault(cat, []).append(full_name)
+    else:
+        for entry in entries:
+            full_name = entry.get("full_name", "")
+            if full_name and full_name not in seen:
+                seen.add(full_name)
+                cat = entry.get("category", "other") or "other"
+                category_map.setdefault(cat, []).append(full_name)
+
+    lines: List[str] = []
+    for cat in sorted(category_map):
+        names = category_map[cat]
+        sample = ", ".join(names[:5])
+        suffix = f" (+{len(names) - 5} more)" if len(names) > 5 else ""
+        lines.append(f"- **{cat}** ({len(names)} functions): {sample}{suffix}")
+    return "\n".join(lines) if lines else "No registered functions detected."
 
 
 # ---------------------------------------------------------------------------

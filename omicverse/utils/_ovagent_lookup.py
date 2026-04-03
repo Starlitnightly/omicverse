@@ -13,7 +13,10 @@ import logging
 from typing import Any
 
 from .ovagent.bootstrap import initialize_skill_registry
-from .ovagent.registry_scanner import RegistryScanner
+from .ovagent.registry_scanner import (
+    RegistryScanner,
+    build_compact_registry_summary,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +40,16 @@ class _RegistryLookupContext:
         max_entries: int = 8,
     ) -> list[dict[str, Any]]:
         return self._scanner.collect_static_entries(
+            request,
+            max_entries=max_entries,
+        )
+
+    def _collect_relevant_registry_entries(
+        self,
+        request: str,
+        max_entries: int = 8,
+    ) -> list[dict[str, Any]]:
+        return self._scanner.collect_relevant_entries(
             request,
             max_entries=max_entries,
         )
@@ -136,6 +149,22 @@ def registry_lookup(
         return _registry_unavailable_message()
 
 
+def registry_summary() -> str:
+    """Return the same compact registry summary used by ``ov.Agent`` prompts."""
+
+    try:
+        scanner = _create_registry_scanner()
+    except Exception as exc:
+        logger.warning("RegistryScanner init failed during summary build: %s", exc)
+        return _registry_unavailable_message()
+
+    try:
+        return build_compact_registry_summary(scanner)
+    except Exception as exc:
+        logger.warning("registry_summary build failed: %s", exc)
+        return _registry_unavailable_message()
+
+
 def skill_lookup(
     query: str,
     max_body_chars: int = 3000,
@@ -162,5 +191,6 @@ __all__ = [
     "RegistryScanner",
     "initialize_skill_registry",
     "registry_lookup",
+    "registry_summary",
     "skill_lookup",
 ]

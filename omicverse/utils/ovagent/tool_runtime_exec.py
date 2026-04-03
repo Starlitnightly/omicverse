@@ -21,8 +21,6 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from ..harness.runtime_state import runtime_state
 from ..harness.tool_catalog import resolve_tool_search
-from ..._registry import _global_registry
-
 if TYPE_CHECKING:
     from .analysis_executor import AnalysisExecutor
     from .protocol import AgentContext
@@ -402,39 +400,26 @@ def handle_search_functions(ctx: "AgentContext", query: str) -> str:
     if not query:
         return "Please provide a non-empty function search query."
 
-    matches: List[Dict[str, Any]] = []
-    seen_full_names: set[str] = set()
-
-    def _extend(entries: List[Dict[str, Any]]) -> None:
-        for entry in entries or []:
-            full_name = str(
-                entry.get("full_name")
-                or entry.get("short_name")
-                or entry.get("name")
-                or ""
-            )
-            if not full_name or full_name in seen_full_names:
-                continue
-            seen_full_names.add(full_name)
-            matches.append(entry)
-
-    try:
-        runtime_matches = list(_global_registry.find(query))
-    except Exception as exc:
-        logger.debug("Runtime registry search failed for %r: %s", query, exc)
-        runtime_matches = []
-    _extend(runtime_matches)
-
-    static_search = getattr(ctx, "_collect_static_registry_entries", None)
-    if callable(static_search):
+    relevant_search = getattr(ctx, "_collect_relevant_registry_entries", None)
+    if callable(relevant_search):
         try:
-            static_matches = list(static_search(query, max_entries=20))
+            matches = list(relevant_search(query, max_entries=20))
         except TypeError:
-            static_matches = list(static_search(query))
+            matches = list(relevant_search(query))
         except Exception as exc:
-            logger.debug("Static registry search failed for %r: %s", query, exc)
-            static_matches = []
-        _extend(static_matches)
+            logger.debug("Unified registry search failed for %r: %s", query, exc)
+            matches = []
+    else:
+        matches = []
+        static_search = getattr(ctx, "_collect_static_registry_entries", None)
+        if callable(static_search):
+            try:
+                matches = list(static_search(query, max_entries=20))
+            except TypeError:
+                matches = list(static_search(query))
+            except Exception as exc:
+                logger.debug("Static registry search failed for %r: %s", query, exc)
+                matches = []
 
     if not matches:
         return f"No functions found matching '{query}'. Try broader keywords."

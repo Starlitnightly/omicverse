@@ -117,6 +117,7 @@ from ._ovagent_lookup import (
     RegistryScanner,
     initialize_skill_registry,
     registry_lookup,
+    registry_summary,
     skill_lookup,
 )
 
@@ -319,6 +320,7 @@ __all__ = [
     "RegistryScanner",
     "initialize_skill_registry",
     "registry_lookup",
+    "registry_summary",
     "skill_lookup",
     # @ agent_backend
     "agent_backend",
