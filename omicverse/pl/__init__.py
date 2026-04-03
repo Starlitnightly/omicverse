@@ -141,6 +141,7 @@ from ._flowsig import (
 from ._embedding import embedding_atlas
 from ._density import add_density_contour, calculate_gene_density
 from ._cpdbviz import CellChatViz
+from ._ccc import ccc_heatmap, ccc_network_plot, ccc_stat_plot
 from ._dotplot import dotplot, rank_genes_groups_dotplot, rank_genes_groups_df, markers_dotplot
 from ._spatial import spatial, spatial_segment, spatial_segment_overlay
 from ._spatialseg import (
@@ -302,6 +303,10 @@ __all__ = [
     "calculate_gene_density",
     # @ _cpdbviz
     "CellChatViz",
+    # @ _ccc
+    "ccc_heatmap",
+    "ccc_network_plot",
+    "ccc_stat_plot",
     # @ _dotplot
     "dotplot",
     "rank_genes_groups_dotplot",
