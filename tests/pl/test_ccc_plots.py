@@ -863,7 +863,9 @@ def test_ccc_scatter_includes_receiver_only_groups(comm_adata_with_receiver_only
         show=False,
     )
     _assert_figure_and_axes(fig, ax)
-    labels = {text.get_text() for text in ax.texts}
+    # adjustText can leave an empty helper text artist in some environments;
+    # the test only cares that receiver-only group labels are present.
+    labels = {text.get_text() for text in ax.texts if text.get_text()}
     assert labels == {"EVT_1", "dNK1", "SCT"}
 
 
