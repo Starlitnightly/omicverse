@@ -103,3 +103,49 @@ ov.pl.embedding(
 # export figure
 plt.savefig('omicverse_visualization.png', dpi=300, bbox_inches='tight')
 ```
+
+## Heatmap family quick reference
+```python
+# grouped summary heatmap
+group_plot = ov.pl.group_heatmap(
+    adata,
+    var_names={'T cells': ['LTB', 'IL7R'], 'Myeloid': ['LYZ', 'S100A8']},
+    groupby='celltype',
+    standard_scale='var',
+    border=False,
+)
+
+# cell-level ordered heatmap
+feature_plot = ov.pl.feature_heatmap(
+    adata,
+    var_names=['LTB', 'IL7R', 'LYZ'],
+    groupby='celltype',
+    cell_orderby='pseudotime',
+    max_cells=200,
+    standard_scale='var',
+    border=False,
+)
+
+# dynamic pseudotime heatmap
+dynamic_plot = ov.pl.dynamic_heatmap(
+    adata_traj,
+    pseudotime='slingshot_pseudotime',
+    lineage_key='slingshot_lineage',
+    top_features=150,
+    standard_scale='var',
+    border=False,
+)
+
+# similarity heatmap across groups
+cor_plot = ov.pl.cell_cor_heatmap(
+    adata,
+    group_by='celltype',
+    method='pearson',
+    standard_scale='var',
+    border=False,
+)
+
+# legacy compatibility entry points
+legacy_group = ov.pl.complexheatmap(...)
+legacy_marker = ov.pl.marker_heatmap(...)
+```

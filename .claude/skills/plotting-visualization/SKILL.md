@@ -1,7 +1,7 @@
 ---
 name: omicverse-visualization-for-bulk-color-systems-and-single-cell-d
 title: OmicVerse visualization for bulk, color systems, and single-cell data
-description: "OmicVerse plotting: volcano, venn, boxplot, embedding, density, dotplot, convex hull, stacked bar, and Forbidden City color palettes."
+description: "OmicVerse plotting: volcano, venn, boxplot, embedding, density, heatmap families, dotplot, convex hull, stacked bar, and Forbidden City color palettes."
 ---
 
 # OmicVerse visualization for bulk, color systems, and single-cell data
@@ -50,7 +50,15 @@ It covers how to configure OmicVerse's plotting style, choose colors from the Fo
      - `ov.pl.embedding_adjust` to reposition legends automatically.
      - `ov.pl.embedding_density` for density overlays, controlling smoothness with `adjust`.
    - For spatial gene density, describe the workflow: `ov.pl.calculate_gene_density(adata, genes=[...], basis='spatial')`, then overlay with `ov.pl.embedding(..., layer='gene_density', cmap='...')`.
-   - Cover additional charts like `ov.pl.single_group_boxplot`, `ov.pl.bardotplot`, `ov.pl.dotplot`, and `ov.pl.marker_heatmap`, emphasizing input formats (long-form DataFrame vs. AnnData with `.obs` annotations) and optional helpers such as `ov.pl.add_palue` for manual p-value annotations.
+   - For heatmaps, prefer the Marsilea mainline family:
+     - `ov.pl.group_heatmap` for grouped expression summaries.
+     - `ov.pl.feature_heatmap` for cell-level ordered heatmaps.
+     - `ov.pl.dynamic_heatmap` for pseudotime/lineage heatmaps.
+     - `ov.pl.cell_cor_heatmap` for group similarity heatmaps.
+   - Treat `ov.pl.complexheatmap` and `ov.pl.marker_heatmap` as compatibility entry points for older workflows rather than the default extension surface.
+   - Keep default `border=False` unless a user explicitly asks for framed panels; this matches current OmicVerse heatmap styling more closely.
+   - For trajectory heatmaps, prefer real inferred pseudotime stored on the AnnData object over synthetic ordering whenever notebook or cached lineage results are available.
+   - Cover additional charts like `ov.pl.single_group_boxplot`, `ov.pl.bardotplot`, `ov.pl.dotplot`, and legacy `ov.pl.marker_heatmap`, emphasizing input formats (long-form DataFrame vs. AnnData with `.obs` annotations) and optional helpers such as `ov.pl.add_palue` for manual p-value annotations.
 5. **Finishing touches and exports**
    - Encourage adding titles, axis labels, and `fig.tight_layout()` to prevent clipping.
    - Suggest saving figures with `fig.savefig('plot.png', dpi=300, bbox_inches='tight')` and documenting color mappings for reproducibility.
