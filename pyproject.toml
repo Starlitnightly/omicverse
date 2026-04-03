@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "omicverse"
-version = "2.1.1rc1"
+version = "2.1.1rc3"
 description = "OmicVerse: A single pipeline for exploring the entire transcriptome universe"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -49,7 +49,7 @@ dependencies = [
     #'boltons>=23.0',
     #'ctxcore>=0.2',
     #'termcolor>=2.1',
-    'pygam>=0.8.0',
+    
     
     #'gdown>=4.6',
     'igraph>=0.10',
@@ -115,6 +115,7 @@ full = [
   'leidenalg>=0.9',
   'gdown>=4.6',
   'wandb',
+  'pygam>=0.8.0',
 ]
 
 easy=[

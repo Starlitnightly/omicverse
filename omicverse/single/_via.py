@@ -4,7 +4,7 @@ import scanpy as sc
 import pandas as pd
 
 import igraph as ig
-import pygam as pg
+
 from datetime import datetime
 from typing import Union,Tuple
 from .._settings import add_reference
@@ -920,6 +920,7 @@ def draw_trajectory_gams_pyomic(adata,clusters,via_object, via_fine=None, embedd
     :param highlight_terminal_states: whether or not to highlight/distinguish the clusters which are detected as the terminal states by via
     :return: f, ax1, ax2
     '''
+    import pygam as pg
 
     if embedding is None:
         embedding = via_object.embedding
@@ -1092,7 +1093,7 @@ def draw_trajectory_gams_pyomic(adata,clusters,via_object, via_fine=None, embedd
         x_val = x_val.reshape((len(x_val), -1))
         y_val = y_val.reshape((len(y_val), -1))
         xp = np.linspace(minx, maxx, 500)
-
+        
         gam50 = pg.LinearGAM(n_splines=4, spline_order=3, lam=10).gridsearch(x_val, y_val)
         XX = gam50.generate_X_grid(term=0, n=500)
         preds = gam50.predict(XX)
@@ -1361,6 +1362,7 @@ def get_gene_expression_pyomic(via0, gene_exp:pd.DataFrame, cmap:str='jet', figs
     :param marker_lineages: Default is to use all lineage pathways. other provide a list of lineage number (terminal cluster number).
     :return: fig, axs
     '''
+    import pygam as pg
 
     if len(marker_lineages)==0: marker_lineages=via0.terminal_clusters
 
