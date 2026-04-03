@@ -1389,7 +1389,7 @@ class CellChatViz(CellChatVizPlus):
                 custom_cmap = self._create_custom_colormap(sender_color)
                 
                 weights = [G[u][v]['weight'] for u, v in edges]
-                edge_widths = [(w / global_max_weight) * edge_width_max for w in weights]
+                edge_widths = [0.9 + (w / global_max_weight) * max(edge_width_max - 0.9, 0.1) for w in weights]
                 
                 # Normalize weights for color mapping
                 if len(weights) > 1 and max(weights) > min(weights):
@@ -1400,13 +1400,13 @@ class CellChatViz(CellChatVizPlus):
                 edge_colors = [custom_cmap(nw) for nw in norm_weights]
                 
                 nx.draw_networkx_edges(G, pos, width=edge_widths, 
-                                      edge_color=edge_colors, alpha=0.7,
+                                      edge_color=edge_colors, alpha=0.82,
                                       arrows=True, arrowsize=15, ax=ax)
             elif edges:
                 # Use traditional single colormap
                 weights = [G[u][v]['weight'] for u, v in edges]
-                edge_widths = [(w / global_max_weight) * edge_width_max for w in weights]
-                nx.draw_networkx_edges(G, pos, width=edge_widths, alpha=0.7,
+                edge_widths = [0.9 + (w / global_max_weight) * max(edge_width_max - 0.9, 0.1) for w in weights]
+                nx.draw_networkx_edges(G, pos, width=edge_widths, alpha=0.82,
                                       edge_color=weights, edge_cmap=plt.cm.get_cmap(cmap),
                                       arrows=True, arrowsize=15, ax=ax)
             
@@ -1572,7 +1572,7 @@ class CellChatViz(CellChatVizPlus):
                     
                     edge_list = [(u, v) for u, v, w in sender_edges]
                     weights = [w for u, v, w in sender_edges]
-                    edge_widths = [(w / global_max_weight) * edge_width_max for w in weights]
+                    edge_widths = [0.9 + (w / global_max_weight) * max(edge_width_max - 0.9, 0.1) for w in weights]
                     
                     # Normalize weights for color mapping
                     if len(weights) > 1 and max(weights) > min(weights):
@@ -1583,13 +1583,13 @@ class CellChatViz(CellChatVizPlus):
                     edge_colors = [custom_cmap(nw) for nw in norm_weights]
                     
                     nx.draw_networkx_edges(G, pos, edgelist=edge_list, width=edge_widths,
-                                          edge_color=edge_colors, alpha=0.7,
+                                          edge_color=edge_colors, alpha=0.82,
                                           arrows=True, arrowsize=15, ax=ax)
             elif edges:
                 # Use traditional single colormap
                 weights = [G[u][v]['weight'] for u, v in edges]
-                edge_widths = [(w / global_max_weight) * edge_width_max for w in weights]
-                nx.draw_networkx_edges(G, pos, width=edge_widths, alpha=0.7,
+                edge_widths = [0.9 + (w / global_max_weight) * max(edge_width_max - 0.9, 0.1) for w in weights]
+                nx.draw_networkx_edges(G, pos, width=edge_widths, alpha=0.82,
                                       edge_color=weights, edge_cmap=plt.cm.get_cmap(cmap),
                                       arrows=True, arrowsize=15, ax=ax)
             
@@ -1922,24 +1922,37 @@ class CellChatViz(CellChatVizPlus):
         if add_row_sum:
             row_sums = filtered_matrix.sum(axis=1)
             h.add_left(ma.plotter.Numbers(row_sums, color="#F05454",
-                                        label="Outgoing"))
+                                        label="Outgoing",
+                                        show_value=False))
         
         # Add column sums (top)
         if add_col_sum:
             col_sums = filtered_matrix.sum(axis=0)
             h.add_top(ma.plotter.Numbers(col_sums, color="#4A90E2",
-                                       label="Incoming"))
+                                       label="Incoming",
+                                       show_value=False))
         
         # Add cell type color annotations
         cell_colors = self._get_cell_type_colors()
         row_colors = [cell_colors.get(ct, '#808080') for ct in active_cell_types]
         col_colors = [cell_colors.get(ct, '#808080') for ct in active_cell_types]
             
-        # Add cell type color bars
-        h.add_left(ma.plotter.Chunk(active_cell_types, fill_colors=row_colors, 
-                                       rotation=90, label="Cell Types (Senders)"))
-        h.add_top(ma.plotter.Chunk(active_cell_types, fill_colors=col_colors, 
-                                      rotation=90, label="Cell Types (Receivers)"))
+        # Keep the focused Marsilea view compact. The main heatmap already
+        # carries row/column labels, so extra label annotations quickly make
+        # the panel noisy.
+        row_palette = dict(zip(active_cell_types, row_colors))
+        col_palette = dict(zip(active_cell_types, col_colors))
+        h.add_left(
+            ma.plotter.Colors(active_cell_types, palette=row_palette),
+            size=0.12,
+            pad=0.02,
+            legend=False,
+        )
+        h.add_top(
+            ma.plotter.Colors(active_cell_types, palette=col_palette),
+            size=0.14,
+            pad=0.02,
+        )
         
         # Add legends
         h.add_legends()
@@ -2733,71 +2746,44 @@ class CellChatViz(CellChatVizPlus):
         
         # Choose visualization method based on layout type
         if layout == 'circle':
-            # Check if there are actual interactions
-            if pathway_matrix.sum() == 0:
-                fig, ax = plt.subplots(figsize=figsize)
-                ax.text(0.5, 0.5, f'No significant interactions found for pathway(s): {", ".join(signaling)}', 
-                       ha='center', va='center', fontsize=16)
-                ax.axis('off')
-                return fig, ax
-            
             title = f"Signaling Pathway: {', '.join(signaling)} (Circle)"
-            
-            # If vertex_sender or vertex_receiver specified, need to filter matrix
-            if vertex_sender is not None or vertex_receiver is not None:
-                # Create filtered matrix
-                filtered_matrix = np.zeros_like(pathway_matrix)
-                
-                for i, sender_type in enumerate(self.cell_types):
-                    for j, receiver_type in enumerate(self.cell_types):
-                        # Check if meets sender/receiver conditions
-                        sender_ok = (vertex_sender is None) or (sender_type in vertex_sender)
-                        receiver_ok = (vertex_receiver is None) or (receiver_type in vertex_receiver)
-                        
-                        if sender_ok and receiver_ok and pathway_matrix[i, j] > 0:
-                            filtered_matrix[i, j] = pathway_matrix[i, j]
-                
-                pathway_matrix = filtered_matrix
-                
-                # Check again if there are still interactions
-                if pathway_matrix.sum() == 0:
-                    fig, ax = plt.subplots(figsize=figsize)
+            from ._ccc import ccc_network_plot
+
+            try:
+                # Route aggregated circle rendering through the Python-native CCC
+                # backend so pathway circles share the same visual language as
+                # `ov.pl.ccc_network_plot(..., plot_type="circle")`.
+                fig, ax = ccc_network_plot(
+                    self.adata,
+                    plot_type="circle",
+                    signaling=signaling,
+                    sender_use=vertex_sender,
+                    receiver_use=vertex_receiver,
+                    pvalue_threshold=pvalue_threshold,
+                    value="sum",
+                    top_n=None,
+                    palette=self.palette,
+                    figsize=figsize,
+                    title=title,
+                    show=False,
+                    save=False,
+                )
+            except ValueError:
+                fig, ax = plt.subplots(figsize=figsize)
+                if vertex_sender is not None or vertex_receiver is not None:
                     sender_str = f"senders: {vertex_sender}" if vertex_sender else "any senders"
                     receiver_str = f"receivers: {vertex_receiver}" if vertex_receiver else "any receivers"
-                    ax.text(0.5, 0.5, f'No interactions found for pathway(s): {", ".join(signaling)}\nwith {sender_str} and {receiver_str}', 
-                           ha='center', va='center', fontsize=14)
-                    ax.axis('off')
-                    return fig, ax
-            
-            # Choose appropriate circular visualization method
-            if focused_view:
-                fig, ax = self.netVisual_circle_focused(
-                    matrix=pathway_matrix,
-                    title=title,
-                    edge_width_max=edge_width_max,
-                    vertex_size_max=vertex_size_max,
-                    show_labels=show_labels,
-                    cmap=cmap,
-                    figsize=figsize,
-                    min_interaction_threshold=0,
-                    use_sender_colors=use_sender_colors,
-                    use_curved_arrows=use_curved_arrows,
-                    curve_strength=curve_strength
-                )
-            else:
-                fig, ax = self.netVisual_circle(
-                    matrix=pathway_matrix,
-                    title=title,
-                    edge_width_max=edge_width_max,
-                    vertex_size_max=vertex_size_max,
-                    show_labels=show_labels,
-                    cmap=cmap,
-                    figsize=figsize,
-                    use_sender_colors=use_sender_colors,
-                    use_curved_arrows=use_curved_arrows,
-                    curve_strength=curve_strength,  
-                    adjust_text=adjust_text
-                )
+                    message = (
+                        f'No interactions found for pathway(s): {", ".join(signaling)}\n'
+                        f'with {sender_str} and {receiver_str}'
+                    )
+                    fontsize = 14
+                else:
+                    message = f'No significant interactions found for pathway(s): {", ".join(signaling)}'
+                    fontsize = 16
+                ax.text(0.5, 0.5, message, ha='center', va='center', fontsize=fontsize)
+                ax.axis('off')
+                return fig, ax
         
         elif layout == 'hierarchy':
             # Determine source and target cells
