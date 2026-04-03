@@ -25,7 +25,7 @@ import os
 from ._scanpy_compat import default_palette, ranking, savefig_or_show, settings
 try:
     import torch  # Optional, used for GPU information
-except ImportError:  # pragma: no cover - optional dependency
+except Exception:  # pragma: no cover - optional dependency / partially initialized import
     torch = None
 
 
