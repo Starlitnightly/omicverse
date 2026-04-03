@@ -6,6 +6,7 @@ import shutil
 import tempfile
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -371,6 +372,29 @@ class TestFilesystemContextManager:
         # Summary file should exist
         summary_file = ctx_manager._workspace_dir / "final_summary.md"
         assert summary_file.exists()
+
+    def test_default_base_dir_falls_back_when_home_context_unwritable(self, tmp_path, monkeypatch):
+        """Default storage should fall back to temp storage when home is unavailable."""
+        blocked_base_dir = tmp_path / "blocked-home" / ".ovagent" / "context"
+        fallback_root = tmp_path / "fallback-tmp"
+        original_mkdir = Path.mkdir
+
+        monkeypatch.delenv(FilesystemContextManager.ENV_BASE_DIR, raising=False)
+        monkeypatch.setattr(FilesystemContextManager, "DEFAULT_BASE_DIR", blocked_base_dir)
+        monkeypatch.setattr(tempfile, "gettempdir", lambda: str(fallback_root))
+
+        def guarded_mkdir(self, mode=0o777, parents=False, exist_ok=False):
+            if self == blocked_base_dir or blocked_base_dir in self.parents:
+                raise PermissionError("blocked home context dir")
+            return original_mkdir(self, mode=mode, parents=parents, exist_ok=exist_ok)
+
+        with patch("pathlib.Path.mkdir", new=guarded_mkdir):
+            ctx = FilesystemContextManager()
+
+        expected_base_dir = fallback_root / "ovagent" / "context"
+        assert ctx.base_dir == expected_base_dir
+        assert ctx.workspace_dir.exists()
+        assert ctx.workspace_dir.is_relative_to(expected_base_dir)
 
 
 class TestFilesystemContextIntegration:

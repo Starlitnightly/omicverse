@@ -13,8 +13,8 @@
 | Meta    | [![scverse-badge]][scverse-link] [![License][license-badge]][license-link] [![Star][star-badge]][star-link] [![Citations][citation-badge]][citation-link]           |
 
 
-[precommit-badge]: https://github.com/Starlitnightly/omicverse/workflows/py310|py311/badge.svg
-[precommit-link]:https://github.com/Starlitnightly/omicverse/
+[precommit-badge]: https://github.com/Starlitnightly/omicverse/actions/workflows/python-package.yml/badge.svg
+[precommit-link]:https://github.com/Starlitnightly/omicverse/actions/workflows/python-package.yml
 [readthedocs-badge]:https://readthedocs.org/projects/omicverse/badge/?version=latest
 [readthedocs-link]:https://omicverse.readthedocs.io/en/latest/?badge=latest
 [preprint-badge]: https://img.shields.io/badge/DOI-10.1038/s41467.024.50194.3-368650.svg

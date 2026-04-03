@@ -59,6 +59,7 @@ sys.modules["omicverse.utils.ovagent.registry_scanner"] = _scanner_mod
 _spec.loader.exec_module(_scanner_mod)
 
 RegistryScanner = _scanner_mod.RegistryScanner
+build_compact_registry_summary = _scanner_mod.build_compact_registry_summary
 _find_register_function_decorator = _scanner_mod._find_register_function_decorator
 _derive_static_signature = _scanner_mod._derive_static_signature
 _branch_subject_name = _scanner_mod._branch_subject_name
@@ -86,6 +87,57 @@ class TestRegistryScannerInit:
         assert len(entries) > 0
         # Second call returns same cached list
         assert scanner.load_static_entries() is entries
+
+    def test_ensure_runtime_registry_prefers_full_hydration(self, monkeypatch):
+        calls = []
+
+        class _FakeRegistry:
+            _registry = None
+
+        def _fake_full_hydrate():
+            calls.append("full")
+            _FakeRegistry._registry = {"ov.pp.qc": object()}
+
+        def _fake_manifest_hydrate():
+            calls.append("manifest")
+
+        monkeypatch.setattr(_scanner_mod, "_global_registry", _FakeRegistry)
+        monkeypatch.setattr(_scanner_mod, "_hydrate_registry_for_export", _fake_full_hydrate)
+
+        import types
+        manifest_mod = types.ModuleType("omicverse.mcp.manifest")
+        manifest_mod.ensure_registry_populated = _fake_manifest_hydrate
+        monkeypatch.setitem(sys.modules, "omicverse.mcp.manifest", manifest_mod)
+
+        RegistryScanner.ensure_runtime_registry()
+
+        assert calls == ["full"]
+
+    def test_ensure_runtime_registry_falls_back_to_manifest(self, monkeypatch):
+        calls = []
+
+        class _FakeRegistry:
+            _registry = None
+
+        def _fake_full_hydrate():
+            calls.append("full")
+            raise RuntimeError("boom")
+
+        def _fake_manifest_hydrate():
+            calls.append("manifest")
+            _FakeRegistry._registry = {"ov.pp.qc": object()}
+
+        monkeypatch.setattr(_scanner_mod, "_global_registry", _FakeRegistry)
+        monkeypatch.setattr(_scanner_mod, "_hydrate_registry_for_export", _fake_full_hydrate)
+
+        import types
+        manifest_mod = types.ModuleType("omicverse.mcp.manifest")
+        manifest_mod.ensure_registry_populated = _fake_manifest_hydrate
+        monkeypatch.setitem(sys.modules, "omicverse.mcp.manifest", manifest_mod)
+
+        RegistryScanner.ensure_runtime_registry()
+
+        assert calls == ["full", "manifest"]
 
 
 class TestStaticScan:
@@ -148,6 +200,28 @@ class TestNormalization:
         result = RegistryScanner.normalize_entry(entry)
         assert result["registry_full_name"] == "omicverse.pp.qc"
 
+    def test_runtime_method_name_preserves_parent_context(self):
+        entry = {
+            "full_name": "omicverse.single._anno.Annotation.annotate",
+            "short_name": "annotate",
+            "parent_full_name": "omicverse.single._anno.Annotation",
+        }
+        result = RegistryScanner.normalize_entry(entry)
+        assert result["full_name"] == "ov.single.Annotation.annotate"
+        assert result["parent_full_name"] == "ov.single.Annotation"
+
+    def test_runtime_branch_name_preserves_parent_context(self):
+        entry = {
+            "full_name": "omicverse.pp._preprocess.pca[mode=cpu]",
+            "short_name": "cpu",
+            "parent_full_name": "omicverse.pp._preprocess.pca",
+            "branch_parameter": "mode",
+            "branch_value": "cpu",
+        }
+        result = RegistryScanner.normalize_entry(entry)
+        assert result["full_name"] == "ov.pp.pca[mode=cpu]"
+        assert result["parent_full_name"] == "ov.pp.pca"
+
 
 class TestScoring:
     def test_exact_full_name_match_scores_high(self):
@@ -186,6 +260,75 @@ class TestCollectStatic:
         scanner = RegistryScanner()
         results = scanner.collect_static_entries("", max_entries=5)
         assert results == []
+
+
+class TestCollectRelevant:
+    def test_exact_api_match_beats_weak_prerequisite_mentions(self, monkeypatch):
+        scanner = RegistryScanner()
+
+        runtime_entries = [
+            {
+                "full_name": "omicverse.pp._preprocess.pca",
+                "short_name": "pca",
+                "aliases": ["pca", "principal component analysis"],
+                "description": "Run PCA on scaled data.",
+                "source": "runtime",
+            },
+            {
+                "full_name": "omicverse.utils._mde.mde",
+                "short_name": "mde",
+                "aliases": ["mde"],
+                "description": "Minimum Distortion Embedding for visualization.",
+                "prerequisites": {"functions": ["pca"]},
+                "requires": {"obsm": ["X_pca"]},
+                "source": "runtime",
+            },
+            {
+                "full_name": "omicverse.pp._preprocess.pca[mode=cpu]",
+                "short_name": "cpu",
+                "aliases": ["pca cpu"],
+                "description": "CPU branch for PCA.",
+                "parent_full_name": "omicverse.pp._preprocess.pca",
+                "branch_parameter": "mode",
+                "branch_value": "cpu",
+                "source": "runtime_derived_branch",
+            },
+        ]
+
+        monkeypatch.setattr(
+            RegistryScanner,
+            "_iter_runtime_entries",
+            staticmethod(lambda: runtime_entries),
+        )
+        monkeypatch.setattr(scanner, "load_static_entries", lambda: [])
+
+        results = scanner.collect_relevant_entries("pca", max_entries=3)
+
+        assert [entry["full_name"] for entry in results] == [
+            "ov.pp.pca",
+            "ov.pp.pca[mode=cpu]",
+            "ov.utils.mde",
+        ]
+
+
+class TestCompactSummary:
+    def test_build_compact_registry_summary_formats_category_lines(self, monkeypatch):
+        scanner = RegistryScanner()
+
+        monkeypatch.setattr(
+            scanner,
+            "load_static_entries",
+            lambda: [
+                {"full_name": "ov.pp.qc", "category": "preprocessing"},
+                {"full_name": "ov.pp.pca", "category": "preprocessing"},
+                {"full_name": "ov.pl.umap", "category": "pl"},
+            ],
+        )
+
+        summary = build_compact_registry_summary(scanner)
+
+        assert "- **pl** (1 functions): ov.pl.umap" in summary
+        assert "- **preprocessing** (2 functions): ov.pp.qc, ov.pp.pca" in summary
 
 
 class TestHelpers:

@@ -52,13 +52,36 @@ _FUNCTION_REPLACEMENTS = {
 for _name, _replacement in _FUNCTION_REPLACEMENTS.items():
     globals()[_name] = _wrap(_name, _replacement)
 
-_FORWARDED_ATTRS = {
-    "_vector_friendly",
-    "pyomic_palette",
-    "blue_palette",
-    "orange_palette",
-    "red_palette",
-    "green_palette",
+def _load_palette_module():
+    return importlib.import_module("omicverse.pl._palette")
+
+
+def pyomic_palette():
+    _warn("pyomic_palette", "ov.pl._palette.sc_color")
+    return _load_palette_module().sc_color
+
+
+def blue_palette():
+    _warn("blue_palette", "ov.pl._palette.blue_color")
+    return _load_palette_module().blue_color
+
+
+def orange_palette():
+    _warn("orange_palette", "ov.pl._palette.orange_color")
+    return _load_palette_module().orange_color
+
+
+def red_palette():
+    _warn("red_palette", "ov.pl._palette.red_color")
+    return _load_palette_module().red_color
+
+
+def green_palette():
+    _warn("green_palette", "ov.pl._palette.green_color")
+    return _load_palette_module().green_color
+
+
+_PALETTE_ATTRS = {
     "sc_color",
     "red_color",
     "green_color",
@@ -76,7 +99,10 @@ _FORWARDED_ATTRS = {
 
 
 def __getattr__(name: str):
-    if name in _FORWARDED_ATTRS:
+    if name in _PALETTE_ATTRS:
+        palette_mod = _load_palette_module()
+        return getattr(palette_mod, name)
+    if name == "_vector_friendly":
         backend = importlib.import_module("omicverse.pl._plot_backend")
         return getattr(backend, name)
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

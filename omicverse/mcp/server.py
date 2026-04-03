@@ -2279,6 +2279,30 @@ def _get_version() -> str:
         return "unknown"
 
 
+def _validate_transport_dependencies(transport: str) -> None:
+    """Fail fast on missing transport dependencies before server hydration."""
+    if transport == "stdio":
+        try:
+            from mcp.server.stdio import stdio_server  # noqa: F401
+        except ImportError:
+            raise ImportError(
+                "The 'mcp' package is required for stdio transport. "
+                "Install it with: pip install mcp"
+            )
+        return
+
+    if transport == "streamable-http":
+        try:
+            import uvicorn  # noqa: F401
+            from starlette.applications import Starlette  # noqa: F401
+            from mcp.server.fastmcp.server import StreamableHTTPASGIApp  # noqa: F401
+        except ImportError:
+            raise ImportError(
+                "Streamable HTTP transport requires: mcp, uvicorn, and starlette. "
+                "Install them with: pip install mcp uvicorn starlette"
+            )
+
+
 def main():
     """CLI entrypoint: ``python -m omicverse.mcp`` or ``omicverse-mcp``."""
     import argparse
@@ -2346,6 +2370,8 @@ def main():
         help="Route path for streamable-http transport (default: /mcp).",
     )
     args = parser.parse_args()
+
+    _validate_transport_dependencies(args.transport)
 
     # All log output must go to stderr — stdout is reserved for MCP JSON-RPC.
     logging.basicConfig(

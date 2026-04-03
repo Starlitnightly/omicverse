@@ -51,6 +51,12 @@ _GOOGLE_GEMINI_CLI_UNSUPPORTED_SCHEMA_KEYS = {
 }
 
 
+def _gemini_tool_call_id(name: str) -> str:
+    """Generate a collision-safe Gemini tool-call ID with a non-numeric suffix."""
+    safe_name = str(name or "unknown").strip() or "unknown"
+    return f"gemini_{safe_name}_id{uuid.uuid4().hex[:12]}"
+
+
 # ---------------------------------------------------------------------------
 # Schema / message conversion utilities
 # ---------------------------------------------------------------------------
@@ -323,7 +329,7 @@ def _chat_tools_gemini(
                     if hasattr(part, 'function_call') and part.function_call:
                         fc = part.function_call
                         tc_list.append(ToolCall(
-                            id=f"gemini_{fc.name}_{uuid.uuid4().hex[:12]}",
+                            id=_gemini_tool_call_id(fc.name),
                             name=fc.name,
                             arguments=dict(fc.args) if fc.args else {},
                         ))
@@ -663,7 +669,7 @@ def _extract_gemini_text_and_tool_calls(payload: Dict[str, Any]):
             if not isinstance(args, dict):
                 args = {}
             tool_calls.append(ToolCall(
-                id=f"gemini_{name}_{uuid.uuid4().hex[:12]}",
+                id=_gemini_tool_call_id(name),
                 name=name,
                 arguments=args,
             ))

@@ -115,7 +115,10 @@ from .ovagent.subagent_controller import SubagentController as _SubagentControll
 from .ovagent.turn_controller import TurnController as _TurnController
 from .ovagent.session_facade import SessionContextFacadeMixin
 from .ovagent.codegen_tool_facade import CodegenToolDispatchFacadeMixin
-from .ovagent.registry_scanner import RegistryScanner as _RegistryScanner
+from .ovagent.registry_scanner import (
+    RegistryScanner as _RegistryScanner,
+    build_compact_registry_summary as _build_compact_registry_summary,
+)
 
 # Session history
 from .session_history import HistoryEntry, SessionHistory
@@ -501,39 +504,8 @@ class OmicVerseAgent(CodegenToolDispatchFacadeMixin, SessionContextFacadeMixin):
         }
 
     def _get_compact_registry_summary(self) -> str:
-        """Build a compact category-level summary of available functions.
-
-        Instead of dumping every function as JSON, returns a concise
-        overview keyed by domain category with representative names.
-        The LLM is directed to ``search_functions`` for details.
-        """
-        category_map: Dict[str, List[str]] = {}
-        seen: set = set()
-
-        # Prefer static entries (always available); fall back to runtime
-        entries = self._scanner.load_static_entries()
-        if not entries:
-            for entry in getattr(_global_registry, "_registry", {}).values():
-                full_name = entry.get("full_name", "")
-                if full_name and full_name not in seen:
-                    seen.add(full_name)
-                    cat = entry.get("category", "other") or "other"
-                    category_map.setdefault(cat, []).append(full_name)
-        else:
-            for entry in entries:
-                full_name = entry.get("full_name", "")
-                if full_name and full_name not in seen:
-                    seen.add(full_name)
-                    cat = entry.get("category", "other") or "other"
-                    category_map.setdefault(cat, []).append(full_name)
-
-        lines: List[str] = []
-        for cat in sorted(category_map):
-            names = category_map[cat]
-            sample = ", ".join(names[:5])
-            suffix = f" (+{len(names) - 5} more)" if len(names) > 5 else ""
-            lines.append(f"- **{cat}** ({len(names)} functions): {sample}{suffix}")
-        return "\n".join(lines) if lines else "No registered functions detected."
+        """Build the shared compact registry summary used in prompts."""
+        return _build_compact_registry_summary(self._scanner)
 
     def _setup_agent(self):
         """Setup the internal agent backend with dynamic instructions.

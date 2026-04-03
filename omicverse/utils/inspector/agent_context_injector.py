@@ -179,7 +179,8 @@ class AgentContextInjector:
                 from ..filesystem_context import FilesystemContextManager
                 self._filesystem_context = FilesystemContextManager()
                 self.conversation_state.filesystem_session_id = self._filesystem_context.session_id
-            except ImportError:
+            except Exception as exc:
+                logger.debug("Failed to initialize filesystem context: %s", exc)
                 self.enable_filesystem_context = False
                 return None
 

@@ -113,6 +113,13 @@ from ._venn import venny4py
 from ._lsi import Array, lsi, tfidf
 from ._neighboors import neighbors,calc_kBET,calc_kSIM
 from ._gene_id_conversion import _infer_species_and_release, convert2gene_symbol, convert2symbol, id2symbol, convert2gene_id, symbol2id
+from ._ovagent_lookup import (
+    RegistryScanner,
+    initialize_skill_registry,
+    registry_lookup,
+    registry_summary,
+    skill_lookup,
+)
 
 # Import smart_agent module to make it accessible and expose key entrypoints
 # Store verifier with a private name first to ensure reference is preserved
@@ -309,6 +316,12 @@ __all__ = [
     "id2symbol",
     "convert2gene_id",
     "symbol2id",
+    # @ _ovagent_lookup
+    "RegistryScanner",
+    "initialize_skill_registry",
+    "registry_lookup",
+    "registry_summary",
+    "skill_lookup",
     # @ agent_backend
     "agent_backend",
     "agent_backend_streaming",

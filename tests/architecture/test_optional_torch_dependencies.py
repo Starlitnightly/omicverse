@@ -6,10 +6,30 @@ import types
 import pytest
 
 
+_MANAGED_PREFIXES = ("omicverse", "torch", "torch_geometric")
+
+
+def _matching_module_names(prefixes):
+    return [
+        name for name in list(sys.modules)
+        if any(name == prefix or name.startswith(prefix + ".") for prefix in prefixes)
+    ]
+
+
+@pytest.fixture(autouse=True)
+def _restore_managed_modules():
+    saved = {name: sys.modules.get(name) for name in _matching_module_names(_MANAGED_PREFIXES)}
+    yield
+    for name in _matching_module_names(_MANAGED_PREFIXES):
+        sys.modules.pop(name, None)
+    for name, module in saved.items():
+        if module is not None:
+            sys.modules[name] = module
+
+
 def _clear_modules(prefixes):
-    for name in list(sys.modules):
-        if any(name == prefix or name.startswith(prefix + ".") for prefix in prefixes):
-            sys.modules.pop(name, None)
+    for name in _matching_module_names(prefixes):
+        sys.modules.pop(name, None)
 
 
 def _block_torch_imports(monkeypatch):

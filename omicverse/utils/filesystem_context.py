@@ -22,6 +22,7 @@ import re
 import uuid
 import fnmatch
 import hashlib
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
@@ -136,6 +137,7 @@ class FilesystemContextManager:
     """
 
     DEFAULT_BASE_DIR = Path.home() / ".ovagent" / "context"
+    ENV_BASE_DIR = "OVAGENT_CONTEXT_DIR"
 
     # Categories for organizing notes
     CATEGORIES = {
@@ -170,7 +172,14 @@ class FilesystemContextManager:
         auto_compress_threshold : int
             Number of notes that triggers auto-compression (default: 50)
         """
-        self.base_dir = Path(base_dir) if base_dir else self.DEFAULT_BASE_DIR
+        env_base_dir = os.environ.get(self.ENV_BASE_DIR)
+        self._base_dir_explicit = base_dir is not None or env_base_dir is not None
+        if base_dir is not None:
+            self.base_dir = Path(base_dir)
+        elif env_base_dir:
+            self.base_dir = Path(env_base_dir).expanduser()
+        else:
+            self.base_dir = self.DEFAULT_BASE_DIR
         self.session_id = session_id or self._generate_session_id()
         self.parent_session_id = parent_session_id
         self.max_notes_per_category = max_notes_per_category
@@ -206,6 +215,28 @@ class FilesystemContextManager:
 
     def _ensure_workspace_structure(self) -> None:
         """Create the workspace directory structure if it doesn't exist."""
+        try:
+            self._create_workspace_structure()
+        except OSError as exc:
+            if self._base_dir_explicit:
+                raise
+
+            fallback_base_dir = Path(tempfile.gettempdir()) / "ovagent" / "context"
+            if self.base_dir == fallback_base_dir:
+                raise
+
+            logger.warning(
+                "Filesystem context base dir %s is unavailable (%s); falling back to %s",
+                self.base_dir,
+                exc,
+                fallback_base_dir,
+            )
+            self.base_dir = fallback_base_dir
+            self._workspace_dir = self._get_workspace_dir()
+            self._create_workspace_structure()
+
+    def _create_workspace_structure(self) -> None:
+        """Create the directory layout for the active workspace."""
         # Create main directories
         directories = [
             self._workspace_dir,
