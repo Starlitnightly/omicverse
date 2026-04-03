@@ -27,6 +27,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Module-level registry used by handle_search_functions as the primary
+# search source.  Falls back to ctx-based search when None or when find()
+# returns an empty list.  Exposed at module scope so tests can monkeypatch it.
+_global_registry = None
+
 
 # ------------------------------------------------------------------
 # Bash hardening helpers
@@ -400,26 +405,36 @@ def handle_search_functions(ctx: "AgentContext", query: str) -> str:
     if not query:
         return "Please provide a non-empty function search query."
 
-    relevant_search = getattr(ctx, "_collect_relevant_registry_entries", None)
-    if callable(relevant_search):
+    # Try the module-level global registry first (allows injection / testing).
+    matches: List[Any] = []
+    if _global_registry is not None:
         try:
-            matches = list(relevant_search(query, max_entries=20))
-        except TypeError:
-            matches = list(relevant_search(query))
+            matches = list(_global_registry.find(query))
         except Exception as exc:
-            logger.debug("Unified registry search failed for %r: %s", query, exc)
+            logger.debug("Global registry search failed for %r: %s", query, exc)
             matches = []
-    else:
-        matches = []
-        static_search = getattr(ctx, "_collect_static_registry_entries", None)
-        if callable(static_search):
+
+    # Fall back to ctx-based search when global registry returned nothing.
+    if not matches:
+        relevant_search = getattr(ctx, "_collect_relevant_registry_entries", None)
+        if callable(relevant_search):
             try:
-                matches = list(static_search(query, max_entries=20))
+                matches = list(relevant_search(query, max_entries=20))
             except TypeError:
-                matches = list(static_search(query))
+                matches = list(relevant_search(query))
             except Exception as exc:
-                logger.debug("Static registry search failed for %r: %s", query, exc)
+                logger.debug("Unified registry search failed for %r: %s", query, exc)
                 matches = []
+        else:
+            static_search = getattr(ctx, "_collect_static_registry_entries", None)
+            if callable(static_search):
+                try:
+                    matches = list(static_search(query, max_entries=20))
+                except TypeError:
+                    matches = list(static_search(query))
+                except Exception as exc:
+                    logger.debug("Static registry search failed for %r: %s", query, exc)
+                    matches = []
 
     if not matches:
         return f"No functions found matching '{query}'. Try broader keywords."
