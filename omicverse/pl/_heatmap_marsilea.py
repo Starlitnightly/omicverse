@@ -302,12 +302,18 @@ def _draw_custom_legends(
 
 
 def _render_plot(plotter, save_path=None, show=False, legend_kws=None):
-    plotter.render()
+    existing_fignums = set(plt.get_fignums())
+    fig = getattr(plotter, "figure", None)
+    render_figure = fig if getattr(fig, "number", None) in existing_fignums else None
+    plotter.render(figure=render_figure)
     fig = getattr(plotter, "figure", None)
     if fig is None:
         raise RuntimeError(
             "Marsilea plot rendering did not produce a matplotlib figure."
         )
+    for fignum in list(set(plt.get_fignums()) - existing_fignums):
+        if fignum != fig.number:
+            plt.close(fignum)
     if legend_kws is not None:
         _draw_custom_legends(plotter, fig, **legend_kws)
     if save_path:

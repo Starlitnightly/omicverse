@@ -85,6 +85,26 @@ def test_ccc_heatmap_variants_return_figure_and_axes(comm_adata: AnnData, plot_t
     _assert_figure_and_axes(fig, ax)
 
 
+@pytest.mark.parametrize(
+    ("plot_type", "kwargs"),
+    [
+        ("pathway_bubble", {"signaling": "MK", "top_n": 2}),
+        ("role_heatmap", {"pattern": "incoming", "top_n": 2}),
+    ],
+)
+def test_ccc_heatmap_marsilea_variants_leave_single_open_figure(
+    comm_adata: AnnData, plot_type: str, kwargs: dict
+) -> None:
+    fig, ax = ov.pl.ccc_heatmap(
+        comm_adata,
+        plot_type=plot_type,
+        show=False,
+        **kwargs,
+    )
+    _assert_figure_and_axes(fig, ax)
+    assert plt.get_fignums() == [fig.number]
+
+
 def test_ccc_heatmap_diff_heatmap_returns_figure_and_axes(
     comm_adata: AnnData, comparison_comm_adata: AnnData
 ) -> None:
@@ -374,6 +394,7 @@ def test_ccc_stat_plot_interaction_sankey_returns_figure_and_axes(comm_adata: An
     interaction_texts = [text for text in ax.texts if "CXCL12" in text.get_text() or "TGFB1" in text.get_text()]
     assert interaction_texts
     assert all(text.get_rotation() == 0 for text in interaction_texts)
+    assert any(" - " in text.get_text() for text in interaction_texts)
     receiver_rectangles = [
         patch
         for patch in ax.patches
@@ -385,6 +406,10 @@ def test_ccc_stat_plot_interaction_sankey_returns_figure_and_axes(comm_adata: An
     ]
     assert receiver_rectangles
     assert any(tuple(round(channel, 3) for channel in patch.get_facecolor()[:3]) != (0.851, 0.851, 0.851) for patch in receiver_rectangles)
+    assert max(float(patch.get_y()) + float(patch.get_height()) / 2.0 for patch in receiver_rectangles) < 0.87
+    assert fig._suptitle is not None
+    assert fig._suptitle.get_text() == "Interaction sankey"
+    assert ax.get_title() == ""
 
 
 @pytest.mark.parametrize("plot_type", ["arrow", "sigmoid"])
@@ -399,16 +424,18 @@ def test_ccc_network_plot_interaction_flow_has_middle_stage_labels(comm_adata: A
     _assert_figure_and_axes(fig, ax)
     texts = [text.get_text() for text in ax.texts]
     assert "Ligand-Receptor" in texts
+    assert "nan" not in texts
     assert any("CXCL12" in text or "TGFB1" in text or "MDK" in text for text in texts)
+    assert any(" - " in text for text in texts if "CXCL12" in text or "TGFB1" in text or "MDK" in text)
     middle_rectangles = [
         patch
         for patch in ax.patches
         if hasattr(patch, "get_width")
         and hasattr(patch, "get_height")
         and hasattr(patch, "get_x")
-        and 0.4 <= patch.get_x() <= 0.55
-        and patch.get_width() >= 0.09
-        and patch.get_height() >= 0.07
+        and 0.45 <= patch.get_x() <= 0.52
+        and patch.get_width() >= 0.03
+        and patch.get_height() >= 0.03
     ]
     assert middle_rectangles
 
@@ -468,6 +495,19 @@ def test_ccc_network_plot_bipartite_aligns_ligand_and_receptor_labels(comm_adata
     )
     receptor_text = text_lookup[receptor_label]
     assert abs(ligand_text.get_position()[1] - receptor_text.get_position()[1]) < 1e-6
+
+
+def test_interaction_display_lookup_formats_lr_labels_and_cleans_complex_suffix() -> None:
+    long_df = pd.DataFrame(
+        {
+            "pair_lr": ["complex:FN1_integrin_a5b1_complex"],
+            "interaction": [""],
+            "ligand": ["complex:FN1"],
+            "receptor": ["integrin_a5b1_complex"],
+        }
+    )
+    lookup = ccc_mod._interaction_display_lookup(long_df)
+    assert lookup["complex:FN1_integrin_a5b1_complex"] == "FN1 - a5b1"
 
 
 def test_ccc_stat_plot_lr_contribution_returns_figure_and_axes(comm_adata: AnnData) -> None:
@@ -654,6 +694,38 @@ def test_ccc_network_plot_pathway_requires_signaling(comm_adata: AnnData) -> Non
         )
 
 
+def test_ccc_network_plot_pathway_forwards_top_n_to_cellchatviz_backend(
+    monkeypatch, comm_adata: AnnData
+) -> None:
+    called: dict[str, object] = {}
+
+    class _StubViz:
+        def netVisual_aggregate(self, **kwargs):
+            called["kwargs"] = kwargs
+            fig, ax = plt.subplots()
+            return fig, ax
+
+    def _fake_build(adata, *, palette=None):
+        called["adata"] = adata
+        called["palette"] = palette
+        return _StubViz()
+
+    monkeypatch.setattr(ccc_mod, "_build_cellchatviz", _fake_build)
+
+    fig, ax = ov.pl.ccc_network_plot(
+        comm_adata,
+        plot_type="pathway",
+        signaling="TGFb",
+        layout="circle",
+        top_n=5,
+        show=False,
+    )
+
+    _assert_figure_and_axes(fig, ax)
+    assert called["kwargs"]["signaling"] == ["TGFb"]
+    assert called["kwargs"]["top_n"] == 5
+
+
 def test_ccc_network_plot_pathway_rejects_interaction_filters(comm_adata: AnnData) -> None:
     with pytest.raises(ValueError, match="interaction_use"):
         ov.pl.ccc_network_plot(
@@ -723,6 +795,7 @@ def test_ccc_stat_plot_lr_contribution_routes_through_cellchatviz_backend(monkey
     _assert_figure_and_axes(fig, ax)
     assert called["kwargs"]["signaling"] == ["TGFb"]
     assert called["kwargs"]["top_pairs"] == 4
+    assert plt.get_fignums() == [fig.number]
 
 
 def test_ccc_stat_plot_lr_contribution_rejects_sender_filter_with_signaling(comm_adata: AnnData) -> None:
