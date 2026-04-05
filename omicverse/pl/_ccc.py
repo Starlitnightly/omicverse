@@ -458,6 +458,56 @@ def _interaction_stage_label(long_df: pd.DataFrame) -> pd.Series:
     return pair_lr.where(pair_lr.ne(""), interaction)
 
 
+def _bounded_weighted_positions(
+    labels: list[str],
+    totals: pd.Series,
+    *,
+    top: float = 0.86,
+    bottom: float = 0.08,
+) -> dict[str, tuple[float, float]]:
+    if not labels:
+        return {}
+    positions = _weighted_positions(labels, totals)
+    ys = np.asarray([positions[label][1] for label in labels], dtype=float)
+    if ys.size == 1 or np.isclose(float(ys.max()), float(ys.min())):
+        centered = np.full(len(labels), (float(top) + float(bottom)) / 2.0, dtype=float)
+    else:
+        centered = float(bottom) + (ys - float(ys.min())) * (float(top) - float(bottom)) / float(ys.max() - ys.min())
+    return {label: (0.0, float(y_coord)) for label, y_coord in zip(labels, centered)}
+
+
+def _format_lr_display(ligand: str, receptor: str) -> str:
+    ligand_label = _display_gene_label(ligand)
+    receptor_label = _display_gene_label(receptor)
+    if ligand_label and receptor_label:
+        return f"{ligand_label} - {receptor_label}"
+    return ligand_label or receptor_label
+
+
+def _node_display_text(row: pd.Series) -> str:
+    display_label = row.get("display_label")
+    if pd.notna(display_label) and str(display_label).strip():
+        return str(display_label)
+    return str(row["label"])
+
+
+def _interaction_display_lookup(long_df: pd.DataFrame) -> dict[str, str]:
+    raw_labels = _interaction_stage_label(long_df)
+    if {"ligand", "receptor"}.issubset(long_df.columns):
+        frame = pd.DataFrame(
+            {
+                "raw_label": raw_labels.astype(str),
+                "ligand": long_df["ligand"].astype(str),
+                "receptor": long_df["receptor"].astype(str),
+            }
+        ).drop_duplicates("raw_label")
+        return {
+            str(row["raw_label"]): _format_lr_display(str(row["ligand"]), str(row["receptor"]))
+            for _, row in frame.iterrows()
+        }
+    return {str(label): _display_interaction_label(str(label)) for label in raw_labels.astype(str).drop_duplicates()}
+
+
 def _rank_flow_levels(labels: Sequence[str], weights: Sequence[float]) -> list[str]:
     frame = pd.DataFrame({"label": [str(label) for label in labels], "weight": np.asarray(weights, dtype=float)})
     frame = frame.loc[frame["label"].str.strip().ne("")]
@@ -493,6 +543,89 @@ def _flow_nodes_for_column(
     )
 
 
+def _flow_stage_node_metrics(
+    label: str,
+    *,
+    weight: float,
+    node_max_weight: float,
+    wrap_width: int = 16,
+    compact_scale: float = 1.0,
+    font_scale: float = 1.0,
+) -> tuple[str, float, float, float]:
+    wrapped_label = _wrap_plot_label(label, width=wrap_width)
+    n_lines = max(len(wrapped_label.splitlines()), 1)
+    base_scale = float(weight) / max(float(node_max_weight), 1e-9)
+    width = 0.10 + 0.025 * base_scale
+    height = 0.07 + 0.038 * (n_lines - 1) + 0.01 * base_scale
+    height = min(height, 0.18) * compact_scale
+    fontsize = max(7.0, 9.0 * font_scale)
+    return wrapped_label, width, height, fontsize
+
+
+def _stacked_stage_positions(
+    labels: list[str],
+    totals: pd.Series,
+    *,
+    wrap_width: int = 16,
+    top: float = 0.88,
+    bottom: float = 0.08,
+    gap: float = 0.024,
+) -> tuple[dict[str, float], float, float]:
+    if not labels:
+        return {}, 1.0, 1.0
+
+    desired = _weighted_positions(labels, totals)
+    ordered = sorted(labels, key=lambda item: desired[item][1], reverse=True)
+    ordered_totals = totals.reindex(ordered).fillna(0.0)
+    node_max_weight = float(ordered_totals.max()) if not ordered_totals.empty else 1.0
+
+    heights = []
+    for label, weight in ordered_totals.items():
+        _, _, height, _ = _flow_stage_node_metrics(
+            label,
+            weight=float(weight),
+            node_max_weight=node_max_weight,
+            wrap_width=wrap_width,
+        )
+        heights.append(height)
+    heights_arr = np.asarray(heights, dtype=float)
+
+    available = max(float(top) - float(bottom), 0.2)
+    gap_use = float(gap)
+    compact_scale = 1.0
+    if len(ordered) > 1:
+        height_budget = max(available - gap_use * (len(ordered) - 1), available * 0.55)
+    else:
+        height_budget = available
+    if heights_arr.sum() > 0 and heights_arr.sum() > height_budget:
+        compact_scale = max(0.58, float(height_budget / heights_arr.sum()))
+        heights_arr = heights_arr * compact_scale
+
+    if len(ordered) > 1:
+        remaining = available - float(heights_arr.sum())
+        gap_use = min(gap_use, max(0.008, remaining / (len(ordered) - 1)))
+
+    centers = []
+    cursor = float(top)
+    for height in heights_arr:
+        center = cursor - float(height) / 2.0
+        centers.append(center)
+        cursor -= float(height) + gap_use
+    centers_arr = np.asarray(centers, dtype=float)
+
+    desired_centers = np.asarray([desired[label][1] for label in ordered], dtype=float)
+    if centers_arr.size:
+        shift = float(np.median(desired_centers) - np.median(centers_arr))
+        upper_shift = np.min((float(top) - heights_arr / 2.0) - centers_arr)
+        lower_shift = np.max((float(bottom) + heights_arr / 2.0) - centers_arr)
+        shift = min(shift, float(upper_shift))
+        shift = max(shift, float(lower_shift))
+        centers_arr = centers_arr + shift
+
+    font_scale = max(0.78, min(1.0, compact_scale + 0.12))
+    return {label: float(y_coord) for label, y_coord in zip(ordered, centers_arr)}, compact_scale, font_scale
+
+
 def _draw_flow_stage_node(
     ax,
     *,
@@ -502,21 +635,57 @@ def _draw_flow_stage_node(
     weight: float,
     node_max_weight: float,
     wrap_width: int = 16,
+    compact_scale: float = 1.0,
+    font_scale: float = 1.0,
+    label_mode: Literal["center", "side"] = "center",
+    text_offset: float = 0.055,
+    text_y_offset: float = 0.0,
+    facecolor: str = "white",
+    edgecolor: str = "#6E6E6E",
 ) -> None:
-    wrapped_label = _wrap_plot_label(label, width=wrap_width)
-    n_lines = max(len(wrapped_label.splitlines()), 1)
-    base_scale = float(weight) / max(float(node_max_weight), 1e-9)
-    width = 0.10 + 0.025 * base_scale
-    height = 0.07 + 0.038 * (n_lines - 1) + 0.01 * base_scale
-    height = min(height, 0.18)
+    wrapped_label, width, height, fontsize = _flow_stage_node_metrics(
+        label,
+        weight=weight,
+        node_max_weight=node_max_weight,
+        wrap_width=wrap_width,
+        compact_scale=compact_scale,
+        font_scale=font_scale,
+    )
+
+    if label_mode == "side":
+        marker_width = min(0.06, max(0.036, width * 0.48))
+        marker_height = min(0.06, max(0.034, height * 0.55))
+        ax.add_patch(
+            Rectangle(
+                (x_coord - marker_width / 2.0, y_coord - marker_height / 2.0),
+                marker_width,
+                marker_height,
+                facecolor=facecolor,
+                edgecolor=edgecolor,
+                linewidth=1.5,
+                zorder=3,
+            )
+        )
+        ax.text(
+            x_coord + text_offset,
+            y_coord + text_y_offset,
+            wrapped_label,
+            ha="left",
+            va="center",
+            fontsize=max(7.0, fontsize - 0.2),
+            zorder=4,
+            linespacing=1.02,
+            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.82, "pad": 0.2},
+        )
+        return
 
     ax.add_patch(
         Rectangle(
             (x_coord - width / 2.0, y_coord - height / 2.0),
             width,
             height,
-            facecolor="white",
-            edgecolor="#6E6E6E",
+            facecolor=facecolor,
+            edgecolor=edgecolor,
             linewidth=1.6,
             zorder=3,
         )
@@ -527,7 +696,7 @@ def _draw_flow_stage_node(
         wrapped_label,
         ha="center",
         va="center",
-        fontsize=9,
+        fontsize=fontsize,
         zorder=4,
         linespacing=1.05,
     )
@@ -541,6 +710,7 @@ def _build_flow_plot_frames(
     top_n: int,
 ) -> tuple[pd.DataFrame, pd.DataFrame, list[tuple[float, str]]]:
     if display_by == "interaction":
+        interaction_lookup = _interaction_display_lookup(long_df)
         plot_df = (
             _aggregate_series(
                 long_df.assign(interaction_label=_interaction_stage_label(long_df)).groupby(
@@ -606,6 +776,10 @@ def _build_flow_plot_frames(
             plot_df=plot_df,
             label_col="interaction_label",
         )
+        if not interaction_nodes.empty:
+            interaction_nodes["display_label"] = interaction_nodes["label"].map(
+                lambda item: interaction_lookup.get(str(item), _display_interaction_label(str(item)))
+            )
         receiver_nodes = _flow_nodes_for_column(
             receiver_levels,
             x=1.0,
@@ -1177,8 +1351,9 @@ def _clean_ccc_identifier(label: str, *, drop_receptor_suffix: bool = False) -> 
     if not text or text.lower() == "nan":
         return ""
     text = re.sub(r"^(complex:|simple:)", "", text)
-    text = re.sub(r"_complex$", "", text)
+    text = re.sub(r"(?:_|\s)complex$", "", text, flags=re.IGNORECASE)
     if drop_receptor_suffix:
+        text = re.sub(r"^integrin[_\s]+", "", text, flags=re.IGNORECASE)
         text = re.sub(r"_receptor_inhibitor$", "", text)
         text = re.sub(r"_receptor$", "", text)
         text = re.sub(r"_ligand$", "", text)
@@ -2027,11 +2202,13 @@ def ccc_heatmap(
         add_text = plot_type == "heatmap" and display_by == "aggregation" and matrix.size <= 49
 
     if plot_type in {"dot", "bubble"}:
+        default_title = "Communication bubble plot" if plot_type == "bubble" else "Communication dot matrix"
+        resolved_title = title or f"{default_title} ({display_color_label})"
         fig, ax = _dot_matrix_plot(
             matrix,
             size_matrix,
             color_label=display_color_label,
-            title=title,
+            title=resolved_title,
             cmap=cmap,
             figsize=figsize,
             border=border,
@@ -2051,8 +2228,6 @@ def ccc_heatmap(
             left_annos=left_annos if display_by == "aggregation" else tuple(item for item in left_annos if item != "cell"),
             right_annos=right_annos if display_by == "aggregation" else tuple(item for item in right_annos if item != "cell"),
         )
-        default_title = "Communication bubble plot" if plot_type == "bubble" else "Communication dot matrix"
-        ax.set_title(title or f"{default_title} ({display_color_label})")
         return _maybe_save_show(fig, show=show, save=save), ax
 
     fig, ax = _plot_heatmap_matrix(
@@ -2176,6 +2351,31 @@ def _draw_arrow_network(
 ):
     cell_labels = node_df.loc[node_df["column"].isin(["sender", "receiver"]), "label"].astype(str).tolist()
     colors = _choose_palette(list(dict.fromkeys(cell_labels)), palette=palette)
+    node_df = node_df.copy()
+    interaction_nodes = node_df.loc[node_df["column"] == "interaction", ["label", "weight"]].copy()
+    interaction_colors = _choose_palette(
+        node_df.loc[node_df["column"] == "interaction", "label"].astype(str).tolist(),
+        palette="Set2",
+    )
+    interaction_pos, interaction_scale, interaction_font_scale = _stacked_stage_positions(
+        interaction_nodes["label"].astype(str).tolist(),
+        interaction_nodes.set_index("label")["weight"] if not interaction_nodes.empty else pd.Series(dtype=float),
+        wrap_width=20,
+        top=0.84,
+        bottom=0.10,
+        gap=0.03,
+    )
+    if interaction_pos:
+        node_df.loc[node_df["column"] == "interaction", "y"] = node_df.loc[node_df["column"] == "interaction", "label"].map(
+            interaction_pos
+        )
+        node_lookup = node_df.set_index("node_id")[["x", "y"]]
+        edge_df = edge_df.copy()
+        edge_df = edge_df.drop(columns=["x_from", "y_from", "x_to", "y_to"], errors="ignore")
+        edge_df = edge_df.merge(node_lookup, left_on="from_id", right_index=True, how="left")
+        edge_df = edge_df.merge(node_lookup, left_on="to_id", right_index=True, how="left", suffixes=("_from", "_to"))
+        edge_df = edge_df.dropna(subset=["x_from", "y_from", "x_to", "y_to"]).reset_index(drop=True)
+
     fig, ax = plt.subplots(figsize=figsize)
     max_weight = float(edge_df["weight"].max()) if not edge_df.empty else 1.0
 
@@ -2195,7 +2395,7 @@ def _draw_arrow_network(
 
     node_max_weight = float(node_df["weight"].max()) if not node_df.empty else 1.0
     for _, row in node_df.iterrows():
-        label = str(row["label"])
+        label = _node_display_text(row)
         x_coord = float(row["x"])
         y_coord = float(row["y"])
         node_size = 220 + 720 * (float(row["weight"]) / max(node_max_weight, 1e-9))
@@ -2226,15 +2426,21 @@ def _draw_arrow_network(
                 label=label,
                 weight=float(row["weight"]),
                 node_max_weight=node_max_weight,
-                wrap_width=16,
+                wrap_width=20,
+                compact_scale=interaction_scale,
+                font_scale=interaction_font_scale,
+                label_mode="side",
+                text_offset=0.06,
+                facecolor=interaction_colors.get(str(row["label"]), "#E0E0E0"),
+                edgecolor="white",
             )
 
     for x_coord, label in column_titles:
-        ax.text(x_coord, 1.06, label, ha="center", va="bottom", fontsize=11, transform=ax.transData)
+        ax.text(x_coord, 1.01, label, ha="center", va="bottom", fontsize=11, transform=ax.transAxes)
 
-    ax.set_xlim(-0.18, 1.18)
-    ax.set_ylim(-0.08, 1.12)
-    ax.set_title(title or "Communication flow")
+    ax.set_xlim(-0.18, 1.28)
+    ax.set_ylim(-0.08, 1.06)
+    ax.set_title(title or "Communication flow", pad=24)
     ax.set_axis_off()
     return fig, ax
 
@@ -2250,6 +2456,31 @@ def _draw_sigmoid_network(
 ):
     cell_labels = node_df.loc[node_df["column"].isin(["sender", "receiver"]), "label"].astype(str).tolist()
     colors = _choose_palette(list(dict.fromkeys(cell_labels)), palette=palette)
+    node_df = node_df.copy()
+    interaction_nodes = node_df.loc[node_df["column"] == "interaction", ["label", "weight"]].copy()
+    interaction_colors = _choose_palette(
+        node_df.loc[node_df["column"] == "interaction", "label"].astype(str).tolist(),
+        palette="Set2",
+    )
+    interaction_pos, interaction_scale, interaction_font_scale = _stacked_stage_positions(
+        interaction_nodes["label"].astype(str).tolist(),
+        interaction_nodes.set_index("label")["weight"] if not interaction_nodes.empty else pd.Series(dtype=float),
+        wrap_width=20,
+        top=0.84,
+        bottom=0.10,
+        gap=0.03,
+    )
+    if interaction_pos:
+        node_df.loc[node_df["column"] == "interaction", "y"] = node_df.loc[node_df["column"] == "interaction", "label"].map(
+            interaction_pos
+        )
+        node_lookup = node_df.set_index("node_id")[["x", "y"]]
+        edge_df = edge_df.copy()
+        edge_df = edge_df.drop(columns=["x_from", "y_from", "x_to", "y_to"], errors="ignore")
+        edge_df = edge_df.merge(node_lookup, left_on="from_id", right_index=True, how="left")
+        edge_df = edge_df.merge(node_lookup, left_on="to_id", right_index=True, how="left", suffixes=("_from", "_to"))
+        edge_df = edge_df.dropna(subset=["x_from", "y_from", "x_to", "y_to"]).reset_index(drop=True)
+
     fig, ax = plt.subplots(figsize=figsize)
     max_weight = float(edge_df["weight"].max()) if not edge_df.empty else 1.0
 
@@ -2282,7 +2513,7 @@ def _draw_sigmoid_network(
 
     node_max_weight = float(node_df["weight"].max()) if not node_df.empty else 1.0
     for _, row in node_df.iterrows():
-        label = str(row["label"])
+        label = _node_display_text(row)
         x_coord = float(row["x"])
         y_coord = float(row["y"])
         node_size = 220 + 720 * (float(row["weight"]) / max(node_max_weight, 1e-9))
@@ -2313,15 +2544,21 @@ def _draw_sigmoid_network(
                 label=label,
                 weight=float(row["weight"]),
                 node_max_weight=node_max_weight,
-                wrap_width=16,
+                wrap_width=20,
+                compact_scale=interaction_scale,
+                font_scale=interaction_font_scale,
+                label_mode="side",
+                text_offset=0.06,
+                facecolor=interaction_colors.get(str(row["label"]), "#E0E0E0"),
+                edgecolor="white",
             )
 
     for x_coord, label in column_titles:
-        ax.text(x_coord, 1.06, label, ha="center", va="bottom", fontsize=11, transform=ax.transData)
+        ax.text(x_coord, 1.01, label, ha="center", va="bottom", fontsize=11, transform=ax.transAxes)
 
-    ax.set_xlim(-0.18, 1.18)
-    ax.set_ylim(-0.08, 1.12)
-    ax.set_title(title or "Communication sigmoid flow")
+    ax.set_xlim(-0.18, 1.28)
+    ax.set_ylim(-0.08, 1.06)
+    ax.set_title(title or "Communication sigmoid flow", pad=24)
     ax.set_axis_off()
     return fig, ax
 
@@ -2356,10 +2593,16 @@ def _draw_bipartite_network(
 
     if top_n is not None and top_n > 0:
         sender_scores = data.groupby("sender", observed=True)["score"].sum().sort_values(ascending=False)
+        receptor_scores = data.groupby("receptor", observed=True)["score"].sum().sort_values(ascending=False)
         receiver_scores = data.groupby("receiver", observed=True)["score"].sum().sort_values(ascending=False)
         keep_senders = sender_scores.head(int(top_n)).index.astype(str).tolist()
+        keep_receptors = receptor_scores.head(int(top_n)).index.astype(str).tolist()
         keep_receivers = receiver_scores.head(int(top_n)).index.astype(str).tolist()
-        data = data.loc[data["sender"].astype(str).isin(keep_senders) & data["receiver"].astype(str).isin(keep_receivers)].copy()
+        data = data.loc[
+            data["sender"].astype(str).isin(keep_senders)
+            & data["receptor"].astype(str).isin(keep_receptors)
+            & data["receiver"].astype(str).isin(keep_receivers)
+        ].copy()
     if data.empty:
         raise ValueError(f"No communication records remain after top_n filtering for ligand '{ligand_name}'.")
 
@@ -2368,6 +2611,9 @@ def _draw_bipartite_network(
     receivers = data.groupby("receiver", observed=True)["score"].sum().sort_values(ascending=False).index.astype(str).tolist()
     cell_types = list(dict.fromkeys(senders + receivers))
     cell_colors = _choose_palette(cell_types, palette=palette)
+    ligand_display = _display_gene_label(ligand_name)
+    receptor_display = {label: _display_gene_label(label) for label in receptors}
+    bridge_colors = _choose_palette([ligand_name] + receptors, palette="Set2")
 
     sender_totals = data.groupby("sender", observed=True)["score"].sum().reindex(senders).fillna(0.0)
     receptor_totals = data.groupby("receptor", observed=True)["score"].sum().reindex(receptors).fillna(0.0)
@@ -2379,13 +2625,25 @@ def _draw_bipartite_network(
     receiver_center = np.median([value[1] for value in receiver_pos.values()]) if receiver_pos else sender_center
     bridge_center = float((sender_center + receiver_center) / 2.0)
     ligand_pos = {ligand_name: (1.0, bridge_center)}
-    receptor_base_pos = {label: (2.0, pos[1]) for label, pos in _weighted_positions(receptors, receptor_totals).items()}
-    if receptor_base_pos:
-        receptor_center = np.median([value[1] for value in receptor_base_pos.values()])
+    receptor_stage_pos, receptor_scale, receptor_font_scale = _stacked_stage_positions(
+        receptors,
+        receptor_totals,
+        wrap_width=18,
+        top=0.84,
+        bottom=0.10,
+        gap=0.03,
+    )
+    if receptor_stage_pos:
+        receptor_center = np.median(list(receptor_stage_pos.values()))
         receptor_shift = bridge_center - float(receptor_center)
-        receptor_pos = {label: (2.0, float(pos[1] + receptor_shift)) for label, pos in receptor_base_pos.items()}
+        receptor_pos = {
+            label: (2.0, float(np.clip(y_coord + receptor_shift, 0.10, 0.84)))
+            for label, y_coord in receptor_stage_pos.items()
+        }
     else:
         receptor_pos = {}
+        receptor_scale = 1.0
+        receptor_font_scale = 1.0
 
     sender_to_ligand = _aggregate_series(data.groupby(["sender", "ligand"], observed=True), "sum").rename("weight").reset_index()
     ligand_to_receptor = _aggregate_series(data.groupby(["ligand", "receptor"], observed=True), "sum").rename("weight").reset_index()
@@ -2454,35 +2712,51 @@ def _draw_bipartite_network(
         ax.scatter(x_coord, y_coord, s=280, c=cell_colors[sender], edgecolors="white", linewidths=1.0, zorder=3)
         ax.text(x_coord - 0.08, y_coord, sender, ha="right", va="center", fontsize=10)
     for ligand_label, (x_coord, y_coord) in ligand_pos.items():
-        ax.scatter(x_coord, y_coord, s=240, c="white", edgecolors="#5C5C5C", linewidths=1.0, marker="s", zorder=3)
+        ax.scatter(
+            x_coord,
+            y_coord,
+            s=240,
+            c=bridge_colors.get(str(ligand_label), "#D9D9D9"),
+            edgecolors="white",
+            linewidths=1.2,
+            marker="s",
+            zorder=3,
+        )
         ax.text(
             x_coord,
             y_coord + bridge_label_offset,
-            _wrap_plot_label(ligand_label.replace("_", "\n"), width=16),
+            _wrap_plot_label(ligand_display, width=16),
             ha="center",
             va="bottom",
             fontsize=9,
         )
     for receptor_label, (x_coord, y_coord) in receptor_pos.items():
-        ax.scatter(x_coord, y_coord, s=220, c="white", edgecolors="#5C5C5C", linewidths=1.0, marker="s", zorder=3)
-        ax.text(
-            x_coord,
-            y_coord + bridge_label_offset,
-            _wrap_plot_label(receptor_label.replace("_", "\n"), width=14),
-            ha="center",
-            va="bottom",
-            fontsize=8.5,
+        _draw_flow_stage_node(
+            ax,
+            x_coord=x_coord,
+            y_coord=y_coord,
+            label=receptor_display.get(receptor_label, _display_gene_label(receptor_label)),
+            weight=float(receptor_totals.get(receptor_label, 0.0)),
+            node_max_weight=float(receptor_totals.max()) if not receptor_totals.empty else 1.0,
+            wrap_width=18,
+            compact_scale=receptor_scale,
+            font_scale=receptor_font_scale,
+            label_mode="side",
+            text_offset=0.08,
+            text_y_offset=bridge_label_offset,
+            facecolor=bridge_colors.get(str(receptor_label), "#D9D9D9"),
+            edgecolor="white",
         )
     for receiver, (x_coord, y_coord) in receiver_pos.items():
         ax.scatter(x_coord, y_coord, s=280, c=cell_colors[receiver], edgecolors="white", linewidths=1.0, zorder=3)
         ax.text(x_coord + 0.08, y_coord, receiver, ha="left", va="center", fontsize=10)
 
     for x_coord, label in ((0.0, "Sender"), (1.0, "Ligand"), (2.0, "Receptor"), (3.0, "Receiver")):
-        ax.text(x_coord, 1.06, label, ha="center", va="bottom", fontsize=11)
+        ax.text(x_coord, 0.98, label, ha="center", va="bottom", fontsize=11, transform=ax.transData)
 
-    ax.set_xlim(-0.4, 3.4)
-    ax.set_ylim(-0.1, 1.18)
-    ax.set_title(title or "Communication bipartite network")
+    ax.set_xlim(-0.4, 3.65)
+    ax.set_ylim(-0.1, 1.06)
+    ax.set_title(title or "Communication bipartite network", pad=24)
     ax.set_axis_off()
     return fig, ax
 
@@ -2783,8 +3057,8 @@ def _draw_sankey_plot(
         receivers = list(dict.fromkeys(flow_df["receiver"]))
         sender_totals = flow_df.groupby("sender", observed=True)["weight"].sum().sort_values(ascending=False)
         receiver_totals = flow_df.groupby("receiver", observed=True)["weight"].sum().sort_values(ascending=False)
-        sender_pos = _weighted_positions(senders, sender_totals)
-        receiver_pos = _weighted_positions(receivers, receiver_totals)
+        sender_pos = _bounded_weighted_positions(senders, sender_totals, top=0.84, bottom=0.08)
+        receiver_pos = _bounded_weighted_positions(receivers, receiver_totals, top=0.84, bottom=0.08)
         flow_df["sender_y"] = flow_df["sender"].map(lambda item: sender_pos[str(item)][1])
         flow_df["receiver_y"] = flow_df["receiver"].map(lambda item: receiver_pos[str(item)][1])
 
@@ -2807,9 +3081,10 @@ def _draw_sankey_plot(
         for receiver, (_, y_coord) in receiver_pos.items():
             ax.add_patch(Rectangle((0.88, y_coord - 0.03), 0.04, 0.06, facecolor=node_colors[receiver], edgecolor="white"))
             ax.text(0.94, y_coord, receiver, ha="left", va="center", fontsize=10)
-        ax.text(0.10, 1.02, "Sender", ha="center", va="bottom", fontsize=11)
-        ax.text(0.90, 1.02, "Receiver", ha="center", va="bottom", fontsize=11)
-        ax.set_title(title or "Communication sankey")
+        ax.text(0.10, 0.90, "Sender", ha="center", va="bottom", fontsize=11, transform=ax.transAxes)
+        ax.text(0.90, 0.90, "Receiver", ha="center", va="bottom", fontsize=11, transform=ax.transAxes)
+        fig.subplots_adjust(top=0.90)
+        fig.suptitle(title or "Communication sankey", y=0.985)
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
         ax.set_axis_off()
@@ -2819,6 +3094,7 @@ def _draw_sankey_plot(
         long_df.groupby(["sender", "interaction", "receiver"], observed=True),
         value,
     ).rename("weight").reset_index()
+    interaction_lookup = _interaction_display_lookup(long_df)
     interaction_scores = flow_df.groupby("interaction", observed=True)["weight"].sum().sort_values(ascending=False)
     keep = interaction_scores.head(int(top_n)).index
     flow_df = flow_df.loc[flow_df["interaction"].isin(keep)].copy()
@@ -2831,9 +3107,17 @@ def _draw_sankey_plot(
     sender_totals = flow_df.groupby("sender", observed=True)["weight"].sum().sort_values(ascending=False)
     interaction_totals = flow_df.groupby("interaction", observed=True)["weight"].sum().sort_values(ascending=False)
     receiver_totals = flow_df.groupby("receiver", observed=True)["weight"].sum().sort_values(ascending=False)
-    sender_pos = _weighted_positions(senders, sender_totals)
-    interaction_pos = _weighted_positions(interactions, interaction_totals)
-    receiver_pos = _weighted_positions(receivers, receiver_totals)
+    sender_pos = _bounded_weighted_positions(senders, sender_totals, top=0.84, bottom=0.08)
+    interaction_y, _, sankey_font_scale = _stacked_stage_positions(
+        interactions,
+        interaction_totals,
+        wrap_width=20,
+        top=0.78,
+        bottom=0.10,
+        gap=0.03,
+    )
+    interaction_pos = {label: (0.0, y_coord) for label, y_coord in interaction_y.items()}
+    receiver_pos = _bounded_weighted_positions(receivers, receiver_totals, top=0.84, bottom=0.08)
 
     flow_left = flow_df.groupby(["sender", "interaction"], observed=True)["weight"].sum().rename("weight").reset_index()
     flow_left["sender_y"] = flow_left["sender"].map(lambda item: sender_pos[str(item)][1])
@@ -2876,19 +3160,20 @@ def _draw_sankey_plot(
         ax.text(
             0.535,
             y_coord,
-            _wrap_plot_label(str(interaction), width=18),
+            _wrap_plot_label(interaction_lookup.get(str(interaction), _display_interaction_label(str(interaction))), width=20),
             ha="left",
             va="center",
-            fontsize=8,
+            fontsize=max(7.0, 8.0 * sankey_font_scale),
             bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.75, "pad": 0.2},
         )
     for receiver, (_, y_coord) in receiver_pos.items():
         ax.add_patch(Rectangle((0.9, y_coord - 0.025), 0.04, 0.05, facecolor=cell_colors[receiver], edgecolor="white"))
         ax.text(0.96, y_coord, receiver, ha="left", va="center", fontsize=9)
-    ax.text(0.08, 1.02, "Sender", ha="center", va="bottom", fontsize=11)
-    ax.text(0.50, 1.02, "Ligand-Receptor", ha="center", va="bottom", fontsize=11)
-    ax.text(0.92, 1.02, "Receiver", ha="center", va="bottom", fontsize=11)
-    ax.set_title(title or "Interaction sankey")
+    ax.text(0.08, 0.90, "Sender", ha="center", va="bottom", fontsize=11, transform=ax.transAxes)
+    ax.text(0.50, 0.90, "Ligand-Receptor", ha="center", va="bottom", fontsize=11, transform=ax.transAxes)
+    ax.text(0.92, 0.90, "Receiver", ha="center", va="bottom", fontsize=11, transform=ax.transAxes)
+    fig.subplots_adjust(top=0.90)
+    fig.suptitle(title or "Interaction sankey", y=0.985)
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.set_axis_off()
@@ -3332,6 +3617,7 @@ def ccc_network_plot(
             pvalue_threshold=pvalue_threshold,
             figsize=figsize,
             vertex_size_max=10,
+            top_n=top_n,
         )
         if title:
             ax.set_title(title)
@@ -3997,8 +4283,6 @@ def ccc_stat_plot(
         )
         return _maybe_save_show(fig, show=show, save=save), ax
 
-    fig, ax = plt.subplots(figsize=figsize)
-
     if plot_type == "lr_contribution":
         if signaling is not None:
             _raise_for_unsupported_arguments(
@@ -4041,6 +4325,7 @@ def ccc_stat_plot(
                     _style_scatter_axis(contribution_ax, max_marker_size=260.0, arrow=False)
             return _maybe_save_show(fig, show=show, save=save), ax
 
+        fig, ax = plt.subplots(figsize=figsize)
         summary = _interaction_contribution(long_df, value=value, top_n=top_n)
         colors = _choose_palette(summary.index.astype(str).tolist(), palette=palette)
         ax.barh(summary.index.astype(str), summary.values, color=[colors[idx] for idx in summary.index.astype(str)])
@@ -4053,6 +4338,8 @@ def ccc_stat_plot(
         ax.set_ylabel("")
         ax.set_title(title or f"Ligand-receptor contribution{pathway_label}")
         return _maybe_save_show(fig, show=show, save=save), ax
+
+    fig, ax = plt.subplots(figsize=figsize)
 
     if plot_type == "gene":
         gene_frame = _gene_metric_frame(long_df, measure=measure, value=value, top_n=top_n)
