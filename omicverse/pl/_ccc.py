@@ -2353,10 +2353,8 @@ def _draw_arrow_network(
     colors = _choose_palette(list(dict.fromkeys(cell_labels)), palette=palette)
     node_df = node_df.copy()
     interaction_nodes = node_df.loc[node_df["column"] == "interaction", ["label", "weight"]].copy()
-    interaction_colors = _choose_palette(
-        node_df.loc[node_df["column"] == "interaction", "label"].astype(str).tolist(),
-        palette="Set2",
-    )
+    interaction_labels = node_df.loc[node_df["column"] == "interaction", "label"].astype(str).tolist()
+    interaction_colors = _choose_palette(interaction_labels, palette="Set2") if interaction_labels else {}
     interaction_pos, interaction_scale, interaction_font_scale = _stacked_stage_positions(
         interaction_nodes["label"].astype(str).tolist(),
         interaction_nodes.set_index("label")["weight"] if not interaction_nodes.empty else pd.Series(dtype=float),
@@ -2458,10 +2456,8 @@ def _draw_sigmoid_network(
     colors = _choose_palette(list(dict.fromkeys(cell_labels)), palette=palette)
     node_df = node_df.copy()
     interaction_nodes = node_df.loc[node_df["column"] == "interaction", ["label", "weight"]].copy()
-    interaction_colors = _choose_palette(
-        node_df.loc[node_df["column"] == "interaction", "label"].astype(str).tolist(),
-        palette="Set2",
-    )
+    interaction_labels = node_df.loc[node_df["column"] == "interaction", "label"].astype(str).tolist()
+    interaction_colors = _choose_palette(interaction_labels, palette="Set2") if interaction_labels else {}
     interaction_pos, interaction_scale, interaction_font_scale = _stacked_stage_positions(
         interaction_nodes["label"].astype(str).tolist(),
         interaction_nodes.set_index("label")["weight"] if not interaction_nodes.empty else pd.Series(dtype=float),
