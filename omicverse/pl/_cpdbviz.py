@@ -2647,6 +2647,7 @@ class CellChatViz(CellChatVizPlus):
     
     def netVisual_aggregate(self, signaling, layout='circle', vertex_receiver=None, vertex_sender=None,
                            pvalue_threshold=0.05, vertex_size_max=50, edge_width_max=10,
+                           top_n=None,
                            show_labels=True, cmap='Blues', figsize=(10, 8), focused_view=True,
                            use_sender_colors=True, use_curved_arrows=True, curve_strength=0.3, adjust_text=False):
         """
@@ -2673,6 +2674,10 @@ class CellChatViz(CellChatVizPlus):
             Upper scaling factor for node size.
         edge_width_max : float
             Upper scaling factor for edge width.
+        top_n : int or None
+            Maximum number of aggregated edges to keep when delegating circle
+            rendering to the Python-native CCC backend. ``None`` keeps all
+            retained edges.
         show_labels : bool
             Whether to display node labels.
         cmap : str
@@ -2761,7 +2766,7 @@ class CellChatViz(CellChatVizPlus):
                     receiver_use=vertex_receiver,
                     pvalue_threshold=pvalue_threshold,
                     value="sum",
-                    top_n=None,
+                    top_n=top_n,
                     palette=self.palette,
                     figsize=figsize,
                     title=title,
