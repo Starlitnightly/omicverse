@@ -19,6 +19,7 @@ from ...utils._memory import (
     get_available_memory as _get_available_cpu_bytes,
     HIGH_DENSITY_SPARSE_THRESHOLD as HIGH_DENSITY_AUTO_DENSE_THRESHOLD,
     AUTO_DENSE_CPU_MEM_FRACTION,
+    MAX_SAFE_DENSE_ELEMENTS,
 )
 
 AUTO_DENSE_COV_EIGH_MAX_FEATURES = 4096
@@ -224,7 +225,10 @@ class PCA:
                 return inputs
         else:
             avail = _get_available_cpu_bytes()
-            if avail is not None and dense_bytes > int(avail * AUTO_DENSE_CPU_MEM_FRACTION):
+            if avail is not None:
+                if dense_bytes > int(avail * AUTO_DENSE_CPU_MEM_FRACTION):
+                    return inputs
+            elif total > MAX_SAFE_DENSE_ELEMENTS:
                 return inputs
 
         warnings.warn(
@@ -245,13 +249,15 @@ class PCA:
         total = int(inputs.shape[0]) * int(inputs.shape[1])
         if total > 0:
             density = float(inputs.nnz) / float(total)
-            # Always estimate as float32: scipy input will be cast to float32 below
-            dense_bytes = total * 4
+            # toarray() materialises in original dtype; use that for the estimate
+            itemsize = max(4, inputs.dtype.itemsize)
+            dense_bytes = total * itemsize
             avail = _get_available_cpu_bytes()
-            if (
-                density >= HIGH_DENSITY_AUTO_DENSE_THRESHOLD
-                and (avail is None or dense_bytes <= int(avail * AUTO_DENSE_CPU_MEM_FRACTION))
-            ):
+            if avail is not None:
+                mem_ok = dense_bytes <= int(avail * AUTO_DENSE_CPU_MEM_FRACTION)
+            else:
+                mem_ok = total <= MAX_SAFE_DENSE_ELEMENTS
+            if density >= HIGH_DENSITY_AUTO_DENSE_THRESHOLD and mem_ok:
                 warnings.warn(
                     "High-density scipy sparse input detected "
                     f"(density={density * 100:.2f}%, shape={inputs.shape}); "
@@ -466,6 +472,9 @@ class PCA:
                 delta = self.n_samples_ * torch.transpose(self.mean_, -2, -1) * self.mean_
                 covariance -= delta
                 covariance /= self.n_samples_ - 1
+            # Enforce exact symmetry — rounding in X^T @ X or gram
+            # subtraction can leave tiny asymmetric residuals that
+            # cause eigh to produce complex eigenvalues.
             covariance = 0.5 * (covariance + covariance.T)
             eigenvals, eigenvecs = torch.linalg.eigh(covariance)
             # Fix eventual numerical errors

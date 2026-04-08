@@ -38,6 +38,7 @@ from ..utils._memory import (
     get_available_memory as _get_available_memory,
     HIGH_DENSITY_SPARSE_THRESHOLD,
     AUTO_DENSE_CPU_MEM_FRACTION,
+    MAX_SAFE_DENSE_ELEMENTS,
 )
 
 
@@ -1199,8 +1200,13 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                             dense_bytes = int(X.shape[0]) * int(X.shape[1]) * itemsize
                             dense_gb = dense_bytes / (1024 ** 3)
                             avail_bytes = _get_available_memory()
-                            # Convert if memory is unknown (None) or within budget
-                            if avail_bytes is None or dense_bytes < avail_bytes * AUTO_DENSE_CPU_MEM_FRACTION:
+                            n_elements = int(X.shape[0]) * int(X.shape[1])
+                            if avail_bytes is not None:
+                                allow = dense_bytes < avail_bytes * AUTO_DENSE_CPU_MEM_FRACTION
+                            else:
+                                # Memory unknown — use element-count ceiling
+                                allow = n_elements <= MAX_SAFE_DENSE_ELEMENTS
+                            if allow:
                                 print(
                                     f"   {Colors.WARNING}{EMOJI['warning']} Sparse matrix density "
                                     f"{sparse_density * 100:.2f}% >= {HIGH_DENSITY_SPARSE_THRESHOLD * 100:.0f}% threshold; "

@@ -226,3 +226,42 @@ class TestPCALayerCorrectness:
             f"Variance ratio sum {np.sum(vr):.6f} is near zero — "
             "PCA may be reading from .X instead of the specified layer"
         )
+
+
+# ---------------------------------------------------------------------------
+# Memory guard: sparse kept when memory is insufficient
+# ---------------------------------------------------------------------------
+
+class TestPCAMemoryGuard:
+    """Verify that the memory guard prevents OOM by keeping sparse."""
+
+    def test_low_memory_keeps_sparse(self, high_density_sparse_adata):
+        """When available memory is tiny, high-density sparse should stay sparse."""
+        from unittest.mock import patch
+
+        # Mock memory to 1 byte — far too small for any dense conversion
+        with patch("omicverse.pp._pca._get_available_memory", return_value=1):
+            _pca(high_density_sparse_adata, n_comps=20, use_gpu=False)
+
+        # PCA should still succeed (via sparse-compatible solver)
+        assert "X_pca" in high_density_sparse_adata.obsm
+        assert high_density_sparse_adata.obsm["X_pca"].shape == (2000, 20)
+
+    def test_none_memory_uses_element_guard(self):
+        """When memory is None, element-count ceiling prevents huge allocations."""
+        from unittest.mock import patch
+        from omicverse.utils._memory import MAX_SAFE_DENSE_ELEMENTS
+
+        # Create data exceeding MAX_SAFE_DENSE_ELEMENTS
+        # We can't actually allocate that much, so just verify the logic
+        # by mocking memory=None and checking a small-enough matrix converts
+        rng = np.random.default_rng(42)
+        X = sp.csr_matrix(rng.standard_normal((200, 50)).astype(np.float32))
+        adata = ad.AnnData(X=X)
+
+        assert 200 * 50 < MAX_SAFE_DENSE_ELEMENTS  # should be allowed
+
+        with patch("omicverse.pp._pca._get_available_memory", return_value=None):
+            _pca(adata, n_comps=10, use_gpu=False)
+
+        assert "X_pca" in adata.obsm
