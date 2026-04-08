@@ -375,15 +375,15 @@ class PCA:
             )
             self.svd_solver_ = "lobpcg"
 
-        if self._input_is_sparse and self.svd_solver_ != "lobpcg":
+        if self._input_is_sparse and self.svd_solver_ not in ("lobpcg", "covariance_eigh"):
             warnings.warn(
                 f"Sparse input with svd_solver='{self.svd_solver_}' is not supported; "
-                "falling back to 'lobpcg'. To silence this warning, pass "
-                "svd_solver='lobpcg' or 'auto'.",
+                "falling back to 'covariance_eigh'. To silence this warning, pass "
+                "svd_solver='covariance_eigh', 'lobpcg', or 'auto'.",
                 UserWarning,
                 stacklevel=2,
             )
-            self.svd_solver_ = "lobpcg"
+            self.svd_solver_ = "covariance_eigh"
 
         # Compute mean and shape based on input type
         if self._input_is_sparse:
@@ -478,10 +478,18 @@ class PCA:
             explained_variance = coefs**2 / (inputs.shape[-2] - 1)
             total_var = torch.sum(explained_variance)
         elif self.svd_solver_ == "covariance_eigh":
-            covariance = inputs.T @ inputs
-            delta = self.n_samples_ * torch.transpose(self.mean_, -2, -1) * self.mean_
-            covariance -= delta
-            covariance /= self.n_samples_ - 1
+            if self._input_is_sparse:
+                gram = self._compute_sparse_gram_matrix(inputs)
+                mean_vec = self.mean_.reshape(-1)
+                covariance = (
+                    gram - self.n_samples_ * torch.outer(mean_vec, mean_vec)
+                ) / (self.n_samples_ - 1)
+            else:
+                covariance = inputs.T @ inputs
+                delta = self.n_samples_ * torch.transpose(self.mean_, -2, -1) * self.mean_
+                covariance -= delta
+                covariance /= self.n_samples_ - 1
+            covariance = 0.5 * (covariance + covariance.T)
             eigenvals, eigenvecs = torch.linalg.eigh(covariance)
             # Fix eventual numerical errors
             eigenvals[eigenvals < 0.0] = 0.0

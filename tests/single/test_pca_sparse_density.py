@@ -149,8 +149,8 @@ class TestPCALowDensitySparse:
 class TestTorchPCASparseCovarEigh:
     """Verify torch_pca falls back to lobpcg instead of raising ValueError."""
 
-    def test_covariance_eigh_with_sparse_warns_and_succeeds(self):
-        """covariance_eigh + sparse torch tensor should warn and fall back, not crash (#615)."""
+    def test_covariance_eigh_with_sparse_succeeds(self):
+        """covariance_eigh + sparse torch tensor should work natively (#615)."""
         torch = pytest.importorskip("torch")
         from omicverse.external.torch_pca import PCA
 
@@ -165,13 +165,32 @@ class TestTorchPCASparseCovarEigh:
         X_torch = torch.sparse_coo_tensor(indices, values, size=X.shape).coalesce()
 
         pca = PCA(n_components=10, svd_solver="covariance_eigh")
-        with pytest.warns(UserWarning, match="falling back to 'lobpcg'"):
-            result = pca.fit_transform(X_torch)
+        result = pca.fit_transform(X_torch)
+        assert result.shape == (500, 10)
+        # Verify it actually used covariance_eigh, not a fallback
+        assert pca.svd_solver_ == "covariance_eigh"
 
+    def test_unsupported_solver_with_sparse_falls_back(self):
+        """Unsupported solver + sparse should fall back to covariance_eigh."""
+        torch = pytest.importorskip("torch")
+        from omicverse.external.torch_pca import PCA
+
+        rng = np.random.default_rng(42)
+        X = sp.random(500, 100, density=0.1, format="csr", dtype=np.float32,
+                      random_state=42)
+        X.data[:] = rng.standard_normal(X.nnz).astype(np.float32)
+        coo = X.tocoo()
+        indices = torch.tensor(np.array([coo.row, coo.col]), dtype=torch.long)
+        values = torch.tensor(coo.data, dtype=torch.float32)
+        X_torch = torch.sparse_coo_tensor(indices, values, size=X.shape).coalesce()
+
+        pca = PCA(n_components=10, svd_solver="full")
+        with pytest.warns(UserWarning, match="falling back to 'covariance_eigh'"):
+            result = pca.fit_transform(X_torch)
         assert result.shape == (500, 10)
 
-    def test_lobpcg_with_sparse_no_warning(self):
-        """lobpcg + sparse should work without any warning."""
+    def test_lobpcg_with_sparse_works(self):
+        """lobpcg + sparse should work."""
         torch = pytest.importorskip("torch")
         from omicverse.external.torch_pca import PCA
 
