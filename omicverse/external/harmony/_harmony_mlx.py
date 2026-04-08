@@ -196,64 +196,65 @@ class HarmonyMLX:
         self.objective_harmony.append(self.objective_kmeans[-1])
 
     def _update_R(self):
-        scale_dist = -self._dist_mat / mx.expand_dims(self._sigma, 1)
-        scale_dist = mx.exp(scale_dist)
+        """R package formula, pure MLX operations."""
+        scale_dist = mx.exp(-self._dist_mat / mx.expand_dims(self._sigma, 1))
         scale_dist = scale_dist / mx.sum(scale_dist, axis=0, keepdims=True)
 
-        update_order = np.random.permutation(self.N)
+        update_order = mx.array(np.random.permutation(self.N))
         n_blocks = int(np.ceil(1.0 / self.block_size))
         cells_per_block = int(self.N * self.block_size)
 
-        R_np = np.array(self._R)
-        scale_np = np.array(scale_dist)
-        Phi_np = np.array(self._Phi)
-        E_np = np.array(self._E)
-        O_np = np.array(self._O)
-        theta_np = np.array(self._theta)
-        Pr_b_np = np.array(self._Pr_b)
+        R_perm = self._R[:, update_order]
+        scale_perm = scale_dist[:, update_order]
+        Phi_perm = self._Phi[:, update_order]
 
         for blk in range(n_blocks):
             idx_min = blk * cells_per_block
             idx_max = self.N if blk == n_blocks - 1 else (blk + 1) * cells_per_block
-            b = update_order[idx_min:idx_max]
 
-            E_np -= np.outer(R_np[:, b].sum(1), Pr_b_np)
-            O_np -= R_np[:, b] @ Phi_np[:, b].T
+            R_block = R_perm[:, idx_min:idx_max]
+            scale_block = scale_perm[:, idx_min:idx_max]
+            Phi_block = Phi_perm[:, idx_min:idx_max]
 
-            ratio = np.clip(E_np / np.clip(O_np + E_np, 1e-8, None), 1e-8, 1.0)
-            ratio_pow = np.empty_like(ratio)
-            for c in range(ratio.shape[1]):
-                ratio_pow[:, c] = np.power(ratio[:, c], theta_np[c])
-            R_new = scale_np[:, b] * (ratio_pow @ Phi_np[:, b])
-            R_new = R_new / np.clip(R_new.sum(0), 1e-8, None)
+            # Remove cells from statistics
+            self._E = self._E - mx.outer(mx.sum(R_block, axis=1), self._Pr_b)
+            self._O = self._O - mx.matmul(R_block, Phi_block.T)
 
-            E_np += np.outer(R_new.sum(1), Pr_b_np)
-            O_np += R_new @ Phi_np[:, b].T
-            R_np[:, b] = R_new
+            # R package formula: ratio = E / (O + E)
+            O_E = mx.clip(self._O + self._E, a_min=1e-8, a_max=None)
+            ratio = mx.clip(self._E / O_E, a_min=1e-8, a_max=1.0)
+            # Broadcast power: ratio^theta
+            ratio_pow = mx.power(ratio, mx.expand_dims(self._theta, 0))
+            R_new = scale_block * mx.matmul(ratio_pow, Phi_block)
+            R_new = R_new / mx.clip(mx.sum(R_new, axis=0, keepdims=True), a_min=1e-8, a_max=None)
 
-        self._R = mx.array(R_np.astype(np.float32))
-        self._E = mx.array(E_np.astype(np.float32))
-        self._O = mx.array(O_np.astype(np.float32))
+            # Put cells back
+            self._E = self._E + mx.outer(mx.sum(R_new, axis=1), self._Pr_b)
+            self._O = self._O + mx.matmul(R_new, Phi_block.T)
+            R_perm[:, idx_min:idx_max] = R_new
+
+        # Restore original order
+        inv_order = mx.argsort(update_order)
+        self._R = R_perm[:, inv_order]
 
     def _moe_correct_ridge(self):
-        Z_orig = np.array(self._Z_orig)
-        Z_corr = Z_orig.copy()
-        Phi_moe = np.array(self._Phi_moe)
-        R = np.array(self._R)
-        lamb = np.diag(np.insert(self._lamb_np, 0, 0)).astype(np.float32)
+        """Ridge regression correction, pure MLX operations."""
+        self._Z_corr = mx.array(np.array(self._Z_orig))  # clone
+        lamb_diag = mx.array(np.diag(np.insert(self._lamb_np, 0, 0)).astype(np.float32))
 
         for k in range(self.K):
-            Phi_Rk = Phi_moe * R[k, :]
-            x = Phi_Rk @ Phi_moe.T + lamb
+            Phi_Rk = self._Phi_moe * self._R[k, :]
+            cov = mx.matmul(Phi_Rk, self._Phi_moe.T) + lamb_diag
             try:
-                x_inv = np.linalg.inv(x)
-            except np.linalg.LinAlgError:
-                x_inv = np.linalg.pinv(x)
-            W = x_inv @ Phi_Rk @ Z_orig.T
-            W[0, :] = 0
-            Z_corr -= W.T @ Phi_Rk
+                inv_cov = mx.linalg.inv(cov)
+            except Exception:
+                # Fallback to numpy pinverse for singular matrices
+                inv_cov = mx.array(np.linalg.pinv(np.array(cov)).astype(np.float32))
+            W = mx.matmul(mx.matmul(inv_cov, Phi_Rk), self._Z_orig.T)
+            # Zero out intercept row
+            W = mx.concatenate([mx.zeros((1, W.shape[1])), W[1:, :]], axis=0)
+            self._Z_corr = self._Z_corr - mx.matmul(W.T, Phi_Rk)
 
-        self._Z_corr = mx.array(Z_corr.astype(np.float32))
         self._Z_cos = self._Z_corr / mx.linalg.norm(self._Z_corr, axis=0, keepdims=True)
 
     def _check_convergence(self, i_type):
