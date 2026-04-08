@@ -75,14 +75,24 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
 
     if methods=='harmony':
         from ..external.harmony import run_harmony
-        
+
         adata3=adata.copy()
         if 'scaled|original|X_pca' not in adata3.obsm.keys() and use_rep=='scaled|original|X_pca':
             scale(adata3)
             pca(adata3,layer='scaled',n_pcs=n_pcs)
-        
-        
-        harmony_out = run_harmony(adata3.obsm[use_rep], adata3.obs, batch_key, **kwargs)
+
+        # Map deprecated use_gpu to device for backward compatibility
+        harmony_kwargs = dict(kwargs)
+        if 'use_gpu' in harmony_kwargs:
+            use_gpu = harmony_kwargs.pop('use_gpu')
+            if 'device' not in harmony_kwargs and use_gpu:
+                harmony_kwargs['device'] = None  # auto-detect
+        # Remove parameters no longer supported by upstream harmonypy
+        for _removed in ('plot_convergence', 'reference_values',
+                         'cluster_prior', 'cluster_fn'):
+            harmony_kwargs.pop(_removed, None)
+
+        harmony_out = run_harmony(adata3.obsm[use_rep], adata3.obs, batch_key, **harmony_kwargs)
         adata.obsm['X_pca_harmony'] = harmony_out.result()
         adata.obsm['X_harmony'] = harmony_out.result()
         
