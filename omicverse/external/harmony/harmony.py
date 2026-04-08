@@ -192,7 +192,12 @@ def run_harmony(
     use_mlx = (device_obj == "mlx")
 
     if verbose:
-        backend_str = "MLX on Apple Silicon" if use_mlx else f"PyTorch on {device_obj}"
+        if use_mlx:
+            backend_str = "MLX on Apple Silicon"
+        elif isinstance(device_obj, torch.device) and device_obj.type == "cpu":
+            backend_str = "NumPy CPU"
+        else:
+            backend_str = f"PyTorch on {device_obj}"
         logger.info(f"Running Harmony ({backend_str})")
         logger.info("  Parameters:")
         logger.info(f"    max_iter_harmony: {max_iter_harmony}")
@@ -221,23 +226,22 @@ def run_harmony(
         data_mat = data_mat.values
     data_mat = np.asarray(data_mat, dtype=np.float32)
 
+    _common_args = (
+        data_mat, phi, Pr_b, sigma.astype(np.float32),
+        theta, lamb, alpha, lambda_estimation,
+        max_iter_harmony, max_iter_kmeans,
+        epsilon_cluster, epsilon_harmony, nclust, block_size, verbose,
+        random_state,
+    )
+
     if use_mlx:
         from ._harmony_mlx import HarmonyMLX
-        ho = HarmonyMLX(
-            data_mat, phi, Pr_b, sigma.astype(np.float32),
-            theta, lamb, alpha, lambda_estimation,
-            max_iter_harmony, max_iter_kmeans,
-            epsilon_cluster, epsilon_harmony, nclust, block_size, verbose,
-            random_state,
-        )
+        ho = HarmonyMLX(*_common_args)
+    elif isinstance(device_obj, torch.device) and device_obj.type == "cpu":
+        from ._harmony_cpu import HarmonyCPU
+        ho = HarmonyCPU(*_common_args)
     else:
-        ho = Harmony(
-            data_mat, phi, Pr_b, sigma.astype(np.float32),
-            theta, lamb, alpha, lambda_estimation,
-            max_iter_harmony, max_iter_kmeans,
-            epsilon_cluster, epsilon_harmony, nclust, block_size, verbose,
-            random_state, device_obj
-        )
+        ho = Harmony(*_common_args, device_obj)
 
     return ho
 
