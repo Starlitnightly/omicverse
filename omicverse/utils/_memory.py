@@ -13,11 +13,11 @@ AUTO_DENSE_CPU_MEM_FRACTION = 0.3
 HIGH_DENSITY_SPARSE_THRESHOLD = 0.2
 
 
-def get_available_memory() -> int:
-    """Return available system memory in bytes.
+def get_available_memory() -> int | None:
+    """Return available system memory in bytes, or ``None`` if unknown.
 
     Detection chain: psutil → /proc/meminfo → os.sysconf.
-    Returns a conservative 4 GB if none of the above is available.
+    Callers should treat ``None`` as "memory is unknown — skip the guard".
     """
     try:
         import psutil
@@ -39,4 +39,4 @@ def get_available_memory() -> int:
             return pages * page_size
     except (AttributeError, ValueError):
         pass
-    return 4 * (1024 ** 3)
+    return None

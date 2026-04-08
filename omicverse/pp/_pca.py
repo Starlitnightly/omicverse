@@ -1199,9 +1199,8 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                             dense_bytes = int(X.shape[0]) * int(X.shape[1]) * itemsize
                             dense_gb = dense_bytes / (1024 ** 3)
                             avail_bytes = _get_available_memory()
-                            # Only convert if dense array uses < 30% of available memory
-                            # (PCA needs ~2-3x the array size internally)
-                            if dense_bytes < avail_bytes * AUTO_DENSE_CPU_MEM_FRACTION:
+                            # Convert if memory is unknown (None) or within budget
+                            if avail_bytes is None or dense_bytes < avail_bytes * AUTO_DENSE_CPU_MEM_FRACTION:
                                 print(
                                     f"   {Colors.WARNING}{EMOJI['warning']} Sparse matrix density "
                                     f"{sparse_density * 100:.2f}% >= {HIGH_DENSITY_SPARSE_THRESHOLD * 100:.0f}% threshold; "

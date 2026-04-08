@@ -224,7 +224,7 @@ class PCA:
                 return inputs
         else:
             avail = _get_available_cpu_bytes()
-            if dense_bytes > int(avail * AUTO_DENSE_CPU_MEM_FRACTION):
+            if avail is not None and dense_bytes > int(avail * AUTO_DENSE_CPU_MEM_FRACTION):
                 return inputs
 
         warnings.warn(
@@ -250,7 +250,7 @@ class PCA:
             avail = _get_available_cpu_bytes()
             if (
                 density >= HIGH_DENSITY_AUTO_DENSE_THRESHOLD
-                and dense_bytes <= int(avail * AUTO_DENSE_CPU_MEM_FRACTION)
+                and (avail is None or dense_bytes <= int(avail * AUTO_DENSE_CPU_MEM_FRACTION))
             ):
                 warnings.warn(
                     "High-density scipy sparse input detected "
