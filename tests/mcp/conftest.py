@@ -335,7 +335,7 @@ MOCK_ENTRIES = [
         "description": "Scale data to unit variance and zero mean",
         "examples": [],
         "related": [],
-        "signature": "(adata, max_value=10, layers_add='scaled', to_sparse=True, **kwargs)",
+        "signature": "(adata, max_value=10, layers_add='scaled', to_sparse=False, **kwargs)",
         "parameters": ["adata", "max_value", "layers_add", "to_sparse", "**kwargs"],
         "docstring": "",
         "prerequisites": {"optional_functions": ["normalize", "qc"]},

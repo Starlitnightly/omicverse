@@ -308,8 +308,11 @@ class Process_Query:
             adata.obs["_ref_subsample"] = False
             adata.layers["scaled"] = adata.X.copy()
             adata.layers["scaled"] /= self.ref_adata.var["std"].values
-            adata.layers["scaled"].data = np.clip(adata.layers["scaled"].data, -10, 10)
-            adata.layers["scaled"] = adata.layers["scaled"].tocsr()
+            if scp.issparse(adata.layers["scaled"]):
+                adata.layers["scaled"].data = np.clip(adata.layers["scaled"].data, -10, 10)
+                adata.layers["scaled"] = adata.layers["scaled"].tocsr()
+            else:
+                adata.layers["scaled"] = np.clip(adata.layers["scaled"], -10, 10)
             adata.obsm["X_pca"] = np.array(adata.layers["scaled"] @ self.ref_adata.varm["PCs"])
         return adata
 

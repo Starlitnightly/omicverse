@@ -890,7 +890,7 @@ def highly_variable_genes(adata, **kwargs):
     examples=["ov.pp.scale(adata, max_value=10)", "ov.pp.scale(adata, max_value=10, to_sparse=True)"],
     related=["normalize", "regress"]
 )
-def scale(adata, max_value=10, layers_add='scaled', to_sparse=True, **kwargs):
+def scale(adata, max_value=10, layers_add='scaled', to_sparse=False, **kwargs):
     """
     Scale the input AnnData object.
 
@@ -898,7 +898,8 @@ def scale(adata, max_value=10, layers_add='scaled', to_sparse=True, **kwargs):
         adata: Annotated data matrix with n_obs x n_vars shape.
         max_value: Maximum value after scaling. Default: 10.
         layers_add: Name of the layer to store the scaled data. Default: 'scaled'.
-        to_sparse: If True, convert the result to csr_matrix format. Default: True.
+        to_sparse: If True, convert the result to csr_matrix format. Default: False.
+            Scaled data is 100% dense, so sparse storage only adds overhead.
         **kwargs: Additional arguments passed to scaling functions.
 
     Returns:

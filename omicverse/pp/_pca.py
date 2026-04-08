@@ -32,8 +32,14 @@ from datetime import datetime
 
 # Default number of PCs
 N_PCS = 50
-HIGH_DENSITY_SPARSE_THRESHOLD = 0.2
 AUTO_DENSE_CHUNK_TARGET_ELEMENTS = 8_000_000
+
+from ..utils._memory import (
+    get_available_memory as _get_available_memory,
+    HIGH_DENSITY_SPARSE_THRESHOLD,
+    AUTO_DENSE_CPU_MEM_FRACTION,
+    MAX_SAFE_DENSE_ELEMENTS,
+)
 
 
 def _sparse_density(x: CSBase) -> float:
@@ -437,11 +443,18 @@ def _torch_chunked_covariance_pca(
     device,
     random_state: int | None,
     force_dense_sparse: bool = False,
+    layer: str | None = None,
 ):
     """Torch chunked PCA via covariance accumulation.
 
     This keeps memory bounded by `chunk_size` and can auto-densify sparse chunks
     when the matrix is effectively dense.
+
+    Parameters
+    ----------
+    layer
+        If provided, read data from ``adata_comp.layers[layer]`` instead of
+        ``adata_comp.X``.
     """
     import gc
     import torch
@@ -467,10 +480,20 @@ def _torch_chunked_covariance_pca(
     )
     effective_chunk_size = max(1, min(n_samples, effective_chunk_size))
 
+    # Use layer data when specified, otherwise fall back to .X via chunked_X
+    def _iter_chunks(chunk_size):
+        if layer is not None:
+            X_source = adata_comp.layers[layer]
+            for start in range(0, n_samples, chunk_size):
+                end = min(start + chunk_size, n_samples)
+                yield X_source[start:end], start, end
+        else:
+            yield from adata_comp.chunked_X(chunk_size)
+
     col_sum = torch.zeros(n_features, dtype=torch.float32, device=device)
     gram = torch.zeros((n_features, n_features), dtype=torch.float32, device=device)
 
-    for chunk, _, _ in adata_comp.chunked_X(effective_chunk_size):
+    for chunk, _, _ in _iter_chunks(effective_chunk_size):
         if isinstance(chunk, CSBase):
             chunk_density = _sparse_density(chunk)
             use_dense_chunk = force_dense_sparse or (
@@ -559,7 +582,7 @@ def _torch_chunked_covariance_pca(
     mean_projection = mean_2d @ components.T
 
     X_pca = zeros((n_samples, k), np.float32)
-    for chunk, start, end in adata_comp.chunked_X(effective_chunk_size):
+    for chunk, start, end in _iter_chunks(effective_chunk_size):
         if isinstance(chunk, CSBase):
             chunk_density = _sparse_density(chunk)
             use_dense_chunk = force_dense_sparse or (
@@ -926,7 +949,7 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                 import scipy.sparse
                 print(f"   {Colors.CYAN}📊 PCA input data type (chunked): {type(X).__name__}, shape: {X.shape}, dtype: {X.dtype}{Colors.ENDC}")
                 if scipy.sparse.issparse(X):
-                    print(f"   {Colors.CYAN}📊 Sparse matrix density: {X.nnz / (X.shape[0] * X.shape[1]) * 100:.2f}%{Colors.ENDC}")
+                    print(f"   {Colors.CYAN}📊 Sparse matrix density: {_sparse_density(X) * 100:.2f}%{Colors.ENDC}")
                 solver_hint = "covariance_eigh" if X.shape[1] <= 4096 else "lobpcg"
                 print(f"   {Colors.CYAN}🔧 solver_used_in_uns (planned): {solver_hint}{Colors.ENDC}")
 
@@ -1084,7 +1107,7 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                         import scipy.sparse
                         print(f"   {Colors.CYAN}📊 PCA input data type: {type(X).__name__}, shape: {X.shape}, dtype: {X.dtype}{Colors.ENDC}")
                         if scipy.sparse.issparse(X):
-                            print(f"   {Colors.CYAN}📊 Sparse matrix density: {X.nnz / (X.shape[0] * X.shape[1]) * 100:.2f}%{Colors.ENDC}")
+                            print(f"   {Colors.CYAN}📊 Sparse matrix density: {_sparse_density(X) * 100:.2f}%{Colors.ENDC}")
                         print(
                             f"   {Colors.CYAN}🔧 solver_used_in_uns (planned): "
                             f"{svd_solver_mapped if svd_solver_mapped != 'auto' else 'covariance_eigh'}"
@@ -1119,6 +1142,7 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                                         else None
                                     ),
                                     force_dense_sparse=True,
+                                    layer=layer,
                                 )
                             else:
                                 from ..external.torch_pca.sparse_utils import (
@@ -1166,7 +1190,35 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                     import scipy.sparse
                     print(f"   {Colors.CYAN}📊 PCA input data type: {type(X).__name__}, shape: {X.shape}, dtype: {X.dtype}{Colors.ENDC}")
                     if scipy.sparse.issparse(X):
-                        print(f"   {Colors.CYAN}📊 Sparse matrix density: {X.nnz / (X.shape[0] * X.shape[1]) * 100:.2f}%{Colors.ENDC}")
+                        sparse_density = _sparse_density(X)
+                        print(f"   {Colors.CYAN}📊 Sparse matrix density: {sparse_density * 100:.2f}%{Colors.ENDC}")
+                        if sparse_density >= HIGH_DENSITY_SPARSE_THRESHOLD:
+                            # High-density sparse is slower than dense for PCA
+                            # covariance computation (observed ~100x for 100% density,
+                            # see #613). Convert to dense when memory allows.
+                            itemsize = np.dtype(X.dtype).itemsize
+                            dense_bytes = int(X.shape[0]) * int(X.shape[1]) * itemsize
+                            dense_gb = dense_bytes / (1024 ** 3)
+                            avail_bytes = _get_available_memory()
+                            n_elements = int(X.shape[0]) * int(X.shape[1])
+                            if avail_bytes is not None:
+                                allow = dense_bytes < avail_bytes * AUTO_DENSE_CPU_MEM_FRACTION
+                            else:
+                                # Memory unknown — use element-count ceiling
+                                allow = n_elements <= MAX_SAFE_DENSE_ELEMENTS
+                            if allow:
+                                print(
+                                    f"   {Colors.WARNING}{EMOJI['warning']} Sparse matrix density "
+                                    f"{sparse_density * 100:.2f}% >= {HIGH_DENSITY_SPARSE_THRESHOLD * 100:.0f}% threshold; "
+                                    f"converting to dense array ({dense_gb:.2f} GB) for faster PCA.{Colors.ENDC}"
+                                )
+                                X = X.toarray()
+                            else:
+                                print(
+                                    f"   {Colors.WARNING}{EMOJI['warning']} Sparse matrix density is high "
+                                    f"({sparse_density * 100:.2f}%) but dense array would need "
+                                    f"{dense_gb:.2f} GB; keeping sparse to avoid OOM.{Colors.ENDC}"
+                                )
 
                     from sklearn.decomposition import PCA
 
