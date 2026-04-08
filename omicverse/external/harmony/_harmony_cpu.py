@@ -80,7 +80,7 @@ class HarmonyCPU:
 
         # Init cluster
         logger.info("Computing initial centroids with sklearn.KMeans...")
-        model = KMeans(n_clusters=K, init="k-means++", n_init=5,
+        model = KMeans(n_clusters=K, init="k-means++", n_init=1,
                        max_iter=25, random_state=random_state)
         model.fit(self._Z_cos.T)
         self._Y = model.cluster_centers_.T.astype(np.float32)
