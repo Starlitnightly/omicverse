@@ -20,9 +20,20 @@ import numpy as np
 import torch
 from sklearn.cluster import KMeans
 import logging
+from datetime import datetime
+from tqdm import tqdm
 
 logger = logging.getLogger('harmonypy')
 logger.addHandler(logging.NullHandler())
+
+try:
+    from ..._settings import EMOJI, Colors
+except ImportError:
+    EMOJI = {'start': '🚀', 'done': '✅', 'warning': '⚠️', 'cpu': '🖥️', 'gpu': '🚀'}
+    Colors = type('Colors', (), {
+        'CYAN': '\033[96m', 'BOLD': '\033[1m', 'ENDC': '\033[0m',
+        'GREEN': '\033[92m', 'WARNING': '\033[93m',
+    })()
 
 
 def _mlx_available() -> bool:
@@ -205,29 +216,17 @@ def run_harmony(
 
     if verbose:
         if use_mlx:
-            backend_str = "MLX on Apple Silicon"
+            print(f"{EMOJI['gpu']} Using MLX Apple Silicon acceleration for Harmony")
+        elif isinstance(device_obj, torch.device) and device_obj.type == "cuda":
+            print(f"{EMOJI['gpu']} Using PyTorch CUDA acceleration for Harmony")
         elif isinstance(device_obj, torch.device) and device_obj.type == "cpu":
-            backend_str = "NumPy CPU"
+            print(f"{EMOJI['cpu']} Using NumPy CPU acceleration for Harmony")
         else:
-            backend_str = f"PyTorch on {device_obj}"
-        logger.info(f"Running Harmony ({backend_str})")
-        logger.info("  Parameters:")
-        logger.info(f"    max_iter_harmony: {max_iter_harmony}")
-        logger.info(f"    max_iter_kmeans: {max_iter_kmeans}")
-        logger.info(f"    epsilon_cluster: {epsilon_cluster}")
-        logger.info(f"    epsilon_harmony: {epsilon_harmony}")
-        logger.info(f"    nclust: {nclust}")
-        logger.info(f"    block_size: {block_size}")
-        if lambda_estimation:
-            logger.info(f"    lamb: dynamic (alpha={alpha})")
-        else:
-            logger.info(f"    lamb: {lamb[1:]}")
-        logger.info(f"    theta: {theta}")
-        logger.info(f"    sigma: {sigma[:5]}..." if len(sigma) > 5 else f"    sigma: {sigma}")
-        logger.info(f"    verbose: {verbose}")
-        logger.info(f"    random_state: {random_state}")
-        logger.info(f"  Data: {data_mat.shape[0]} PCs × {N} cells")
-        logger.info(f"  Batch variables: {vars_use}")
+            print(f"{EMOJI['gpu']} Using PyTorch {device_obj} acceleration for Harmony")
+        print(f"{Colors.CYAN}    Data: {data_mat.shape[0]} PCs × {N} cells{Colors.ENDC}")
+        print(f"{Colors.CYAN}    Batch variables: {vars_use}{Colors.ENDC}")
+        print(f"{Colors.CYAN}    Max iterations: {Colors.BOLD}{max_iter_harmony}{Colors.ENDC}")
+        print(f"{Colors.CYAN}    Convergence threshold: {Colors.BOLD}{epsilon_harmony}{Colors.ENDC}")
 
     # Set random seeds
     np.random.seed(random_state)
@@ -411,14 +410,15 @@ class Harmony:
         self._Y = torch.zeros((self.d, self.K), dtype=torch.float32, device=self.device)
 
     def init_cluster(self, random_state):
-        logger.info("Computing initial centroids with sklearn.KMeans...")
-        # KMeans needs CPU numpy array
+        if self.verbose:
+            print(f"{Colors.CYAN}    Initializing centroids (K={self.K}) ...{Colors.ENDC}", end=" ", flush=True)
         Z_cos_np = self._Z_cos.cpu().numpy()
         model = KMeans(n_clusters=self.K, init='k-means++',
                        n_init=1, max_iter=25, random_state=random_state)
         model.fit(Z_cos_np.T)
         self._Y = torch.tensor(model.cluster_centers_.T, dtype=torch.float32, device=self.device)
-        logger.info("KMeans initialization complete.")
+        if self.verbose:
+            print("done")
         
         # Normalize centroids
         self._Y = self._Y / torch.linalg.norm(self._Y, ord=2, dim=0)
@@ -452,21 +452,26 @@ class Harmony:
 
     def harmonize(self, iter_harmony=10, verbose=True):
         converged = False
-        for i in range(1, iter_harmony + 1):
-            if verbose:
-                logger.info(f"Iteration {i} of {iter_harmony}")
-            
+        if verbose:
+            print(f"{EMOJI['start']} [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Running Harmony integration...")
+
+        pbar = tqdm(range(1, iter_harmony + 1), desc="Harmony iterations", disable=not verbose)
+        for i in pbar:
             self.cluster()
             self.moe_correct_ridge()
-            
+
             converged = self.check_convergence(1)
+            if verbose:
+                pbar.set_description(f"Harmony iteration {i}/{iter_harmony}")
             if converged:
                 if verbose:
-                    logger.info(f"Converged after {i} iteration{'s' if i > 1 else ''}")
+                    pbar.set_description(f"Harmony converged after {i} iterations")
+                    print(f"\n{EMOJI['done']} Harmony converged after {i} iteration{'s' if i > 1 else ''}")
                 break
-                
+        pbar.close()
+
         if verbose and not converged:
-            logger.info("Stopped before convergence")
+            print(f"{EMOJI['warning']} Harmony stopped before convergence after {iter_harmony} iterations")
 
     def cluster(self):
         self._dist_mat = 2 * (1 - self._Y.T @ self._Z_cos)

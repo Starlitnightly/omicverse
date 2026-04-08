@@ -7,8 +7,19 @@ and MLX is installed.
 
 import numpy as np
 import logging
+from datetime import datetime
+from tqdm import tqdm
 
 logger = logging.getLogger("harmonypy")
+
+try:
+    from ..._settings import EMOJI, Colors
+except ImportError:
+    EMOJI = {'start': '🚀', 'done': '✅', 'warning': '⚠️', 'cpu': '🖥️', 'gpu': '🚀'}
+    Colors = type('Colors', (), {
+        'CYAN': '\033[96m', 'BOLD': '\033[1m', 'ENDC': '\033[0m',
+        'GREEN': '\033[92m', 'WARNING': '\033[93m',
+    })()
 
 try:
     import mlx.core as mx
@@ -80,12 +91,16 @@ class HarmonyMLX:
         self._O = mx.zeros((K, self.B), dtype=mx.float32)
 
         # Init cluster
+        if verbose:
+            print(f"{Colors.CYAN}    Initializing centroids (K={K}) ...{Colors.ENDC}", end=" ", flush=True)
         Z_cos_np = np.array(self._Z_cos)
         model = KMeans(n_clusters=K, init="k-means++", n_init=1,
                        max_iter=25, random_state=random_state)
         model.fit(Z_cos_np.T)
         self._Y = mx.array(model.cluster_centers_.T.astype(np.float32))
         self._Y = self._Y / mx.linalg.norm(self._Y, axis=0, keepdims=True)
+        if verbose:
+            print("done")
 
         self._dist_mat = 2 * (1 - mx.matmul(self._Y.T, self._Z_cos))
         self._R = -self._dist_mat / mx.expand_dims(self._sigma, 1)
@@ -143,18 +158,25 @@ class HarmonyMLX:
 
     def _harmonize(self, iter_harmony, verbose):
         converged = False
-        for i in range(1, iter_harmony + 1):
-            if verbose:
-                logger.info(f"Iteration {i} of {iter_harmony}")
+        if verbose:
+            print(f"{EMOJI['start']} [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Running Harmony integration...")
+
+        pbar = tqdm(range(1, iter_harmony + 1), desc="Harmony iterations", disable=not verbose)
+        for i in pbar:
             self._cluster()
             self._moe_correct_ridge()
             converged = self._check_convergence(1)
+            if verbose:
+                pbar.set_description(f"Harmony iteration {i}/{iter_harmony}")
             if converged:
                 if verbose:
-                    logger.info(f"Converged after {i} iteration{'s' if i > 1 else ''}")
+                    pbar.set_description(f"Harmony converged after {i} iterations")
+                    print(f"\n{EMOJI['done']} Harmony converged after {i} iteration{'s' if i > 1 else ''}")
                 break
+        pbar.close()
+
         if verbose and not converged:
-            logger.info("Stopped before convergence")
+            print(f"{EMOJI['warning']} Harmony stopped before convergence after {iter_harmony} iterations")
 
     def _cluster(self):
         self._dist_mat = 2 * (1 - mx.matmul(self._Y.T, self._Z_cos))
