@@ -101,8 +101,9 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         harmony_kwargs.pop('plot_convergence', None)
 
         harmony_out = run_harmony(adata3.obsm[use_rep], adata3.obs, batch_key, **harmony_kwargs)
-        adata.obsm['X_pca_harmony'] = harmony_out.result()
-        adata.obsm['X_harmony'] = harmony_out.result()
+        harmony_result = harmony_out.result()
+        adata.obsm['X_pca_harmony'] = harmony_result
+        adata.obsm['X_harmony'] = harmony_result
         
         add_reference(adata,'Harmony','batch correction with Harmony')
         

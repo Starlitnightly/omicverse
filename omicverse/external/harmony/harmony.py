@@ -21,15 +21,8 @@ import torch
 from sklearn.cluster import KMeans
 import logging
 
-# create logger
 logger = logging.getLogger('harmonypy')
-logger.setLevel(logging.DEBUG)
-if not logger.handlers:
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
+logger.addHandler(logging.NullHandler())
 
 
 def _mlx_available() -> bool:
@@ -78,10 +71,11 @@ def run_harmony(
     alpha=0.2,
     verbose=True,
     random_state=0,
-    device=None
+    device=None,
+    **kwargs
 ):
     """Run Harmony batch effect correction.
-    
+
     This is a PyTorch implementation matching the R package formulas.
     Supports CPU and GPU (CUDA, MPS) acceleration.
     
@@ -128,6 +122,24 @@ def run_harmony(
     Harmony
         Harmony object with corrected data in Z_corr attribute.
     """
+    import warnings as _warnings
+    # Handle deprecated/removed kwargs from old API
+    _removed = {'use_gpu', 'plot_convergence', 'reference_values',
+                'cluster_prior', 'cluster_fn'}
+    for k in list(kwargs):
+        if k in _removed:
+            _warnings.warn(
+                f"run_harmony parameter '{k}' is no longer supported and will be ignored.",
+                FutureWarning, stacklevel=2,
+            )
+            val = kwargs.pop(k)
+            if k == 'use_gpu' and device is None:
+                device = None if val else 'cpu'
+    if kwargs:
+        raise TypeError(
+            f"run_harmony got unexpected keyword arguments: {list(kwargs)}"
+        )
+
     N = meta_data.shape[0]
     if data_mat.shape[1] != N:
         data_mat = data_mat.T
@@ -166,7 +178,7 @@ def run_harmony(
     if lamb is None:
         lamb = np.repeat([1] * len(phi_n), phi_n).astype(np.float32)
         lamb = np.insert(lamb, 0, 0).astype(np.float32)
-    elif lamb == -1:
+    elif np.isscalar(lamb) and lamb == -1:
         lambda_estimation = True
         lamb = np.zeros(1, dtype=np.float32)
     elif isinstance(lamb, (float, int)):
@@ -427,30 +439,16 @@ class Harmony:
         self.objective_harmony.append(self.objective_kmeans[-1])
 
     def compute_objective(self):
-        # Normalization constant (matches R package): scales objective to be
-        # independent of dataset size so epsilon thresholds are comparable
-        norm_const = 2000.0 / self.N
-        
-        # K-means error
         kmeans_error = torch.sum(self._R * self._dist_mat).item()
-        
-        # Entropy
         _entropy = torch.sum(safe_entropy_torch(self._R) * self._sigma[:, None]).item()
-        
-        # Cross entropy (R package formula) with numerical stability
+        # Cross-entropy: R package formula with +1 smoothing to avoid log(0)
         R_sigma = self._R * self._sigma[:, None]
-        # Clamp to avoid log(0) or division by zero
-        O_clamped = torch.clamp(self._O, min=1e-8)
-        E_clamped = torch.clamp(self._E, min=1e-8)
-        ratio = (O_clamped + E_clamped) / E_clamped
-        theta_log = self._theta.unsqueeze(0).expand(self.K, -1) * torch.log(ratio)
+        theta_log = self._theta.unsqueeze(0).expand(self.K, -1) * torch.log((self._O + 1) / (self._E + 1))
         _cross_entropy = torch.sum(R_sigma * (theta_log @ self._Phi)).item()
-        
-        # Store with normalization constant
-        self.objective_kmeans.append((kmeans_error + _entropy + _cross_entropy) * norm_const)
-        self.objective_kmeans_dist.append(kmeans_error * norm_const)
-        self.objective_kmeans_entropy.append(_entropy * norm_const)
-        self.objective_kmeans_cross.append(_cross_entropy * norm_const)
+        self.objective_kmeans.append(kmeans_error + _entropy + _cross_entropy)
+        self.objective_kmeans_dist.append(kmeans_error)
+        self.objective_kmeans_entropy.append(_entropy)
+        self.objective_kmeans_cross.append(_cross_entropy)
 
     def harmonize(self, iter_harmony=10, verbose=True):
         converged = False
@@ -591,15 +589,8 @@ class Harmony:
             except torch.linalg.LinAlgError:
                 inv_cov = torch.linalg.pinv(cov_mat)
             
-            # Calculate R-scaled PCs
-            Z_tmp = self._Z_orig * self._R[k, :]
-            
-            # Generate betas using the batch index
-            W = inv_cov[:, 0:1] @ Z_tmp.sum(dim=1, keepdim=True).T
-            
-            for b in range(self.B):
-                batch_sum = Z_tmp[:, self._batch_index[b]].sum(dim=1, keepdim=True)
-                W = W + inv_cov[:, b+1:b+2] @ batch_sum.T
+            # W = inv(Phi_Rk @ Phi_moe.T + diag(lamb)) @ Phi_Rk @ Z_orig.T
+            W = inv_cov @ Phi_Rk @ self._Z_orig.T
             
             W[0, :] = 0  # Do not remove intercept
             self._Z_corr = self._Z_corr - W.T @ Phi_Rk

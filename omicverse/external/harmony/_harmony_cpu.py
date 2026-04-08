@@ -132,20 +132,16 @@ class HarmonyCPU:
     # ── Core algorithm ──────────────────────────────────────────
 
     def _compute_objective(self):
-        norm_const = 2000.0 / self.N
         kmeans_error = np.sum(self._R * self._dist_mat)
         _entropy = np.sum(_safe_entropy(self._R) * self._sigma[:, None])
-        # R package cross-entropy formula
-        O_E_sum = np.clip(self._O + self._E, 1e-8, None)
-        E_clipped = np.clip(self._E, 1e-8, None)
-        ratio = O_E_sum / E_clipped
-        theta_log = self._theta[None, :] * np.log(ratio)
+        # Cross-entropy: R package formula with +1 smoothing
+        theta_log = self._theta[None, :] * np.log((self._O + 1) / (self._E + 1))
         R_sigma = self._R * self._sigma[:, None]
         _cross_entropy = np.sum(R_sigma * (theta_log @ self._Phi))
-        self.objective_kmeans.append((kmeans_error + _entropy + _cross_entropy) * norm_const)
-        self.objective_kmeans_dist.append(kmeans_error * norm_const)
-        self.objective_kmeans_entropy.append(_entropy * norm_const)
-        self.objective_kmeans_cross.append(_cross_entropy * norm_const)
+        self.objective_kmeans.append(kmeans_error + _entropy + _cross_entropy)
+        self.objective_kmeans_dist.append(kmeans_error)
+        self.objective_kmeans_entropy.append(_entropy)
+        self.objective_kmeans_cross.append(_cross_entropy)
 
     def _harmonize(self, iter_harmony, verbose):
         converged = False
