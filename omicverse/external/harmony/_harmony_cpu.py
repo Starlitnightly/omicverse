@@ -54,6 +54,7 @@ class HarmonyCPU:
         self.max_iter_harmony = max_iter_harmony
         self.max_iter_kmeans = max_iter_kmeans
         self.verbose = verbose
+        self._rng = np.random.default_rng(random_state)
         self.alpha = alpha
         self.lambda_estimation = lambda_estimation
         self._lamb_vec = lamb.copy()
@@ -199,7 +200,7 @@ class HarmonyCPU:
         scale_dist = np.exp(-self._dist_mat / self._sigma[:, None])
         scale_dist /= scale_dist.sum(axis=0, keepdims=True)
 
-        update_order = np.random.permutation(self.N)
+        update_order = self._rng.permutation(self.N)
         n_blocks = int(np.ceil(1.0 / self.block_size))
         cells_per_block = int(self.N * self.block_size)
 
@@ -267,11 +268,15 @@ class HarmonyCPU:
             w = self.window_size
             obj_old = sum(self.objective_kmeans[-w - 1:-1])
             obj_new = sum(self.objective_kmeans[-w:])
+            if abs(obj_old) < 1e-10:
+                return True
             return abs(obj_old - obj_new) / abs(obj_old) < self.epsilon_kmeans
         if i_type == 1:
             if len(self.objective_harmony) < 2:
                 return False
             obj_old = self.objective_harmony[-2]
             obj_new = self.objective_harmony[-1]
+            if abs(obj_old) < 1e-10:
+                return True
             return (obj_old - obj_new) / abs(obj_old) < self.epsilon_harmony
         return True

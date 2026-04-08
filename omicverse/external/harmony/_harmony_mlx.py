@@ -56,6 +56,7 @@ class HarmonyMLX:
         self.max_iter_harmony = max_iter_harmony
         self.max_iter_kmeans = max_iter_kmeans
         self.verbose = verbose
+        self._rng = np.random.default_rng(random_state)
         self.alpha = alpha
         self.lambda_estimation = lambda_estimation
 
@@ -200,7 +201,7 @@ class HarmonyMLX:
         scale_dist = mx.exp(-self._dist_mat / mx.expand_dims(self._sigma, 1))
         scale_dist = scale_dist / mx.sum(scale_dist, axis=0, keepdims=True)
 
-        update_order = mx.array(np.random.permutation(self.N))
+        update_order = mx.array(self._rng.permutation(self.N))
         n_blocks = int(np.ceil(1.0 / self.block_size))
         cells_per_block = int(self.N * self.block_size)
 
@@ -240,15 +241,21 @@ class HarmonyMLX:
     def _moe_correct_ridge(self):
         """Ridge regression correction, pure MLX operations."""
         self._Z_corr = mx.array(np.array(self._Z_orig))  # clone
-        lamb_diag = mx.array(np.diag(np.insert(self._lamb_np, 0, 0)).astype(np.float32))
 
         for k in range(self.K):
+            # Dynamic lambda estimation (matches CPU/Torch backends)
+            if self.lambda_estimation:
+                lamb_vec = np.zeros(self.B + 1, dtype=np.float32)
+                lamb_vec[1:] = np.array(self._E[k, :]) * self.alpha
+            else:
+                lamb_vec = np.insert(self._lamb_np, 0, 0).astype(np.float32)
+            lamb_diag = mx.array(np.diag(lamb_vec))
+
             Phi_Rk = self._Phi_moe * self._R[k, :]
             cov = mx.matmul(Phi_Rk, self._Phi_moe.T) + lamb_diag
             try:
                 inv_cov = mx.linalg.inv(cov)
-            except Exception:
-                # Fallback to numpy pinverse for singular matrices
+            except (ValueError, RuntimeError):
                 inv_cov = mx.array(np.linalg.pinv(np.array(cov)).astype(np.float32))
             W = mx.matmul(mx.matmul(inv_cov, Phi_Rk), self._Z_orig.T)
             # Zero out intercept row
@@ -264,11 +271,15 @@ class HarmonyMLX:
             w = self.window_size
             obj_old = sum(self.objective_kmeans[-w - 1:-1])
             obj_new = sum(self.objective_kmeans[-w:])
+            if abs(obj_old) < 1e-10:
+                return True
             return abs(obj_old - obj_new) / abs(obj_old) < self.epsilon_kmeans
         if i_type == 1:
             if len(self.objective_harmony) < 2:
                 return False
             obj_old = self.objective_harmony[-2]
             obj_new = self.objective_harmony[-1]
+            if abs(obj_old) < 1e-10:
+                return True
             return (obj_old - obj_new) / abs(obj_old) < self.epsilon_harmony
         return True

@@ -82,13 +82,17 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
             pca(adata3,layer='scaled',n_pcs=n_pcs)
 
         # Map deprecated use_gpu to device for backward compatibility
+        import warnings
         harmony_kwargs = dict(kwargs)
         if 'use_gpu' in harmony_kwargs:
             use_gpu = harmony_kwargs.pop('use_gpu')
+            warnings.warn(
+                "Harmony parameter 'use_gpu' is deprecated, use device='cuda'/'cpu' instead.",
+                FutureWarning, stacklevel=2,
+            )
             if 'device' not in harmony_kwargs:
                 harmony_kwargs['device'] = None if use_gpu else 'cpu'
         # Warn on removed parameters that had functional meaning
-        import warnings
         for _removed in ('reference_values', 'cluster_prior', 'cluster_fn'):
             if _removed in harmony_kwargs:
                 warnings.warn(

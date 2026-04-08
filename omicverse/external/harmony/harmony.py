@@ -161,8 +161,8 @@ def run_harmony(
     if nclust is None:
         nclust = int(min(round(N / 30.0), 100))
 
-    if isinstance(sigma, float) and nclust > 1:
-        sigma = np.repeat(sigma, nclust)
+    if not isinstance(sigma, np.ndarray):
+        sigma = np.repeat(float(sigma), nclust)
 
     if isinstance(vars_use, str):
         vars_use = [vars_use]
@@ -559,6 +559,8 @@ class Harmony:
             w = self.window_size
             obj_old = sum(self.objective_kmeans[-w-1:-1])
             obj_new = sum(self.objective_kmeans[-w:])
+            if abs(obj_old) < 1e-10:
+                return True
             return abs(obj_old - obj_new) / abs(obj_old) < self.epsilon_kmeans
         
         if i_type == 1:
@@ -567,6 +569,8 @@ class Harmony:
             
             obj_old = self.objective_harmony[-2]
             obj_new = self.objective_harmony[-1]
+            if abs(obj_old) < 1e-10:
+                return True
             return (obj_old - obj_new) / abs(obj_old) < self.epsilon_harmony
         
         return True
