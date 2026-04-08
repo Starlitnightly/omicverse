@@ -207,6 +207,9 @@ class HarmonyMLX:
         scale_perm = scale_dist[:, update_order]
         Phi_perm = self._Phi[:, update_order]
 
+        # Collect updated blocks (MLX arrays are immutable — no slice assignment)
+        R_blocks = []
+
         for blk in range(n_blocks):
             idx_min = blk * cells_per_block
             idx_max = self.N if blk == n_blocks - 1 else (blk + 1) * cells_per_block
@@ -222,7 +225,6 @@ class HarmonyMLX:
             # R package formula: ratio = E / (O + E)
             O_E = mx.clip(self._O + self._E, a_min=1e-8, a_max=None)
             ratio = mx.clip(self._E / O_E, a_min=1e-8, a_max=1.0)
-            # Broadcast power: ratio^theta
             ratio_pow = mx.power(ratio, mx.expand_dims(self._theta, 0))
             R_new = scale_block * mx.matmul(ratio_pow, Phi_block)
             R_new = R_new / mx.clip(mx.sum(R_new, axis=0, keepdims=True), a_min=1e-8, a_max=None)
@@ -230,9 +232,10 @@ class HarmonyMLX:
             # Put cells back
             self._E = self._E + mx.outer(mx.sum(R_new, axis=1), self._Pr_b)
             self._O = self._O + mx.matmul(R_new, Phi_block.T)
-            R_perm[:, idx_min:idx_max] = R_new
+            R_blocks.append(R_new)
 
-        # Restore original order
+        # Rebuild R from updated blocks and restore original order
+        R_perm = mx.concatenate(R_blocks, axis=1)
         inv_order = mx.argsort(update_order)
         self._R = R_perm[:, inv_order]
 

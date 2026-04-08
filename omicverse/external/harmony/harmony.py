@@ -405,7 +405,6 @@ class Harmony:
         self._dist_mat = torch.zeros((self.K, self.N), dtype=torch.float32, device=self.device)
         self._O = torch.zeros((self.K, self.B), dtype=torch.float32, device=self.device)
         self._E = torch.zeros((self.K, self.B), dtype=torch.float32, device=self.device)
-        self._W = torch.zeros((self.B + 1, self.d), dtype=torch.float32, device=self.device)
         self._R = torch.zeros((self.K, self.N), dtype=torch.float32, device=self.device)
         self._Y = torch.zeros((self.d, self.K), dtype=torch.float32, device=self.device)
 
