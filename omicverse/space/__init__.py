@@ -61,6 +61,7 @@ from ._spatrio import CellMap,CellLoc
 from ._stt import STT
 from ._svg import svg,spatial_neighbors,spatial_autocorr,moranI
 from ._cast import CAST
+from ._cellcharter import cellcharter
 from ._tools import *
 from ._commot import create_communication_anndata,update_classification_from_database
 from ._deconvolution import Deconvolution,calculate_gene_signature
@@ -110,6 +111,7 @@ __all__ = [
     'clusters',
     'merge_cluster',
     'CAST',
+    'cellcharter',
     
     # Spatial integration and mapping
     'Tangram',

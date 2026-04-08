@@ -102,6 +102,7 @@ def spatial_neighbors(
     spatial_key: str = 'spatial',
     n_neighs: int = 6,
     radius=None,
+    delaunay: bool = False,
     set_diag: bool = False,
     key_added: str = 'spatial',
     copy: bool = False,
@@ -116,9 +117,12 @@ def spatial_neighbors(
     Arguments:
         adata: AnnData object with spatial coordinates in ``adata.obsm[spatial_key]``.
         spatial_key: Key in ``adata.obsm`` that stores 2-D spatial coordinates. Default: 'spatial'.
-        n_neighs: Number of nearest spatial neighbors (used when *radius* is ``None``). Default: 6.
+        n_neighs: Number of nearest spatial neighbors (used when *radius* is ``None`` and
+            ``delaunay=False``). Default: 6.
         radius: Radius (or ``(min_radius, max_radius)`` tuple) for radius-based graph.
             When set, *n_neighs* is ignored. Default: None.
+        delaunay: Whether to build the graph from a Delaunay triangulation of the
+            spatial coordinates. When set, *n_neighs* is ignored. Default: False.
         set_diag: Whether to include self-loops in the connectivity matrix. Default: False.
         key_added: Prefix for the keys added to ``adata.obsp`` and ``adata.uns``. Default: 'spatial'.
         copy: If ``True``, return ``(connectivities, distances)`` as sparse matrices. Default: False.
@@ -133,12 +137,60 @@ def spatial_neighbors(
         >>> # radius graph
         >>> ov.space.spatial_neighbors(adata, radius=150)
     """
+    from scipy.spatial import Delaunay, QhullError
     from sklearn.neighbors import NearestNeighbors
 
     coords = np.asarray(adata.obsm[spatial_key], dtype=np.float64)
     n_obs  = coords.shape[0]
 
-    if radius is not None:
+    if delaunay:
+        if n_obs < coords.shape[1] + 1:
+            raise ValueError(
+                "Delaunay triangulation requires at least n_dims + 1 observations. "
+                f"Got {n_obs} observations with {coords.shape[1]} spatial dimensions."
+            )
+        try:
+            tri = Delaunay(coords)
+        except QhullError as exc:
+            raise ValueError(
+                "Failed to build a Delaunay graph from `adata.obsm[spatial_key]`. "
+                "Check for duplicated/degenerate spatial coordinates."
+            ) from exc
+
+        simplices = np.asarray(tri.simplices, dtype=np.int64)
+        edge_pairs = []
+        for simplex in simplices:
+            for i in range(len(simplex)):
+                for j in range(i + 1, len(simplex)):
+                    a = int(simplex[i])
+                    b = int(simplex[j])
+                    if a == b:
+                        continue
+                    if a > b:
+                        a, b = b, a
+                    edge_pairs.append((a, b))
+
+        if edge_pairs:
+            edges = np.unique(np.asarray(edge_pairs, dtype=np.int64), axis=0)
+            distances = np.linalg.norm(coords[edges[:, 0]] - coords[edges[:, 1]], axis=1)
+            row = np.concatenate([edges[:, 0], edges[:, 1]])
+            col = np.concatenate([edges[:, 1], edges[:, 0]])
+            data = np.concatenate([distances, distances])
+            dist_mat = _sp.coo_matrix((data, (row, col)), shape=(n_obs, n_obs)).tocsr()
+        else:
+            dist_mat = _sp.csr_matrix((n_obs, n_obs), dtype=np.float64)
+
+        if radius is not None:
+            r_min = radius[0] if isinstance(radius, (tuple, list)) else 0.0
+            r_max = radius[1] if isinstance(radius, (tuple, list)) else float(radius)
+            mask = (dist_mat.data < r_min) | (dist_mat.data > r_max)
+            dist_mat.data[mask] = 0
+            dist_mat.eliminate_zeros()
+
+        if not set_diag:
+            dist_mat.setdiag(0)
+            dist_mat.eliminate_zeros()
+    elif radius is not None:
         r_min = radius[0] if isinstance(radius, (tuple, list)) else 0.0
         r_max = radius[1] if isinstance(radius, (tuple, list)) else float(radius)
         nn = NearestNeighbors(algorithm='ball_tree', radius=r_max)
@@ -170,6 +222,7 @@ def spatial_neighbors(
         'params': {
             'n_neighbors': n_neighs,
             'radius':      radius,
+            'delaunay':    delaunay,
             'method':      'spatial',
             'spatial_key': spatial_key,
         },

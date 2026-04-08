@@ -122,6 +122,8 @@ __all__ = [
     'SpatialDE',
     'NaiveDE',
     'somde'
+    ,
+    'cellcharter'
 ]
 
 

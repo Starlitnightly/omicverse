@@ -105,7 +105,7 @@ def mclust_py(adata,  n_components=None,use_rep:str='X_pca',
         'obsm': []
     },
     produces={
-        'obs': ['leiden', 'louvain', 'kmeans', 'mclust', 'scICE_cluster']
+        'obs': ['leiden', 'louvain', 'kmeans', 'mclust', 'scICE_cluster', 'cellcharter']
     },
     auto_fix='escalate',
     examples=[
@@ -121,7 +121,10 @@ def mclust_py(adata,  n_components=None,use_rep:str='X_pca',
         "# K-means clustering",
         "ov.utils.cluster(adata, method='kmeans', n_components=8)",
         "# Louvain clustering",
-        "ov.utils.cluster(adata, method='louvain', resolution=0.8)"
+        "ov.utils.cluster(adata, method='louvain', resolution=0.8)",
+        "# CellCharter-style spatial clustering",
+        "model = ov.utils.cluster(adata, method='cellcharter',",
+        "                         n_components=8, use_rep='X_pca')",
     ],
     related=["pp.neighbors", "pl.embedding", "utils.refine_label"]
 )
@@ -137,7 +140,7 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
     method : str, default='leiden'
         Clustering backend. Supported values include ``'leiden'``,
         ``'louvain'``, ``'kmeans'``, ``'GMM'``, ``'mclust'``,
-        ``'mclust_R'``, ``'schist'``, and ``'scICE'``.
+        ``'mclust_R'``, ``'schist'``, ``'scICE'``, and ``'cellcharter'``.
     use_rep : str, default='X_pca'
         Key in ``adata.obsm`` used for embedding-based methods such as GMM,
         K-means, and scICE.
@@ -152,8 +155,9 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
     Returns
     -------
     object or None
-        Returns a fitted scICE model instance when ``method='scICE'``.
-        Other methods write labels to ``adata.obs`` and return ``None``.
+        Returns a fitted scICE or CellCharter model instance for the
+        corresponding methods. Other methods write labels to ``adata.obs``
+        and return ``None``.
 
     Examples
     --------
@@ -161,6 +165,7 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
     >>> cluster(adata, method='leiden', resolution=1.0)
     >>> cluster(adata, method='GMM', n_components=10, use_rep='X_pca')
     >>> scice_model = cluster(adata, method='scICE', use_rep='X_pca')
+    >>> cc_model = cluster(adata, method='cellcharter', n_components=8, use_rep='X_pca')
     """
 
     if method=='leiden':
@@ -235,6 +240,23 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
         print('scICE_cluster has been added to adata.obs')
         add_reference(adata,'scICE','clustering with scICE')
         return scice
+    elif method=='cellcharter':
+        if n_components is None:
+            print('You need to input the `n_components` when method is `cellcharter`')
+            return
+        from ..space._cellcharter import cellcharter as run_cellcharter
+
+        model = run_cellcharter(
+            adata,
+            n_clusters=n_components,
+            use_rep=use_rep,
+            random_state=random_state,
+            **kwargs,
+        )
+        print(f"""finished: found {n_components} clusters and added
+    'cellcharter', the cluster labels (adata.obs, categorical)""")
+        add_reference(adata,'cellcharter','clustering with CellCharter')
+        return model
 
 
       
