@@ -1166,7 +1166,34 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                     import scipy.sparse
                     print(f"   {Colors.CYAN}📊 PCA input data type: {type(X).__name__}, shape: {X.shape}, dtype: {X.dtype}{Colors.ENDC}")
                     if scipy.sparse.issparse(X):
-                        print(f"   {Colors.CYAN}📊 Sparse matrix density: {X.nnz / (X.shape[0] * X.shape[1]) * 100:.2f}%{Colors.ENDC}")
+                        sparse_density = _sparse_density(X)
+                        print(f"   {Colors.CYAN}📊 Sparse matrix density: {sparse_density * 100:.2f}%{Colors.ENDC}")
+                        if sparse_density >= HIGH_DENSITY_SPARSE_THRESHOLD:
+                            # Estimate dense array memory (float32 = 4 bytes per element)
+                            itemsize = np.dtype(X.dtype).itemsize
+                            dense_bytes = int(X.shape[0]) * int(X.shape[1]) * itemsize
+                            dense_gb = dense_bytes / (1024 ** 3)
+                            # Check available memory; fall back to 8 GB limit if psutil unavailable
+                            try:
+                                import psutil
+                                avail_bytes = psutil.virtual_memory().available
+                            except ImportError:
+                                avail_bytes = 8 * (1024 ** 3)
+                            # Only convert if dense array uses < 30% of available memory
+                            # (PCA needs ~2-3x the array size internally)
+                            if dense_bytes < avail_bytes * 0.3:
+                                print(
+                                    f"   {Colors.WARNING}{EMOJI['warning']} Sparse matrix density "
+                                    f"{sparse_density * 100:.2f}% >= {HIGH_DENSITY_SPARSE_THRESHOLD * 100:.0f}% threshold; "
+                                    f"converting to dense array ({dense_gb:.2f} GB) for faster PCA.{Colors.ENDC}"
+                                )
+                                X = np.asarray(X.toarray())
+                            else:
+                                print(
+                                    f"   {Colors.WARNING}{EMOJI['warning']} Sparse matrix density is high "
+                                    f"({sparse_density * 100:.2f}%) but dense array would need "
+                                    f"{dense_gb:.2f} GB; keeping sparse to avoid OOM.{Colors.ENDC}"
+                                )
 
                     from sklearn.decomposition import PCA
 
