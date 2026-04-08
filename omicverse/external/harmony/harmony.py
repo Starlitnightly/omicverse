@@ -32,15 +32,30 @@ if not logger.handlers:
     logger.addHandler(ch)
 
 
+def _mlx_available() -> bool:
+    """Check if MLX is installed and Metal GPU is accessible."""
+    try:
+        import mlx.core as mx
+        return mx.metal.is_available()
+    except (ImportError, AttributeError):
+        return False
+
+
 def get_device(device=None):
-    """Get the appropriate device for PyTorch operations."""
+    """Get the appropriate device for PyTorch operations.
+
+    On Apple Silicon, returns ``'mlx'`` when MLX is available (preferred
+    over PyTorch MPS which is still in beta).  All other platforms use
+    the standard CUDA > CPU fallback.
+    """
     if device is not None:
-        return torch.device(device)
-    
-    # Check for available accelerators
+        return device if device == "mlx" else torch.device(device)
+
     if torch.cuda.is_available():
         return torch.device('cuda')
     elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        if _mlx_available():
+            return "mlx"
         return torch.device('mps')
     else:
         return torch.device('cpu')
@@ -174,9 +189,11 @@ def run_harmony(
 
     # Get device
     device_obj = get_device(device)
+    use_mlx = (device_obj == "mlx")
 
     if verbose:
-        logger.info(f"Running Harmony (PyTorch on {device_obj})")
+        backend_str = "MLX on Apple Silicon" if use_mlx else f"PyTorch on {device_obj}"
+        logger.info(f"Running Harmony ({backend_str})")
         logger.info("  Parameters:")
         logger.info(f"    max_iter_harmony: {max_iter_harmony}")
         logger.info(f"    max_iter_kmeans: {max_iter_kmeans}")
@@ -203,14 +220,24 @@ def run_harmony(
     if hasattr(data_mat, 'values'):
         data_mat = data_mat.values
     data_mat = np.asarray(data_mat, dtype=np.float32)
-    
-    ho = Harmony(
-        data_mat, phi, Pr_b, sigma.astype(np.float32), 
-        theta, lamb, alpha, lambda_estimation,
-        max_iter_harmony, max_iter_kmeans,
-        epsilon_cluster, epsilon_harmony, nclust, block_size, verbose,
-        random_state, device_obj
-    )
+
+    if use_mlx:
+        from ._harmony_mlx import HarmonyMLX
+        ho = HarmonyMLX(
+            data_mat, phi, Pr_b, sigma.astype(np.float32),
+            theta, lamb, alpha, lambda_estimation,
+            max_iter_harmony, max_iter_kmeans,
+            epsilon_cluster, epsilon_harmony, nclust, block_size, verbose,
+            random_state,
+        )
+    else:
+        ho = Harmony(
+            data_mat, phi, Pr_b, sigma.astype(np.float32),
+            theta, lamb, alpha, lambda_estimation,
+            max_iter_harmony, max_iter_kmeans,
+            epsilon_cluster, epsilon_harmony, nclust, block_size, verbose,
+            random_state, device_obj
+        )
 
     return ho
 
