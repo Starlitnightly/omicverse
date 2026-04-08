@@ -19,11 +19,8 @@ def _safe_entropy(x):
 
 
 def _pow_by_col(A, T):
-    """Element-wise power with per-column exponents."""
-    result = np.empty_like(A)
-    for c in range(A.shape[1]):
-        result[:, c] = np.power(A[:, c], T[c])
-    return result
+    """Element-wise power with per-column exponents: A^T broadcast."""
+    return np.power(A, T[np.newaxis, :])
 
 
 class HarmonyCPU:
@@ -83,7 +80,7 @@ class HarmonyCPU:
 
         # Init cluster
         logger.info("Computing initial centroids with sklearn.KMeans...")
-        model = KMeans(n_clusters=K, init="k-means++", n_init=1,
+        model = KMeans(n_clusters=K, init="k-means++", n_init=5,
                        max_iter=25, random_state=random_state)
         model.fit(self._Z_cos.T)
         self._Y = model.cluster_centers_.T.astype(np.float32)

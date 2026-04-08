@@ -81,7 +81,7 @@ class HarmonyMLX:
 
         # Init cluster
         Z_cos_np = np.array(self._Z_cos)
-        model = KMeans(n_clusters=K, init="k-means++", n_init=1,
+        model = KMeans(n_clusters=K, init="k-means++", n_init=5,
                        max_iter=25, random_state=random_state)
         model.fit(Z_cos_np.T)
         self._Y = mx.array(model.cluster_centers_.T.astype(np.float32))

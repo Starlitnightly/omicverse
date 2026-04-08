@@ -85,12 +85,20 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         harmony_kwargs = dict(kwargs)
         if 'use_gpu' in harmony_kwargs:
             use_gpu = harmony_kwargs.pop('use_gpu')
-            if 'device' not in harmony_kwargs and use_gpu:
-                harmony_kwargs['device'] = None  # auto-detect
-        # Remove parameters no longer supported by upstream harmonypy
-        for _removed in ('plot_convergence', 'reference_values',
-                         'cluster_prior', 'cluster_fn'):
-            harmony_kwargs.pop(_removed, None)
+            if 'device' not in harmony_kwargs:
+                harmony_kwargs['device'] = None if use_gpu else 'cpu'
+        # Warn on removed parameters that had functional meaning
+        import warnings
+        for _removed in ('reference_values', 'cluster_prior', 'cluster_fn'):
+            if _removed in harmony_kwargs:
+                warnings.warn(
+                    f"Harmony parameter '{_removed}' is no longer supported "
+                    "in harmonypy v0.2.0 and will be ignored.",
+                    FutureWarning,
+                    stacklevel=2,
+                )
+                harmony_kwargs.pop(_removed)
+        harmony_kwargs.pop('plot_convergence', None)
 
         harmony_out = run_harmony(adata3.obsm[use_rep], adata3.obs, batch_key, **harmony_kwargs)
         adata.obsm['X_pca_harmony'] = harmony_out.result()

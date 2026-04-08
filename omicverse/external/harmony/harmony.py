@@ -301,6 +301,10 @@ class Harmony:
         self.verbose = verbose
         self._theta = torch.tensor(theta, dtype=torch.float32, device=device)
 
+        # Generator for reproducible block shuffling in update_R
+        self._rng = torch.Generator(device=device)
+        self._rng.manual_seed(random_state)
+
         self.objective_harmony = []
         self.objective_kmeans = []
         self.objective_kmeans_dist = []
@@ -399,7 +403,7 @@ class Harmony:
         # KMeans needs CPU numpy array
         Z_cos_np = self._Z_cos.cpu().numpy()
         model = KMeans(n_clusters=self.K, init='k-means++',
-                       n_init=1, max_iter=25, random_state=random_state)
+                       n_init=5, max_iter=25, random_state=random_state)
         model.fit(Z_cos_np.T)
         self._Y = torch.tensor(model.cluster_centers_.T, dtype=torch.float32, device=self.device)
         logger.info("KMeans initialization complete.")
@@ -423,7 +427,8 @@ class Harmony:
         self.objective_harmony.append(self.objective_kmeans[-1])
 
     def compute_objective(self):
-        # Normalization constant
+        # Normalization constant (matches R package): scales objective to be
+        # independent of dataset size so epsilon thresholds are comparable
         norm_const = 2000.0 / self.N
         
         # K-means error
@@ -498,8 +503,8 @@ class Harmony:
         self._scale_dist = torch.exp(self._scale_dist)
         self._scale_dist = self._scale_dist / self._scale_dist.sum(dim=0)
         
-        # Create shuffled update order
-        update_order = torch.randperm(self.N, device=self.device)
+        # Reproducible shuffled update order
+        update_order = torch.randperm(self.N, device=self.device, generator=self._rng)
         
         # Process in blocks
         n_blocks = int(np.ceil(1.0 / self.block_size))
@@ -580,8 +585,11 @@ class Harmony:
             # Compute covariance
             cov_mat = Phi_Rk @ self._Phi_moe.T + torch.diag(lamb_vec)
             
-            # Invert
-            inv_cov = torch.linalg.inv(cov_mat)
+            # Invert (with fallback for near-singular matrices)
+            try:
+                inv_cov = torch.linalg.inv(cov_mat)
+            except torch.linalg.LinAlgError:
+                inv_cov = torch.linalg.pinv(cov_mat)
             
             # Calculate R-scaled PCs
             Z_tmp = self._Z_orig * self._R[k, :]
@@ -608,11 +616,8 @@ def safe_entropy_torch(x):
 
 
 def harmony_pow_torch(A, T):
-    """Element-wise power with different exponents per column."""
-    result = torch.empty_like(A)
-    for c in range(A.shape[1]):
-        result[:, c] = torch.pow(A[:, c], T[c])
-    return result
+    """Element-wise power with per-column exponents: A^T broadcast."""
+    return torch.pow(A, T.unsqueeze(0))
 
 
 def find_lambda_torch(alpha, cluster_E, device):
