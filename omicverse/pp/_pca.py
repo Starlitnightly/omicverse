@@ -32,8 +32,13 @@ from datetime import datetime
 
 # Default number of PCs
 N_PCS = 50
-HIGH_DENSITY_SPARSE_THRESHOLD = 0.2
 AUTO_DENSE_CHUNK_TARGET_ELEMENTS = 8_000_000
+
+from ..utils._memory import (
+    get_available_memory as _get_available_memory,
+    HIGH_DENSITY_SPARSE_THRESHOLD,
+    AUTO_DENSE_CPU_MEM_FRACTION,
+)
 
 
 def _sparse_density(x: CSBase) -> float:
@@ -42,35 +47,6 @@ def _sparse_density(x: CSBase) -> float:
     if total <= 0:
         return 0.0
     return float(x.nnz) / float(total)
-
-
-def _get_available_memory() -> int:
-    """Return available system memory in bytes.
-
-    Tries psutil → /proc/meminfo → os.sysconf, falls back to total/2.
-    """
-    try:
-        import psutil
-        return psutil.virtual_memory().available
-    except ImportError:
-        pass
-    import os
-    try:
-        with open("/proc/meminfo") as f:
-            for line in f:
-                if line.startswith("MemAvailable:"):
-                    return int(line.split()[1]) * 1024
-    except (OSError, ValueError):
-        pass
-    try:
-        pages = os.sysconf("SC_AVPHYS_PAGES")
-        page_size = os.sysconf("SC_PAGE_SIZE")
-        if pages > 0 and page_size > 0:
-            return pages * page_size
-    except (AttributeError, ValueError):
-        pass
-    # Last resort: assume 4 GB
-    return 4 * (1024 ** 3)
 
 
 def _auto_dense_chunk_size(n_obs: int, n_vars: int) -> int:
@@ -1225,7 +1201,7 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                             avail_bytes = _get_available_memory()
                             # Only convert if dense array uses < 30% of available memory
                             # (PCA needs ~2-3x the array size internally)
-                            if dense_bytes < avail_bytes * 0.3:
+                            if dense_bytes < avail_bytes * AUTO_DENSE_CPU_MEM_FRACTION:
                                 print(
                                     f"   {Colors.WARNING}{EMOJI['warning']} Sparse matrix density "
                                     f"{sparse_density * 100:.2f}% >= {HIGH_DENSITY_SPARSE_THRESHOLD * 100:.0f}% threshold; "

@@ -12,11 +12,8 @@ import pytest
 import scipy.sparse as sp
 import anndata as ad
 
-from omicverse.pp._pca import (
-    pca as _pca,
-    _sparse_density,
-    HIGH_DENSITY_SPARSE_THRESHOLD,
-)
+from omicverse.pp._pca import pca as _pca, _sparse_density
+from omicverse.utils._memory import HIGH_DENSITY_SPARSE_THRESHOLD
 
 
 # ---------------------------------------------------------------------------
@@ -103,6 +100,7 @@ class TestPCAHighDensitySparse:
         pca_dense = np.abs(dense_adata.obsm["X_pca"])
         np.testing.assert_allclose(pca_sparse, pca_dense, rtol=1e-2, atol=1e-3)
 
+    @pytest.mark.slow
     def test_performance_not_degraded(self, high_density_sparse_adata, dense_adata):
         """High-density sparse PCA should not be drastically slower than dense."""
         t0 = time.perf_counter()

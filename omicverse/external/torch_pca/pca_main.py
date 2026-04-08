@@ -15,38 +15,14 @@ import warnings
 from .ncompo import NComponentsType, find_ncomponents
 from .svd import choose_svd_solver, randomized_svd, svd_flip
 
-HIGH_DENSITY_AUTO_DENSE_THRESHOLD = 0.2
+from ...utils._memory import (
+    get_available_memory as _get_available_cpu_bytes,
+    HIGH_DENSITY_SPARSE_THRESHOLD as HIGH_DENSITY_AUTO_DENSE_THRESHOLD,
+    AUTO_DENSE_CPU_MEM_FRACTION,
+)
+
 AUTO_DENSE_COV_EIGH_MAX_FEATURES = 4096
 AUTO_DENSE_CUDA_FREE_MEM_FRACTION = 0.4
-# Fraction of available CPU RAM that the dense array may occupy
-AUTO_DENSE_CPU_MEM_FRACTION = 0.3
-
-
-def _get_available_cpu_bytes() -> int:
-    """Return available CPU memory in bytes, or total/2 as fallback."""
-    try:
-        import psutil
-        return psutil.virtual_memory().available
-    except ImportError:
-        import os
-        # Try /proc/meminfo on Linux
-        try:
-            with open("/proc/meminfo") as f:
-                for line in f:
-                    if line.startswith("MemAvailable:"):
-                        return int(line.split()[1]) * 1024  # kB → bytes
-        except (OSError, ValueError):
-            pass
-        # Last resort: use os.sysconf if available
-        try:
-            pages = os.sysconf("SC_AVPHYS_PAGES")
-            page_size = os.sysconf("SC_PAGE_SIZE")
-            if pages > 0 and page_size > 0:
-                return pages * page_size
-        except (AttributeError, ValueError):
-            pass
-        # Cannot determine — return a conservative 4 GB
-        return 4 * (1024 ** 3)
 
 
 class PCA:
@@ -269,7 +245,8 @@ class PCA:
         total = int(inputs.shape[0]) * int(inputs.shape[1])
         if total > 0:
             density = float(inputs.nnz) / float(total)
-            dense_bytes = total * 4  # float32 target
+            # Always estimate as float32: scipy input will be cast to float32 below
+            dense_bytes = total * 4
             avail = _get_available_cpu_bytes()
             if (
                 density >= HIGH_DENSITY_AUTO_DENSE_THRESHOLD
