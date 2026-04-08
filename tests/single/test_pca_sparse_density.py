@@ -140,3 +140,72 @@ class TestPCALowDensitySparse:
         """Confirm test data is actually below the conversion threshold."""
         density = _sparse_density(low_density_sparse_adata.X)
         assert density < HIGH_DENSITY_SPARSE_THRESHOLD
+
+
+# ---------------------------------------------------------------------------
+# Issue #615: torch_pca sparse + covariance_eigh should not crash
+# ---------------------------------------------------------------------------
+
+class TestTorchPCASparseCovarEigh:
+    """Verify torch_pca falls back to lobpcg instead of raising ValueError."""
+
+    def test_covariance_eigh_with_sparse_warns_and_succeeds(self):
+        """covariance_eigh + sparse torch tensor should warn and fall back, not crash (#615)."""
+        torch = pytest.importorskip("torch")
+        from omicverse.external.torch_pca import PCA
+
+        # Use a torch sparse tensor directly to bypass scipy auto-densification
+        rng = np.random.default_rng(42)
+        X = sp.random(500, 100, density=0.1, format="csr", dtype=np.float32,
+                      random_state=42)
+        X.data[:] = rng.standard_normal(X.nnz).astype(np.float32)
+        coo = X.tocoo()
+        indices = torch.tensor(np.array([coo.row, coo.col]), dtype=torch.long)
+        values = torch.tensor(coo.data, dtype=torch.float32)
+        X_torch = torch.sparse_coo_tensor(indices, values, size=X.shape).coalesce()
+
+        pca = PCA(n_components=10, svd_solver="covariance_eigh")
+        with pytest.warns(UserWarning, match="falling back to 'lobpcg'"):
+            result = pca.fit_transform(X_torch)
+
+        assert result.shape == (500, 10)
+
+    def test_lobpcg_with_sparse_no_warning(self):
+        """lobpcg + sparse should work without any warning."""
+        torch = pytest.importorskip("torch")
+        from omicverse.external.torch_pca import PCA
+
+        rng = np.random.default_rng(42)
+        X = sp.random(500, 100, density=0.1, format="csr", dtype=np.float32,
+                      random_state=42)
+        X.data[:] = rng.standard_normal(X.nnz).astype(np.float32)
+        pca = PCA(n_components=10, svd_solver="lobpcg")
+        result = pca.fit_transform(X)
+        assert result.shape == (500, 10)
+
+
+# ---------------------------------------------------------------------------
+# Issue #615: chunked PCA with layer should read from correct layer
+# ---------------------------------------------------------------------------
+
+class TestPCALayerCorrectness:
+    """Verify that PCA reads from the specified layer, not .X."""
+
+    def test_pca_reads_from_layer(self):
+        """When layer is specified, PCA should use that layer's data."""
+        rng = np.random.default_rng(42)
+        # .X is zeros, layer is random — if PCA reads from .X, variance will be ~0
+        n_obs, n_vars = 500, 100
+        adata = ad.AnnData(X=sp.csr_matrix((n_obs, n_vars), dtype=np.float32))
+        adata.layers["scaled"] = rng.standard_normal(
+            (n_obs, n_vars)
+        ).astype(np.float32)
+
+        _pca(adata, n_comps=10, layer="scaled", use_gpu=False)
+
+        vr = adata.uns["pca"]["variance_ratio"]
+        # If layer was read correctly, explained variance should be meaningful
+        assert np.sum(vr) > 0.01, (
+            f"Variance ratio sum {np.sum(vr):.6f} is near zero — "
+            "PCA may be reading from .X instead of the specified layer"
+        )

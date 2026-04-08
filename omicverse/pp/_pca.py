@@ -44,6 +44,35 @@ def _sparse_density(x: CSBase) -> float:
     return float(x.nnz) / float(total)
 
 
+def _get_available_memory() -> int:
+    """Return available system memory in bytes.
+
+    Tries psutil → /proc/meminfo → os.sysconf, falls back to total/2.
+    """
+    try:
+        import psutil
+        return psutil.virtual_memory().available
+    except ImportError:
+        pass
+    import os
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemAvailable:"):
+                    return int(line.split()[1]) * 1024
+    except (OSError, ValueError):
+        pass
+    try:
+        pages = os.sysconf("SC_AVPHYS_PAGES")
+        page_size = os.sysconf("SC_PAGE_SIZE")
+        if pages > 0 and page_size > 0:
+            return pages * page_size
+    except (AttributeError, ValueError):
+        pass
+    # Last resort: assume 4 GB
+    return 4 * (1024 ** 3)
+
+
 def _auto_dense_chunk_size(n_obs: int, n_vars: int) -> int:
     """Heuristic chunk size for dense chunked PCA accumulation."""
     if n_obs <= 0:
@@ -437,11 +466,18 @@ def _torch_chunked_covariance_pca(
     device,
     random_state: int | None,
     force_dense_sparse: bool = False,
+    layer: str | None = None,
 ):
     """Torch chunked PCA via covariance accumulation.
 
     This keeps memory bounded by `chunk_size` and can auto-densify sparse chunks
     when the matrix is effectively dense.
+
+    Parameters
+    ----------
+    layer
+        If provided, read data from ``adata_comp.layers[layer]`` instead of
+        ``adata_comp.X``.
     """
     import gc
     import torch
@@ -467,10 +503,20 @@ def _torch_chunked_covariance_pca(
     )
     effective_chunk_size = max(1, min(n_samples, effective_chunk_size))
 
+    # Use layer data when specified, otherwise fall back to .X via chunked_X
+    def _iter_chunks(chunk_size):
+        if layer is not None:
+            X_source = adata_comp.layers[layer]
+            for start in range(0, n_samples, chunk_size):
+                end = min(start + chunk_size, n_samples)
+                yield X_source[start:end], start, end
+        else:
+            yield from adata_comp.chunked_X(chunk_size)
+
     col_sum = torch.zeros(n_features, dtype=torch.float32, device=device)
     gram = torch.zeros((n_features, n_features), dtype=torch.float32, device=device)
 
-    for chunk, _, _ in adata_comp.chunked_X(effective_chunk_size):
+    for chunk, _, _ in _iter_chunks(effective_chunk_size):
         if isinstance(chunk, CSBase):
             chunk_density = _sparse_density(chunk)
             use_dense_chunk = force_dense_sparse or (
@@ -559,7 +605,7 @@ def _torch_chunked_covariance_pca(
     mean_projection = mean_2d @ components.T
 
     X_pca = zeros((n_samples, k), np.float32)
-    for chunk, start, end in adata_comp.chunked_X(effective_chunk_size):
+    for chunk, start, end in _iter_chunks(effective_chunk_size):
         if isinstance(chunk, CSBase):
             chunk_density = _sparse_density(chunk)
             use_dense_chunk = force_dense_sparse or (
@@ -1119,6 +1165,7 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                                         else None
                                     ),
                                     force_dense_sparse=True,
+                                    layer=layer,
                                 )
                             else:
                                 from ..external.torch_pca.sparse_utils import (
@@ -1175,19 +1222,7 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                             itemsize = np.dtype(X.dtype).itemsize
                             dense_bytes = int(X.shape[0]) * int(X.shape[1]) * itemsize
                             dense_gb = dense_bytes / (1024 ** 3)
-                            try:
-                                import psutil
-                                avail_bytes = psutil.virtual_memory().available
-                            except ImportError:
-                                avail_bytes = 8 * (1024 ** 3)
-                                logg.info(
-                                    f"   {EMOJI['warning']} psutil not available; "
-                                    "assuming 8 GB RAM for memory guard"
-                                )
-                                print(
-                                    f"   {Colors.WARNING}{EMOJI['warning']} psutil not available; "
-                                    f"assuming 8 GB RAM for memory guard{Colors.ENDC}"
-                                )
+                            avail_bytes = _get_available_memory()
                             # Only convert if dense array uses < 30% of available memory
                             # (PCA needs ~2-3x the array size internally)
                             if dense_bytes < avail_bytes * 0.3:

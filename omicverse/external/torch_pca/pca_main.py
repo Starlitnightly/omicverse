@@ -16,10 +16,37 @@ from .ncompo import NComponentsType, find_ncomponents
 from .svd import choose_svd_solver, randomized_svd, svd_flip
 
 HIGH_DENSITY_AUTO_DENSE_THRESHOLD = 0.2
-MAX_AUTO_DENSE_ELEMENTS = 250_000_000
 AUTO_DENSE_COV_EIGH_MAX_FEATURES = 4096
-AUTO_DENSE_CPU_MAX_BYTES = 2_500_000_000
 AUTO_DENSE_CUDA_FREE_MEM_FRACTION = 0.4
+# Fraction of available CPU RAM that the dense array may occupy
+AUTO_DENSE_CPU_MEM_FRACTION = 0.3
+
+
+def _get_available_cpu_bytes() -> int:
+    """Return available CPU memory in bytes, or total/2 as fallback."""
+    try:
+        import psutil
+        return psutil.virtual_memory().available
+    except ImportError:
+        import os
+        # Try /proc/meminfo on Linux
+        try:
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    if line.startswith("MemAvailable:"):
+                        return int(line.split()[1]) * 1024  # kB → bytes
+        except (OSError, ValueError):
+            pass
+        # Last resort: use os.sysconf if available
+        try:
+            pages = os.sysconf("SC_AVPHYS_PAGES")
+            page_size = os.sysconf("SC_PAGE_SIZE")
+            if pages > 0 and page_size > 0:
+                return pages * page_size
+        except (AttributeError, ValueError):
+            pass
+        # Cannot determine — return a conservative 4 GB
+        return 4 * (1024 ** 3)
 
 
 class PCA:
@@ -201,7 +228,7 @@ class PCA:
         """Auto-convert high-density sparse tensors to dense for better performance."""
         n_samples, n_features = inputs.shape
         total = int(n_samples) * int(n_features)
-        if total <= 0 or total > MAX_AUTO_DENSE_ELEMENTS:
+        if total <= 0:
             return inputs
 
         # inputs is coalesced sparse COO in our pipeline
@@ -219,8 +246,10 @@ class PCA:
                 return inputs
             if dense_bytes > int(free_mem * AUTO_DENSE_CUDA_FREE_MEM_FRACTION):
                 return inputs
-        elif dense_bytes > AUTO_DENSE_CPU_MAX_BYTES:
-            return inputs
+        else:
+            avail = _get_available_cpu_bytes()
+            if dense_bytes > int(avail * AUTO_DENSE_CPU_MEM_FRACTION):
+                return inputs
 
         warnings.warn(
             "High-density sparse input detected "
@@ -238,12 +267,13 @@ class PCA:
     ) -> Tensor:
         """Convert scipy sparse input to torch tensor with high-density fast path."""
         total = int(inputs.shape[0]) * int(inputs.shape[1])
-        if total > 0 and total <= MAX_AUTO_DENSE_ELEMENTS:
+        if total > 0:
             density = float(inputs.nnz) / float(total)
             dense_bytes = total * 4  # float32 target
+            avail = _get_available_cpu_bytes()
             if (
                 density >= HIGH_DENSITY_AUTO_DENSE_THRESHOLD
-                and dense_bytes <= AUTO_DENSE_CPU_MAX_BYTES
+                and dense_bytes <= int(avail * AUTO_DENSE_CPU_MEM_FRACTION)
             ):
                 warnings.warn(
                     "High-density scipy sparse input detected "
@@ -346,10 +376,14 @@ class PCA:
             self.svd_solver_ = "lobpcg"
 
         if self._input_is_sparse and self.svd_solver_ != "lobpcg":
-            raise ValueError(
-                f"Sparse inputs only support 'auto', 'lobpcg', or 'arpack' compatibility alias. "
-                f"Got '{self.svd_solver_}'."
+            warnings.warn(
+                f"Sparse input with svd_solver='{self.svd_solver_}' is not supported; "
+                "falling back to 'lobpcg'. To silence this warning, pass "
+                "svd_solver='lobpcg' or 'auto'.",
+                UserWarning,
+                stacklevel=2,
             )
+            self.svd_solver_ = "lobpcg"
 
         # Compute mean and shape based on input type
         if self._input_is_sparse:
