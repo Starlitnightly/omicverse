@@ -76,10 +76,8 @@ class HarmonyMLX:
         self._sigma = mx.array(sigma.astype(np.float32))
         self._theta = mx.array(theta.astype(np.float32))
 
-        # Lambda
+        # Lambda — lamb already has leading zero from run_harmony
         self._lamb_np = lamb
-        self._lamb = mx.array(np.diag(np.insert(lamb, 0, 0)).astype(np.float32)) \
-            if not lambda_estimation else mx.zeros((1,), dtype=mx.float32)
 
         # Phi_moe with intercept
         ones = mx.ones((1, self.N), dtype=mx.float32)
@@ -248,7 +246,7 @@ class HarmonyMLX:
                 lamb_vec = np.zeros(self.B + 1, dtype=np.float32)
                 lamb_vec[1:] = np.array(self._E[k, :]) * self.alpha
             else:
-                lamb_vec = np.insert(self._lamb_np, 0, 0).astype(np.float32)
+                lamb_vec = self._lamb_np  # already has leading zero
             lamb_diag = mx.array(np.diag(lamb_vec))
 
             Phi_Rk = self._Phi_moe * self._R[k, :]
