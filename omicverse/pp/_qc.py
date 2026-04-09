@@ -421,7 +421,7 @@ def _detect_mt_prefix(var_names) -> str:
     * Some mixed annotations: ``Mt-``
     * Drosophila: ``mt:``
     * Arabidopsis thaliana: ``ATMG``
-    * C. elegans: ``ctc-`` and ``nduo-`` (checked as a group)
+    * C. elegans: ``ctc-``, ``nduo-`` and ``ctb-`` (checked as a group)
     """
     if isinstance(var_names, list):
         var_names = pd.Index(var_names)
@@ -472,6 +472,11 @@ def _mt_mask(var_names, mt_startswith):
     ``'nduo-'``, ``'ctb-'``), all three prefixes are matched together
     because C. elegans mitochondrial genes do not share a single prefix.
     """
+    if mt_startswith == 'auto':
+        raise ValueError(
+            "mt_startswith='auto' was not resolved before calling _mt_mask. "
+            "Call _detect_mt_prefix() first."
+        )
     if isinstance(var_names, list):
         var_names = pd.Index(var_names)
     if mt_startswith in _CE_MT_PREFIXES:

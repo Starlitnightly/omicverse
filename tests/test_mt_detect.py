@@ -126,6 +126,23 @@ class TestMtMask:
         mask = _mt_mask(genes, "MT-")
         assert list(mask) == [True, False]
 
+    def test_explicit_override(self):
+        """Explicit mt_startswith bypasses auto-detection."""
+        genes = pd.Index(["Gapdh", "mt-Co1", "mt-Co2", "MT-CO1"])
+        mask = _mt_mask(genes, "MT-")
+        assert list(mask) == [False, False, False, True]
+
+    def test_auto_raises(self):
+        """Unresolved 'auto' raises ValueError."""
+        with pytest.raises(ValueError, match="auto"):
+            _mt_mask(pd.Index(["MT-CO1"]), "auto")
+
+    def test_nduo_expands_to_all_ce(self):
+        """User passing 'nduo-' also matches ctc- and ctb-."""
+        genes = pd.Index(["ctc-1", "nduo-2", "ctb-1", "unc-54"])
+        mask = _mt_mask(genes, "nduo-")
+        assert list(mask) == [True, True, True, False]
+
 
 class TestQcAutoMt:
     """Integration test: verify auto-detection works end-to-end."""
