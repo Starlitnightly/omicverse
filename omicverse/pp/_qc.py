@@ -404,24 +404,10 @@ def mads_test(meta, cov, nmads=5, lt=None, batch_key=None):
             
         return result
 
-@monitor
-@register_function(
-    aliases=["质控", "qc", "quality_control", "质量控制"],
-    category="preprocessing",
-    description="Perform comprehensive quality control on single-cell data. For seurat mode, use tresh dict with keys: 'mito_perc', 'nUMIs', 'detected_genes'",
-    prerequisites={},
-    requires={},
-    produces={
-        'obs': ['n_genes', 'n_counts', 'pct_counts_mt'],
-        'var': ['mt', 'n_cells']
-    },
-    auto_fix='none',
-    examples=[
-        "ov.pp.qc(adata, tresh={'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250})",
-        "ov.pp.qc(adata, mode='mads', nmads=5, doublets=True)"
-    ],
-    related=["preprocess", "filter_cells", "filter_genes", "scrublet"]
-)
+# C. elegans mitochondrial gene prefixes (no single shared prefix)
+_CE_MT_PREFIXES = ('ctc-', 'nduo-', 'ctb-')
+
+
 def _detect_mt_prefix(var_names) -> str:
     """Auto-detect mitochondrial gene prefix from variable names.
 
@@ -440,8 +426,6 @@ def _detect_mt_prefix(var_names) -> str:
     if isinstance(var_names, list):
         var_names = pd.Index(var_names)
 
-    # Candidates ordered roughly by prevalence.
-    # Each entry is (prefix, species_hint).
     candidates = [
         'MT-',    # Human / pig / cattle / most vertebrates
         'mt-',    # Mouse / rat / zebrafish
@@ -460,32 +444,34 @@ def _detect_mt_prefix(var_names) -> str:
 
     # C. elegans: mitochondrial genes use heterogeneous names
     # (ctc-1, ctc-2, ctc-3, nduo-1 … nduo-6, ctb-1, etc.)
+    # Note: 'ctc-' could appear in other contexts (e.g. clone names),
+    # but this check only runs when no standard MT prefix was found.
     if best_count == 0:
-        ce_prefixes = ('ctc-', 'nduo-', 'ctb-')
-        ce_count = int(var_names.str.startswith(ce_prefixes).sum())
+        ce_count = int(var_names.str.startswith(_CE_MT_PREFIXES).sum())
         if ce_count > 0:
             best_prefix = 'ctc-'  # representative prefix
             best_count = ce_count
 
     if best_count == 0:
-        # Try case-insensitive as last resort
+        # Case-insensitive fallback as last resort.
+        # [:3] is safe because all MT- variants are exactly 3 characters.
         count = int(var_names.str.upper().str.startswith('MT-').sum())
         if count > 0:
             mt_mask = var_names.str.upper().str.startswith('MT-')
             first_mt = var_names[mt_mask][0]
-            # Extract the prefix including separator (e.g. 'mT-')
             best_prefix = first_mt[:3]
             best_count = count
 
     return best_prefix
 
 
-# C. elegans mitochondrial gene prefixes (no single shared prefix)
-_CE_MT_PREFIXES = ('ctc-', 'nduo-', 'ctb-')
-
-
 def _mt_mask(var_names, mt_startswith):
-    """Return boolean mask for mitochondrial genes, handling multi-prefix species."""
+    """Return boolean mask for mitochondrial genes, handling multi-prefix species.
+
+    When ``mt_startswith`` is any of the C. elegans prefixes (``'ctc-'``,
+    ``'nduo-'``, ``'ctb-'``), all three prefixes are matched together
+    because C. elegans mitochondrial genes do not share a single prefix.
+    """
     if isinstance(var_names, list):
         var_names = pd.Index(var_names)
     if mt_startswith in _CE_MT_PREFIXES:
@@ -493,6 +479,24 @@ def _mt_mask(var_names, mt_startswith):
     return var_names.str.startswith(mt_startswith)
 
 
+@monitor
+@register_function(
+    aliases=["质控", "qc", "quality_control", "质量控制"],
+    category="preprocessing",
+    description="Perform comprehensive quality control on single-cell data. For seurat mode, use tresh dict with keys: 'mito_perc', 'nUMIs', 'detected_genes'",
+    prerequisites={},
+    requires={},
+    produces={
+        'obs': ['n_genes', 'n_counts', 'pct_counts_mt'],
+        'var': ['mt', 'n_cells']
+    },
+    auto_fix='none',
+    examples=[
+        "ov.pp.qc(adata, tresh={'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250})",
+        "ov.pp.qc(adata, mode='mads', nmads=5, doublets=True)"
+    ],
+    related=["preprocess", "filter_cells", "filter_genes", "scrublet"]
+)
 def qc(adata,**kwargs):
     r'''
     Perform quality control on a dictionary of AnnData objects.
