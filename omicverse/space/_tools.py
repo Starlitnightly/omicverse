@@ -1124,7 +1124,7 @@ def bin2cell(
         labels_key="labels_joint",
         spatial_keys=["spatial"],
         diameter_scale_factor=None,
-        add_geometry: bool = False,
+        add_geometry: bool = True,
         geometry_key: str = "geometry",
         geometry_spatial_key: str = "spatial",
         geometry_force_polygon: bool = False,

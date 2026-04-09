@@ -2051,61 +2051,7 @@ def bin_to_cell(adata, labels_key="labels_expanded",
         if pbar is not None:
             pbar.close()
     
-    # Generate cell boundary polygons from bin coordinates
-    # Stores WKT geometry in obs["geometry"] matching read_visium_hd_seg() format
-    try:
-        _generate_cell_polygons(cell_adata, adata, labels_key, labels_all, valid_idx, rows, unique_labels)
-    except Exception as e:
-        import warnings
-        warnings.warn(f"Could not generate cell boundary polygons: {e}")
-
     return cell_adata
-
-
-def _generate_cell_polygons(cell_adata, bin_adata, labels_key, labels_all, valid_idx, rows, unique_labels):
-    """Build cell boundary polygons from bin spatial coordinates.
-
-    Uses convex hull of each cell's bin positions. For cells with fewer
-    than 3 bins, falls back to a circle approximation. Stores WKT-encoded
-    polygon strings in ``cell_adata.obs["geometry"]``.
-    """
-    from scipy.spatial import ConvexHull
-
-    coords = np.asarray(bin_adata.obsm["spatial"])[valid_idx]
-    n_cells = len(unique_labels)
-    geometries = [""] * n_cells
-
-    for i in range(n_cells):
-        cell_mask = rows == i
-        cell_coords = coords[cell_mask]
-        n_pts = cell_coords.shape[0]
-
-        if n_pts == 0:
-            continue
-
-        if n_pts >= 3:
-            try:
-                hull = ConvexHull(cell_coords)
-                hull_pts = cell_coords[hull.vertices]
-                # Close the polygon
-                pts = np.vstack([hull_pts, hull_pts[:1]])
-                coords_str = ", ".join(f"{x:.2f} {y:.2f}" for x, y in pts)
-                geometries[i] = f"POLYGON (({coords_str}))"
-                continue
-            except Exception:
-                pass
-
-        # Fallback: circle from centroid + radius
-        cx, cy = cell_coords.mean(axis=0)
-        radius = max(np.sqrt(n_pts / np.pi), 1.0)
-        theta = np.linspace(0, 2 * np.pi, 24, endpoint=False)
-        xs = cx + radius * np.cos(theta)
-        ys = cy + radius * np.sin(theta)
-        coords_str = ", ".join(f"{x:.2f} {y:.2f}" for x, y in zip(xs, ys))
-        coords_str += f", {xs[0]:.2f} {ys[0]:.2f}"
-        geometries[i] = f"POLYGON (({coords_str}))"
-
-    cell_adata.obs["geometry"] = geometries
 
 
 def _add_segmentation_to_adata(cell_adata, original_adata, labels_key, segmentation_key):
