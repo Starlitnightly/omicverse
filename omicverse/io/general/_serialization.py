@@ -1,6 +1,45 @@
 import os
+import contextlib
 
 from ..._registry import register_function
+
+
+@contextlib.contextmanager
+def _patch_categorical_setstate():
+    """Temporarily patch ``Categorical.__setstate__`` to tolerate old pickle formats.
+
+    Older pandas versions serialised ``Categorical`` as a ``(dtype, codes)``
+    tuple.  Newer pandas (≥ 2.x) dropped that path and raises
+    ``NotImplementedError``.  This context-manager installs a shim that
+    reconstructs the ``Categorical`` from the tuple when needed, and restores
+    the original method on exit.
+    """
+    try:
+        from pandas import Categorical, CategoricalDtype
+    except ImportError:
+        yield
+        return
+
+    _orig = Categorical.__setstate__
+
+    def _compat_setstate(self, state):
+        if isinstance(state, tuple) and len(state) == 2:
+            dtype, codes = state
+            if isinstance(dtype, CategoricalDtype):
+                import numpy as np
+                # Reconstruct via dict-based __setstate__ which pandas 2.x supports
+                dict_state = {
+                    "_dtype": dtype,
+                    "_ndarray": np.asarray(codes),
+                }
+                return _orig(self, dict_state)
+        return _orig(self, state)
+
+    Categorical.__setstate__ = _compat_setstate
+    try:
+        yield
+    finally:
+        Categorical.__setstate__ = _orig
 
 
 @register_function(
@@ -85,8 +124,28 @@ def load(path, backend=None):
     """
     print("📂 Load Operation:")
     print(f"   Source path: {path}")
-    if backend is None:
-        try:
+    with _patch_categorical_setstate():
+        if backend is None:
+            try:
+                import pickle
+                print("   Using: pickle")
+                with open(path, 'rb') as f:
+                    data = pickle.load(f)
+                print("   ✅ Successfully loaded!")
+                print(f"   Loaded object type: {type(data).__name__}")
+                print("─" * 60)
+                return data
+            except Exception:
+                import cloudpickle
+                print("   Pickle failed, switching to: cloudpickle")
+                with open(path, 'rb') as f:
+                    data = cloudpickle.load(f)
+                print("   ✅ Successfully loaded using cloudpickle!")
+                print(f"   Loaded object type: {type(data).__name__}")
+                print("─" * 60)
+                return data
+
+        if backend == 'pickle':
             import pickle
             print("   Using: pickle")
             with open(path, 'rb') as f:
@@ -95,34 +154,15 @@ def load(path, backend=None):
             print(f"   Loaded object type: {type(data).__name__}")
             print("─" * 60)
             return data
-        except Exception:
+
+        if backend == 'cloudpickle':
             import cloudpickle
-            print("   Pickle failed, switching to: cloudpickle")
+            print("   Using: cloudpickle")
             with open(path, 'rb') as f:
                 data = cloudpickle.load(f)
-            print("   ✅ Successfully loaded using cloudpickle!")
+            print("   ✅ Successfully loaded!")
             print(f"   Loaded object type: {type(data).__name__}")
             print("─" * 60)
             return data
-
-    if backend == 'pickle':
-        import pickle
-        print("   Using: pickle")
-        with open(path, 'rb') as f:
-            data = pickle.load(f)
-        print("   ✅ Successfully loaded!")
-        print(f"   Loaded object type: {type(data).__name__}")
-        print("─" * 60)
-        return data
-
-    if backend == 'cloudpickle':
-        import cloudpickle
-        print("   Using: cloudpickle")
-        with open(path, 'rb') as f:
-            data = cloudpickle.load(f)
-        print("   ✅ Successfully loaded!")
-        print(f"   Loaded object type: {type(data).__name__}")
-        print("─" * 60)
-        return data
 
     raise ValueError(f"Invalid backend: {backend}")
