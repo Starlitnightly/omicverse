@@ -1459,6 +1459,33 @@ def sync_visium_hd_seg_geometries(adata, sample=None):
         )
 
     return adata
-    
-    
-    
+
+
+@register_function(
+    aliases=["export_spaceranger", "write_cellseg", "导出spaceranger", "保存细胞分割结果"],
+    category="space",
+    description="Export cell-level AnnData to SpaceRanger v4-compatible directory structure",
+    examples=[
+        "ov.space.write_visium_hd_cellseg(cdata, 'output/segmented_outputs')",
+    ],
+    related=["space.bin2cell", "io.spatial.read_visium_hd_seg"],
+)
+def write_visium_hd_cellseg(adata, path, sample=None):
+    """Export cell-level AnnData to SpaceRanger v4-compatible directory.
+
+    Creates ``filtered_feature_cell_matrix.h5``,
+    ``graphclust_annotated_cell_segmentations.geojson``, and ``spatial/``
+    with images and scalefactors.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Cell-level AnnData from ``bin2cell()``.
+    path : str or Path
+        Output directory.
+    sample : str, optional
+        Sample key in ``adata.uns["spatial"]``.
+    """
+    from ..io.spatial import write_visium_hd_cellseg as _write
+    _write(adata, path, sample=sample)
+
