@@ -422,6 +422,77 @@ def mads_test(meta, cov, nmads=5, lt=None, batch_key=None):
     ],
     related=["preprocess", "filter_cells", "filter_genes", "scrublet"]
 )
+def _detect_mt_prefix(var_names) -> str:
+    """Auto-detect mitochondrial gene prefix from variable names.
+
+    Checks common prefixes across species and returns the one with the
+    most matches.  Falls back to ``'MT-'`` if nothing is found.
+
+    Supported species / prefixes:
+
+    * Human, pig, cattle and most vertebrates: ``MT-``
+    * Mouse, rat, zebrafish: ``mt-``
+    * Some mixed annotations: ``Mt-``
+    * Drosophila: ``mt:``
+    * Arabidopsis thaliana: ``ATMG``
+    * C. elegans: ``ctc-`` and ``nduo-`` (checked as a group)
+    """
+    if isinstance(var_names, list):
+        var_names = pd.Index(var_names)
+
+    # Candidates ordered roughly by prevalence.
+    # Each entry is (prefix, species_hint).
+    candidates = [
+        'MT-',    # Human / pig / cattle / most vertebrates
+        'mt-',    # Mouse / rat / zebrafish
+        'Mt-',    # Some annotations
+        'mt:',    # Drosophila (e.g. mt:CoI, mt:ND1)
+        'ATMG',   # Arabidopsis thaliana mitochondrial genes
+    ]
+
+    best_prefix = 'MT-'
+    best_count = 0
+    for prefix in candidates:
+        count = int(var_names.str.startswith(prefix).sum())
+        if count > best_count:
+            best_count = count
+            best_prefix = prefix
+
+    # C. elegans: mitochondrial genes use heterogeneous names
+    # (ctc-1, ctc-2, ctc-3, nduo-1 … nduo-6, ctb-1, etc.)
+    if best_count == 0:
+        ce_prefixes = ('ctc-', 'nduo-', 'ctb-')
+        ce_count = int(var_names.str.startswith(ce_prefixes).sum())
+        if ce_count > 0:
+            best_prefix = 'ctc-'  # representative prefix
+            best_count = ce_count
+
+    if best_count == 0:
+        # Try case-insensitive as last resort
+        count = int(var_names.str.upper().str.startswith('MT-').sum())
+        if count > 0:
+            mt_mask = var_names.str.upper().str.startswith('MT-')
+            first_mt = var_names[mt_mask][0]
+            # Extract the prefix including separator (e.g. 'mT-')
+            best_prefix = first_mt[:3]
+            best_count = count
+
+    return best_prefix
+
+
+# C. elegans mitochondrial gene prefixes (no single shared prefix)
+_CE_MT_PREFIXES = ('ctc-', 'nduo-', 'ctb-')
+
+
+def _mt_mask(var_names, mt_startswith):
+    """Return boolean mask for mitochondrial genes, handling multi-prefix species."""
+    if isinstance(var_names, list):
+        var_names = pd.Index(var_names)
+    if mt_startswith in _CE_MT_PREFIXES:
+        return var_names.str.startswith(_CE_MT_PREFIXES)
+    return var_names.str.startswith(mt_startswith)
+
+
 def qc(adata,**kwargs):
     r'''
     Perform quality control on a dictionary of AnnData objects.
@@ -442,7 +513,9 @@ def qc(adata,**kwargs):
         tresh : A dictionary of QC thresholds. The keys should be 'mito_perc',
         'nUMIs', and 'detected_genes'.
             Only used if mode is 'seurat'. Default is None.
-        mt_startswith : The prefix of mitochondrial genes. Default is 'MT-'.
+        mt_startswith : The prefix of mitochondrial genes. Default is 'auto',
+            which automatically detects the prefix (e.g. 'MT-' for human,
+            'mt-' for mouse). Set explicitly (e.g. 'MT-') to override.
         mt_genes : The list of mitochondrial genes. Default is None.
         if mt_genes is not None, mt_startswith will be ignored.
 
@@ -453,6 +526,10 @@ def qc(adata,**kwargs):
         >>> import omicverse as ov
         >>> adata = ov.pp.qc(adata, tresh={'mito_perc': 0.2, 'nUMIs': 500, 'detected_genes': 250})
         >>> adata = ov.pp.qc(adata, mode='mads', nmads=5, doublets=True)
+        >>> # Auto-detects 'mt-' for mouse data
+        >>> adata = ov.pp.qc(adata)
+        >>> # Explicit prefix
+        >>> adata = ov.pp.qc(adata, mt_startswith='mt-')
 
     '''
 
@@ -473,7 +550,7 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
        max_cells_ratio=1,max_genes_ratio=1,
        batch_key=None,doublets=True,doublets_method='scrublet',
        filter_doublets=True,
-       path_viz=None, tresh=None,mt_startswith='MT-',mt_genes=None,
+       path_viz=None, tresh=None,mt_startswith='auto',mt_genes=None,
        ribo_startswith=("RPS", "RPL"),ribo_genes=None,
        hb_startswith="^HB[^(P)]",hb_genes=None,
        use_gpu=True,batch_wise_mad=None):
@@ -520,6 +597,10 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
     print(f"   {Colors.CYAN}Dataset shape: {Colors.BOLD}{adata.shape[0]:,} cells × {adata.shape[1]:,} genes{Colors.ENDC}")
     print(f"   {Colors.BLUE}QC mode: {Colors.BOLD}{mode}{Colors.ENDC}")
     print(f"   {Colors.BLUE}Doublet detection: {Colors.BOLD}{doublets_method if doublets else 'disabled'}{Colors.ENDC}")
+    # Auto-detect mitochondrial gene prefix
+    if mt_startswith == 'auto' and mt_genes is None:
+        mt_startswith = _detect_mt_prefix(adata.var_names)
+        print(f"   {Colors.CYAN}Auto-detected mitochondrial prefix: {Colors.BOLD}'{mt_startswith}'{Colors.ENDC}")
     print(f"   {Colors.BLUE}Mitochondrial genes: {Colors.BOLD}{mt_startswith if mt_genes is None else 'custom list'}{Colors.ENDC}")
 
     # QC metrics
@@ -535,7 +616,7 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
             var_names = pd.Index(adata.var_names)
         else:
             var_names = adata.var_names
-        adata.var["mt"] = var_names.str.startswith(mt_startswith)
+        adata.var["mt"] = _mt_mask(var_names, mt_startswith)
         mt_genes_found = sum(adata.var["mt"])
     # print(f"   {Colors.CYAN}Mitochondrial genes (prefix '{mt_startswith}'): {Colors.BOLD}{mt_genes_found}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
 
@@ -806,12 +887,12 @@ def qc_cpu(
     filter_doublets: Optional[bool] = True,
     path_viz: Optional[str] = None, 
     tresh: Optional[dict] = None,
-    mt_startswith: Optional[str] = 'MT-',
+    mt_startswith: Optional[str] = 'auto',
     mt_genes: Optional[list] = None,
     ribo_startswith: Optional[tuple] = ("RPS", "RPL"),
-    ribo_genes: Optional[list] = None, 
+    ribo_genes: Optional[list] = None,
     hb_startswith: Optional[str] = "^HB[^(P)]",
-    hb_genes: Optional[list] = None, 
+    hb_genes: Optional[list] = None,
     **kwargs
 ):
     r"""
@@ -854,6 +935,11 @@ def qc_cpu(
     # with PdfPages(path_viz + 'original_QC_by_sample.pdf') as pdf:
     removed_cells = []
 
+    # Auto-detect mitochondrial gene prefix
+    if mt_startswith == 'auto' and mt_genes is None:
+        mt_startswith = _detect_mt_prefix(adata.var_names)
+        print(f"   {Colors.CYAN}Auto-detected mitochondrial prefix: {Colors.BOLD}'{mt_startswith}'{Colors.ENDC}")
+
     # QC metrics
     print(f"\n{Colors.HEADER}{Colors.BOLD}📊 Step 1: Calculating QC Metrics{Colors.ENDC}")
     adata.var_names_make_unique()
@@ -867,13 +953,13 @@ def qc_cpu(
             var_names = pd.Index(adata.var_names)
         else:
             var_names = adata.var_names
-        adata.var["mt"] = var_names.str.startswith(mt_startswith)
+        adata.var["mt"] = _mt_mask(var_names, mt_startswith)
         mt_genes_found = sum(adata.var["mt"])
     # print(f"   {Colors.CYAN}Mitochondrial genes (prefix '{mt_startswith}'): {Colors.BOLD}{mt_genes_found}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
-    
+
     if ribo_genes is not None:
-        adata.var["ribo"] = False 
-        adata.var.loc[list(set(adata.var_names) & set(ribo_genes)),'ribo']=True 
+        adata.var["ribo"] = False
+        adata.var.loc[list(set(adata.var_names) & set(ribo_genes)),'ribo']=True
         ribo_genes_found = sum(adata.var["ribo"]) 
     # print(f"   {Colors.CYAN}Ribosomal genes: {Colors.BOLD}{ribo_genes_found}/{len(ribo_genes)}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
     else:
@@ -1128,7 +1214,7 @@ def qc_gpu(adata, mode='seurat',
        max_cells_ratio=1,max_genes_ratio=1,
        batch_key=None,doublets=True,doublets_method='scrublet',
        filter_doublets=True,
-       path_viz=None, tresh=None,mt_startswith='MT-',mt_genes=None,
+       path_viz=None, tresh=None,mt_startswith='auto',mt_genes=None,
        ribo_startswith=("RPS", "RPL"),ribo_genes=None,
        hb_startswith="^HB[^(P)]",hb_genes=None):
     '''
@@ -1146,11 +1232,15 @@ def qc_gpu(adata, mode='seurat',
     print(f"   {Colors.CYAN}Dataset shape: {Colors.BOLD}{adata.shape[0]:,} cells × {adata.shape[1]:,} genes{Colors.ENDC}")
     print(f"   {Colors.BLUE}QC mode: {Colors.BOLD}{mode}{Colors.ENDC}")
     print(f"   {Colors.BLUE}Doublet detection: {Colors.BOLD}{doublets_method if doublets else 'disabled'}{Colors.ENDC}")
+    # Auto-detect mitochondrial gene prefix
+    if mt_startswith == 'auto' and mt_genes is None:
+        mt_startswith = _detect_mt_prefix(adata.var_names)
+        print(f"   {Colors.CYAN}Auto-detected mitochondrial prefix: {Colors.BOLD}'{mt_startswith}'{Colors.ENDC}")
     print(f"   {Colors.BLUE}Mitochondrial genes: {Colors.BOLD}{mt_startswith if mt_genes is None else 'custom list'}{Colors.ENDC}")
-    
+
     print(f"   {Colors.GREEN}{EMOJI['gpu']} Loading data to GPU...{Colors.ENDC}")
     rsc.get.anndata_to_GPU(adata)
-    
+
     # QC metrics
     print(f"\n{Colors.HEADER}{Colors.BOLD}📊 Step 1: Calculating QC Metrics{Colors.ENDC}")
     adata.var_names_make_unique()
@@ -1160,7 +1250,11 @@ def qc_gpu(adata, mode='seurat',
         mt_genes_found = sum(adata.var['mt'])
     # print(f"   {Colors.CYAN}Custom mitochondrial genes: {Colors.BOLD}{mt_genes_found}/{len(mt_genes)}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
     else:
-        rsc.pp.flag_gene_family(adata, gene_family_name="mt", gene_family_prefix=mt_startswith)
+        if mt_startswith in _CE_MT_PREFIXES:
+            # C. elegans: multiple prefixes, flag manually
+            adata.var["mt"] = _mt_mask(adata.var_names, mt_startswith)
+        else:
+            rsc.pp.flag_gene_family(adata, gene_family_name="mt", gene_family_prefix=mt_startswith)
         mt_genes_found = sum(adata.var["mt"])
     # print(f"   {Colors.CYAN}Mitochondrial genes (prefix '{mt_startswith}'): {Colors.BOLD}{mt_genes_found}{Colors.ENDC}{Colors.CYAN} found{Colors.ENDC}")
 
