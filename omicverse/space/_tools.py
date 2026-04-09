@@ -885,12 +885,18 @@ def visium_10x_hd_cellpose_he(
     """
     from ..external.bin2cell import destripe, scaled_he_image, stardist, insert_labels
 
-    if not os.path.exists(he_save_path):    
+    spatial_key = f"spatial_cropped_{buffer}_buffer"
+    if not os.path.exists(he_save_path):
         destripe(adata)
         scaled_he_image(adata, mpp=mpp, buffer=buffer, save_path=he_save_path,
                         backend=backend)
     else:
-        print(f"he_save_path {he_save_path} already exists, skipping destripe and scaled_he_image")
+        print(f"he_save_path {he_save_path} already exists, skipping image generation")
+        # destripe and scaled_he_image create spatial metadata needed downstream
+        if spatial_key not in adata.obsm:
+            destripe(adata)
+            scaled_he_image(adata, mpp=mpp, buffer=buffer, save_path=None,
+                            backend=backend)
     stardist(image_path=he_save_path    , 
              labels_npz_path=he_save_path.replace(".tiff", ".npz"), 
              stardist_model="2D_versatile_he", 

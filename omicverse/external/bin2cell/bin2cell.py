@@ -1166,6 +1166,12 @@ def destripe(adata, quantile=0.99, counts_key="n_counts", factor_key="destripe_f
         Whether to use the computed adjusted count total to adjust the counts in 
         ``adata.X``.
     '''
+    # Ensure counts_key exists in obs (compute from X if missing)
+    if counts_key not in adata.obs.columns:
+        if scipy.sparse.issparse(adata.X):
+            adata.obs[counts_key] = np.asarray(adata.X.sum(axis=1)).flatten()
+        else:
+            adata.obs[counts_key] = np.asarray(adata.X.sum(axis=1)).flatten()
     #apply destriping via sequential quantile scaling
     #get specified quantile per row
     quant = adata.obs.groupby("array_row")[counts_key].quantile(quantile)
@@ -1704,7 +1710,12 @@ def insert_labels(adata, labels_npz_path, basis="spatial", spatial_key="spatial"
            )
     #pull out the cell labels for the coordinates, can just index the sparse matrix with them
     #insert into bin object, need to turn it into a 1d numpy array from a 1d numpy matrix first
-    adata.obs.loc[mask, labels_key] = np.asarray(labels_sparse[coords[mask,0], coords[mask,1]]).flatten()
+    label_vals = labels_sparse[coords[mask,0], coords[mask,1]]
+    if scipy.sparse.issparse(label_vals):
+        label_vals = np.asarray(label_vals.todense()).flatten()
+    else:
+        label_vals = np.asarray(label_vals).flatten()
+    adata.obs.loc[mask, labels_key] = label_vals
 
 def expand_labels(adata, labels_key="labels", expanded_labels_key="labels_expanded", algorithm="max_bin_distance", max_bin_distance=2, volume_ratio=4, k=4, subset_pca=True):
     '''
@@ -1988,7 +1999,8 @@ def bin_to_cell(adata, labels_key="labels_expanded",
             X = X.tocsr()
         _tick()
 
-        cell_names = unique_labels.astype(str).tolist()
+        # Format cell IDs to match SpaceRanger v4 convention: cellid_XXXXXXXXX-1
+        cell_names = [f"cellid_{int(lbl):09d}-1" for lbl in unique_labels]
         cell_adata = ad.AnnData(X, var=adata.var)
         cell_adata.obs_names = cell_names
         cell_adata.obs["object_id"] = unique_labels.astype(np.int64)
@@ -2039,9 +2051,61 @@ def bin_to_cell(adata, labels_key="labels_expanded",
         if pbar is not None:
             pbar.close()
     
-    # Generate and store segmentation mask for cell boundary visualization
+    # Generate cell boundary polygons from bin coordinates
+    # Stores WKT geometry in obs["geometry"] matching read_visium_hd_seg() format
+    try:
+        _generate_cell_polygons(cell_adata, adata, labels_key, labels_all, valid_idx, rows, unique_labels)
+    except Exception as e:
+        import warnings
+        warnings.warn(f"Could not generate cell boundary polygons: {e}")
 
     return cell_adata
+
+
+def _generate_cell_polygons(cell_adata, bin_adata, labels_key, labels_all, valid_idx, rows, unique_labels):
+    """Build cell boundary polygons from bin spatial coordinates.
+
+    Uses convex hull of each cell's bin positions. For cells with fewer
+    than 3 bins, falls back to a circle approximation. Stores WKT-encoded
+    polygon strings in ``cell_adata.obs["geometry"]``.
+    """
+    from scipy.spatial import ConvexHull
+
+    coords = np.asarray(bin_adata.obsm["spatial"])[valid_idx]
+    n_cells = len(unique_labels)
+    geometries = [""] * n_cells
+
+    for i in range(n_cells):
+        cell_mask = rows == i
+        cell_coords = coords[cell_mask]
+        n_pts = cell_coords.shape[0]
+
+        if n_pts == 0:
+            continue
+
+        if n_pts >= 3:
+            try:
+                hull = ConvexHull(cell_coords)
+                hull_pts = cell_coords[hull.vertices]
+                # Close the polygon
+                pts = np.vstack([hull_pts, hull_pts[:1]])
+                coords_str = ", ".join(f"{x:.2f} {y:.2f}" for x, y in pts)
+                geometries[i] = f"POLYGON (({coords_str}))"
+                continue
+            except Exception:
+                pass
+
+        # Fallback: circle from centroid + radius
+        cx, cy = cell_coords.mean(axis=0)
+        radius = max(np.sqrt(n_pts / np.pi), 1.0)
+        theta = np.linspace(0, 2 * np.pi, 24, endpoint=False)
+        xs = cx + radius * np.cos(theta)
+        ys = cy + radius * np.sin(theta)
+        coords_str = ", ".join(f"{x:.2f} {y:.2f}" for x, y in zip(xs, ys))
+        coords_str += f", {xs[0]:.2f} {ys[0]:.2f}"
+        geometries[i] = f"POLYGON (({coords_str}))"
+
+    cell_adata.obs["geometry"] = geometries
 
 
 def _add_segmentation_to_adata(cell_adata, original_adata, labels_key, segmentation_key):
