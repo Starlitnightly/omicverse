@@ -598,24 +598,25 @@ def clusters(adata,
             except (ImportError, AttributeError):
                 _orig_repr = None
 
-            results_df = run_banksy_multiparam(
-                adata,
-                banksy_dict,
-                lambda_list=methods_kwargs['Banksy']['lambda_list'],
-                resolutions=methods_kwargs['Banksy']['resolutions'],
-                color_list=palette_112,
-                annotation_key=None,
-                max_m=methods_kwargs['Banksy']['max_m'],
-                filepath=methods_kwargs['Banksy']['filepath'],
-                key=coord_keys,
-                #annotation_key='banksy_label',
-                add_nonspatial=methods_kwargs['Banksy']['add_nonspatial'],
-                variance_balance=methods_kwargs['Banksy']['variance_balance'],
-                match_labels=methods_kwargs['Banksy']['match_labels'],
-            )
-
-            if _orig_repr is not None:
-                Label.__repr__ = _orig_repr
+            try:
+                results_df = run_banksy_multiparam(
+                    adata,
+                    banksy_dict,
+                    lambda_list=methods_kwargs['Banksy']['lambda_list'],
+                    resolutions=methods_kwargs['Banksy']['resolutions'],
+                    color_list=palette_112,
+                    annotation_key=None,
+                    max_m=methods_kwargs['Banksy']['max_m'],
+                    filepath=methods_kwargs['Banksy']['filepath'],
+                    key=coord_keys,
+                    #annotation_key='banksy_label',
+                    add_nonspatial=methods_kwargs['Banksy']['add_nonspatial'],
+                    variance_balance=methods_kwargs['Banksy']['variance_balance'],
+                    match_labels=methods_kwargs['Banksy']['match_labels'],
+                )
+            finally:
+                if _orig_repr is not None:
+                    Label.__repr__ = _orig_repr
             result_keys=[i for i in results_df['adata'].keys()]
             for key in result_keys:
                 adata.obsm[f'X_banksy_{key}']=results_df['adata'][key].obsm['reduced_pc_20']

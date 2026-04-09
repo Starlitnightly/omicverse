@@ -17,7 +17,6 @@ import pandas as pd
 from sklearn.metrics import fowlkes_mallows_score
 
 from ._gmm import Cluster
-from ._utils import AnyRandom
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +33,10 @@ class ClusterAutoK:
     ----------
     n_clusters
         Range of K values to test. Either a tuple ``(min, max)``
-        (inclusive) or a list of specific K values.
+        (inclusive) or a list of specific K values.  When a list is
+        given, only those exact K values are tested (the list must be
+        contiguous — for non-contiguous values, use a tuple range
+        instead).
     max_runs
         Maximum number of clustering repetitions per K.
     convergence_tol
@@ -59,6 +61,13 @@ class ClusterAutoK:
             self._k_range = list(range(n_clusters[0] - 1, n_clusters[1] + 2))
         else:
             k_sorted = sorted(n_clusters)
+            # Validate contiguity
+            expected = list(range(k_sorted[0], k_sorted[-1] + 1))
+            if k_sorted != expected:
+                raise ValueError(
+                    f"n_clusters list must be contiguous (got {n_clusters}). "
+                    f"Use a tuple (min, max) for range-based selection."
+                )
             self._k_range = list(range(k_sorted[0] - 1, k_sorted[-1] + 2))
 
         self._inner_range = self._k_range[1:-1]  # reported K values
@@ -69,39 +78,45 @@ class ClusterAutoK:
 
         # Filled after fit
         self._labels: dict[int, list[np.ndarray]] = {k: [] for k in self._k_range}
-        self._stability: np.ndarray | None = None
+        self.stability_: np.ndarray | None = None
         self._models: dict[int, Cluster] = {}
 
     @property
     def best_k(self) -> int:
         """K with highest mean stability."""
-        if self._stability is None:
+        if self.stability_ is None:
             raise RuntimeError("Call `fit` first.")
-        idx = int(np.argmax(self._stability.mean(axis=0)))
+        idx = int(np.argmax(self.stability_.mean(axis=0)))
         return self._inner_range[idx]
 
     @property
     def peaks(self) -> np.ndarray:
         """All K values at local stability peaks."""
-        if self._stability is None:
+        if self.stability_ is None:
             raise RuntimeError("Call `fit` first.")
         from scipy.signal import find_peaks
-        mean_stab = self._stability.mean(axis=0)
+        mean_stab = self.stability_.mean(axis=0)
         peak_idx, _ = find_peaks(mean_stab)
         return np.array([self._inner_range[i] for i in peak_idx])
+
+    # Keep backward compat for code that accessed _stability directly
+    @property
+    def _stability(self) -> np.ndarray | None:
+        return self.stability_
 
     def fit(self, adata: ad.AnnData, use_rep: str = "X_cellcharter"):
         """Run repeated clustering for each K and compute stability."""
         prev_stability = None
+        seed = self.model_params.get("random_state", 0)
+        non_seed_params = {k: v for k, v in self.model_params.items() if k != "random_state"}
 
         for run in range(self.max_runs):
             # Cluster for each K
             for k in self._k_range:
-                seed = self.model_params.get("random_state", 0)
                 model = Cluster(
                     n_clusters=k,
                     random_state=seed + run * 1000 + k,
-                    **{k_: v for k_, v in self.model_params.items() if k_ != "random_state"},
+                    **non_seed_params,
                 )
                 model.fit(adata, use_rep=use_rep)
                 labels = model.predict(adata, use_rep=use_rep)
@@ -113,7 +128,7 @@ class ClusterAutoK:
                 continue
 
             stability = self._compute_stability()
-            self._stability = stability
+            self.stability_ = stability
 
             # Early stopping via MAPE
             if prev_stability is not None and stability.shape[0] >= 2:
@@ -130,11 +145,11 @@ class ClusterAutoK:
         return self
 
     def _compute_stability(self) -> np.ndarray:
-        """Compute mirrored stability matrix (runs x inner_K)."""
+        """Compute normalised stability matrix (runs x inner_K)."""
         n_inner = len(self._inner_range)
         n_runs = min(len(self._labels[k]) for k in self._k_range)
 
-        # For each pair of runs, compute similarity between K and K±1
+        # For each run, compute similarity between K and K±1
         stab_down = np.zeros((n_runs, n_inner))  # K vs K-1
         stab_up = np.zeros((n_runs, n_inner))    # K vs K+1
 
@@ -149,12 +164,18 @@ class ClusterAutoK:
                     self._labels[k][r], self._labels[k_next][r]
                 )
 
-        # Mirror: stability[j] = stab_down[j] + stab_up[j-1] (when applicable)
+        # Average similarity to both neighbours, normalised by number of terms
         stability = np.zeros((n_runs, n_inner))
+        count = np.ones(n_inner)
         for j in range(n_inner):
             stability[:, j] = stab_down[:, j]
             if j > 0:
                 stability[:, j] += stab_up[:, j - 1]
+                count[j] += 1
+            if j < n_inner - 1:
+                stability[:, j] += stab_up[:, j]
+                count[j] += 1
+        stability /= count
 
         return stability
 
@@ -197,12 +218,12 @@ def plot_autok_stability(
     """
     import matplotlib.pyplot as plt
 
-    if autok._stability is None:
+    if autok.stability_ is None:
         raise RuntimeError("ClusterAutoK has not been fitted yet.")
 
     k_vals = autok._inner_range
-    mean_stab = autok._stability.mean(axis=0)
-    std_stab = autok._stability.std(axis=0)
+    mean_stab = autok.stability_.mean(axis=0)
+    std_stab = autok.stability_.std(axis=0)
 
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
