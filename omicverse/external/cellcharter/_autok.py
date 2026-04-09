@@ -33,10 +33,8 @@ class ClusterAutoK:
     ----------
     n_clusters
         Range of K values to test. Either a tuple ``(min, max)``
-        (inclusive) or a list of specific K values.  When a list is
-        given, only those exact K values are tested (the list must be
-        contiguous — for non-contiguous values, use a tuple range
-        instead).
+        (inclusive) or a contiguous list of K values (e.g. ``[3, 4, 5, 6]``).
+        Non-contiguous lists raise ``ValueError``.
     max_runs
         Maximum number of clustering repetitions per K.
     convergence_tol
@@ -99,11 +97,6 @@ class ClusterAutoK:
         peak_idx, _ = find_peaks(mean_stab)
         return np.array([self._inner_range[i] for i in peak_idx])
 
-    # Keep backward compat for code that accessed _stability directly
-    @property
-    def _stability(self) -> np.ndarray | None:
-        return self.stability_
-
     def fit(self, adata: ad.AnnData, use_rep: str = "X_cellcharter"):
         """Run repeated clustering for each K and compute stability."""
         prev_stability = None
@@ -164,18 +157,8 @@ class ClusterAutoK:
                     self._labels[k][r], self._labels[k_next][r]
                 )
 
-        # Average similarity to both neighbours, normalised by number of terms
-        stability = np.zeros((n_runs, n_inner))
-        count = np.ones(n_inner)
-        for j in range(n_inner):
-            stability[:, j] = stab_down[:, j]
-            if j > 0:
-                stability[:, j] += stab_up[:, j - 1]
-                count[j] += 1
-            if j < n_inner - 1:
-                stability[:, j] += stab_up[:, j]
-                count[j] += 1
-        stability /= count
+        # Average similarity to both neighbours (K-1 and K+1)
+        stability = (stab_down + stab_up) / 2
 
         return stability
 
@@ -218,12 +201,13 @@ def plot_autok_stability(
     """
     import matplotlib.pyplot as plt
 
-    if autok.stability_ is None:
+    stab = autok.stability_
+    if stab is None:
         raise RuntimeError("ClusterAutoK has not been fitted yet.")
 
     k_vals = autok._inner_range
-    mean_stab = autok.stability_.mean(axis=0)
-    std_stab = autok.stability_.std(axis=0)
+    mean_stab = stab.mean(axis=0)
+    std_stab = stab.std(axis=0)
 
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)

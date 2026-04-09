@@ -30,7 +30,7 @@ def _patch_categorical_setstate():
                 # Reconstruct via dict-based __setstate__ which pandas 2.x supports
                 dict_state = {
                     "_dtype": dtype,
-                    "_ndarray": np.asarray(codes),
+                    "_ndarray": np.asarray(codes, dtype=np.intp),
                 }
                 return _orig(self, dict_state)
         return _orig(self, state)

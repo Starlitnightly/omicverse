@@ -594,7 +594,7 @@ def clusters(adata,
             try:
                 from banksy.labels import Label
                 _orig_repr = Label.__repr__
-                Label.__repr__ = lambda self: f'Label(n={self.num_labels})'
+                Label.__repr__ = lambda self: f'Label(n={getattr(self, "num_labels", "?")})'
             except (ImportError, AttributeError):
                 _orig_repr = None
 
