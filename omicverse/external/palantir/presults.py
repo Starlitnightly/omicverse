@@ -605,7 +605,11 @@ def select_branch_cells(
     masks[idx, :] = prob_thresholds - eps < sorted_fate_probs
 
     if save_as_df:
-        ad.obsm[masks_key] = pd.DataFrame(masks, columns=fate_names, index=ad.obs_names)
+        ad.obsm[masks_key] = pd.DataFrame(
+            masks,
+            columns=fate_names,
+            index=ad.obs_names,
+        )
     else:
         ad.obsm[masks_key] = masks
         ad.uns[masks_key + "_columns"] = fate_names
