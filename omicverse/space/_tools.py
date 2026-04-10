@@ -1461,15 +1461,6 @@ def sync_visium_hd_seg_geometries(adata, sample=None):
     return adata
 
 
-@register_function(
-    aliases=["export_spaceranger", "write_cellseg", "导出spaceranger", "保存细胞分割结果"],
-    category="space",
-    description="Export cell-level AnnData to SpaceRanger v4-compatible directory structure",
-    examples=[
-        "ov.space.write_visium_hd_cellseg(cdata, 'output/segmented_outputs')",
-    ],
-    related=["space.bin2cell", "io.spatial.read_visium_hd_seg"],
-)
 def write_visium_hd_cellseg(adata, path, sample=None):
     """Export cell-level AnnData to SpaceRanger v4-compatible directory.
 

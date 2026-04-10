@@ -612,6 +612,13 @@ def write_visium_hd_cellseg(
     X = adata.X
     if not issparse(X):
         X = csc_matrix(X)
+    # Warn if data looks like normalized floats rather than raw counts
+    if X.dtype.kind == 'f' and X.max() < 100:
+        warnings.warn(
+            "adata.X appears to contain normalized values (max < 100, float dtype). "
+            "write_visium_hd_cellseg expects raw integer counts; values will be "
+            "truncated to int32."
+        )
     X_t = csc_matrix(X.T)  # transpose to (n_genes, n_cells)
 
     with h5py.File(str(h5_path), "w") as f:
@@ -646,9 +653,11 @@ def write_visium_hd_cellseg(
     _progress(f"Writing segmentation GeoJSON: {geojson_path}")
 
     features = []
+    skipped = 0
     for idx, (cell_id, row) in enumerate(adata.obs.iterrows()):
         geom_wkt = row.get("geometry", "")
         if not geom_wkt:
+            skipped += 1
             continue
 
         # Parse cell_id number from cellid_XXXXXXXXX-1 format
@@ -660,6 +669,7 @@ def write_visium_hd_cellseg(
         # Convert WKT to GeoJSON geometry
         geojson_geom = _wkt_to_geojson_geometry(geom_wkt)
         if geojson_geom is None:
+            skipped += 1
             continue
 
         feature = {
@@ -678,6 +688,8 @@ def write_visium_hd_cellseg(
     with open(geojson_path, "w") as f:
         json.dump(geojson, f)
     _progress(f"  {len(features)} cell polygons written")
+    if skipped:
+        warnings.warn(f"{skipped} cells skipped due to missing or invalid geometry.")
 
     # --- 3. Write spatial images ---
     spatial_uns = adata.uns.get("spatial", {}).get(sample, {})

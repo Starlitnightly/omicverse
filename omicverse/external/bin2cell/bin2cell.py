@@ -1168,10 +1168,7 @@ def destripe(adata, quantile=0.99, counts_key="n_counts", factor_key="destripe_f
     '''
     # Ensure counts_key exists in obs (compute from X if missing)
     if counts_key not in adata.obs.columns:
-        if scipy.sparse.issparse(adata.X):
-            adata.obs[counts_key] = np.asarray(adata.X.sum(axis=1)).flatten()
-        else:
-            adata.obs[counts_key] = np.asarray(adata.X.sum(axis=1)).flatten()
+        adata.obs[counts_key] = np.asarray(adata.X.sum(axis=1)).flatten()
     #apply destriping via sequential quantile scaling
     #get specified quantile per row
     quant = adata.obs.groupby("array_row")[counts_key].quantile(quantile)
