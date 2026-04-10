@@ -1846,7 +1846,111 @@ def ccc_heatmap(
     show: bool = False,
     save: str | bool = False,
 ):
-    """Plot communication matrices as heatmaps or dot/bubble matrices."""
+    """Plot communication matrices as heatmaps, dot plots, or bubble maps.
+
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Communication AnnData produced by the OmicVerse CCC workflow. The
+        object should contain aggregated pathway scores and interaction-level
+        summaries required by the selected ``plot_type``.
+    plot_type : str, default="heatmap"
+        Matrix view to render. Supported values include aggregated heatmaps,
+        focused heatmaps, dot and bubble summaries, pathway-level bubble
+        plots, signaling role maps, and differential heatmaps.
+    comparison_adata : anndata.AnnData or None, default=None
+        Second communication AnnData used when plotting condition-to-condition
+        differential heatmaps.
+    display_by : {"aggregation", "interaction"}, default="aggregation"
+        Whether to summarize the matrix at the signaling/pathway level or at
+        the interaction level.
+    sender_use : str, sequence of str, or None, default=None
+        Optional sender cell types retained in sender-aware heatmap views.
+    receiver_use : str, sequence of str, or None, default=None
+        Optional receiver cell types retained in receiver-aware heatmap views.
+    signaling : str, sequence of str, or None, default=None
+        Signaling pathway name or names to visualize.
+    interaction_use : str, sequence of str, or None, default=None
+        Interaction names used to restrict interaction-level dot or bubble
+        plots.
+    pair_lr_use : str, sequence of str, or None, default=None
+        Ligand-receptor pair identifiers used by pair-resolved bubble views.
+    pvalue_threshold : float, default=0.05
+        Maximum p-value retained as a significant communication event.
+    pattern : {"outgoing", "incoming", "all"}, default="all"
+        Signaling role pattern used by role-specific heatmap summaries.
+    color_by : {"score", "pvalue"}, default="score"
+        Quantity encoded by the heatmap color scale when the selected view
+        supports alternative coloring modes.
+    value : {"sum", "mean", "max", "count"}, default="sum"
+        Aggregation statistic used to summarize communication strengths before
+        plotting.
+    top_n : int, default=20
+        Number of top pathways or interactions retained in ranked matrix
+        views.
+    top_n_pairs : int or None, default=None
+        Number of ligand-receptor pairs retained in interaction-level views.
+        When omitted and ``display_by='interaction'``, ``top_n`` is used.
+    top_anno : str, sequence of str, or None, default="bar"
+        Annotation layer(s) displayed above the matrix, such as cell-color or
+        summary-bar annotations.
+    bottom_anno : str, sequence of str, or None, default="cell"
+        Annotation layer(s) displayed below the matrix.
+    left_anno : str, sequence of str, or None, default="bar"
+        Annotation layer(s) displayed on the left side of the matrix.
+    right_anno : str, sequence of str, or None, default="cell"
+        Annotation layer(s) displayed on the right side of the matrix.
+    bar_value : {"count", "sum", "mean", "max"}, default="sum"
+        Summary statistic used in bar-style annotations.
+    facet_by : {"sender", "receiver"} or None, default=None
+        Split the matrix into sender- or receiver-specific facets when the
+        selected plot type supports faceting.
+    pathway_method : str, default="mean"
+        Method used to summarize multiple ligand-receptor pairs into pathway
+        level scores.
+    min_lr_pairs : int, default=1
+        Minimum number of ligand-receptor pairs required for a pathway to be
+        retained.
+    min_expression : float, default=0.1
+        Minimum grouped expression threshold used by pathway-level summaries.
+    group_pathways : bool, default=True
+        Whether to combine related pathways in pathway-focused bubble views.
+    transpose : bool, default=False
+        Whether to transpose the plotted matrix when supported by the selected
+        plot type.
+    add_violin : bool, default=False
+        Whether to append violin summaries in compatible bubble-style plots.
+    remove_isolate : bool, default=False
+        Whether to remove isolated rows or columns with no retained signal.
+    min_interaction_threshold : float, default=0.0
+        Minimum interaction strength shown in focused heatmap views.
+    cluster_rows : bool, default=False
+        Whether to cluster matrix rows before plotting.
+    cluster_columns : bool, default=False
+        Whether to cluster matrix columns before plotting.
+    add_text : bool or None, default=None
+        Whether to overlay text labels on matrix entries when the selected
+        plot type supports annotation text.
+    border : bool, default=False
+        Whether to draw borders around matrix cells.
+    cmap : str, default="Reds"
+        Colormap used for the matrix color scale.
+    figsize : tuple of float, default=(8, 6)
+        Figure size in inches.
+    title : str or None, default=None
+        Custom title for the generated figure. When omitted, a plot-specific
+        default title is used.
+    show : bool, default=False
+        Whether to immediately display the figure.
+    save : str or bool, default=False
+        File path for saving the figure, or ``False`` to skip saving.
+
+    Returns
+    -------
+    tuple
+        A ``(fig, ax)`` tuple containing the Matplotlib figure and the main
+        axes used for the rendered heatmap-style view.
+    """
     default_top_bar = top_anno == "bar"
     default_left_bar = left_anno == "bar"
     default_bottom_cell = bottom_anno == "cell"
@@ -3233,7 +3337,86 @@ def ccc_network_plot(
     show: bool = False,
     save: str | bool = False,
 ):
-    """Plot aggregated communication as circle, flow, bipartite, or differential networks."""
+    """Plot cell-cell communication networks with multiple graph layouts.
+
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Communication AnnData produced by the OmicVerse CCC workflow. The
+        object is expected to contain sender, receiver, ligand-receptor, and
+        pathway level communication summaries used by the selected
+        ``plot_type``.
+    plot_type : str, default="circle"
+        Network style to render. Supported values include aggregated circle
+        views, pathway or interaction flow plots, bipartite ligand-receptor
+        layouts, embedding-based networks, differential comparison networks,
+        chord summaries, and diffusion-style visualizations.
+    comparison_adata : anndata.AnnData or None, default=None
+        Second communication AnnData used by ``plot_type='diff_network'`` to
+        compute differential edges between two conditions.
+    display_by : {"aggregation", "interaction"}, default="aggregation"
+        Whether to summarize networks at the signaling/pathway aggregation
+        level or at the individual interaction level when the chosen
+        ``plot_type`` supports both.
+    sender_use : str, sequence of str, or None, default=None
+        Optional sender cell types to keep in the plot.
+    receiver_use : str, sequence of str, or None, default=None
+        Optional receiver cell types to keep in the plot.
+    signaling : str, sequence of str, or None, default=None
+        Signaling pathway name or names to visualize. Required by several
+        pathway-specific network views.
+    interaction_use : str, sequence of str, or None, default=None
+        Interaction names to keep when plotting interaction-level networks.
+    pair_lr_use : str, sequence of str, or None, default=None
+        Ligand-receptor pair identifiers used to filter individual or
+        interaction-focused plots.
+    pvalue_threshold : float, default=0.05
+        Maximum p-value retained as a significant communication event.
+    value : {"sum", "mean", "max", "count"}, default="sum"
+        Aggregation statistic used when communication strengths are collapsed
+        before plotting.
+    top_n : int, default=20
+        Number of top pathways, interactions, or pairs retained for plot
+        types that rank results before drawing.
+    ligand : str or None, default=None
+        Ligand name used by ligand-centric plots such as ``bipartite`` or
+        ligand-receptor chord views.
+    receptor : str, sequence of str, or None, default=None
+        Receptor name or names used by receptor-specific network views.
+    layout : {"circle", "hierarchy"}, default="circle"
+        Layout passed to compatible CellChat-style network backends.
+    normalize_to_sender : bool, default=True
+        Whether to normalize outgoing edge contributions per sender before
+        plotting chord-style networks.
+    rotate_names : bool, default=True
+        Whether to rotate node labels to follow the circle in chord-like
+        layouts.
+    min_interaction_threshold : float, default=0.0
+        Minimum edge weight shown in focused or thresholded network views.
+    node_positions : mapping, array-like, or None, default=None
+        Precomputed node coordinates used by ``embedding_network`` or other
+        layouts that require explicit positions.
+    embedding_points : array-like or None, default=None
+        Optional background embedding coordinates plotted together with
+        ``embedding_network`` edges.
+    palette : mapping, sequence, or None, default=None
+        Color palette used for cell types, pathways, or nodes.
+    figsize : tuple of float, default=(7, 7)
+        Figure size in inches.
+    title : str or None, default=None
+        Custom title for the generated figure. When omitted, a plot-specific
+        default title is used.
+    show : bool, default=False
+        Whether to immediately display the figure.
+    save : str or bool, default=False
+        File path for saving the figure, or ``False`` to skip saving.
+
+    Returns
+    -------
+    tuple
+        A ``(fig, ax)`` tuple containing the Matplotlib figure and the main
+        axes used for the rendered network.
+    """
     if plot_type == "circle_focused":
         signaling_values = _normalize_use_arg(signaling)
         _raise_for_unsupported_arguments(
@@ -4087,7 +4270,99 @@ def ccc_stat_plot(
     show: bool = False,
     save: str | bool = False,
 ):
-    """Plot communication summaries and score distributions."""
+    """Plot communication summaries, distributions, and pathway statistics.
+
+    Parameters
+    ----------
+    adata : anndata.AnnData
+        Communication AnnData produced by the OmicVerse CCC workflow. The
+        object should contain pathway-, interaction-, and cell-pair-level
+        communication summaries used by the selected ``plot_type``.
+    plot_type : str, default="bar"
+        Summary view to render. Supported values include bar plots, sankey
+        diagrams, score distributions, signaling role analyses, pathway
+        summaries, ligand-receptor contribution plots, differential
+        comparisons, and pathway gene-expression summaries.
+    comparison_adata : anndata.AnnData or None, default=None
+        Second communication AnnData used by comparison-style summary plots.
+    source_adata : anndata.AnnData or None, default=None
+        Expression AnnData used by ``plot_type='gene'`` to summarize pathway
+        gene expression across groups.
+    source_groupby : str or None, default=None
+        Observation column in ``source_adata.obs`` used to group cells before
+        plotting gene-expression summaries.
+    display_by : {"aggregation", "interaction"}, default="aggregation"
+        Whether to summarize results at the signaling/pathway level or at the
+        interaction level.
+    sender_use : str, sequence of str, or None, default=None
+        Optional sender cell types retained in sender-aware summary plots.
+    receiver_use : str, sequence of str, or None, default=None
+        Optional receiver cell types retained in receiver-aware summary plots.
+    signaling : str, sequence of str, or None, default=None
+        Signaling pathway name or names to visualize.
+    interaction_use : str, sequence of str, or None, default=None
+        Interaction names used to restrict interaction-level statistics.
+    pair_lr_use : str, sequence of str, or None, default=None
+        Ligand-receptor pair identifiers used by pair-specific statistics.
+    pvalue_threshold : float, default=0.05
+        Maximum p-value retained as a significant communication event.
+    group_by : {"interaction", "classification", "pair", "sender", "receiver"}, default="interaction"
+        Category used to group communication events in bar, box, violin, or
+        contribution summaries.
+    compare_by : {"overall", "celltype"}, default="overall"
+        Comparison mode used by summary plots that contrast communication
+        patterns across cell types or globally.
+    measure : {"weight", "count"}, default="weight"
+        Communication quantity summarized by applicable statistical plots.
+    pattern : {"outgoing", "incoming", "all"}, default="all"
+        Signaling role direction used by role-based summaries.
+    idents_use : str, sequence of str, or None, default=None
+        Optional subset of identities retained in role-change or comparison
+        plots.
+    facet_by : {"sender", "receiver"} or None, default=None
+        Split compatible plots by sender or receiver.
+    value : {"sum", "mean", "max", "count"}, default="sum"
+        Aggregation statistic used to summarize communication strengths before
+        plotting.
+    top_n : int, default=20
+        Number of top pathways, interactions, or pairs retained in ranked
+        summaries.
+    pathway_method : str, default="mean"
+        Method used to summarize multiple ligand-receptor pairs into pathway
+        level scores.
+    min_lr_pairs : int, default=1
+        Minimum number of ligand-receptor pairs required for a pathway to be
+        retained in pathway summaries.
+    min_expression : float, default=0.1
+        Minimum grouped expression threshold used by pathway-level summaries.
+    strength_threshold : float, default=0.5
+        Minimum pathway strength retained in pathway summary statistics.
+    min_significant_pairs : int, default=1
+        Minimum number of significant ligand-receptor pairs required for a
+        pathway to be highlighted.
+    palette : mapping, sequence, or None, default=None
+        Color palette used for cell types, pathways, or groups.
+    measures : sequence of str or None, default=None
+        Role-network measures to display, such as outgoing or incoming
+        centrality summaries.
+    cmap : str, default="RdYlBu_r"
+        Colormap used by heatmap-like statistical summaries.
+    figsize : tuple of float, default=(8, 5)
+        Figure size in inches.
+    title : str or None, default=None
+        Custom title for the generated figure. When omitted, a plot-specific
+        default title is used.
+    show : bool, default=False
+        Whether to immediately display the figure.
+    save : str or bool, default=False
+        File path for saving the figure, or ``False`` to skip saving.
+
+    Returns
+    -------
+    tuple
+        A ``(fig, ax)`` tuple containing the Matplotlib figure and the main
+        axes used for the rendered statistical summary.
+    """
     if plot_type == "role_network":
         _raise_for_unsupported_arguments(
             plot_type,
