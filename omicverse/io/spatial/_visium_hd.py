@@ -682,6 +682,7 @@ def write_visium_hd_cellseg(
     # --- 3. Write spatial images ---
     spatial_uns = adata.uns.get("spatial", {}).get(sample, {})
     images = spatial_uns.get("images", {})
+    scalefactors = dict(spatial_uns.get("scalefactors", {}))
 
     for img_name, filename in [("hires", "tissue_hires_image.png"),
                                 ("lowres", "tissue_lowres_image.png")]:
@@ -694,7 +695,6 @@ def write_visium_hd_cellseg(
             _progress(f"  Saved {filename}")
 
     # --- 4. Write scalefactors ---
-    scalefactors = spatial_uns.get("scalefactors", {})
     if scalefactors:
         sf_path = spatial_dir / "scalefactors_json.json"
         # Convert numpy types to native Python for JSON serialization
