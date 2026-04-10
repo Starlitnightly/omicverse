@@ -234,8 +234,15 @@ class TrajInfer(object):
             add_reference(self.adata,'slingshot','trajectory inference with slingshot')
         elif method=='sctour':
             import sctour as sct
+
+            sctour_adata = self.adata.copy()
+            if issparse(sctour_adata.X):
+                sctour_adata.X = sctour_adata.X.toarray()
+            else:
+                sctour_adata.X = np.asarray(sctour_adata.X)
+
             tnode = sct.train.Trainer(
-                self.adata, loss_mode='nb', 
+                sctour_adata, loss_mode='nb', 
                 **kwargs
             )
             tnode.train()
@@ -252,18 +259,23 @@ class TrajInfer(object):
             print('Please input the correct method name, such as `palantir` or `diffusion_map`')
             return
         
-    def palantir_plot_pseudotime(self,**kwargs):
+    def palantir_plot_pseudotime(self, return_fig: bool = False, **kwargs):
         r"""Plot Palantir pseudotime results.
         
         Parameters
         ----------
+        return_fig : bool, optional
+            Whether to return the matplotlib figure object. By default the
+            figure is drawn without being returned, which avoids duplicate
+            notebook rendering.
         **kwargs
             Additional keyword arguments forwarded to
-            ``plot_palantir_results``.
+            ``plot_palantir_results`` such as ``embedding_basis``, ``cmap``,
+            ``s``, ``n_cols`` or ``figsize``.
 
         Returns
         -------
-        None
+        matplotlib.figure.Figure or None
         """
         palantir = _get_palantir_backend()
         fig = palantir["plot_palantir_results"](self.adata, **kwargs)
