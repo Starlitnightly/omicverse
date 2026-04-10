@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 from anndata import AnnData
 
 
@@ -71,17 +72,20 @@ def _bootstrap_omicverse_single_packages():
     return saved
 
 
-_SAVED = _bootstrap_omicverse_single_packages()
-dynamic_features_mod = importlib.import_module("omicverse.single._dynamic_features")
+@pytest.fixture
+def dynamic_features_mod():
+    saved = _bootstrap_omicverse_single_packages()
+    try:
+        yield importlib.import_module("omicverse.single._dynamic_features")
+    finally:
+        for name, mod in saved.items():
+            if mod is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = mod
 
-for name, mod in _SAVED.items():
-    if mod is None:
-        sys.modules.pop(name, None)
-    else:
-        sys.modules[name] = mod
 
-
-def test_dynamic_features_accepts_full_length_weights_after_pseudotime_filter(monkeypatch):
+def test_dynamic_features_accepts_full_length_weights_after_pseudotime_filter(monkeypatch, dynamic_features_mod):
     adata = AnnData(np.array([[1.0], [2.0], [3.0]]))
     adata.var_names = pd.Index(["gene_a"])
     adata.obs["pseudotime"] = [0.0, np.nan, 2.0]
@@ -138,7 +142,7 @@ def test_dynamic_features_accepts_full_length_weights_after_pseudotime_filter(mo
     assert result.stats["success"].tolist() == [True]
 
 
-def test_dynamic_features_uns_tables_are_h5ad_serializable(monkeypatch, tmp_path):
+def test_dynamic_features_uns_tables_are_h5ad_serializable(monkeypatch, tmp_path, dynamic_features_mod):
     adata = AnnData(np.array([[1.0], [2.0], [3.0]]))
     adata.var_names = pd.Index(["gene_a"])
     adata.obs["pseudotime"] = [0.0, 1.0, 2.0]
@@ -184,7 +188,7 @@ def test_dynamic_features_uns_tables_are_h5ad_serializable(monkeypatch, tmp_path
     assert output_path.exists()
 
 
-def test_dynamic_features_can_split_single_adata_by_group(monkeypatch):
+def test_dynamic_features_can_split_single_adata_by_group(monkeypatch, dynamic_features_mod):
     adata = AnnData(np.array([[1.0], [2.0], [4.0], [5.0]]))
     adata.var_names = pd.Index(["gene_a"])
     adata.obs["pseudotime"] = [0.0, 1.0, 0.0, 1.0]

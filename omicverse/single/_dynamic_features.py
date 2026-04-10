@@ -472,7 +472,7 @@ def dynamic_features(
         group_name = dataset_view["group"]
         adata = dataset_view["adata"]
         subset = _resolve_dataset_param(subsets, dataset_name, source_dataset_name)
-        adata_use = adata[subset].copy() if subset is not None else adata.copy()
+        adata_use = adata[subset].copy() if subset is not None else adata
         if pseudotime not in adata_use.obs.columns:
             raise KeyError(f"Pseudotime key `{pseudotime}` was not found in adata.obs for dataset `{dataset_name}`.")
 
@@ -491,9 +491,10 @@ def dynamic_features(
                 weights_arr = weights_arr[keep]
         order = np.argsort(time, kind="stable")
         time = time[order]
+        available_features = _available_feature_names(adata_use, use_raw=use_raw)
 
         for gene in gene_list:
-            if gene not in _available_feature_names(adata_use, use_raw=use_raw):
+            if gene not in available_features:
                 stats_records.append(
                     {
                         "dataset": dataset_name,

@@ -82,10 +82,10 @@ def _default_panel_title(
 
 def _draw_legend(axis, *, legend: bool, legend_outside: bool):
     if not legend:
-        return
+        return False
     handles, labels = axis.get_legend_handles_labels()
     if not labels:
-        return
+        return False
     dedup = dict(zip(labels, handles))
     if legend_outside:
         axis.legend(
@@ -98,6 +98,7 @@ def _draw_legend(axis, *, legend: bool, legend_outside: bool):
         )
     else:
         axis.legend(dedup.values(), dedup.keys(), frameon=False)
+    return True
 
 
 @register_function(
@@ -335,6 +336,8 @@ def dynamic_trends(
     else:
         style_map = {}
 
+    legend_drawn = False
+
     for idx, panel_label in enumerate(panel_labels):
         axis = axes[0] if panel_mode == "combined" else axes[idx]
         if panel_mode == "combined":
@@ -426,7 +429,7 @@ def dynamic_trends(
             axis.spines["top"].set_visible(False)
             axis.spines["right"].set_visible(False)
             axis.grid(add_grid, alpha=grid_alpha, linewidth=grid_linewidth)
-            _draw_legend(axis, legend=legend, legend_outside=legend_outside)
+            legend_drawn = _draw_legend(axis, legend=legend, legend_outside=legend_outside) or legend_drawn
 
     if panel_mode == "combined":
         axis = axes[0]
@@ -439,12 +442,12 @@ def dynamic_trends(
         axis.spines["top"].set_visible(False)
         axis.spines["right"].set_visible(False)
         axis.grid(add_grid, alpha=grid_alpha, linewidth=grid_linewidth)
-        _draw_legend(axis, legend=legend, legend_outside=legend_outside)
+        legend_drawn = _draw_legend(axis, legend=legend, legend_outside=legend_outside) or legend_drawn
 
     for axis in axes[len(panel_labels):]:
         axis.set_visible(False)
 
-    fig.tight_layout(rect=(0, 0, 0.84, 1) if legend and legend_outside else None)
+    fig.tight_layout(rect=(0, 0, 0.84, 1) if legend_drawn and legend_outside else None)
     axes_out = axes[0] if panel_mode == "combined" or len(panel_labels) == 1 else axes[: len(panel_labels)]
     if show is None:
         show = not return_fig and not return_axes

@@ -200,21 +200,6 @@ class SlingshotPlotter:
                 alpha=1)
             ax.legend()
 
-
-def _place_debug_legend(ax):
-    handles, labels = ax.get_legend_handles_labels()
-    if not labels:
-        return
-    dedup = dict(zip(labels, handles))
-    ax.legend(
-        dedup.values(),
-        dedup.keys(),
-        loc='center left',
-        bbox_to_anchor=(1.02, 0.5),
-        frameon=False,
-        borderaxespad=0.0,
-    )
-
     def network(self, cluster_to_label, figsize=(8, 10)):
         import networkx as nx
         from networkx.drawing.nx_agraph import graphviz_layout
@@ -244,6 +229,21 @@ def _place_debug_legend(ax):
             node_size=[len(v) * 100 for v in G.nodes()]
         )
         nx.draw_networkx_labels(G, pos, font_size=14, font_color='w', bbox=label_options)
+
+
+def _place_debug_legend(ax):
+    handles, labels = ax.get_legend_handles_labels()
+    if not labels:
+        return
+    dedup = dict(zip(labels, handles))
+    ax.legend(
+        dedup.values(),
+        dedup.keys(),
+        loc='center left',
+        bbox_to_anchor=(1.02, 0.5),
+        frameon=False,
+        borderaxespad=0.0,
+    )
 
 
 from typing import Union

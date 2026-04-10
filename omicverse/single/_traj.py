@@ -362,7 +362,9 @@ class TrajInfer(object):
             available fate-probability columns are used. Each lineage is fit as
             a separate weighted series using its fate probabilities.
         layers : str, optional
-            Expression layer used for fitting when ``use_raw=False``.
+            Expression layer used for fitting when ``use_raw=False``. The
+            default ``"MAGIC_imputed_data"`` requires that this layer already
+            exists in ``adata.layers``.
         pseudo_time_key : str, optional
             Obs key containing Palantir pseudotime values.
         fate_prob_key : str, optional
@@ -396,6 +398,11 @@ class TrajInfer(object):
         from ..external.palantir.validation import _validate_obsm_key
 
         fate_probs, lineage_names = _validate_obsm_key(self.adata, fate_prob_key)
+        if not use_raw and layers is not None and layers not in self.adata.layers:
+            raise KeyError(
+                f"Layer `{layers}` not found in adata.layers. "
+                "Run the required imputation step first, choose an available layer, or set `use_raw=True`."
+            )
         if lineages is None:
             lineages = list(lineage_names)
         else:

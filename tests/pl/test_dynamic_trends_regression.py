@@ -80,18 +80,23 @@ def _bootstrap_omicverse_plot_packages():
     return saved
 
 
-_SAVED = _bootstrap_omicverse_plot_packages()
-dynamic_features_mod = importlib.import_module("omicverse.single._dynamic_features")
-dynamic_trends_mod = importlib.import_module("omicverse.pl._dynamic_trends")
+@pytest.fixture
+def dynamic_modules():
+    saved = _bootstrap_omicverse_plot_packages()
+    try:
+        dynamic_features_mod = importlib.import_module("omicverse.single._dynamic_features")
+        dynamic_trends_mod = importlib.import_module("omicverse.pl._dynamic_trends")
+        yield dynamic_features_mod, dynamic_trends_mod
+    finally:
+        for name, mod in saved.items():
+            if mod is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = mod
 
-for name, mod in _SAVED.items():
-    if mod is None:
-        sys.modules.pop(name, None)
-    else:
-        sys.modules[name] = mod
 
-
-def test_dynamic_trends_compare_features_and_groups_share_one_panel():
+def test_dynamic_trends_compare_features_and_groups_share_one_panel(dynamic_modules):
+    dynamic_features_mod, dynamic_trends_mod = dynamic_modules
     result = dynamic_features_mod.DynamicFeaturesResult(
         stats=pd.DataFrame(
             [
@@ -133,7 +138,8 @@ def test_dynamic_trends_compare_features_and_groups_share_one_panel():
     plt.close(fig)
 
 
-def test_dynamic_trends_compare_features_panels_by_group():
+def test_dynamic_trends_compare_features_panels_by_group(dynamic_modules):
+    dynamic_features_mod, dynamic_trends_mod = dynamic_modules
     result = dynamic_features_mod.DynamicFeaturesResult(
         stats=pd.DataFrame(
             [
@@ -169,7 +175,8 @@ def test_dynamic_trends_compare_features_panels_by_group():
     plt.close(fig)
 
 
-def test_dynamic_trends_single_group_combined_request_uses_gene_labels_and_blank_title():
+def test_dynamic_trends_single_group_combined_request_uses_gene_labels_and_blank_title(dynamic_modules):
+    dynamic_features_mod, dynamic_trends_mod = dynamic_modules
     result = dynamic_features_mod.DynamicFeaturesResult(
         stats=pd.DataFrame(
             [
@@ -207,7 +214,8 @@ def test_dynamic_trends_single_group_combined_request_uses_gene_labels_and_blank
     plt.close(fig)
 
 
-def test_dynamic_trends_returns_none_by_default_and_accepts_nrows_ncols():
+def test_dynamic_trends_returns_none_by_default_and_accepts_nrows_ncols(dynamic_modules):
+    dynamic_features_mod, dynamic_trends_mod = dynamic_modules
     result = dynamic_features_mod.DynamicFeaturesResult(
         stats=pd.DataFrame(
             [
@@ -241,7 +249,8 @@ def test_dynamic_trends_returns_none_by_default_and_accepts_nrows_ncols():
     plt.close("all")
 
 
-def test_dynamic_trends_add_point_requires_store_raw():
+def test_dynamic_trends_add_point_requires_store_raw(dynamic_modules):
+    dynamic_features_mod, dynamic_trends_mod = dynamic_modules
     result = dynamic_features_mod.DynamicFeaturesResult(
         stats=pd.DataFrame([{"dataset": "adata", "gene": "g1", "success": True}]),
         fitted=pd.DataFrame(
