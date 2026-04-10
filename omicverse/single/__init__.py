@@ -106,6 +106,7 @@ from ._annotation_ref import AnnotationRef
 from ._velo import Velo,velocity_embedding
 from ._milo_dev import Milo
 from ._markers import find_markers, get_markers
+from ._dynamic_features import DynamicFeaturesResult, dynamic_features
 
 _TORCH_DEPS = ("torch", "torch_geometric")
 
@@ -214,6 +215,8 @@ __all__ = [
     'resume_from_checkpoint',
     'list_checkpoints',
     'cleanup_checkpoints',
+    'dynamic_features',
+    'DynamicFeaturesResult',
     'lazy_step_qc',
     'lazy_step_preprocess',
     'lazy_step_scale',

@@ -94,6 +94,7 @@ from ._single import (
     violin_box,
     violin_old,
 )
+from ._dynamic_trends import dynamic_trends, plot_gam_trends
 from ._general import (
     add_palue,
     create_custom_colormap,
@@ -228,6 +229,8 @@ __all__ = [
     "palette_28",
     "palette_56",
     "pastel_palette",
+    "dynamic_trends",
+    "plot_gam_trends",
     "purple_color",
     "red_color",
     "sc_color",
