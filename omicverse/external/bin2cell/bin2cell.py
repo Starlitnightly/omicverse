@@ -272,7 +272,7 @@ def _paste_with_relabel(
 
     return next_label_start
 
-def stardist(
+def cellseg(
     image_path: str,
     labels_npz_path: str,
     stardist_model: str = "2D_versatile_he",
@@ -321,7 +321,7 @@ def stardist(
     from skimage.io import imread
 
     if backend == "cellsam":
-        return _stardist_cellsam(
+        return _cellseg_cellsam(
             image_path, labels_npz_path,
             block_size=block_size, min_overlap=min_overlap, context=context,
             gpu=gpu, iou_merge_threshold=iou_merge_threshold,
@@ -384,7 +384,7 @@ def stardist(
         total_tiles = len(y_starts) * len(x_starts)
         try:
             from tqdm import tqdm  # type: ignore
-            pbar = tqdm(total=total_tiles, desc=progress_desc or "bin2cell.stardist", unit="tile")
+            pbar = tqdm(total=total_tiles, desc=progress_desc or "bin2cell.cellseg", unit="tile")
         except Exception:
             use_fallback_progress = True
             print_every = max(1, total_tiles // 10) if total_tiles > 0 else 1
@@ -445,7 +445,7 @@ def stardist(
                     flows = styles = diams = None
             except Exception as e:
                 # safe fallback: yield empty mask for this tile
-                print(f"[bin2cell.stardist] Cellpose eval failed on a tile: {e}. Using empty mask for this tile.")
+                print(f"[bin2cell.cellseg] Cellpose eval failed on a tile: {e}. Using empty mask for this tile.")
                 masks = np.zeros(tile.shape[:2], dtype=np.int32)
                 flows, styles, diams = None, None, None
 
@@ -498,7 +498,7 @@ def stardist(
         elif use_fallback_progress:
             tiles_done += 1
             if (tiles_done % print_every == 0) or (tiles_done == total_tiles):
-                print(f"[bin2cell.stardist] Processed {tiles_done}/{total_tiles} tiles")
+                print(f"[bin2cell.cellseg] Processed {tiles_done}/{total_tiles} tiles")
 
     # close progress bar if used
     if pbar is not None:
@@ -516,7 +516,7 @@ def stardist(
     sparse.save_npz(labels_npz_path, labels_csr)
 
 
-def _stardist_cellsam(
+def _cellseg_cellsam(
     image_path: str,
     labels_npz_path: str,
     block_size: int = 1024,
@@ -678,7 +678,7 @@ def _stardist_cellsam(
     sparse.save_npz(labels_npz_path, labels_csr)
 
 
-def view_stardist_labels(image_path, labels_npz_path, crop, **kwargs):
+def view_cellseg_labels(image_path, labels_npz_path, crop, **kwargs):
     '''
     Use StarDist's label rendering to view segmentation results in a crop 
     of the input image.
@@ -2446,3 +2446,8 @@ def _plot_boundaries_matplotlib(cell_adata, color, segmentation_key, library_id,
     ax.set_ylabel('Y coordinate')
     
     return ax
+
+# Backward-compatible aliases
+stardist = cellseg
+view_stardist_labels = view_cellseg_labels
+
