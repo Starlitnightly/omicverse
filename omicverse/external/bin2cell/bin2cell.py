@@ -1166,6 +1166,9 @@ def destripe(adata, quantile=0.99, counts_key="n_counts", factor_key="destripe_f
         Whether to use the computed adjusted count total to adjust the counts in 
         ``adata.X``.
     '''
+    # Ensure counts_key exists in obs (compute from X if missing)
+    if counts_key not in adata.obs.columns:
+        adata.obs[counts_key] = np.asarray(adata.X.sum(axis=1)).flatten()
     #apply destriping via sequential quantile scaling
     #get specified quantile per row
     quant = adata.obs.groupby("array_row")[counts_key].quantile(quantile)
@@ -1704,7 +1707,12 @@ def insert_labels(adata, labels_npz_path, basis="spatial", spatial_key="spatial"
            )
     #pull out the cell labels for the coordinates, can just index the sparse matrix with them
     #insert into bin object, need to turn it into a 1d numpy array from a 1d numpy matrix first
-    adata.obs.loc[mask, labels_key] = np.asarray(labels_sparse[coords[mask,0], coords[mask,1]]).flatten()
+    label_vals = labels_sparse[coords[mask,0], coords[mask,1]]
+    if scipy.sparse.issparse(label_vals):
+        label_vals = np.asarray(label_vals.todense()).flatten()
+    else:
+        label_vals = np.asarray(label_vals).flatten()
+    adata.obs.loc[mask, labels_key] = label_vals
 
 def expand_labels(adata, labels_key="labels", expanded_labels_key="labels_expanded", algorithm="max_bin_distance", max_bin_distance=2, volume_ratio=4, k=4, subset_pca=True):
     '''
@@ -1988,7 +1996,8 @@ def bin_to_cell(adata, labels_key="labels_expanded",
             X = X.tocsr()
         _tick()
 
-        cell_names = unique_labels.astype(str).tolist()
+        # Format cell IDs to match SpaceRanger v4 convention: cellid_XXXXXXXXX-1
+        cell_names = [f"cellid_{int(lbl):09d}-1" for lbl in unique_labels]
         cell_adata = ad.AnnData(X, var=adata.var)
         cell_adata.obs_names = cell_names
         cell_adata.obs["object_id"] = unique_labels.astype(np.int64)
@@ -2039,8 +2048,6 @@ def bin_to_cell(adata, labels_key="labels_expanded",
         if pbar is not None:
             pbar.close()
     
-    # Generate and store segmentation mask for cell boundary visualization
-
     return cell_adata
 
 

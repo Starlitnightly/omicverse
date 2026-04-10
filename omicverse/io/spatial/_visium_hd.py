@@ -547,3 +547,201 @@ def read_visium_hd(
 
     raise ValueError("`data_type` must be one of {'bin', 'cellseg'}.")
 
+
+@register_function(
+    aliases=["write_visium_hd_cellseg", "export_spaceranger", "导出spaceranger", "保存细胞分割"],
+    category="io",
+    description="Export cell-level AnnData to a SpaceRanger v4-compatible directory structure",
+    prerequisites={},
+    requires={"obs": ["geometry"], "obsm": ["spatial"]},
+    produces={},
+    auto_fix="none",
+    examples=[
+        "ov.io.spatial.write_visium_hd_cellseg(cdata, 'output/segmented_outputs')",
+    ],
+    related=["io.spatial.read_visium_hd_seg", "space.bin2cell"],
+)
+def write_visium_hd_cellseg(
+    adata: AnnData,
+    path: Union[str, Path],
+    sample: Optional[str] = None,
+):
+    """Export cell-level AnnData to SpaceRanger v4-compatible directory structure.
+
+    Creates the following output files::
+
+        path/
+        ├── filtered_feature_cell_matrix.h5
+        ├── graphclust_annotated_cell_segmentations.geojson
+        └── spatial/
+            ├── tissue_hires_image.png
+            ├── tissue_lowres_image.png
+            └── scalefactors_json.json
+
+    Parameters
+    ----------
+    adata : AnnData
+        Cell-level AnnData from ``bin_to_cell()`` or ``read_visium_hd_seg()``.
+        Must have ``obs["geometry"]`` (WKT strings) and ``obsm["spatial"]``.
+    path : str or Path
+        Output directory to write SpaceRanger-like structure.
+    sample : str, optional
+        Sample key in ``adata.uns["spatial"]``. If None, uses the first key.
+    """
+    import h5py
+    from scipy.sparse import issparse, csc_matrix
+
+    root = Path(path)
+    root.mkdir(parents=True, exist_ok=True)
+    spatial_dir = root / "spatial"
+    spatial_dir.mkdir(exist_ok=True)
+
+    if sample is None:
+        if "spatial" in adata.uns and adata.uns["spatial"]:
+            sample = list(adata.uns["spatial"].keys())[0]
+        else:
+            sample = "sample"
+
+    _progress(f"Exporting to SpaceRanger v4 format: {root}")
+
+    # --- 1. Write filtered_feature_cell_matrix.h5 (10x H5 format) ---
+    h5_path = root / "filtered_feature_cell_matrix.h5"
+    _progress(f"Writing count matrix: {h5_path}")
+
+    # 10x H5 stores the matrix as (n_genes x n_cells) in CSC format
+    X = adata.X
+    if not issparse(X):
+        X = csc_matrix(X)
+    # Warn if data looks like normalized floats rather than raw counts
+    if X.dtype.kind == 'f' and X.max() < 100:
+        warnings.warn(
+            "adata.X appears to contain normalized values (max < 100, float dtype). "
+            "write_visium_hd_cellseg expects raw integer counts; values will be "
+            "truncated to int32."
+        )
+    X_t = csc_matrix(X.T)  # transpose to (n_genes, n_cells)
+
+    with h5py.File(str(h5_path), "w") as f:
+        g = f.create_group("matrix")
+        g.create_dataset("data", data=X_t.data.astype(np.int32))
+        g.create_dataset("indices", data=X_t.indices.astype(np.int64))
+        g.create_dataset("indptr", data=X_t.indptr.astype(np.int64))
+        g.create_dataset("shape", data=np.array(X_t.shape, dtype=np.int32))
+        g.create_dataset("barcodes", data=np.array(adata.obs_names, dtype="S"))
+
+        fg = g.create_group("features")
+        gene_ids = adata.var["gene_ids"].values if "gene_ids" in adata.var else adata.var_names.values
+        gene_names = adata.var_names.values
+        feature_types = (
+            adata.var["feature_types"].values
+            if "feature_types" in adata.var
+            else np.array(["Gene Expression"] * adata.n_vars)
+        )
+        genome = (
+            adata.var["genome"].values
+            if "genome" in adata.var
+            else np.array(["GRCh38"] * adata.n_vars)
+        )
+        fg.create_dataset("id", data=np.array(gene_ids, dtype="S"))
+        fg.create_dataset("name", data=np.array(gene_names, dtype="S"))
+        fg.create_dataset("feature_type", data=np.array(feature_types, dtype="S"))
+        fg.create_dataset("genome", data=np.array(genome, dtype="S"))
+        fg.create_dataset("_all_tag_keys", data=np.array(["genome"], dtype="S"))
+
+    # --- 2. Write cell segmentation GeoJSON ---
+    geojson_path = root / "graphclust_annotated_cell_segmentations.geojson"
+    _progress(f"Writing segmentation GeoJSON: {geojson_path}")
+
+    features = []
+    skipped = 0
+    for idx, (cell_id, row) in enumerate(adata.obs.iterrows()):
+        geom_wkt = row.get("geometry", "")
+        if not geom_wkt:
+            skipped += 1
+            continue
+
+        # Parse cell_id number from cellid_XXXXXXXXX-1 format
+        if cell_id.startswith("cellid_"):
+            numeric_id = int(cell_id.split("_")[1].split("-")[0])
+        else:
+            numeric_id = idx + 1
+
+        # Convert WKT to GeoJSON geometry
+        geojson_geom = _wkt_to_geojson_geometry(geom_wkt)
+        if geojson_geom is None:
+            skipped += 1
+            continue
+
+        feature = {
+            "type": "Feature",
+            "geometry": geojson_geom,
+            "properties": {
+                "cell_id": numeric_id,
+            },
+        }
+        features.append(feature)
+
+    geojson = {
+        "type": "FeatureCollection",
+        "features": features,
+    }
+    with open(geojson_path, "w") as f:
+        json.dump(geojson, f)
+    _progress(f"  {len(features)} cell polygons written")
+    if skipped:
+        warnings.warn(f"{skipped} cells skipped due to missing or invalid geometry.")
+
+    # --- 3. Write spatial images ---
+    spatial_uns = adata.uns.get("spatial", {}).get(sample, {})
+    images = spatial_uns.get("images", {})
+    scalefactors = dict(spatial_uns.get("scalefactors", {}))
+
+    for img_name, filename in [("hires", "tissue_hires_image.png"),
+                                ("lowres", "tissue_lowres_image.png")]:
+        if img_name in images and images[img_name] is not None:
+            img_path = spatial_dir / filename
+            img_arr = images[img_name]
+            if img_arr.max() <= 1.0:
+                img_arr = (img_arr * 255).astype(np.uint8)
+            Image.fromarray(img_arr).save(str(img_path))
+            _progress(f"  Saved {filename}")
+
+    # --- 4. Write scalefactors ---
+    if scalefactors:
+        sf_path = spatial_dir / "scalefactors_json.json"
+        # Convert numpy types to native Python for JSON serialization
+        sf_clean = {}
+        for k, v in scalefactors.items():
+            if isinstance(v, (np.integer, np.int64, np.int32)):
+                sf_clean[k] = int(v)
+            elif isinstance(v, (np.floating, np.float64, np.float32)):
+                sf_clean[k] = float(v)
+            else:
+                sf_clean[k] = v
+        with open(sf_path, "w") as f:
+            json.dump(sf_clean, f, indent=2)
+        _progress(f"  Saved scalefactors_json.json")
+
+    _progress(f"Export complete: {root}", level="success")
+
+
+def _wkt_to_geojson_geometry(wkt_str: str) -> Optional[dict]:
+    """Convert a WKT POLYGON string to a GeoJSON geometry dict."""
+    wkt_str = wkt_str.strip()
+    if not wkt_str.upper().startswith("POLYGON"):
+        return None
+    try:
+        # Extract coordinates from POLYGON ((x1 y1, x2 y2, ...))
+        coords_str = wkt_str[wkt_str.index("((") + 2 : wkt_str.rindex("))")]
+        pairs = coords_str.split(",")
+        coordinates = []
+        for pair in pairs:
+            parts = pair.strip().split()
+            coordinates.append([float(parts[0]), float(parts[1])])
+        return {
+            "type": "Polygon",
+            "coordinates": [coordinates],
+        }
+    except (ValueError, IndexError):
+        return None
+

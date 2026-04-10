@@ -885,12 +885,18 @@ def visium_10x_hd_cellpose_he(
     """
     from ..external.bin2cell import destripe, scaled_he_image, stardist, insert_labels
 
-    if not os.path.exists(he_save_path):    
+    spatial_key = f"spatial_cropped_{buffer}_buffer"
+    if not os.path.exists(he_save_path):
         destripe(adata)
         scaled_he_image(adata, mpp=mpp, buffer=buffer, save_path=he_save_path,
                         backend=backend)
     else:
-        print(f"he_save_path {he_save_path} already exists, skipping destripe and scaled_he_image")
+        print(f"he_save_path {he_save_path} already exists, skipping image generation")
+        # destripe and scaled_he_image create spatial metadata needed downstream
+        if spatial_key not in adata.obsm:
+            destripe(adata)
+            scaled_he_image(adata, mpp=mpp, buffer=buffer, save_path=None,
+                            backend=backend)
     stardist(image_path=he_save_path    , 
              labels_npz_path=he_save_path.replace(".tiff", ".npz"), 
              stardist_model="2D_versatile_he", 
@@ -1118,7 +1124,7 @@ def bin2cell(
         labels_key="labels_joint",
         spatial_keys=["spatial"],
         diameter_scale_factor=None,
-        add_geometry: bool = False,
+        add_geometry: bool = True,
         geometry_key: str = "geometry",
         geometry_spatial_key: str = "spatial",
         geometry_force_polygon: bool = False,
@@ -1453,6 +1459,24 @@ def sync_visium_hd_seg_geometries(adata, sample=None):
         )
 
     return adata
-    
-    
-    
+
+
+def write_visium_hd_cellseg(adata, path, sample=None):
+    """Export cell-level AnnData to SpaceRanger v4-compatible directory.
+
+    Creates ``filtered_feature_cell_matrix.h5``,
+    ``graphclust_annotated_cell_segmentations.geojson``, and ``spatial/``
+    with images and scalefactors.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Cell-level AnnData from ``bin2cell()``.
+    path : str or Path
+        Output directory.
+    sample : str, optional
+        Sample key in ``adata.uns["spatial"]``.
+    """
+    from ..io.spatial import write_visium_hd_cellseg as _write
+    _write(adata, path, sample=sample)
+
