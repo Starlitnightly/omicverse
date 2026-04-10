@@ -219,6 +219,8 @@ def _draw_custom_legends(
     for ax in fig.axes:
         if not ax.get_visible():
             continue
+        if not hasattr(ax, "get_position"):
+            continue
         has_visual = bool(ax.images or ax.collections or ax.lines or ax.patches)
         if has_visual:
             bbox = ax.get_position()
@@ -612,6 +614,8 @@ def _find_main_heatmap_axis(fig, n_rows, n_cols):
     candidates = []
     for ax in fig.axes:
         if not ax.get_visible():
+            continue
+        if not hasattr(ax, "get_position"):
             continue
         has_visual = bool(ax.collections or ax.images or ax.lines or ax.patches)
         if not has_visual:

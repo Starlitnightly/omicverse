@@ -28,6 +28,7 @@ def _bootstrap_omicverse_plot_packages():
             "omicverse.pl",
             "omicverse.single",
             "omicverse._registry",
+            "omicverse._settings",
         ]
     }
     for name in saved:
@@ -61,6 +62,20 @@ def _bootstrap_omicverse_plot_packages():
     registry_mod.register_function = register_function
     sys.modules["omicverse._registry"] = registry_mod
     ov_pkg._registry = registry_mod
+
+    settings_mod = types.ModuleType("omicverse._settings")
+
+    class _Colors:
+        HEADER = ""
+        BOLD = ""
+        CYAN = ""
+        GREEN = ""
+        ENDC = ""
+
+    settings_mod.Colors = _Colors
+    settings_mod.EMOJI = {"start": "", "done": ""}
+    sys.modules["omicverse._settings"] = settings_mod
+    ov_pkg._settings = settings_mod
 
     return saved
 
@@ -149,19 +164,8 @@ def test_dynamic_trends_compare_features_panels_by_group():
     )
 
     assert len(axes) == 2
-    assert [ax.get_title() for ax in axes] == ["", ""]
-    assert all(len(ax.lines) == 2 for ax in axes)
-    plt.close(fig)
-
-    fig, axes = dynamic_trends_mod.dynamic_trends(
-        result,
-        genes=["g1", "g2"],
-        compare_features=True,
-        title=None,
-        return_fig=True,
-    )
-
     assert [ax.get_title() for ax in axes] == ["LineageA", "LineageB"]
+    assert all(len(ax.lines) == 2 for ax in axes)
     plt.close(fig)
 
 

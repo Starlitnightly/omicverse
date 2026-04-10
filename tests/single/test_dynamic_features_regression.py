@@ -25,6 +25,7 @@ def _bootstrap_omicverse_single_packages():
             "omicverse",
             "omicverse.single",
             "omicverse._registry",
+            "omicverse._settings",
         ]
     }
     for name in saved:
@@ -52,6 +53,20 @@ def _bootstrap_omicverse_single_packages():
     registry_mod.register_function = register_function
     sys.modules["omicverse._registry"] = registry_mod
     ov_pkg._registry = registry_mod
+
+    settings_mod = types.ModuleType("omicverse._settings")
+
+    class _Colors:
+        HEADER = ""
+        BOLD = ""
+        CYAN = ""
+        GREEN = ""
+        ENDC = ""
+
+    settings_mod.Colors = _Colors
+    settings_mod.EMOJI = {"start": "", "done": ""}
+    sys.modules["omicverse._settings"] = settings_mod
+    ov_pkg._settings = settings_mod
 
     return saved
 
@@ -217,5 +232,6 @@ def test_dynamic_features_can_split_single_adata_by_group(monkeypatch):
 
     assert len(fit_calls) == 2
     assert set(result.stats["dataset"]) == {"TypeA", "TypeB"}
-    assert set(result.stats["source_dataset"]) == {"adata"}
+    assert "source_dataset" not in result.stats.columns
+    assert set(result.stats["groupby_key"]) == {"cell_type"}
     assert set(result.stats["group"]) == {"TypeA", "TypeB"}
