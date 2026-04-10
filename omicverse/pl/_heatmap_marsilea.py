@@ -6,7 +6,8 @@ import pandas as pd
 import seaborn as sns
 from anndata import AnnData
 from matplotlib import cm
-from matplotlib.colors import to_hex
+from matplotlib.colors import Normalize, TwoSlopeNorm, to_hex
+from matplotlib.text import Text
 from pandas.api.types import CategoricalDtype, is_numeric_dtype
 from scipy.cluster.hierarchy import leaves_list, linkage
 from scipy.cluster.vq import kmeans2
@@ -15,6 +16,7 @@ from scipy.spatial.distance import pdist
 from ._scanpy_compat import _prepare_dataframe, default_palette, obs_df
 from ._palette import palette_28, palette_56
 from .._registry import register_function
+from .._settings import Colors, EMOJI
 
 
 def _import_marsilea():
@@ -77,7 +79,9 @@ def _normalize_group_order(values, valid_labels, name):
     values = [str(value) for value in values]
     missing = [value for value in values if value not in valid_labels]
     if missing:
-        raise ValueError(f"{name} contains labels not present in the heatmap: {missing}.")
+        raise ValueError(
+            f"{name} contains labels not present in the heatmap: {missing}."
+        )
     return values
 
 
@@ -89,12 +93,16 @@ def _resolve_lineage_order(values, requested=None):
         requested = [str(value) for value in requested]
         missing = [value for value in requested if value not in observed_set]
         if missing:
-            raise ValueError(f"lineages contains labels not present in adata.obs: {missing}.")
+            raise ValueError(
+                f"lineages contains labels not present in adata.obs: {missing}."
+            )
         return requested
 
     series = pd.Series(values)
     if isinstance(series.dtype, pd.CategoricalDtype):
-        ordered = [str(value) for value in series.cat.categories if str(value) in observed_set]
+        ordered = [
+            str(value) for value in series.cat.categories if str(value) in observed_set
+        ]
         if ordered:
             return ordered
     return list(dict.fromkeys(observed))
@@ -104,7 +112,11 @@ def _resolve_reverse_lineages(reverse_ht, lineage_names):
     if reverse_ht is None:
         return set()
 
-    items = [reverse_ht] if np.isscalar(reverse_ht) and not isinstance(reverse_ht, str) else reverse_ht
+    items = (
+        [reverse_ht]
+        if np.isscalar(reverse_ht) and not isinstance(reverse_ht, str)
+        else reverse_ht
+    )
     if isinstance(reverse_ht, str):
         items = [reverse_ht]
     else:
@@ -159,7 +171,7 @@ def _draw_custom_legends(
     try:
         from itertools import batched
     except ImportError:
-        # Python < 3.12 fallback
+
         def batched(iterable, n):
             it = iter(iterable)
             while True:
@@ -175,7 +187,6 @@ def _draw_custom_legends(
 
     from legendkit.layout import vstack as _vstack, hstack as _hstack
 
-    # 1. Collect legend artists from all plotters
     legends = plotter.get_legends()
     user_legends = getattr(plotter, "_user_legends", {})
     if user_legends:
@@ -191,7 +202,6 @@ def _draw_custom_legends(
     if not all_legs:
         return
 
-    # Detach artists from any prior figure to avoid double-rendering
     for leg in all_legs:
         try:
             leg.remove()
@@ -204,11 +214,6 @@ def _draw_custom_legends(
                 except Exception:
                     pass
 
-    # 2. Determine content bounding box in figure-fraction coordinates
-    #    Only include axes with actual plotted content (images, mesh/color
-    #    collections, line plots, filled patches) — exclude text-only axes
-    #    like labels, titles, or annotation text that artificially push the
-    #    content boundary outward.
     content_x1 = 0.0
     content_y0, content_y1 = 1.0, 0.0
     for ax in fig.axes:
@@ -224,7 +229,6 @@ def _draw_custom_legends(
     if content_x1 <= 0 or content_y1 <= content_y0:
         return
 
-    # 3. Measure legend box dimensions using a temporary axes
     try:
         renderer = fig.canvas.get_renderer()
     except AttributeError:
@@ -257,14 +261,14 @@ def _draw_custom_legends(
     legend_width_frac = (extent.xmax - extent.xmin) / (fig_w * dpi)
     temp_ax.remove()
 
-    # 4. Create the legend axes positioned right next to the content
-    pad_frac = pad / fig_w  # convert inches to figure-fraction
+    pad_frac = pad / fig_w
     legend_x = content_x1 + pad_frac
-    legend_width = min(legend_width_frac + 0.02, 0.35)  # cap at 35% of figure
-    legend_ax = fig.add_axes([legend_x, content_y0, legend_width, content_y1 - content_y0])
+    legend_width = min(legend_width_frac + 0.02, 0.35)
+    legend_ax = fig.add_axes(
+        [legend_x, content_y0, legend_width, content_y1 - content_y0]
+    )
     legend_ax.set_axis_off()
 
-    # 5. Re-collect and draw legends (artists were consumed by temp ax)
     legends2 = plotter.get_legends()
     if user_legends:
         for k, v in user_legends.items():
@@ -300,6 +304,12 @@ def _draw_custom_legends(
         padding=box_padding,
     )
 
+    for text in legend_ax.findobj(match=Text):
+        try:
+            text.set_fontweight("normal")
+        except Exception:
+            pass
+
 
 def _render_plot(plotter, save_path=None, show=False, legend_kws=None):
     existing_fignums = set(plt.get_fignums())
@@ -327,12 +337,28 @@ def _available_var_names(adata, use_raw):
     return adata.raw.var_names if use_raw else adata.var_names
 
 
+def _dynamic_hvg_candidates(adata, use_raw):
+    var = adata.raw.var if use_raw else adata.var
+    var_names = adata.raw.var_names if use_raw else adata.var_names
+
+    for key in ("highly_variable_features", "highly_variable"):
+        if key not in var.columns:
+            continue
+        flag = pd.Series(var[key]).fillna(False).astype(bool).to_numpy()
+        selected = list(var_names[flag])
+        if selected:
+            return selected
+    return None
+
+
 def _sanitize_var_names(adata, var_names, use_raw):
     available = _available_var_names(adata, use_raw)
     filtered = [gene for gene in var_names if gene in available]
     filtered = list(dict.fromkeys(filtered))
     if not filtered:
-        raise ValueError("No requested genes were found in the selected AnnData object.")
+        raise ValueError(
+            "No requested genes were found in the selected AnnData object."
+        )
     return filtered
 
 
@@ -341,7 +367,9 @@ def _select_top_variable_features(adata, n_features):
         return []
     matrix = adata.X
     if hasattr(matrix, "power"):
-        variances = np.asarray(matrix.power(2).mean(axis=0) - np.square(matrix.mean(axis=0))).ravel()
+        variances = np.asarray(
+            matrix.power(2).mean(axis=0) - np.square(matrix.mean(axis=0))
+        ).ravel()
     else:
         variances = np.var(np.asarray(matrix), axis=0)
     order = np.argsort(np.nan_to_num(variances, nan=-np.inf))[::-1]
@@ -395,7 +423,9 @@ def _scale_dynamic_frame(frame, standard_scale):
         frame = frame.sub(frame.min(axis=0), axis=1)
         frame = frame.div(frame.max(axis=0).replace(0, np.nan), axis=1).fillna(0)
     elif standard_scale not in {None, "raw"}:
-        raise ValueError("standard_scale must be one of {'var', 'zscore', 'group', 'minmax', 'obs', 'raw', None}.")
+        raise ValueError(
+            "standard_scale must be one of {'var', 'zscore', 'group', 'minmax', 'obs', 'raw', None}."
+        )
     frame = frame.replace([np.inf, -np.inf], np.nan).fillna(0)
     return frame
 
@@ -443,7 +473,6 @@ def _safe_anno_labels(mp, labels, **kwargs):
         try:
             original_render_ax(spec)
         except (ValueError, Exception):
-            # Fallback: axis too small for connector lines — clear silently
             try:
                 spec.ax.set_axis_off()
             except Exception:
@@ -451,6 +480,55 @@ def _safe_anno_labels(mp, labels, **kwargs):
 
     plotter.render_ax = _safe_render_ax
     return plotter
+
+
+def _add_dynamic_gene_group_strip(board, mp, gene_groups, gene_colors, *, show_legend):
+    if not gene_groups:
+        return
+    legend_kws = None
+    if show_legend:
+        legend_kws = {
+            "title": "Feature groups",
+            "title_fontproperties": {"weight": "normal"},
+        }
+    board.add_left(
+        mp.Colors(
+            gene_groups,
+            palette=gene_colors,
+            legend_kws=legend_kws,
+        ),
+        size=0.15,
+        pad=0.05,
+        legend=show_legend,
+    )
+
+
+def _add_dynamic_row_labels(board, mp, label_names, *, direct_labels=False):
+    if direct_labels:
+        board.add_left(
+            mp.Labels(label_names, align="right", fontsize=10),
+            pad=0.03,
+        )
+        return
+    if any(label_names) and len(label_names) >= 2:
+        board.add_left(
+            _safe_anno_labels(
+                mp,
+                _make_masked_labels(label_names),
+                text_pad=0.48,
+                text_gap=0.08,
+                pointer_size=0.28,
+                linewidth=0.5,
+                connectionstyle="bar,fraction=-0.24",
+                fontsize=8,
+            ),
+            pad=0.03,
+        )
+    elif any(label_names):
+        board.add_left(
+            mp.Labels(label_names, fontsize=8),
+            pad=0.03,
+        )
 
 
 def _hide_plotter_axis(plotter):
@@ -486,12 +564,161 @@ def _attach_post_render_hook(plotter, callback):
     return plotter
 
 
+def _style_dynamic_heatmap_legends(fig):
+    if fig is None:
+        return
+
+    content_x0 = 1.0
+    for ax in fig.axes:
+        if not ax.get_visible():
+            continue
+        has_visual = bool(ax.images or ax.collections or ax.lines or ax.patches)
+        if has_visual:
+            content_x0 = min(content_x0, ax.get_position().x0)
+
+    for ax in fig.axes:
+        legend = ax.get_legend()
+        if legend is not None:
+            title = legend.get_title()
+            if title is not None:
+                title.set_fontweight("normal")
+
+        for getter, setter in (
+            (ax.get_title, ax.set_title),
+            (ax.get_xlabel, ax.set_xlabel),
+            (ax.get_ylabel, ax.set_ylabel),
+        ):
+            value = getter()
+            if value == "Feature groups":
+                bbox = ax.get_position()
+                if bbox.x1 <= content_x0 + 0.02:
+                    setter("")
+
+        for text in ax.texts:
+            if text.get_text() == "Feature groups":
+                x, _ = text.get_position()
+                try:
+                    text.set_fontweight("normal")
+                except Exception:
+                    pass
+                if x <= 0:
+                    text.set_visible(False)
+
+
+def _find_main_heatmap_axis(fig, n_rows, n_cols):
+    if fig is None:
+        return None
+
+    candidates = []
+    for ax in fig.axes:
+        if not ax.get_visible():
+            continue
+        has_visual = bool(ax.collections or ax.images or ax.lines or ax.patches)
+        if not has_visual:
+            continue
+
+        bbox = ax.get_position()
+        area = float(bbox.width * bbox.height)
+        x0, x1 = ax.get_xlim()
+        y0, y1 = ax.get_ylim()
+        xspan = abs(float(x1) - float(x0))
+        yspan = abs(float(y1) - float(y0))
+        dim_penalty = abs(xspan - float(n_cols)) + abs(yspan - float(n_rows))
+        candidates.append((dim_penalty, -area, ax))
+
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda item: (item[0], item[1]))
+    return candidates[0][2]
+
+
+def _annotate_heatmap_values(
+    fig,
+    values,
+    *,
+    value_fmt=".2f",
+    value_cutoff=0.0,
+    use_abs_cutoff=False,
+    fontsize=8,
+    text_color="auto",
+    cmap="RdBu_r",
+    vmin=None,
+    vmax=None,
+):
+    if fig is None:
+        return
+
+    if isinstance(values, pd.DataFrame):
+        matrix = values.to_numpy(dtype=float)
+    else:
+        matrix = np.asarray(values, dtype=float)
+
+    if matrix.ndim != 2 or matrix.size == 0:
+        return
+
+    n_rows, n_cols = matrix.shape
+    ax = _find_main_heatmap_axis(fig, n_rows, n_cols)
+    if ax is None:
+        return
+
+    for text in list(ax.texts):
+        if getattr(text, "gid", None) == "ov_heatmap_value":
+            text.remove()
+
+    finite_values = matrix[np.isfinite(matrix)]
+    if finite_values.size == 0:
+        return
+
+    resolved_vmin = float(np.nanmin(finite_values)) if vmin is None else float(vmin)
+    resolved_vmax = float(np.nanmax(finite_values)) if vmax is None else float(vmax)
+    if resolved_vmin == resolved_vmax:
+        eps = 1e-6 if resolved_vmin == 0 else abs(resolved_vmin) * 0.05
+        resolved_vmin -= eps
+        resolved_vmax += eps
+
+    cmap_obj = cm.get_cmap(cmap) if isinstance(cmap, str) else cmap
+    if resolved_vmin < 0 < resolved_vmax:
+        norm = TwoSlopeNorm(vmin=resolved_vmin, vcenter=0.0, vmax=resolved_vmax)
+    else:
+        norm = Normalize(vmin=resolved_vmin, vmax=resolved_vmax)
+
+    cutoff = 0.0 if value_cutoff is None else float(value_cutoff)
+    for row_idx in range(n_rows):
+        for col_idx in range(n_cols):
+            value = matrix[row_idx, col_idx]
+            if not np.isfinite(value):
+                continue
+            compare_value = abs(value) if use_abs_cutoff else value
+            if compare_value < cutoff:
+                continue
+            label = format(float(value), value_fmt)
+            if text_color == "auto":
+                rgba = cmap_obj(norm(float(value)))
+                luminance = 0.299 * rgba[0] + 0.587 * rgba[1] + 0.114 * rgba[2]
+                current_text_color = "#F8F8F8" if luminance < 0.5 else "#1F1F1F"
+            else:
+                current_text_color = text_color
+            text = ax.text(
+                col_idx + 0.5,
+                row_idx + 0.5,
+                label,
+                ha="center",
+                va="center",
+                fontsize=fontsize,
+                color=current_text_color,
+            )
+            text.set_gid("ov_heatmap_value")
+
+
 def _style_heatmap_axes(fig, border_color="#2B2B2B", border_width=0.8):
     if fig is None:
         return
 
     for ax in fig.axes:
-        has_plotted_content = bool(ax.collections or ax.images or ax.lines or ax.patches)
+        has_plotted_content = bool(
+            ax.collections or ax.images or ax.lines or ax.patches
+        )
         if not has_plotted_content:
             continue
 
@@ -631,7 +858,9 @@ def _prepare_dynamic_matrix(
     mask = obs[pseudotime_key].notna()
     if lineage_key is not None:
         if lineage_key not in obs:
-            raise ValueError(f"lineage_key '{lineage_key}' is not present in adata.obs.")
+            raise ValueError(
+                f"lineage_key '{lineage_key}' is not present in adata.obs."
+            )
         if lineages is not None:
             lineages = [lineages] if isinstance(lineages, str) else list(lineages)
             mask &= obs[lineage_key].isin(lineages)
@@ -686,7 +915,9 @@ def _prepare_dynamic_matrix(
             metadata = pd.DataFrame(
                 {
                     "cell": list(meta.index),
-                    "pseudotime": pd.to_numeric(meta[pseudotime_key], errors="coerce").to_numpy(),
+                    "pseudotime": pd.to_numeric(
+                        meta[pseudotime_key], errors="coerce"
+                    ).to_numpy(),
                 },
                 index=meta.index.astype(str),
             )
@@ -697,7 +928,9 @@ def _prepare_dynamic_matrix(
             chunks = []
             metadata_rows = []
             for lineage_name in lineage_names:
-                lineage_meta = meta.loc[meta[lineage_key].astype(str) == lineage_name].copy()
+                lineage_meta = meta.loc[
+                    meta[lineage_key].astype(str) == lineage_name
+                ].copy()
                 if lineage_meta.empty:
                     continue
                 lineage_meta = lineage_meta.sort_values(
@@ -750,14 +983,18 @@ def _prepare_dynamic_matrix(
                 if is_numeric_dtype(meta[key]):
                     metadata[key] = grouped_meta.mean().to_numpy()
                 else:
-                    metadata[key] = grouped_meta.agg(lambda x: x.astype(str).mode().iloc[0] if len(x) else "").to_numpy()
+                    metadata[key] = grouped_meta.agg(
+                        lambda x: x.astype(str).mode().iloc[0] if len(x) else ""
+                    ).to_numpy()
     else:
         lineage_names = _resolve_lineage_order(meta[lineage_key], lineages)
         reverse_lineages = _resolve_reverse_lineages(reverse_ht, lineage_names)
         chunks = []
         metadata_rows = []
         for lineage_name in lineage_names:
-            lineage_meta = meta.loc[meta[lineage_key].astype(str) == lineage_name].copy()
+            lineage_meta = meta.loc[
+                meta[lineage_key].astype(str) == lineage_name
+            ].copy()
             if lineage_meta.empty:
                 continue
             lineage_meta = lineage_meta.sort_values(
@@ -783,9 +1020,13 @@ def _prepare_dynamic_matrix(
                     if is_numeric_dtype(lineage_meta[key]):
                         annotation_values[key] = grouped_bins[key].mean().to_numpy()
                     else:
-                        annotation_values[key] = grouped_bins[key].agg(
-                            lambda x: x.astype(str).mode().iloc[0] if len(x) else ""
-                        ).to_numpy()
+                        annotation_values[key] = (
+                            grouped_bins[key]
+                            .agg(
+                                lambda x: x.astype(str).mode().iloc[0] if len(x) else ""
+                            )
+                            .to_numpy()
+                        )
             metadata_rows.extend(
                 {
                     "column": label,
@@ -806,7 +1047,9 @@ def _prepare_dynamic_matrix(
     return matrix, metadata
 
 
-def _compute_dynamic_feature_metadata(matrix, metadata, order_by="peak", cluster_features_by=None):
+def _compute_dynamic_feature_metadata(
+    matrix, metadata, order_by="peak", cluster_features_by=None
+):
     lineage_names = (
         list(dict.fromkeys(metadata["lineage"].astype(str)))
         if "lineage" in metadata.columns
@@ -827,7 +1070,9 @@ def _compute_dynamic_feature_metadata(matrix, metadata, order_by="peak", cluster
         feature_metadata["valley_time"] = time_values[valley_idx]
         feature_metadata["peak_lineage"] = "global"
         feature_metadata["cluster_time"] = (
-            feature_metadata["peak_time"] if order_by == "peak" else feature_metadata["valley_time"]
+            feature_metadata["peak_time"]
+            if order_by == "peak"
+            else feature_metadata["valley_time"]
         )
         return feature_metadata
 
@@ -850,17 +1095,15 @@ def _compute_dynamic_feature_metadata(matrix, metadata, order_by="peak", cluster
             raise ValueError(
                 f"cluster_features_by '{cluster_features_by}' is not present in dynamic heatmap lineages."
             )
-        feature_metadata["cluster_time"] = feature_metadata[f"{cluster_lineage}_{time_key}"]
+        feature_metadata["cluster_time"] = feature_metadata[
+            f"{cluster_lineage}_{time_key}"
+        ]
         feature_metadata["peak_lineage"] = cluster_lineage
     else:
-        # Use min across lineages so genes that peak/valley earliest appear
-        # first (ascending sort → early-peaking genes at top), matching scop
-        # behaviour where most genes only exist in one lineage (na.rm=TRUE max
-        # degenerates to that single value; our min gives the same semantics
-        # when all lineages are present but we want the earliest-active lineage
-        # to drive the ordering).
         feature_metadata["cluster_time"] = lineage_time.min(axis=1)
-        feature_metadata["peak_lineage"] = lineage_time.idxmin(axis=1).str.replace(f"_{time_key}", "", regex=False)
+        feature_metadata["peak_lineage"] = lineage_time.idxmin(axis=1).str.replace(
+            f"_{time_key}", "", regex=False
+        )
 
     return feature_metadata
 
@@ -881,11 +1124,15 @@ def _compute_lineage_presence(matrix, metadata, lineage_names, presence_threshol
             presence[lineage_name] = np.zeros(matrix.shape[0], dtype=bool)
             continue
         lin_max = matrix.loc[:, cols].abs().max(axis=1)
-        presence[lineage_name] = (lin_max / global_max).fillna(0).to_numpy() >= presence_threshold
+        presence[lineage_name] = (lin_max / global_max).fillna(
+            0
+        ).to_numpy() >= presence_threshold
     return presence
 
 
-def _split_dynamic_features(matrix, feature_metadata, n_split=None, split_method="kmeans-peaktime"):
+def _split_dynamic_features(
+    matrix, feature_metadata, n_split=None, split_method="kmeans-peaktime"
+):
     if n_split is None or n_split <= 1 or matrix.shape[0] <= 1:
         return None
 
@@ -903,7 +1150,9 @@ def _split_dynamic_features(matrix, feature_metadata, n_split=None, split_method
 
     if split_method.startswith("kmeans"):
         if split_method.endswith("peaktime"):
-            fit_data = feature_metadata.loc[ordered_index, ["cluster_time"]].to_numpy(dtype=float)
+            fit_data = feature_metadata.loc[ordered_index, ["cluster_time"]].to_numpy(
+                dtype=float
+            )
         else:
             fit_data = working.to_numpy()
         _, labels = kmeans2(
@@ -914,7 +1163,9 @@ def _split_dynamic_features(matrix, feature_metadata, n_split=None, split_method
         )
     else:
         if split_method.endswith("peaktime"):
-            fit_data = feature_metadata.loc[ordered_index, ["cluster_time"]].to_numpy(dtype=float)
+            fit_data = feature_metadata.loc[ordered_index, ["cluster_time"]].to_numpy(
+                dtype=float
+            )
         else:
             fit_data = working.to_numpy()
         if fit_data.shape[0] == 1:
@@ -923,9 +1174,14 @@ def _split_dynamic_features(matrix, feature_metadata, n_split=None, split_method
             tree = linkage(pdist(fit_data), method="average")
             from scipy.cluster.hierarchy import fcluster
 
-            labels = fcluster(tree, t=min(n_split, len(ordered_index)), criterion="maxclust") - 1
+            labels = (
+                fcluster(tree, t=min(n_split, len(ordered_index)), criterion="maxclust")
+                - 1
+            )
 
-    split_labels = pd.Series([f"cluster_{int(label) + 1}" for label in labels], index=ordered_index)
+    split_labels = pd.Series(
+        [f"cluster_{int(label) + 1}" for label in labels], index=ordered_index
+    )
     ordering = (
         feature_metadata.loc[ordered_index]
         .assign(split=split_labels)
@@ -937,7 +1193,9 @@ def _split_dynamic_features(matrix, feature_metadata, n_split=None, split_method
 def _cluster_dynamic_rows(matrix, feature_metadata):
     if matrix.shape[0] <= 2:
         return matrix.index
-    ordering = feature_metadata.sort_values(["cluster_time", "peak_lineage"], kind="stable").index
+    ordering = feature_metadata.sort_values(
+        ["cluster_time", "peak_lineage"], kind="stable"
+    ).index
     ordered_matrix = matrix.loc[ordering]
     distances = pdist(ordered_matrix.to_numpy())
     if len(distances) == 0:
@@ -980,7 +1238,11 @@ def _smooth_dynamic_matrix(matrix, metadata, window=15):
         cols = list(meta_block.index)
         if not cols:
             continue
-        smoothed_blocks.append(_smooth_matrix_columns(matrix.loc[:, cols], window=min(int(window), len(cols))))
+        smoothed_blocks.append(
+            _smooth_matrix_columns(
+                matrix.loc[:, cols], window=min(int(window), len(cols))
+            )
+        )
         ordered_columns.extend(cols)
     if not smoothed_blocks:
         return matrix
@@ -997,12 +1259,16 @@ def _fit_dynamic_matrix(matrix, metadata, window=31):
 
     fitted_blocks = []
     ordered_columns = []
-    for lineage_name, meta_block in metadata.groupby("lineage", sort=False, observed=True):
+    for lineage_name, meta_block in metadata.groupby(
+        "lineage", sort=False, observed=True
+    ):
         cols = list(meta_block.index)
         if not cols:
             continue
         block = matrix.loc[:, cols]
-        fitted_block = _smooth_matrix_columns(block, window=min(window, max(3, len(cols) // 5 or 3)))
+        fitted_block = _smooth_matrix_columns(
+            block, window=min(window, max(3, len(cols) // 5 or 3))
+        )
         fitted_blocks.append(fitted_block)
         ordered_columns.extend(cols)
     if not fitted_blocks:
@@ -1048,6 +1314,19 @@ def _select_spaced_row_labels(row_names, n_labels, groups=None):
         chosen = sorted(chosen)
         keep = np.linspace(0, len(chosen) - 1, num=n_labels, dtype=int)
         chosen = [chosen[i] for i in sorted(set(keep.tolist()))]
+    chosen = sorted(chosen)
+    min_gap = max(1, int(np.ceil(total / max(n_labels * 2, 1))))
+    min_gap_floor = max(1, int(np.ceil(min_gap * 0.6)))
+    while True:
+        filtered = []
+        for idx in chosen:
+            if filtered and idx - filtered[-1] < min_gap:
+                continue
+            filtered.append(idx)
+        if len(filtered) >= n_labels or min_gap <= min_gap_floor:
+            chosen = filtered
+            break
+        min_gap -= 1
     for idx in chosen:
         labels[idx] = row_names[idx]
     return labels
@@ -1076,7 +1355,10 @@ def _build_dynamic_annotation_palette(metadata, key, cmap_name):
         return cmap_name, True
     categories = list(metadata[key].astype(str))
     palette = dict(
-        zip(list(dict.fromkeys(categories)), _resolve_palette(len(dict.fromkeys(categories))))
+        zip(
+            list(dict.fromkeys(categories)),
+            _resolve_palette(len(dict.fromkeys(categories))),
+        )
     )
     return palette, False
 
@@ -1128,15 +1410,21 @@ def _make_dynamic_annotation_track(
     )
 
 
-def _resolve_dynamic_track_series(adata, lineage_meta, item, use_raw=False, layer=None, gene_symbols=None):
+def _resolve_dynamic_track_series(
+    adata, lineage_meta, item, use_raw=False, layer=None, gene_symbols=None
+):
     if item in lineage_meta.columns:
-        return pd.Series(lineage_meta[item].to_numpy(), index=lineage_meta.index, name=item)
+        return pd.Series(
+            lineage_meta[item].to_numpy(), index=lineage_meta.index, name=item
+        )
     if "cell" not in lineage_meta.columns:
         return None
 
     cells = lineage_meta["cell"].astype(str)
     if item in adata.obs.columns:
-        return pd.Series(adata.obs.loc[cells, item].to_numpy(), index=lineage_meta.index, name=item)
+        return pd.Series(
+            adata.obs.loc[cells, item].to_numpy(), index=lineage_meta.index, name=item
+        )
 
     available = _available_var_names(adata, use_raw)
     if item in available:
@@ -1201,49 +1489,69 @@ def _make_separate_track_plotter(
     label = track_label if show_label else None
     label_props = {"fontsize": 9} if show_label else None
 
-    # Resolve plot_type
     is_categorical = len(series_list) == 1 and not is_numeric_dtype(series_list[0])
     if plot_type == "auto":
         plot_type = "area" if is_categorical else "heatmap"
 
-    # Categorical area chart (stacked bar)
     if plot_type == "area" and is_categorical:
         categories = series_list[0].astype(str)
         onehot = pd.get_dummies(categories)
         prop = onehot.T
-        prop = prop.T.rolling(window=min(max(3, int(smooth_window)), len(categories)), center=True, min_periods=1).mean().T
+        prop = (
+            prop.T.rolling(
+                window=min(max(3, int(smooth_window)), len(categories)),
+                center=True,
+                min_periods=1,
+            )
+            .mean()
+            .T
+        )
         prop = prop.div(prop.sum(axis=0).replace(0, np.nan), axis=1).fillna(0)
         palette_lookup = None
         if len(items) == 1 and items[0] in adata.obs.columns:
             palette_lookup = _resolve_group_colors(adata, items[0], list(prop.index))
-        colors = [palette_lookup[item] for item in prop.index] if palette_lookup is not None else _resolve_palette(prop.shape[0])
-        return _hide_plotter_axis(mp.StackBar(
-            prop,
-            items=list(prop.index),
-            colors=colors,
-            width=1.0,
-            linewidth=0,
-            edgecolor="none",
-            antialiased=False,
-            label=label,
-            label_loc="left",
-            label_props=label_props,
-        )), n_items
+        colors = (
+            [palette_lookup[item] for item in prop.index]
+            if palette_lookup is not None
+            else _resolve_palette(prop.shape[0])
+        )
+        return _hide_plotter_axis(
+            mp.StackBar(
+                prop,
+                items=list(prop.index),
+                colors=colors,
+                width=1.0,
+                linewidth=0,
+                edgecolor="none",
+                antialiased=False,
+                label=label,
+                label_loc="left",
+                label_props=label_props,
+            )
+        ), n_items
 
-    # Build numeric matrix for the remaining plot types
     if is_categorical:
-        # Force categorical data into numeric (one-hot proportions)
         categories = series_list[0].astype(str)
         onehot = pd.get_dummies(categories)
         matrix = onehot.T.to_numpy().astype(float)
     else:
-        matrix = np.vstack([pd.to_numeric(s, errors="coerce").to_numpy(dtype=float) for s in series_list])
+        matrix = np.vstack(
+            [
+                pd.to_numeric(s, errors="coerce").to_numpy(dtype=float)
+                for s in series_list
+            ]
+        )
     if matrix.shape[1] > 2:
-        matrix = pd.DataFrame(matrix).T.rolling(
-            window=min(max(3, int(smooth_window)), matrix.shape[1]),
-            center=True,
-            min_periods=1,
-        ).mean().T.to_numpy()
+        matrix = (
+            pd.DataFrame(matrix)
+            .T.rolling(
+                window=min(max(3, int(smooth_window)), matrix.shape[1]),
+                center=True,
+                min_periods=1,
+            )
+            .mean()
+            .T.to_numpy()
+        )
 
     if plot_type == "heatmap":
         return mp.ColorMesh(
@@ -1255,13 +1563,19 @@ def _make_separate_track_plotter(
             label_props=label_props,
         ), n_items
     elif plot_type == "line":
-        # Line plot — each row of the matrix is a separate line
-        names = [s.name for s in series_list] if not is_categorical else list(pd.get_dummies(series_list[0].astype(str)).columns)
+        names = (
+            [s.name for s in series_list]
+            if not is_categorical
+            else list(pd.get_dummies(series_list[0].astype(str)).columns)
+        )
         palette_lookup = None
         if is_categorical and len(items) == 1 and items[0] in adata.obs.columns:
             palette_lookup = _resolve_group_colors(adata, items[0], names)
-        colors = [palette_lookup[n] for n in names] if palette_lookup else _resolve_palette(matrix.shape[0])
-        # Use Arc to draw filled line curves
+        colors = (
+            [palette_lookup[n] for n in names]
+            if palette_lookup
+            else _resolve_palette(matrix.shape[0])
+        )
         try:
             return mp.Arc(
                 matrix,
@@ -1272,7 +1586,6 @@ def _make_separate_track_plotter(
                 label_props=label_props,
             ), n_items
         except (TypeError, AttributeError):
-            # Fallback to ColorMesh if Arc is unavailable
             return mp.ColorMesh(
                 matrix,
                 cmap=continuous_cmap,
@@ -1282,7 +1595,6 @@ def _make_separate_track_plotter(
                 label_props=label_props,
             ), n_items
     elif plot_type == "bar":
-        # Simple bar chart
         if matrix.shape[0] == 1:
             values = matrix[0]
             return mp.Numbers(
@@ -1301,7 +1613,6 @@ def _make_separate_track_plotter(
             label_props=label_props,
         ), n_items
     else:
-        # Default: heatmap
         return mp.ColorMesh(
             matrix,
             cmap=continuous_cmap,
@@ -1334,6 +1645,16 @@ def _score_dynamic_features(matrix, metadata, smooth_window=21):
             block_score.append(corr * amplitude)
         scores = np.maximum(scores, pd.Series(block_score, index=expr.index))
     return pd.Series(scores, index=matrix.index).sort_values(ascending=False)
+
+
+def _filter_dynamic_candidates(dynamic_score):
+    score = pd.Series(dynamic_score).replace([np.inf, -np.inf], np.nan).dropna()
+    score = score[score > 0]
+    if score.empty:
+        return list(
+            pd.Series(dynamic_score).replace([np.inf, -np.inf], np.nan).dropna().index
+        )
+    return list(score.index)
 
 
 @register_function(
@@ -1370,6 +1691,9 @@ def group_heatmap(
     legend_style: str = "tight",
     border: bool = False,
     label: str = "Mean expression",
+    show_values: bool = False,
+    value_fmt: str = ".2f",
+    value_cutoff: float = 0.0,
     save: bool | str = False,
     save_pathway: str = "",
     show: bool = False,
@@ -1408,6 +1732,12 @@ def group_heatmap(
         Whether to draw a visible border around heatmap axes after rendering.
     label
         Label used for the heatmap value legend.
+    show_values
+        Whether to print heatmap values inside cells.
+    value_fmt
+        Format string for printed values (e.g. ``'.2f'``).
+    value_cutoff
+        Only display text labels for values greater than or equal to this threshold.
     save, save_pathway, show
         Output controls. ``save`` may be ``True``/``False`` or a concrete path.
 
@@ -1442,8 +1772,8 @@ def group_heatmap(
 
     heatmap = ma.Heatmap(
         grouped_expr,
-        width=max(float(figsize[0]) * 0.7, 3.0),
-        height=max(float(figsize[1]) * 0.7, 2.5),
+        width=float(figsize[0]),
+        height=float(figsize[1]),
         cmap=cmap,
         label=label,
     )
@@ -1457,11 +1787,17 @@ def group_heatmap(
     right_labels = right_color_labels or None
 
     if isinstance(left_labels, Mapping):
-        left_labels = [left_labels.get(label_name, label_name) for label_name in row_labels]
+        left_labels = [
+            left_labels.get(label_name, label_name) for label_name in row_labels
+        ]
     if isinstance(right_labels, Mapping):
-        right_labels = [right_labels.get(label_name, label_name) for label_name in row_labels]
+        right_labels = [
+            right_labels.get(label_name, label_name) for label_name in row_labels
+        ]
 
-    heatmap.add_left(mp.Colors(row_labels, palette=left_colors), size=0.2, pad=0.05, legend=False)
+    heatmap.add_left(
+        mp.Colors(row_labels, palette=left_colors), size=0.2, pad=0.05, legend=False
+    )
     heatmap.add_left(mp.Labels(left_labels, align="right", fontsize=12), pad=0.05)
     heatmap.add_right(
         mp.Numbers(
@@ -1477,14 +1813,21 @@ def group_heatmap(
     )
 
     if right_color_bars is not None:
-        heatmap.add_right(mp.Colors(row_labels, palette=right_color_bars), size=0.15, pad=0.05, legend=False)
+        heatmap.add_right(
+            mp.Colors(row_labels, palette=right_color_bars),
+            size=0.15,
+            pad=0.05,
+            legend=False,
+        )
     if right_labels is not None:
         heatmap.add_right(mp.Labels(right_labels, fontsize=10), pad=0.05)
 
     if grouped_var_names is not None:
         gene_groups = []
         for group, genes in grouped_var_names.items():
-            gene_groups.extend([group] * len([gene for gene in genes if gene in col_labels]))
+            gene_groups.extend(
+                [group] * len([gene for gene in genes if gene in col_labels])
+            )
         ordered_groups = _normalize_group_order(
             col_split,
             list(dict.fromkeys(gene_groups)),
@@ -1493,10 +1836,14 @@ def group_heatmap(
         gene_group_colors = col_color_bars or dict(
             zip(ordered_groups, _resolve_palette(len(ordered_groups)))
         )
-        heatmap.add_top(mp.Colors(gene_groups, palette=gene_group_colors), size=0.2, pad=0.05)
+        heatmap.add_top(
+            mp.Colors(gene_groups, palette=gene_group_colors), size=0.2, pad=0.05
+        )
         heatmap.group_cols(gene_groups, order=ordered_groups)
     elif col_color_bars is not None:
-        heatmap.add_top(mp.Colors(col_labels, palette=col_color_bars), size=0.2, pad=0.05)
+        heatmap.add_top(
+            mp.Colors(col_labels, palette=col_color_bars), size=0.2, pad=0.05
+        )
 
     heatmap.add_bottom(mp.Labels(col_labels, rotation=90, fontsize=10), pad=0.05)
 
@@ -1518,12 +1865,25 @@ def group_heatmap(
             heatmap,
             lambda: _style_heatmap_axes(getattr(heatmap, "figure", None)),
         )
+    if show_values:
+        heatmap = _attach_post_render_hook(
+            heatmap,
+            lambda: _annotate_heatmap_values(
+                getattr(heatmap, "figure", None),
+                grouped_expr,
+                value_fmt=value_fmt,
+                value_cutoff=value_cutoff,
+                use_abs_cutoff=False,
+                cmap=cmap,
+            ),
+        )
 
     save_path = save if isinstance(save, str) else (save_pathway if save else None)
     fig = None
     if save_path or show or _legend_kws is not None:
-        fig = _render_plot(heatmap, save_path=save_path, show=show,
-                           legend_kws=_legend_kws)
+        fig = _render_plot(
+            heatmap, save_path=save_path, show=show, legend_kws=_legend_kws
+        )
 
     return heatmap if fig is None else fig
 
@@ -1639,17 +1999,33 @@ def feature_heatmap(
         heatmap.group_cols(categories, order=list(dict.fromkeys(categories)))
 
     if show_column_names:
-        heatmap.add_bottom(mp.Labels(list(expr.index), rotation=90, fontsize=8), pad=0.05)
+        heatmap.add_bottom(
+            mp.Labels(list(expr.index), rotation=90, fontsize=8), pad=0.05
+        )
     if show_row_names:
-        heatmap.add_left(mp.Labels(list(expr.columns), align="right", fontsize=10), pad=0.05)
+        heatmap.add_left(
+            mp.Labels(list(expr.columns), align="right", fontsize=10), pad=0.05
+        )
 
     if grouped_var_names is not None:
         gene_groups = []
         for group, genes in grouped_var_names.items():
-            gene_groups.extend([group] * len([gene for gene in genes if gene in expr.columns]))
+            gene_groups.extend(
+                [group] * len([gene for gene in genes if gene in expr.columns])
+            )
         if gene_groups:
-            colors = dict(zip(list(dict.fromkeys(gene_groups)), _resolve_palette(len(dict.fromkeys(gene_groups)))))
-            heatmap.add_left(mp.Colors(gene_groups, palette=colors), size=0.15, pad=0.05, legend=False)
+            colors = dict(
+                zip(
+                    list(dict.fromkeys(gene_groups)),
+                    _resolve_palette(len(dict.fromkeys(gene_groups))),
+                )
+            )
+            heatmap.add_left(
+                mp.Colors(gene_groups, palette=colors),
+                size=0.15,
+                pad=0.05,
+                legend=False,
+            )
 
     _legend_kws = None
     if legend:
@@ -1666,25 +2042,33 @@ def feature_heatmap(
     save_path = save if isinstance(save, str) else (save_pathway if save else None)
     fig = None
     if save_path or show or _legend_kws is not None:
-        fig = _render_plot(heatmap, save_path=save_path, show=show,
-                           legend_kws=_legend_kws)
+        fig = _render_plot(
+            heatmap, save_path=save_path, show=show, legend_kws=_legend_kws
+        )
     return heatmap if fig is None else fig
 
 
 @register_function(
     aliases=["dynamic_heatmap", "伪时序热图", "动态热图"],
     category="pl",
-    description="Create a dynamic heatmap along pseudotime or another continuous ordering.",
+    description="Python-native dynamic heatmap for pseudotime-ordered expression trends, with optional lineage-aware layouts and Marsilea annotations.",
     examples=[
         "ov.pl.dynamic_heatmap(adata, var_names=genes, pseudotime='dpt_pseudotime')",
-        "ov.pl.dynamic_heatmap(adata, var_names=genes, pseudotime='pt_via', lineage_key='lineage')",
+        "ov.pl.dynamic_heatmap(adata, var_names=gene_modules, pseudotime='pt_via', cell_annotation='clusters')",
+        "ov.pl.dynamic_heatmap(adata, var_names=genes, pseudotime='palantir_pseudotime', lineage_key='lineage', lineages=['B-cell'])",
+        "ov.pl.dynamic_heatmap(adata, var_names=genes, pseudotime='pt_via', show_row_names=True, figsize=(4, 6))",
     ],
-    related=["pl.group_heatmap", "pl.feature_heatmap"],
+    related=[
+        "pl.group_heatmap",
+        "pl.feature_heatmap",
+        "pl.cell_cor_heatmap",
+        "pl.marker_heatmap",
+    ],
 )
 def dynamic_heatmap(
     adata: AnnData,
-    var_names,
     pseudotime: str,
+    var_names=None,
     *,
     lineage_key: str = None,
     lineages=None,
@@ -1726,6 +2110,7 @@ def dynamic_heatmap(
     save: bool | str = False,
     save_pathway: str = "",
     show: bool = False,
+    verbose: bool = True,
 ):
     """Plot dynamic feature trends along pseudotime, optionally by lineage.
 
@@ -1736,17 +2121,25 @@ def dynamic_heatmap(
     var_names
         Features to plot. Accepts a list of genes, a single gene name, a
         mapping of group label to gene list, or ``None`` to start from all
-        available features.
+        available features. When ``None``, the function prefers
+        ``adata.var['highly_variable_features']`` or
+        ``adata.var['highly_variable']`` as the candidate pool before
+        falling back to all features.
     pseudotime
         Key in ``adata.obs`` containing the continuous ordering variable.
     lineage_key
         Optional key in ``adata.obs`` describing lineage membership.
     lineages
-        Optional lineage subset to include.
+        Optional lineage subset to include. When provided, the displayed
+        lineage order follows this sequence.
     max_lineages
         Maximum number of lineages retained after ordering.
     top_features
-        Keep only the highest-scoring dynamic features after ranking.
+        Keep only the highest-scoring dynamic features after ranking. Dynamic
+        scores are computed from smoothed pseudotime correlation multiplied by
+        feature amplitude, so this parameter acts as a post-ranking cap rather
+        than the initial feature selection pool. The printed feature count
+        before fitting refers to the candidate pool before this cap is applied.
     cell_bins
         Number of bins used when aggregating cells along pseudotime.
     use_cell_columns
@@ -1757,7 +2150,8 @@ def dynamic_heatmap(
     aggregate
         Aggregation function used when binning cells, for example ``'mean'``.
     smooth_window, score_smooth_window, fitted_window
-        Window sizes used for smoothing, feature scoring, and fitted trends.
+        Window sizes used for display smoothing, dynamic feature scoring, and
+        fitted trend estimation respectively.
     figsize
         Figure size ``(width, height)`` in inches.
     layer, use_raw, gene_symbols
@@ -1779,7 +2173,9 @@ def dynamic_heatmap(
     row_cluster, col_cluster
         Whether to add hierarchical dendrograms for rows or columns.
     show_row_names, show_column_names
-        Whether to show row or column labels directly on the plot.
+        Whether to show row or column labels directly on the plot. When
+        ``show_row_names=True``, gene names are placed directly beside the
+        heatmap without connector lines.
     pseudotime_label
         Optional custom label for the pseudotime annotation.
     cell_annotation
@@ -1788,22 +2184,29 @@ def dynamic_heatmap(
     separate_annotation, separate_annotation_type, separate_smooth_window
         Controls for auxiliary smoothed annotation tracks.
     feature_labels
-        Explicit feature labels to force-display.
+        Explicit feature labels to force-display. When provided, these labels
+        take priority over ``top_label_features``.
     top_label_features
-        Number of automatically selected feature labels to display when
-        ``feature_labels`` is not provided.
+        Target number of automatically selected feature labels to display when
+        ``feature_labels`` is not provided and ``show_row_names=False``. The
+        function tries to honor this count while still enforcing spacing
+        between labels, so the final number may be slightly smaller in dense
+        layouts.
     legend, legend_style
         Legend visibility and layout strategy.
     border
         Whether to draw a visible border around heatmap axes after rendering.
     save, save_pathway, show
         Output controls. ``save`` may be ``True``/``False`` or a concrete path.
+    verbose
+        Whether to print a short preparation/rendering summary.
 
     Returns
     -------
     marsilea.StackBoard or matplotlib.figure.Figure
-        Returns the assembled Marsilea board by default, or the rendered figure
-        when rendering is triggered for saving/showing/tight legends.
+        Returns the assembled Marsilea board by default. When rendering is
+        triggered for saving, showing, or tight-legend export, returns the
+        rendered matplotlib figure instead.
     """
     if layer is not None:
         use_raw = False
@@ -1811,24 +2214,53 @@ def dynamic_heatmap(
         raise ValueError("use_raw=True was requested, but adata.raw is not available.")
 
     if var_names is None:
-        if use_raw:
-            selected_var_names = list(adata.raw.var_names)
-        else:
-            selected_var_names = list(adata.var_names)
+        selected_var_names = _dynamic_hvg_candidates(adata, use_raw)
+        if not selected_var_names:
+            if use_raw:
+                selected_var_names = list(adata.raw.var_names)
+            else:
+                selected_var_names = list(adata.var_names)
         grouped_var_names = None
     else:
         selected_var_names, grouped_var_names = _build_gene_groups(var_names)
         if selected_var_names is None:
             raise ValueError("Please provide `var_names` for dynamic_heatmap.")
         selected_var_names = _sanitize_var_names(adata, selected_var_names, use_raw)
+    if verbose:
+        print(
+            f"\n{Colors.HEADER}{Colors.BOLD}{EMOJI['start']} Dynamic heatmap:{Colors.ENDC}"
+        )
+        print(
+            f"   {Colors.CYAN}Candidate features: {Colors.BOLD}{len(selected_var_names)}{Colors.ENDC}"
+        )
+        print(f"   {Colors.CYAN}Pseudotime: {Colors.BOLD}{pseudotime}{Colors.ENDC}")
+        if lineage_key is not None:
+            print(
+                f"   {Colors.CYAN}Lineage key: {Colors.BOLD}{lineage_key}{Colors.ENDC}"
+            )
+        if cell_annotation is not None:
+            print(
+                f"   {Colors.CYAN}Cell annotation: {Colors.BOLD}{cell_annotation}{Colors.ENDC}"
+            )
+        print(
+            f"   {Colors.CYAN}use_fitted={Colors.BOLD}{use_fitted}{Colors.ENDC}{Colors.CYAN} | cell_bins={Colors.BOLD}{cell_bins}{Colors.ENDC}{Colors.CYAN} | cmap={Colors.BOLD}{cmap}{Colors.ENDC}"
+        )
 
     ma, mp = _import_marsilea()
     annotation_keys = None
     if cell_annotation is not None:
-        annotation_keys = [cell_annotation] if isinstance(cell_annotation, str) else list(cell_annotation)
+        annotation_keys = (
+            [cell_annotation]
+            if isinstance(cell_annotation, str)
+            else list(cell_annotation)
+        )
     separate_specs = None
     if separate_annotation is not None:
-        separate_specs = list(separate_annotation) if isinstance(separate_annotation, (list, tuple)) else [separate_annotation]
+        separate_specs = (
+            list(separate_annotation)
+            if isinstance(separate_annotation, (list, tuple))
+            else [separate_annotation]
+        )
 
     matrix, metadata = _prepare_dynamic_matrix(
         adata,
@@ -1846,19 +2278,34 @@ def dynamic_heatmap(
         use_cell_columns=use_cell_columns,
         annotation_keys=annotation_keys,
     )
-    if lineage_key is not None and "lineage" in metadata.columns and max_lineages is not None:
+    if (
+        lineage_key is not None
+        and "lineage" in metadata.columns
+        and max_lineages is not None
+    ):
         lineage_order = list(dict.fromkeys(metadata["lineage"].astype(str)))
         keep_lineages = lineage_order[: max(int(max_lineages), 1)]
-        keep_columns = metadata.index[metadata["lineage"].astype(str).isin(keep_lineages)]
+        keep_columns = metadata.index[
+            metadata["lineage"].astype(str).isin(keep_lineages)
+        ]
         metadata = metadata.loc[keep_columns]
         matrix = matrix.loc[:, keep_columns]
+    if verbose and lineage_key is not None and "lineage" in metadata.columns:
+        lineage_summary = list(dict.fromkeys(metadata["lineage"].astype(str)))
+        print(
+            f"   {Colors.CYAN}Lineages: {Colors.BOLD}{', '.join(lineage_summary)}{Colors.ENDC}"
+        )
     if use_fitted:
         matrix = _fit_dynamic_matrix(matrix, metadata, window=fitted_window)
     matrix = _smooth_dynamic_matrix(matrix, metadata, window=smooth_window)
-    heatmap_vmin, heatmap_vmax, heatmap_center = _dynamic_display_limits(matrix, standard_scale)
+    heatmap_vmin, heatmap_vmax, heatmap_center = _dynamic_display_limits(
+        matrix, standard_scale
+    )
     order_by = str(order_by).lower()
     if order_by not in {"peak", "peaktime", "valley", "valleytime"}:
-        raise ValueError("order_by must be one of {'peak', 'peaktime', 'valley', 'valleytime'}.")
+        raise ValueError(
+            "order_by must be one of {'peak', 'peaktime', 'valley', 'valleytime'}."
+        )
     order_mode = "peak" if order_by in {"peak", "peaktime"} else "valley"
 
     feature_metadata = _compute_dynamic_feature_metadata(
@@ -1867,15 +2314,27 @@ def dynamic_heatmap(
         order_by=order_mode,
         cluster_features_by=cluster_features_by,
     )
-    if top_features is not None and top_features > 0 and matrix.shape[0] > top_features:
+    dynamic_score = None
+    if top_features is not None or var_names is None:
         dynamic_score = _score_dynamic_features(
             matrix,
             metadata,
             smooth_window=score_smooth_window,
         )
-        keep_features = dynamic_score.index[: int(top_features)]
-        matrix = matrix.loc[keep_features]
-        feature_metadata = feature_metadata.loc[keep_features]
+        if var_names is None:
+            dynamic_keep = _filter_dynamic_candidates(dynamic_score)
+            if dynamic_keep:
+                matrix = matrix.loc[dynamic_keep]
+                feature_metadata = feature_metadata.loc[dynamic_keep]
+                dynamic_score = dynamic_score.loc[dynamic_keep]
+        if (
+            top_features is not None
+            and top_features > 0
+            and matrix.shape[0] > top_features
+        ):
+            keep_features = dynamic_score.index[: int(top_features)]
+            matrix = matrix.loc[keep_features]
+            feature_metadata = feature_metadata.loc[keep_features]
     ordered_rows = feature_metadata.sort_values(
         ["cluster_time", "peak_lineage"],
         kind="stable",
@@ -1920,11 +2379,26 @@ def dynamic_heatmap(
     if grouped_var_names is not None:
         gene_groups = []
         for group, genes in grouped_var_names.items():
-            gene_groups.extend([group] * len([gene for gene in genes if gene in matrix.index]))
-        if gene_groups:
-            gene_colors = dict(
-                zip(list(dict.fromkeys(gene_groups)), _resolve_palette(len(dict.fromkeys(gene_groups))))
+            gene_groups.extend(
+                [group] * len([gene for gene in genes if gene in matrix.index])
             )
+        if gene_groups:
+            group_order = list(dict.fromkeys(gene_groups))
+            gene_colors = None
+            if annotation_keys is not None:
+                for key in annotation_keys:
+                    if key in adata.obs.columns:
+                        obs_values = adata.obs[key]
+                        categories = (
+                            [str(value) for value in obs_values.cat.categories]
+                            if isinstance(obs_values.dtype, pd.CategoricalDtype)
+                            else list(dict.fromkeys(obs_values.astype(str)))
+                        )
+                        if set(group_order).issubset(set(categories)):
+                            gene_colors = _resolve_group_colors(adata, key, group_order)
+                            break
+            if gene_colors is None:
+                gene_colors = dict(zip(group_order, _resolve_palette(len(group_order))))
 
     split_order = None
     split_colors = None
@@ -1937,7 +2411,9 @@ def dynamic_heatmap(
     if "peak_lineage" in feature_metadata.columns:
         peak_lineages = list(feature_metadata["peak_lineage"].astype(str))
         peak_lineage_order = list(dict.fromkeys(peak_lineages))
-        peak_lineage_colors = dict(zip(peak_lineage_order, _resolve_palette(len(peak_lineage_order))))
+        peak_lineage_colors = dict(
+            zip(peak_lineage_order, _resolve_palette(len(peak_lineage_order)))
+        )
 
     has_lineage_panels = lineage_key is not None and "lineage" in metadata.columns
     plotter = None
@@ -1946,7 +2422,9 @@ def dynamic_heatmap(
         annotation_palettes = {}
         if annotation_keys is not None:
             for key in annotation_keys:
-                ann_palette, is_continuous = _build_dynamic_annotation_palette(metadata, key, pseudotime_cmap)
+                ann_palette, is_continuous = _build_dynamic_annotation_palette(
+                    metadata, key, pseudotime_cmap
+                )
                 if not is_continuous and key in adata.obs.columns:
                     categories = list(dict.fromkeys(metadata[key].astype(str)))
                     ann_palette = _resolve_group_colors(adata, key, categories)
@@ -1956,7 +2434,9 @@ def dynamic_heatmap(
         lineage_presence = _compute_lineage_presence(matrix, metadata, lineage_names)
         boards = []
         for idx, lineage_name in enumerate(lineage_names):
-            lineage_cols = metadata.index[metadata["lineage"].astype(str) == lineage_name]
+            lineage_cols = metadata.index[
+                metadata["lineage"].astype(str) == lineage_name
+            ]
             lineage_matrix = matrix.loc[:, lineage_cols]
             lineage_meta = metadata.loc[lineage_cols]
             width_ratio = lineage_matrix.shape[1] / max(matrix.shape[1], 1)
@@ -1968,14 +2448,12 @@ def dynamic_heatmap(
                 vmin=heatmap_vmin,
                 vmax=heatmap_vmax,
                 center=heatmap_center,
-                label="Dynamic expression (z-score)" if idx == 0 and str(standard_scale).lower() in {"var", "zscore"} else ("Dynamic expression" if idx == 0 else None),
+                label="Dynamic expression (z-score)"
+                if idx == 0 and str(standard_scale).lower() in {"var", "zscore"}
+                else ("Dynamic expression" if idx == 0 else None),
                 legend=idx == 0,
             )
 
-            # Top annotations — order (bottom→top, closest→farthest from heatmap):
-            # 1. separate_annotation tracks (closest to heatmap)
-            # 2. cell_annotation tracks
-            # 3. pseudotime (topmost)
             if separate_specs is not None:
                 for spec in separate_specs:
                     track_plotter, n_track_items = _make_separate_track_plotter(
@@ -1991,10 +2469,16 @@ def dynamic_heatmap(
                         plot_type=separate_annotation_type,
                     )
                     if track_plotter is not None:
-                        if annotation_keys is not None and isinstance(spec, str) and spec in annotation_keys:
+                        if (
+                            annotation_keys is not None
+                            and isinstance(spec, str)
+                            and spec in annotation_keys
+                        ):
                             track_plotter = _suppress_plotter_legend(track_plotter)
                         sep_size = 0.18 * max(n_track_items, 1)
-                        board.add_top(track_plotter, size=sep_size, pad=0.02, legend=idx == 0)
+                        board.add_top(
+                            track_plotter, size=sep_size, pad=0.02, legend=idx == 0
+                        )
             if annotation_keys is not None:
                 for key in annotation_keys:
                     ann_palette, is_continuous = annotation_palettes[key]
@@ -2035,7 +2519,13 @@ def dynamic_heatmap(
                 )
             if idx == 0:
                 if gene_groups:
-                    board.add_left(mp.Colors(gene_groups, palette=gene_colors), size=0.15, pad=0.05, legend=False)
+                    _add_dynamic_gene_group_strip(
+                        board,
+                        mp,
+                        gene_groups,
+                        gene_colors,
+                        show_legend=True,
+                    )
                 if row_split is not None:
                     board.add_left(
                         mp.Colors(list(row_split.astype(str)), palette=split_colors),
@@ -2045,30 +2535,14 @@ def dynamic_heatmap(
                     )
                 if row_cluster:
                     board.add_dendrogram("left", pad=0.05, colors="#33A6B8")
-                if any(label_names) and len(label_names) >= 2:
-                    board.add_left(
-                        _safe_anno_labels(
-                            mp,
-                            _make_masked_labels(label_names),
-                            text_pad=0.6,
-                            text_gap=0.1,
-                            pointer_size=0.3,
-                            linewidth=0.5,
-                            connectionstyle="bar,fraction=-0.2",
-                        ),
-                        pad=0.02,
-                    )
-                elif any(label_names):
-                    board.add_left(
-                        mp.Labels(label_names, fontsize=8),
-                        pad=0.02,
-                    )
+                _add_dynamic_row_labels(
+                    board,
+                    mp,
+                    label_names,
+                    direct_labels=show_row_names,
+                )
             if row_split is not None:
                 board.group_rows(list(row_split.astype(str)), order=split_order)
-            # Right-side lineage presence annotation: one strip per lineage.
-            # Dark (#181830) = gene is active in that lineage; transparent =
-            # gene absent/low.  Matches scop's is.na logic.  Only added to the
-            # last board to avoid duplication.
             if idx == len(lineage_names) - 1 and len(lineage_names) > 1:
                 for lineage_idx, lineage_label in enumerate(lineage_names):
                     present_arr = lineage_presence[lineage_label]
@@ -2090,12 +2564,19 @@ def dynamic_heatmap(
             board.add_title(top=lineage_name, pad=0.03, fontsize=12)
             boards.append(board)
         panel_boards = boards
-        plotter = ma.StackBoard(boards, direction="horizontal", spacing=0.06, keep_legends=False)
+        plotter = ma.StackBoard(
+            boards, direction="horizontal", spacing=0.06, keep_legends=False
+        )
         _legend_kws = None
         if legend:
             if legend_style == "tight":
-                _legend_kws = dict(pad=0.05, stack_size=2, legend_spacing=4,
-                                   stack_spacing=5, box_padding=0.5)
+                _legend_kws = dict(
+                    pad=0.05,
+                    stack_size=2,
+                    legend_spacing=4,
+                    stack_spacing=5,
+                    box_padding=0.5,
+                )
             else:
                 plotter.add_legends(
                     side="right",
@@ -2115,10 +2596,11 @@ def dynamic_heatmap(
             vmin=heatmap_vmin,
             vmax=heatmap_vmax,
             center=heatmap_center,
-            label="Dynamic expression (z-score)" if str(standard_scale).lower() in {"var", "zscore"} else "Dynamic expression",
+            label="Dynamic expression (z-score)"
+            if str(standard_scale).lower() in {"var", "zscore"}
+            else "Dynamic expression",
         )
 
-        # Top annotations — order (bottom→top): separate → cell_annotation → pseudotime
         if separate_specs is not None:
             for spec in separate_specs:
                 track_plotter, n_track_items = _make_separate_track_plotter(
@@ -2134,13 +2616,19 @@ def dynamic_heatmap(
                     plot_type=separate_annotation_type,
                 )
                 if track_plotter is not None:
-                    if annotation_keys is not None and isinstance(spec, str) and spec in annotation_keys:
+                    if (
+                        annotation_keys is not None
+                        and isinstance(spec, str)
+                        and spec in annotation_keys
+                    ):
                         track_plotter = _suppress_plotter_legend(track_plotter)
                     sep_size = 0.18 * max(n_track_items, 1)
                     heatmap.add_top(track_plotter, size=sep_size, pad=0.02)
         if annotation_keys is not None:
             for key in annotation_keys:
-                ann_palette, is_continuous = _build_dynamic_annotation_palette(metadata, key, pseudotime_cmap)
+                ann_palette, is_continuous = _build_dynamic_annotation_palette(
+                    metadata, key, pseudotime_cmap
+                )
                 if not is_continuous and key in adata.obs.columns:
                     categories = list(dict.fromkeys(metadata[key].astype(str)))
                     ann_palette = _resolve_group_colors(adata, key, categories)
@@ -2168,7 +2656,13 @@ def dynamic_heatmap(
             pad=0.03,
         )
         if gene_groups:
-            heatmap.add_left(mp.Colors(gene_groups, palette=gene_colors), size=0.15, pad=0.05, legend=False)
+            _add_dynamic_gene_group_strip(
+                heatmap,
+                mp,
+                gene_groups,
+                gene_colors,
+                show_legend=True,
+            )
         if row_split is not None:
             heatmap.add_left(
                 mp.Colors(list(row_split.astype(str)), palette=split_colors),
@@ -2177,24 +2671,12 @@ def dynamic_heatmap(
                 legend=False,
             )
             heatmap.group_rows(list(row_split.astype(str)), order=split_order)
-        if any(label_names) and len(label_names) >= 2:
-            heatmap.add_left(
-                _safe_anno_labels(
-                    mp,
-                    _make_masked_labels(label_names),
-                    text_pad=0.6,
-                    text_gap=0.1,
-                    pointer_size=0.3,
-                    linewidth=0.5,
-                    connectionstyle="bar,fraction=-0.2",
-                ),
-                pad=0.02,
-            )
-        elif any(label_names):
-            heatmap.add_left(
-                mp.Labels(label_names, fontsize=8),
-                pad=0.02,
-            )
+        _add_dynamic_row_labels(
+            heatmap,
+            mp,
+            label_names,
+            direct_labels=show_row_names,
+        )
         if show_column_names:
             heatmap.add_bottom(
                 mp.Labels(
@@ -2207,14 +2689,18 @@ def dynamic_heatmap(
         if peak_lineage_colors is not None:
             for lineage_idx, lineage_label in enumerate(peak_lineage_order):
                 lineage_match = np.where(
-                    feature_metadata["peak_lineage"].astype(str).to_numpy() == lineage_label,
+                    feature_metadata["peak_lineage"].astype(str).to_numpy()
+                    == lineage_label,
                     lineage_label,
                     "other",
                 )
                 heatmap.add_right(
                     mp.Colors(
                         lineage_match,
-                        palette={lineage_label: peak_lineage_colors[lineage_label], "other": "#FFFFFF"},
+                        palette={
+                            lineage_label: peak_lineage_colors[lineage_label],
+                            "other": "#FFFFFF",
+                        },
                     ),
                     size=0.08,
                     pad=0.03 if lineage_idx == 0 else 0.0,
@@ -2228,8 +2714,13 @@ def dynamic_heatmap(
         _legend_kws = None
         if legend:
             if legend_style == "tight":
-                _legend_kws = dict(pad=0.05, stack_size=2, legend_spacing=4,
-                                   stack_spacing=5, box_padding=0.5)
+                _legend_kws = dict(
+                    pad=0.05,
+                    stack_size=2,
+                    legend_spacing=4,
+                    stack_spacing=5,
+                    box_padding=0.5,
+                )
             else:
                 heatmap.add_legends(
                     side="right",
@@ -2243,7 +2734,11 @@ def dynamic_heatmap(
         plotter = heatmap
 
     if pseudotime_label is not None:
-        label_values = [pseudotime_label] if np.isscalar(pseudotime_label) else list(pseudotime_label)
+        label_values = (
+            [pseudotime_label]
+            if np.isscalar(pseudotime_label)
+            else list(pseudotime_label)
+        )
 
         def _add_pseudotime_guides():
             if getattr(plotter, "_dynamic_pseudotime_guides_added", False):
@@ -2259,14 +2754,22 @@ def dynamic_heatmap(
                     ax = board.get_main_ax()
                     if ax is None:
                         continue
-                    lineage_meta = metadata.loc[metadata["lineage"].astype(str) == lineage_name]
+                    lineage_meta = metadata.loc[
+                        metadata["lineage"].astype(str) == lineage_name
+                    ]
                     panel_time = lineage_meta["pseudotime"].to_numpy(dtype=float)
                     if panel_time.size == 0:
                         continue
                     for value in label_values:
                         target = float(value)
                         xpos = int(np.argmin(np.abs(panel_time - target))) + 0.5
-                        ax.axvline(x=xpos, color="#111111", linestyle="--", linewidth=0.8, alpha=0.65)
+                        ax.axvline(
+                            x=xpos,
+                            color="#111111",
+                            linestyle="--",
+                            linewidth=0.8,
+                            alpha=0.65,
+                        )
             else:
                 ax = plotter.get_main_ax()
                 if ax is None:
@@ -2277,10 +2780,22 @@ def dynamic_heatmap(
                 for value in label_values:
                     target = float(value)
                     xpos = int(np.argmin(np.abs(panel_time - target))) + 0.5
-                    ax.axvline(x=xpos, color="#111111", linestyle="--", linewidth=0.8, alpha=0.65)
+                    ax.axvline(
+                        x=xpos,
+                        color="#111111",
+                        linestyle="--",
+                        linewidth=0.8,
+                        alpha=0.65,
+                    )
             plotter._dynamic_pseudotime_guides_added = True
 
         plotter = _attach_post_render_hook(plotter, _add_pseudotime_guides)
+
+    if legend or gene_groups:
+        plotter = _attach_post_render_hook(
+            plotter,
+            lambda: _style_dynamic_heatmap_legends(getattr(plotter, "figure", None)),
+        )
 
     if border:
         plotter = _attach_post_render_hook(
@@ -2291,23 +2806,36 @@ def dynamic_heatmap(
     save_path = save if isinstance(save, str) else (save_pathway if save else None)
     fig = None
     if save_path or show or _legend_kws is not None:
-        fig = _render_plot(plotter, save_path=save_path, show=show,
-                           legend_kws=_legend_kws)
+        fig = _render_plot(
+            plotter, save_path=save_path, show=show, legend_kws=_legend_kws
+        )
+    if verbose:
+        print(
+            f"\n{Colors.GREEN}{EMOJI['done']} Dynamic heatmap completed!{Colors.ENDC}"
+        )
+        print(
+            f"   {Colors.GREEN}✓ Matrix shape: {Colors.BOLD}{matrix.shape[0]}{Colors.ENDC}{Colors.GREEN} features × {Colors.BOLD}{matrix.shape[1]}{Colors.ENDC}{Colors.GREEN} columns{Colors.ENDC}"
+        )
 
     return plotter if fig is None else fig
 
 
-# ---------------------------------------------------------------------------
-# Cell correlation / similarity heatmap  (mirrors scop::CellCorHeatmap)
-# ---------------------------------------------------------------------------
 @register_function(
     aliases=["cell_cor_heatmap", "细胞相关性热图", "cell_similarity"],
     category="pl",
-    description="Compute and plot pairwise similarity between cell groups.",
+    description="Python-native group similarity heatmap for within-dataset or cross-dataset annotation concordance analysis.",
     examples=[
         "ov.pl.cell_cor_heatmap(adata, group_by='cell_type', method='pearson')",
+        "ov.pl.cell_cor_heatmap(adata, group_by='major_celltype', ref_adata=adata_ref, ref_group_by='label_transfer')",
+        "ov.pl.cell_cor_heatmap(adata, group_by='leiden', show_values=True, value_cutoff=0.3)",
+        "ov.pl.cell_cor_heatmap(adata, group_by='cell_type', method='cosine', figsize=(5, 4))",
     ],
-    related=["pl.group_heatmap", "pl.feature_heatmap"],
+    related=[
+        "pl.group_heatmap",
+        "pl.feature_heatmap",
+        "pl.dynamic_heatmap",
+        "pl.dotplot",
+    ],
 )
 def cell_cor_heatmap(
     adata: AnnData,
@@ -2325,6 +2853,7 @@ def cell_cor_heatmap(
     figsize: tuple = (6, 6),
     show_values: bool = True,
     value_fmt: str = ".2f",
+    value_cutoff: float = 0.0,
     row_cluster: bool = True,
     col_cluster: bool = True,
     vmin: float = None,
@@ -2338,8 +2867,8 @@ def cell_cor_heatmap(
 ):
     """Compute pairwise correlation/similarity between cell groups and plot as heatmap.
 
-    Mirrors scop::CellCorHeatmap — computes group-level mean expression and
-    plots the resulting similarity matrix.
+    Computes group-level mean expression and plots the resulting similarity
+    matrix.
 
     Parameters
     ----------
@@ -2370,6 +2899,9 @@ def cell_cor_heatmap(
         Whether to print correlation values inside cells.
     value_fmt
         Format string for printed values (e.g. ``'.2f'``).
+    value_cutoff
+        Only display text labels for cells with absolute similarity greater than
+        or equal to this threshold.
     row_cluster, col_cluster
         Whether to hierarchically cluster rows / columns.
     vmin, vmax
@@ -2387,7 +2919,6 @@ def cell_cor_heatmap(
     """
     ma, mp = _import_marsilea()
 
-    # Resolve expression matrix
     if layer is not None:
         use_raw = False
     if use_raw and adata.raw is not None:
@@ -2395,7 +2926,6 @@ def cell_cor_heatmap(
     else:
         expr_adata = adata
 
-    # Feature selection
     if features is None:
         if "highly_variable" in expr_adata.var.columns:
             features = list(expr_adata.var_names[expr_adata.var["highly_variable"]])
@@ -2403,7 +2933,6 @@ def cell_cor_heatmap(
             features = _select_top_variable_features(expr_adata, n_features)
     features = [f for f in features if f in expr_adata.var_names][:n_features]
 
-    # Aggregate per group
     def _aggregate(ad, key, feats, lyr):
         df = obs_df(ad, keys=[key] + feats, layer=lyr)
         return df.groupby(key).mean()
@@ -2421,25 +2950,29 @@ def cell_cor_heatmap(
     else:
         ref_agg = query_agg
 
-    # Scale
     if standard_scale == "var":
         query_agg = (query_agg - query_agg.mean()) / query_agg.std().replace(0, 1)
         ref_agg = (ref_agg - ref_agg.mean()) / ref_agg.std().replace(0, 1)
     elif standard_scale == "obs":
-        query_agg = query_agg.sub(query_agg.mean(axis=1), axis=0).div(query_agg.std(axis=1).replace(0, 1), axis=0)
-        ref_agg = ref_agg.sub(ref_agg.mean(axis=1), axis=0).div(ref_agg.std(axis=1).replace(0, 1), axis=0)
+        query_agg = query_agg.sub(query_agg.mean(axis=1), axis=0).div(
+            query_agg.std(axis=1).replace(0, 1), axis=0
+        )
+        ref_agg = ref_agg.sub(ref_agg.mean(axis=1), axis=0).div(
+            ref_agg.std(axis=1).replace(0, 1), axis=0
+        )
 
-    # Compute similarity
     if method == "pearson":
         sim = query_agg.T.corrwith(ref_agg.T, method="pearson")
-        # Full pairwise
         sim_matrix = pd.DataFrame(
-            np.corrcoef(query_agg.to_numpy(), ref_agg.to_numpy())[: len(query_agg), len(query_agg) :],
+            np.corrcoef(query_agg.to_numpy(), ref_agg.to_numpy())[
+                : len(query_agg), len(query_agg) :
+            ],
             index=query_agg.index,
             columns=ref_agg.index,
         )
     elif method == "spearman":
         from scipy.stats import spearmanr
+
         combined = np.vstack([query_agg.to_numpy(), ref_agg.to_numpy()])
         corr, _ = spearmanr(combined, axis=1)
         nq = len(query_agg)
@@ -2450,6 +2983,7 @@ def cell_cor_heatmap(
         )
     elif method == "cosine":
         from scipy.spatial.distance import cdist
+
         dist = cdist(query_agg.to_numpy(), ref_agg.to_numpy(), metric="cosine")
         sim_matrix = pd.DataFrame(
             1 - dist,
@@ -2457,32 +2991,33 @@ def cell_cor_heatmap(
             columns=ref_agg.index,
         )
     else:
-        raise ValueError(f"method must be 'pearson', 'spearman', or 'cosine', got '{method}'.")
+        raise ValueError(
+            f"method must be 'pearson', 'spearman', or 'cosine', got '{method}'."
+        )
 
-    # Cluster
     if row_cluster and sim_matrix.shape[0] > 2:
         from scipy.cluster.hierarchy import leaves_list as _ll, linkage as _lk
+
         tree = _lk(pdist(sim_matrix.to_numpy()), method="average")
         row_order = sim_matrix.index[_ll(tree)]
         sim_matrix = sim_matrix.loc[row_order]
     if col_cluster and sim_matrix.shape[1] > 2:
         from scipy.cluster.hierarchy import leaves_list as _ll, linkage as _lk
+
         tree = _lk(pdist(sim_matrix.to_numpy().T), method="average")
         col_order = sim_matrix.columns[_ll(tree)]
         sim_matrix = sim_matrix[col_order]
 
-    # Build heatmap
     heatmap = ma.Heatmap(
         sim_matrix,
-        width=max(float(figsize[0]) * 0.7, 3.0),
-        height=max(float(figsize[1]) * 0.7, 3.0),
+        width=float(figsize[0]),
+        height=float(figsize[1]),
         cmap=cmap,
         vmin=vmin,
         vmax=vmax,
         label=f"{method.capitalize()} correlation",
     )
 
-    # Add group colour strips
     query_colors = _resolve_group_colors(adata, group_by, list(sim_matrix.index))
     heatmap.add_left(
         mp.Colors(list(sim_matrix.index), palette=query_colors),
@@ -2496,7 +3031,9 @@ def cell_cor_heatmap(
     )
     ref_key_name = ref_group_by or group_by
     if ref_adata is not None:
-        ref_colors = _resolve_group_colors(ref_adata, ref_key_name, list(sim_matrix.columns))
+        ref_colors = _resolve_group_colors(
+            ref_adata, ref_key_name, list(sim_matrix.columns)
+        )
     else:
         ref_colors = query_colors
     heatmap.add_top(
@@ -2526,12 +3063,27 @@ def cell_cor_heatmap(
             heatmap,
             lambda: _style_heatmap_axes(getattr(heatmap, "figure", None)),
         )
+    if show_values:
+        heatmap = _attach_post_render_hook(
+            heatmap,
+            lambda: _annotate_heatmap_values(
+                getattr(heatmap, "figure", None),
+                sim_matrix,
+                value_fmt=value_fmt,
+                value_cutoff=value_cutoff,
+                use_abs_cutoff=True,
+                cmap=cmap,
+                vmin=vmin,
+                vmax=vmax,
+            ),
+        )
 
     save_path = save if isinstance(save, str) else (save_pathway if save else None)
     fig = None
     if save_path or show or _legend_kws is not None:
-        fig = _render_plot(heatmap, save_path=save_path, show=show,
-                           legend_kws=_legend_kws)
+        fig = _render_plot(
+            heatmap, save_path=save_path, show=show, legend_kws=_legend_kws
+        )
     return heatmap if fig is None else fig
 
 
