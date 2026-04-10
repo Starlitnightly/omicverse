@@ -266,24 +266,44 @@ class TrajInfer(object):
         None
         """
         palantir = _get_palantir_backend()
-        palantir["plot_palantir_results"](self.adata,**kwargs)
+        fig = palantir["plot_palantir_results"](self.adata, **kwargs)
+        if return_fig:
+            return fig
+        return None
         
-    def palantir_cal_branch(self,**kwargs):
+    def palantir_cal_branch(
+        self,
+        plot_kwargs: dict | None = None,
+        return_fig: bool = False,
+        **kwargs,
+    ):
         r"""Calculate and plot branch selection for Palantir results.
         
         Parameters
         ----------
+        plot_kwargs : dict, optional
+            Keyword arguments forwarded to ``plot_branch_selection`` such as
+            ``figsize``, ``selected_color`` or ``deselected_color``.
+        return_fig : bool, optional
+            Whether to return the matplotlib figure object. By default the
+            figure is drawn without being returned, which avoids duplicate
+            notebook rendering.
         **kwargs
             Additional keyword arguments forwarded to
-            ``select_branch_cells``.
+            ``select_branch_cells`` such as ``eps``, ``q`` or
+            ``save_as_df``.
 
         Returns
         -------
-        None
+        matplotlib.figure.Figure or None
         """
         palantir = _get_palantir_backend()
-        masks = palantir["select_branch_cells"](self.adata, **kwargs)
-        palantir["plot_branch_selection"](self.adata)
+        palantir["select_branch_cells"](self.adata, **kwargs)
+        plot_kwargs = dict(plot_kwargs or {})
+        fig = palantir["plot_branch_selection"](self.adata, **plot_kwargs)
+        if return_fig:
+            return fig
+        return None
 
     def palantir_cal_gene_trends(self,layers:str="MAGIC_imputed_data"):
         r"""Calculate gene expression trends along Palantir trajectories.
@@ -306,22 +326,104 @@ class TrajInfer(object):
         )
         return gene_trends
         
-    def palantir_plot_gene_trends(self,genes):
+    def palantir_plot_gene_trends(
+        self,
+        genes,
+        lineages=None,
+        layers: str = "MAGIC_imputed_data",
+        pseudo_time_key: str = "palantir_pseudotime",
+        fate_prob_key: str = "palantir_fate_probabilities",
+        use_raw: bool = False,
+        fit_kwargs: dict | None = None,
+        return_fig: bool = False,
+        return_result: bool = False,
+        **plot_kwargs,
+    ):
         r"""Plot gene expression trends along Palantir trajectories.
         
         Parameters
         ----------
         genes : list
             Gene symbols to visualize along inferred trajectories.
+        lineages : list, optional
+            Optional subset of Palantir lineages to compare. By default all
+            available fate-probability columns are used. Each lineage is fit as
+            a separate weighted series using its fate probabilities.
+        layers : str, optional
+            Expression layer used for fitting when ``use_raw=False``.
+        pseudo_time_key : str, optional
+            Obs key containing Palantir pseudotime values.
+        fate_prob_key : str, optional
+            Obsm key containing Palantir lineage probabilities.
+        use_raw : bool, optional
+            Whether to read expression values from ``adata.raw`` instead of the
+            specified layer or ``adata.X``.
+        fit_kwargs : dict, optional
+            Additional keyword arguments forwarded to
+            ``ov.single.dynamic_features``. If ``plot_kwargs`` requests
+            ``add_point=True``, ``store_raw=True`` is enabled automatically.
+        return_fig : bool, optional
+            Whether to return the created matplotlib figure.
+        return_result : bool, optional
+            Whether to also return the fitted dynamic-features result object.
+        **plot_kwargs
+            Additional keyword arguments forwarded to
+            ``ov.pl.dynamic_trends``. When multiple lineages are present,
+            ``compare_groups=True`` is enabled automatically unless explicitly
+            overridden.
             
         Returns
         -------
         object
-            Matplotlib figure/axes object returned by ``plot_gene_trends``.
+            By default, draws the plot and returns ``None``. When
+            ``return_fig=True`` and/or ``return_result=True``, returns the
+            requested plotting figure/result objects.
         """
-        #genes = ['Cdca3','Rasl10a','Mog','Aqp4']
-        palantir = _get_palantir_backend()
-        return palantir["plot_gene_trends"](self.adata, genes)
+        from ._dynamic_features import dynamic_features
+        from ..pl._dynamic_trends import dynamic_trends
+        from ..external.palantir.validation import _validate_obsm_key
+
+        fate_probs, lineage_names = _validate_obsm_key(self.adata, fate_prob_key)
+        if lineages is None:
+            lineages = list(lineage_names)
+        else:
+            lineages = [str(lineage) for lineage in lineages]
+            missing = [lineage for lineage in lineages if lineage not in lineage_names]
+            if missing:
+                raise KeyError(
+                    f"Requested lineages were not found in `{fate_prob_key}`: {missing}."
+                )
+
+        dataset_map = {lineage: self.adata for lineage in lineages}
+        weights = {lineage: fate_probs[lineage].to_numpy(dtype=float) for lineage in lineages}
+        fit_kwargs = dict(fit_kwargs or {})
+        fit_kwargs.setdefault("store_raw", bool(plot_kwargs.get("add_point", False)))
+
+        trend_res = dynamic_features(
+            dataset_map,
+            genes=genes,
+            pseudotime=pseudo_time_key,
+            layer=None if use_raw else layers,
+            use_raw=use_raw,
+            weights=weights,
+            key_added=None,
+            **fit_kwargs,
+        )
+
+        plot_kwargs = dict(plot_kwargs)
+        plot_kwargs.setdefault("compare_groups", len(lineages) > 1)
+        plot_output = dynamic_trends(
+            trend_res,
+            genes=genes,
+            return_fig=return_fig,
+            **plot_kwargs,
+        )
+
+        if return_fig and return_result:
+            return plot_output, trend_res
+        if return_result:
+            return trend_res
+        return plot_output
     
 import networkx as nx
 from scipy.sparse import csr_matrix
