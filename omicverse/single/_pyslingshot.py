@@ -17,12 +17,13 @@ def mahalanobis(X1, X2, S1, S2):
 
     Returns
     -------
-    numpy.ndarray
-        Squared Mahalanobis distance as a ``1x1`` array.
+    float
+        Squared Mahalanobis distance as a scalar.
     """
     S_inv = np.linalg.inv(S1 + S2)
     diff = (X1 - X2).reshape(-1, 1)
-    return np.matmul(np.matmul(diff.T, S_inv), diff)
+    value = np.matmul(np.matmul(diff.T, S_inv), diff)
+    return float(np.asarray(value).squeeze())
 
 def isint(x):
     if isinstance(x, int):
@@ -74,7 +75,8 @@ class Lineage:
         return len(self.clusters)
 
     def __repr__(self):
-        return 'Lineage' + str(self.clusters)
+        clean_clusters = [int(cluster) for cluster in self.clusters]
+        return 'Lineage' + str(clean_clusters)
 
     def __iter__(self):
         for c in self.clusters:
@@ -227,6 +229,21 @@ class SlingshotPlotter:
             node_size=[len(v) * 100 for v in G.nodes()]
         )
         nx.draw_networkx_labels(G, pos, font_size=14, font_color='w', bbox=label_options)
+
+
+def _place_debug_legend(ax):
+    handles, labels = ax.get_legend_handles_labels()
+    if not labels:
+        return
+    dedup = dict(zip(labels, handles))
+    ax.legend(
+        dedup.values(),
+        dedup.keys(),
+        loc='center left',
+        bbox_to_anchor=(1.02, 0.5),
+        frameon=False,
+        borderaxespad=0.0,
+    )
 
 
 from typing import Union
@@ -557,13 +574,13 @@ class Slingshot:
                     path_to = (self.data[i][1], curve.points_interp[i][1])
                     self.debug_axes[0, 1].plot(path_from, path_to, c='black', alpha=alphas[i])
                 self.debug_axes[0, 1].plot(curve.points_interp[curve.order, 0],
-                                           curve.points_interp[curve.order, 1], label=str(lineage))
+                                           curve.points_interp[curve.order, 1], label=f'Lineage {l_idx}')
 
             d_sq, dist = curve.project_to_curve(self.data, curve.points_interp[curve.order])
             distances.append(d_sq)
         self.distances = distances
         if self.debug_plot_lineages:
-            self.debug_axes[0, 1].legend()
+            _place_debug_legend(self.debug_axes[0, 1])
 
     def calculate_cell_weights(self):
         """TODO: annotate, this is a translation from R"""
@@ -680,7 +697,7 @@ class Slingshot:
             #         })
             # }
         if self.debug_plot_avg:
-            self.debug_axes[1, 0].legend()
+            _place_debug_legend(self.debug_axes[1, 0])
         return shrinkage_percentages, cluster_children, cluster_avg_curves
 
     def shrink_curves(self, cluster_children, shrinkage_percentages, cluster_avg_curves):

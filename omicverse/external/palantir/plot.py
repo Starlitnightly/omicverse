@@ -684,6 +684,8 @@ def plot_palantir_results(
     pseudo_time_key: str = "palantir_pseudotime",
     entropy_key: str = "palantir_entropy",
     fate_prob_key: str = "palantir_fate_probabilities",
+    n_cols: int = 4,
+    figsize: Optional[Tuple[float, float]] = None,
     **kwargs,
 ):
     """
@@ -703,6 +705,11 @@ def plot_palantir_results(
         Key to access the entropy from obs of the AnnData object. Default is 'palantir_entropy'.
     fate_prob_key : str, optional
         Key to access the fate probabilities from obsm of the AnnData object. Default is 'palantir_fate_probabilities'.
+    n_cols : int, optional
+        Number of columns used for branch probability panels. Default is 4.
+    figsize : tuple[float, float], optional
+        Figure size in inches. When omitted, a balanced size is inferred from
+        the number of panels.
     **kwargs
         Additional keyword arguments passed to `ax.scatter`.
 
@@ -723,7 +730,6 @@ def plot_palantir_results(
             ):
                 raise KeyError("Required Palantir results not found in .obs or .obsm.")
             obsm_pobs, _ = _validate_obsm_key(data, fate_prob_key)
-            obsm_pobs = data.obsm[fate_prob_key]
             pr_res = PResults(
                 data.obs[pseudo_time_key],
                 data.obs[entropy_key],
@@ -734,11 +740,15 @@ def plot_palantir_results(
         embedding_data = data
 
     n_branches = pr_res.branch_probs.shape[1]
-    n_cols = 6
+    n_cols = max(2, int(n_cols))
     n_rows = int(np.ceil(n_branches / n_cols))
-    plt.figure(figsize=[2 * n_cols, 2 * (n_rows + 2)])
+    if figsize is None:
+        figsize = [3 * n_cols, 3 * (n_rows + 1)]
+    plt.figure(figsize=figsize)
     gs = plt.GridSpec(
-        n_rows + 2, n_cols, height_ratios=np.append([0.75, 0.75], np.repeat(1, n_rows))
+        n_rows + 1,
+        n_cols,
+        height_ratios=np.append([1], np.repeat(1, n_rows)),
     )
 
     def scatter_with_colorbar(ax, x, y, c, **kwargs):
@@ -748,7 +758,7 @@ def plot_palantir_results(
         plt.colorbar(sc, cax=cax, orientation="vertical")
 
     # Pseudotime
-    ax = plt.subplot(gs[0:2, 1:3])
+    ax = plt.subplot(gs[0, : n_cols // 2])
     scatter_with_colorbar(
         ax,
         embedding_data.iloc[:, 0],
@@ -760,7 +770,7 @@ def plot_palantir_results(
     ax.set_title("Pseudotime")
 
     # Entropy
-    ax = plt.subplot(gs[0:2, 3:5])
+    ax = plt.subplot(gs[0, n_cols // 2 :])
     scatter_with_colorbar(
         ax,
         embedding_data.iloc[:, 0],
@@ -773,7 +783,7 @@ def plot_palantir_results(
 
     # Branch probabilities
     for i, branch in enumerate(pr_res.branch_probs.columns):
-        ax = plt.subplot(gs[i // n_cols + 2, i % n_cols])
+        ax = plt.subplot(gs[i // n_cols + 1, i % n_cols])
         scatter_with_colorbar(
             ax,
             embedding_data.iloc[:, 0],
@@ -864,6 +874,8 @@ def plot_branch_selection(
     fates: Optional[Union[List[str], str]] = None,
     embedding_basis: str = "X_umap",
     figsize: Tuple[float, float] = (15, 5),
+    selected_color: str = config.SELECTED_COLOR,
+    deselected_color: str = config.DESELECTED_COLOR,
     **kwargs,
 ):
     """
@@ -888,6 +900,10 @@ def plot_branch_selection(
     figsize : Tuple[float, float], optional
         Width and height of each subplot in inches. The total height of the figure is determined by
         multiplying the height by the number of fates. Default is (15, 5).
+    selected_color : str, optional
+        Color used for selected branch cells.
+    deselected_color : str, optional
+        Color used for non-selected cells.
     **kwargs
         Additional arguments passed to `matplotlib.pyplot.scatter`.
 
@@ -948,14 +964,14 @@ def plot_branch_selection(
         ax1.scatter(
             pt[~mask],
             fate_probs.loc[~mask, fate],
-            c=config.DESELECTED_COLOR,
+            c=deselected_color,
             label="Other Cells",
             **kwargs,
         )
         ax1.scatter(
             pt[mask],
             fate_probs.loc[mask, fate],
-            c=config.SELECTED_COLOR,
+            c=selected_color,
             label="Selected Cells",
             **kwargs,
         )
@@ -968,18 +984,20 @@ def plot_branch_selection(
         ax2.scatter(
             umap[~mask, 0],
             umap[~mask, 1],
-            c=config.DESELECTED_COLOR,
+            c=deselected_color,
             label="Other Cells",
             **kwargs,
         )
         ax2.scatter(
             umap[mask, 0],
             umap[mask, 1],
-            c=config.SELECTED_COLOR,
+            c=selected_color,
             label="Selected Cells",
             **kwargs,
         )
         ax2.set_title(f"Branch: {fate}")
+        ax2.set_box_aspect(1)
+        ax2.set_aspect("equal", adjustable="box")
         ax2.axis("off")
 
     plt.tight_layout()

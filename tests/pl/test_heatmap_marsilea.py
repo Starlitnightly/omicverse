@@ -211,9 +211,12 @@ def simple_adata():
             "cell_type": pd.Categorical(["T", "T", "B", "B", "Mono", "Mono"]),
             "pseudotime": [0.1, 0.2, 0.4, 0.5, 0.8, 0.9],
             "lineage": pd.Categorical(["L1", "L1", "L1", "L2", "L2", "L2"]),
+            "clusters": pd.Categorical(["Alpha", "Alpha", "Beta", "Beta", "Delta", "Delta"]),
         },
         index=[f"cell_{i}" for i in range(6)],
     )
+    adata.var["highly_variable"] = [True, False, True, False]
+    adata.uns["clusters_colors"] = ["#1f77b4", "#ff7f0e", "#2ca02c"]
     return adata
 
 
@@ -428,6 +431,42 @@ def test_dynamic_heatmap_limits_to_two_lineages_and_places_titles_on_outer_sides
     assert right_right_annotations[1][1][0].kwargs.get("label") == "L2"
     assert right_right_annotations[0][2].get("pad") == pytest.approx(0.03)
     assert right_right_annotations[1][2].get("pad") == pytest.approx(0.0)
+
+
+def test_dynamic_heatmap_grouped_var_names_reuse_cell_annotation_palette(simple_adata, stub_marsilea):
+    heatmap = dynamic_heatmap(
+        simple_adata,
+        var_names={
+            "Alpha": ["GeneA"],
+            "Beta": ["GeneB"],
+            "Delta": ["GeneC"],
+        },
+        pseudotime="pseudotime",
+        lineage_key="lineage",
+        cell_annotation="clusters",
+        legend=False,
+    )
+
+    left_color_calls = [call for call in heatmap.boards[0].calls if call[0] == "add_left"]
+    color_tracks = [call for call in left_color_calls if getattr(call[1][0], "kind", None) == "Colors"]
+    assert color_tracks
+    palette = color_tracks[0][1][0].kwargs["palette"]
+    assert palette["Alpha"] == "#1f77b4"
+    assert palette["Beta"] == "#ff7f0e"
+    assert palette["Delta"] == "#2ca02c"
+
+
+def test_dynamic_heatmap_var_names_none_prefers_hvg_candidates(simple_adata, stub_marsilea):
+    heatmap = dynamic_heatmap(
+        simple_adata,
+        var_names=None,
+        pseudotime="pseudotime",
+        lineage_key="lineage",
+        legend=False,
+    )
+
+    plotted = list(heatmap.boards[0].args[0].index)
+    assert set(plotted).issubset({"GeneA", "GeneC"})
 
 
 def test_compute_dynamic_feature_metadata_orders_by_earliest_peak():
