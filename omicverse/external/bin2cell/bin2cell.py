@@ -272,7 +272,7 @@ def _paste_with_relabel(
 
     return next_label_start
 
-def stardist(
+def cellseg(
     image_path: str,
     labels_npz_path: str,
     stardist_model: str = "2D_versatile_he",
@@ -288,22 +288,49 @@ def stardist(
     build_sparse_directly: bool = True,
     show_progress: bool = True,
     progress_desc: Optional[str] = None,
+    backend: str = "cellpose",
+    bbox_threshold: float = 0.4,
     **kwargs,
 ):
     """
-    Drop-in replacement for bin2cell.stardist() using Cellpose with tiled inference.
-    Keeps I/O identical: writes a SciPy sparse CSR label matrix to labels_npz_path.
+    Cell segmentation with tiled inference using Cellpose or CellSAM.
+    Writes a SciPy sparse CSR label matrix to labels_npz_path.
 
-    Parameters kept for compatibility:
-      - block_size, min_overlap, context: control tiling; mirrors original StarDist big-predict.
-
-    Additional parameters:
-      - show_progress: whether to display a progress bar over tiles.
-      - progress_desc: optional description for the progress bar.
+    Parameters
+    ----------
+    image_path : str
+        Path to the input image.
+    labels_npz_path : str
+        Output path for the sparse label matrix (.npz).
+    stardist_model : str
+        Model hint. For cellpose: '2D_versatile_he' -> 'cyto',
+        '2D_versatile_fluo' -> 'nuclei'. Ignored for CellSAM.
+    block_size, min_overlap, context : int
+        Tiling parameters.
+    gpu : bool
+        Whether to use GPU.
+    backend : str
+        Segmentation backend: 'cellpose' (default) or 'cellsam'.
+    bbox_threshold : float
+        CellSAM bounding box confidence threshold. Default 0.4.
+    show_progress : bool
+        Display progress bar.
+    **kwargs
+        Additional arguments forwarded to the backend.
     """
-    # map Stardist model to Cellpose model
-    from cellpose import models
     from skimage.io import imread
+
+    if backend == "cellsam":
+        return _cellseg_cellsam(
+            image_path, labels_npz_path,
+            block_size=block_size, min_overlap=min_overlap, context=context,
+            gpu=gpu, iou_merge_threshold=iou_merge_threshold,
+            show_progress=show_progress, progress_desc=progress_desc,
+            bbox_threshold=bbox_threshold, **kwargs,
+        )
+
+    # --- Cellpose backend ---
+    from cellpose import models
     if stardist_model == "2D_versatile_he":
         model_type = "cyto"
     elif stardist_model == "2D_versatile_fluo":
@@ -357,7 +384,7 @@ def stardist(
         total_tiles = len(y_starts) * len(x_starts)
         try:
             from tqdm import tqdm  # type: ignore
-            pbar = tqdm(total=total_tiles, desc=progress_desc or "bin2cell.stardist", unit="tile")
+            pbar = tqdm(total=total_tiles, desc=progress_desc or "bin2cell.cellseg", unit="tile")
         except Exception:
             use_fallback_progress = True
             print_every = max(1, total_tiles // 10) if total_tiles > 0 else 1
@@ -418,7 +445,7 @@ def stardist(
                     flows = styles = diams = None
             except Exception as e:
                 # safe fallback: yield empty mask for this tile
-                print(f"[bin2cell.stardist] Cellpose eval failed on a tile: {e}. Using empty mask for this tile.")
+                print(f"[bin2cell.cellseg] Cellpose eval failed on a tile: {e}. Using empty mask for this tile.")
                 masks = np.zeros(tile.shape[:2], dtype=np.int32)
                 flows, styles, diams = None, None, None
 
@@ -471,7 +498,7 @@ def stardist(
         elif use_fallback_progress:
             tiles_done += 1
             if (tiles_done % print_every == 0) or (tiles_done == total_tiles):
-                print(f"[bin2cell.stardist] Processed {tiles_done}/{total_tiles} tiles")
+                print(f"[bin2cell.cellseg] Processed {tiles_done}/{total_tiles} tiles")
 
     # close progress bar if used
     if pbar is not None:
@@ -489,7 +516,169 @@ def stardist(
     sparse.save_npz(labels_npz_path, labels_csr)
 
 
-def view_stardist_labels(image_path, labels_npz_path, crop, **kwargs):
+def _cellseg_cellsam(
+    image_path: str,
+    labels_npz_path: str,
+    block_size: int = 1024,
+    min_overlap: int = 128,
+    context: int = 64,
+    gpu: bool = False,
+    iou_merge_threshold: float = 0.5,
+    show_progress: bool = True,
+    progress_desc: Optional[str] = None,
+    bbox_threshold: float = 0.4,
+    cellsam_model: str = "cellsam_general",
+    **kwargs,
+):
+    """CellSAM backend for tiled cell segmentation.
+
+    Uses the CellSAM foundation model (vanvalenlab) with non-overlapping
+    tiling to keep memory usage low. Each tile is segmented independently
+    and labels are assigned sequentially.
+
+    Requires ``pip install git+https://github.com/vanvalenlab/cellSAM.git``
+    and the ``DEEPCELL_ACCESS_TOKEN`` environment variable for model download.
+    """
+    try:
+        from cellSAM import get_model, segment_cellular_image
+    except ImportError:
+        raise ImportError(
+            "CellSAM is not installed. Install with:\n"
+            "  pip install git+https://github.com/vanvalenlab/cellSAM.git\n"
+            "Also set DEEPCELL_ACCESS_TOKEN environment variable."
+        )
+
+    device = "cuda" if gpu else "cpu"
+
+    # Read image dimensions without loading full array
+    import tifffile
+    with tifffile.TiffFile(image_path) as tif:
+        page = tif.pages[0]
+        H, W = page.shape[:2]
+        n_channels = page.shape[2] if page.ndim > 2 else 1
+
+    # Load CellSAM model
+    print(f"Loading CellSAM model ({cellsam_model})...", flush=True)
+    model = get_model(model=cellsam_model)
+    print(f"CellSAM model loaded. Image: {H}x{W}", flush=True)
+
+    # Non-overlapping tiling. Read tiles lazily to keep memory bounded.
+    import tempfile, os as _os
+
+    stride = block_size
+    y_starts = list(range(0, H, stride))
+    x_starts = list(range(0, W, stride))
+    total_tiles = len(y_starts) * len(x_starts)
+
+    # Write partial results to temp files every N tiles to bound memory
+    flush_every = max(1, min(50, total_tiles // 10))
+    tmp_dir = tempfile.mkdtemp(prefix="cellsam_")
+    part_files = []
+    buf_rows, buf_cols, buf_vals = [], [], []
+    next_label = 1
+    buf_pixels = 0
+
+    pbar = None
+    tiles_done = 0
+    if show_progress:
+        try:
+            from tqdm import tqdm
+            pbar = tqdm(total=total_tiles, desc=progress_desc or "bin2cell.cellsam", unit="tile")
+        except Exception:
+            pass
+
+    def _flush_buf():
+        nonlocal buf_rows, buf_cols, buf_vals, buf_pixels
+        if not buf_rows:
+            return
+        r = np.concatenate(buf_rows)
+        c = np.concatenate(buf_cols)
+        v = np.concatenate(buf_vals)
+        part_path = _os.path.join(tmp_dir, f"part_{len(part_files)}.npz")
+        np.savez_compressed(part_path, r=r, c=c, v=v)
+        part_files.append(part_path)
+        buf_rows.clear(); buf_cols.clear(); buf_vals.clear()
+        buf_pixels = 0
+
+    # Lazy tile reader via zarr (avoids loading full image into memory)
+    _tif = tifffile.TiffFile(image_path)
+    _store = _tif.pages[0].aszarr()
+    import zarr as _zarr
+    _img_z = _zarr.open(_store, mode='r')
+
+    for ys in y_starts:
+        for xs in x_starts:
+            y1 = min(ys + block_size, H)
+            x1 = min(xs + block_size, W)
+            if _img_z.ndim == 2:
+                tile_gray = np.array(_img_z[ys:y1, xs:x1])
+                tile = np.stack([tile_gray] * 3, axis=-1)
+            elif _img_z.shape[-1] >= 3:
+                tile = np.array(_img_z[ys:y1, xs:x1, :3])
+            else:
+                tile = np.array(_img_z[ys:y1, xs:x1])
+
+            try:
+                result = segment_cellular_image(
+                    tile, model, device=device,
+                    bbox_threshold=bbox_threshold,
+                    **{k: v for k, v in kwargs.items()
+                       if k in ('normalize', 'postprocess', 'remove_boundaries', 'fast')},
+                )
+                masks = result[0] if result[0] is not None else None
+            except Exception:
+                masks = None
+
+            if masks is not None and masks.max() > 0:
+                # Vectorised relabel: shift all labels at once
+                n_cells = masks.max()
+                nz = masks > 0
+                ry, rx = np.where(nz)
+                shifted = masks[nz] + (next_label - 1)
+                buf_rows.append((ry + ys).astype(np.int32))
+                buf_cols.append((rx + xs).astype(np.int32))
+                buf_vals.append(shifted.astype(np.int32))
+                buf_pixels += len(ry)
+                next_label += n_cells
+
+            tiles_done += 1
+            if pbar is not None:
+                pbar.update(1)
+            elif show_progress and tiles_done % max(1, total_tiles // 20) == 0:
+                print(f"[bin2cell.cellsam] {tiles_done}/{total_tiles} tiles", flush=True)
+
+            # Flush to disk when buffer gets large (~50M pixels)
+            if buf_pixels > 50_000_000:
+                _flush_buf()
+
+    if pbar is not None:
+        pbar.close()
+
+    # Final flush
+    _flush_buf()
+
+    # Merge all parts into a single CSR matrix
+    all_r, all_c, all_v = [], [], []
+    for pf in part_files:
+        d = np.load(pf)
+        all_r.append(d['r']); all_c.append(d['c']); all_v.append(d['v'])
+        _os.remove(pf)
+    _os.rmdir(tmp_dir)
+
+    if all_r:
+        rows = np.concatenate(all_r)
+        cols = np.concatenate(all_c)
+        vals = np.concatenate(all_v)
+        labels_csr = sparse.csr_matrix((vals, (rows, cols)), shape=(H, W), dtype=np.int32)
+    else:
+        labels_csr = sparse.csr_matrix((H, W), dtype=np.int32)
+
+    _tif.close()
+    print(f"CellSAM segmentation complete: {next_label - 1} cells", flush=True)
+    sparse.save_npz(labels_npz_path, labels_csr)
+
+
+def view_cellseg_labels(image_path, labels_npz_path, crop, **kwargs):
     '''
     Use StarDist's label rendering to view segmentation results in a crop 
     of the input image.
@@ -2257,3 +2446,8 @@ def _plot_boundaries_matplotlib(cell_adata, color, segmentation_key, library_id,
     ax.set_ylabel('Y coordinate')
     
     return ax
+
+# Backward-compatible aliases
+stardist = cellseg
+view_stardist_labels = view_cellseg_labels
+

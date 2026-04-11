@@ -883,7 +883,7 @@ def visium_10x_hd_cellpose_he(
     Convert Visium 10x data to cell-level data.
     
     """
-    from ..external.bin2cell import destripe, scaled_he_image, stardist, insert_labels
+    from ..external.bin2cell import destripe, scaled_he_image, cellseg, insert_labels
 
     spatial_key = f"spatial_cropped_{buffer}_buffer"
     if not os.path.exists(he_save_path):
@@ -897,7 +897,7 @@ def visium_10x_hd_cellpose_he(
             destripe(adata)
             scaled_he_image(adata, mpp=mpp, buffer=buffer, save_path=None,
                             backend=backend)
-    stardist(image_path=he_save_path    , 
+    cellseg(image_path=he_save_path    , 
              labels_npz_path=he_save_path.replace(".tiff", ".npz"), 
              stardist_model="2D_versatile_he", 
              prob_thresh=prob_thresh,
@@ -1028,7 +1028,7 @@ def visium_10x_hd_cellpose_gex(
     None
         Writes ``labels_gex`` back into ``adata``.
     """
-    from ..external.bin2cell import grid_image, stardist, insert_labels,destripe
+    from ..external.bin2cell import grid_image, cellseg, insert_labels,destripe
     #if gex_save_path's file exist, jump grid_image to stardist
     if obs_key not in adata.obs.keys():
         destripe(adata)
@@ -1037,7 +1037,7 @@ def visium_10x_hd_cellpose_gex(
                 mpp=mpp, sigma=sigma, save_path=gex_save_path)
     else:
         print(f"gex_save_path {gex_save_path} already exists, skipping grid_image")
-    stardist(image_path=gex_save_path, 
+    cellseg(image_path=gex_save_path, 
              labels_npz_path=gex_save_path.replace(".tiff", ".npz"), 
              stardist_model="2D_versatile_fluo", 
              prob_thresh=prob_thresh, 
