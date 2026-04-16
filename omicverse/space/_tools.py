@@ -77,6 +77,12 @@ def crop_space_visium(adata, crop_loc, crop_area,
         ...     scale=1.0
         ... )
     """
+    if scale != 1:
+        raise NotImplementedError(
+            "scale != 1 is not yet supported in the squidpy-free implementation. "
+            "Use scale=1 or install squidpy for rescaled crops."
+        )
+
     adata1 = adata.copy()
     scalef = adata1.uns['spatial'][library_id]['scalefactors'][f'tissue_{res}_scalef']
     full_img = adata1.uns["spatial"][library_id]["images"][res]
@@ -94,14 +100,8 @@ def crop_space_visium(adata, crop_loc, crop_area,
     y1 = max(0, min(y0 + h, img_h))
     x1 = max(0, min(x0 + w, img_w))
 
-    # Crop image and optionally rescale
+    # Crop image
     cropped_img = full_img[y0:y1, x0:x1]
-    if scale != 1 and cropped_img.size > 0:
-        from scipy.ndimage import zoom
-        if cropped_img.ndim == 3:
-            cropped_img = zoom(cropped_img, (scale, scale, 1), order=1)
-        else:
-            cropped_img = zoom(cropped_img, (scale, scale), order=1)
 
     # Scale spatial coords to hires pixel coords
     # Visium obsm['spatial'] columns are (x=col, y=row)

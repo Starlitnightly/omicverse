@@ -19,6 +19,11 @@ from .post_analysis import get_z_umap
 random.seed(0)
 np.random.seed(0)
 
+# Max value for library size log-space clamp: exp(12)≈163k, safely below float32 range
+# while covering typical Visium library sizes (up to ~50k counts per spot).
+# Adjust if targeting platforms with very different library size distributions.
+_QL_CLAMP_MAX = 12.0
+
 import os
 import multiprocessing
 import logging
@@ -203,9 +208,7 @@ class AVAE(nn.Module):
 
         hidden = self.px_hidden_decoder(qz)
         px_scale = self.px_scale_decoder(hidden)
-        # Clamp ql to prevent exp overflow: exp(12)≈163k, safely below float32 range
-        # while covering typical Visium library sizes (up to ~50k counts per spot)
-        px_rate = torch.exp(torch.clamp(ql, max=12.0)) * px_scale + self.eps
+        px_rate = torch.exp(torch.clamp(ql, max=_QL_CLAMP_MAX)) * px_scale + self.eps
         pc_p = xs_k + self.eps
 
         return dict(
@@ -503,9 +506,7 @@ class AVAE_PoE(nn.Module):
 
         hidden = self.z_to_hidden_decoder(qz)
         px_scale = self.px_scale_decoder(hidden)
-        # Clamp ql to prevent exp overflow: exp(12)≈163k, safely below float32 range
-        # while covering typical Visium library sizes (up to ~50k counts per spot)
-        px_rate = torch.exp(torch.clamp(ql, max=12.0)) * px_scale + self.eps
+        px_rate = torch.exp(torch.clamp(ql, max=_QL_CLAMP_MAX)) * px_scale + self.eps
         pc_p = xs_k + self.eps
 
         return dict(
@@ -588,9 +589,7 @@ class AVAE_PoE(nn.Module):
 
         # p(x | z_poe)
         px_scale = self.px_scale_poe_decoder(hidden)
-        # Clamp ql to prevent exp overflow: exp(12)≈163k, safely below float32 range
-        # while covering typical Visium library sizes (up to ~50k counts per spot)
-        px_rate = torch.exp(torch.clamp(ql, max=12.0)) * px_scale + self.eps
+        px_rate = torch.exp(torch.clamp(ql, max=_QL_CLAMP_MAX)) * px_scale + self.eps
 
         # p(y | z_poe)
         py_m = self.py_mu_poe_decoder(hidden)
@@ -748,7 +747,6 @@ def train(
     corr_list = []
     for i, (x, xs_k, x_peri, library_i) in enumerate(dataloader):
 
-        counter += 1
         x = x.float()
         x = x.to(device)
         xs_k = xs_k.to(device)
@@ -787,6 +785,7 @@ def train(
 
         nn.utils.clip_grad_norm_(model.parameters(), 5)
         optimizer.step()
+        counter += 1
 
         running_loss += loss.item()
         running_reconst += reconst_loss.item()
@@ -795,6 +794,8 @@ def train(
         running_c += kl_divergence_c.item()
         running_l += kl_divergence_l.item()
 
+    if counter == 0:
+        raise ValueError('All batches produced NaN gradients')
     train_loss = running_loss / counter
     train_reconst = running_reconst / counter
     train_u = running_u / counter
@@ -828,7 +829,6 @@ def train_poe(
             data_loc,
             xs_k,
             ) in enumerate(dataloader):
-        counter += 1
         mini_batch, _ = x.shape
 
         x = x.float()
@@ -877,6 +877,7 @@ def train_poe(
 
         nn.utils.clip_grad_norm_(model.parameters(), 5)
         optimizer.step()
+        counter += 1
 
         running_loss += loss.item()
         running_reconst += reconst_loss.item()
@@ -885,6 +886,8 @@ def train_poe(
         running_l += kl_divergence_l.item()
         running_u += kl_divergence_u.item()
 
+    if counter == 0:
+        raise ValueError('All batches produced NaN gradients')
     train_loss = running_loss / counter
     train_reconst = running_reconst / counter
     train_z = running_z / counter

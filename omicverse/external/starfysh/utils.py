@@ -381,7 +381,7 @@ def run_starfysh(
                     f"Starfysh failed to complete any successful training run after {max_retries} attempts "
                     f"due to numerical instability. Try adjusting `alpha_mul`, `lr`, or `batch_size`."
                 )
-            LOGGER.warning(f"Reached max retries ({max_retries}), using {count}/{n_repeats} successful runs.")
+            LOGGER.warning("Reached max retries (%d), using %d/%d successful runs.", max_retries, count, n_repeats)
             break
         best_loss_c = np.inf
         if poe:

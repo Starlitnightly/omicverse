@@ -133,6 +133,7 @@ class ArchetypalAnalysis:
 
         # Shim: py_pcha (v0.1.3) uses np.mat, removed in NumPy 2.0.
         # Temporarily restore it only for PCHA calls to avoid global pollution.
+        # Note: not thread-safe — concurrent compute_archetypes calls could race.
         _needs_mat_shim = not hasattr(np, 'mat')
         if _needs_mat_shim:
             np.mat = np.asmatrix
