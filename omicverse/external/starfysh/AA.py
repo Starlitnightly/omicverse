@@ -112,9 +112,6 @@ class ArchetypalAnalysis:
         """
         
         # TMP: across-sample comparison: fix # principle components for all samples
-        # Compatibility fix: py_pcha uses np.mat which was removed in NumPy 2.0
-        if not hasattr(np, 'mat'):
-            np.mat = np.asmatrix
         from py_pcha import PCHA
         import skdim
         if self.verbose:
@@ -134,14 +131,23 @@ class ArchetypalAnalysis:
         archetypes = []
         evs = []
 
-        # TODO: speedup with multiprocessing
-        for i, k in enumerate(range(self.kmin, self.kmin+n_iters, 2)):
-            archetype, _, _, _, ev = PCHA(X, noc=k)
-            evs.append(ev)
-            archetypes.append(np.array(archetype).T)
-            if i > 0 and ev - evs[i-1] < converge:
-                # early stopping
-                break
+        # Shim: py_pcha (v0.1.3) uses np.mat, removed in NumPy 2.0.
+        # Temporarily restore it only for PCHA calls to avoid global pollution.
+        _needs_mat_shim = not hasattr(np, 'mat')
+        if _needs_mat_shim:
+            np.mat = np.asmatrix
+        try:
+            # TODO: speedup with multiprocessing
+            for i, k in enumerate(range(self.kmin, self.kmin+n_iters, 2)):
+                archetype, _, _, _, ev = PCHA(X, noc=k)
+                evs.append(ev)
+                archetypes.append(np.array(archetype).T)
+                if i > 0 and ev - evs[i-1] < converge:
+                    # early stopping
+                    break
+        finally:
+            if _needs_mat_shim:
+                del np.mat
         self.archetype = archetypes[-1]
 
         # Merge raw archetypes to get major archetypes

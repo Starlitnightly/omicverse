@@ -203,7 +203,8 @@ class AVAE(nn.Module):
 
         hidden = self.px_hidden_decoder(qz)
         px_scale = self.px_scale_decoder(hidden)
-        # Clamp ql to prevent exp overflow causing NaN gradients
+        # Clamp ql to prevent exp overflow: exp(12)≈163k, safely below float32 range
+        # while covering typical Visium library sizes (up to ~50k counts per spot)
         px_rate = torch.exp(torch.clamp(ql, max=12.0)) * px_scale + self.eps
         pc_p = xs_k + self.eps
 
@@ -502,7 +503,8 @@ class AVAE_PoE(nn.Module):
 
         hidden = self.z_to_hidden_decoder(qz)
         px_scale = self.px_scale_decoder(hidden)
-        # Clamp ql to prevent exp overflow causing NaN gradients
+        # Clamp ql to prevent exp overflow: exp(12)≈163k, safely below float32 range
+        # while covering typical Visium library sizes (up to ~50k counts per spot)
         px_rate = torch.exp(torch.clamp(ql, max=12.0)) * px_scale + self.eps
         pc_p = xs_k + self.eps
 
@@ -586,7 +588,8 @@ class AVAE_PoE(nn.Module):
 
         # p(x | z_poe)
         px_scale = self.px_scale_poe_decoder(hidden)
-        # Clamp ql to prevent exp overflow causing NaN gradients
+        # Clamp ql to prevent exp overflow: exp(12)≈163k, safely below float32 range
+        # while covering typical Visium library sizes (up to ~50k counts per spot)
         px_rate = torch.exp(torch.clamp(ql, max=12.0)) * px_scale + self.eps
 
         # p(y | z_poe)
@@ -776,9 +779,11 @@ def train(
         optimizer.zero_grad()
         loss.backward()
 
-        # Skip step if gradients contain NaN to prevent parameter corruption
+        # Skip batch if gradients contain NaN (recoverable), don't corrupt parameters
         if any(p.grad is not None and torch.isnan(p.grad).any() for p in model.parameters()):
-            raise ValueError('NaN detected in gradients')
+            LOGGER.warning('NaN gradient in batch %d, skipping step', i)
+            optimizer.zero_grad()
+            continue
 
         nn.utils.clip_grad_norm_(model.parameters(), 5)
         optimizer.step()
@@ -864,9 +869,11 @@ def train_poe(
         optimizer.zero_grad()
         loss.backward()
 
-        # Skip step if gradients contain NaN to prevent parameter corruption
+        # Skip batch if gradients contain NaN (recoverable), don't corrupt parameters
         if any(p.grad is not None and torch.isnan(p.grad).any() for p in model.parameters()):
-            raise ValueError('NaN detected in gradients')
+            LOGGER.warning('NaN gradient in batch %d, skipping step', i)
+            optimizer.zero_grad()
+            continue
 
         nn.utils.clip_grad_norm_(model.parameters(), 5)
         optimizer.step()

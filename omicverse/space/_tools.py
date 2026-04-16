@@ -107,10 +107,10 @@ def crop_space_visium(adata, crop_loc, crop_area,
     # Visium obsm['spatial'] columns are (x=col, y=row)
     pixel_coords = adata1.obsm[spatial_key] * scalef
 
-    # Filter spots within the crop region (squidpy subset logic)
+    # Filter spots within the crop region [x0, x1) x [y0, y1)
     mask = (
-        (pixel_coords[:, 0] >= x0) & (pixel_coords[:, 0] <= x1) &
-        (pixel_coords[:, 1] >= y0) & (pixel_coords[:, 1] <= y1)
+        (pixel_coords[:, 0] >= x0) & (pixel_coords[:, 0] < x1) &
+        (pixel_coords[:, 1] >= y0) & (pixel_coords[:, 1] < y1)
     )
     adata_crop = adata1[mask].copy()
 
@@ -124,9 +124,6 @@ def crop_space_visium(adata, crop_loc, crop_area,
     ])
 
     return adata_crop
-
-import numpy as np
-import scipy.ndimage  # 导入 scipy.ndimage 库用于图像旋转
 
 @register_function(
     aliases=["旋转空间数据", "rotate_space_visium", "rotate_visium", "空间数据旋转", "Visium旋转"],
@@ -238,6 +235,7 @@ def rotate_space_visium(
     )
 
     # 4. 旋转图像 (默认逆时针)，使用转换后的像素坐标中心
+    import scipy.ndimage
     rotated_image = scipy.ndimage.rotate(
         original_image,
         angle=angle,           # 图像旋转角度 (逆时针)

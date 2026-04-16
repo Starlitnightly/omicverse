@@ -493,7 +493,7 @@ class Deconvolution(object):
                     adata_raw = self.adata_sp.copy()
                     adata_raw.X = adata_raw.layers['counts'].copy()
                 else:
-                    adata_raw = self.adata_sp
+                    adata_raw = self.adata_sp.copy()
 
                 # Parameters for training
                 visium_args = utils.VisiumArguments(adata_raw,
