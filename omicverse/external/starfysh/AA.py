@@ -112,6 +112,9 @@ class ArchetypalAnalysis:
         """
         
         # TMP: across-sample comparison: fix # principle components for all samples
+        # Compatibility fix: py_pcha uses np.mat which was removed in NumPy 2.0
+        if not hasattr(np, 'mat'):
+            np.mat = np.asmatrix
         from py_pcha import PCHA
         import skdim
         if self.verbose:

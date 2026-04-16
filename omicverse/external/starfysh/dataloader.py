@@ -24,7 +24,7 @@ class VisiumDataset(Dataset):
         spots = adata.obs_names
         genes = adata.var_names
 
-        x = adata.X if isinstance(adata.X, np.ndarray) else adata.X.A
+        x = adata.X if isinstance(adata.X, np.ndarray) else adata.X.toarray()
         self.expr_mat = pd.DataFrame(x, index=spots, columns=genes)
         self.gexp = args.sig_mean_norm
         self.anchor_idx = args.pure_idx
