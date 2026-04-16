@@ -1644,9 +1644,7 @@ def _dot_matrix_plot(
         color_legend_kws=dict(title=color_label),
         size_legend_kws=dict(
             title="Significant interactions",
-            show_at=[float(np.nanmin(display_size.to_numpy())), float(np.nanmax(display_size.to_numpy()))]
-            if np.nanmax(display_size.to_numpy()) > 0
-            else [0.0],
+            show_at=[0.25, 0.5, 0.75, 1.0],
         ),
     )
 
