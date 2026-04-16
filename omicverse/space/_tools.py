@@ -77,26 +77,53 @@ def crop_space_visium(adata, crop_loc, crop_area,
         ...     scale=1.0
         ... )
     """
-    # Configure dask to use query-planning before importing squidpy
-    import dask
-    dask.config.set({"dataframe.query-planning": True})
-    import squidpy as sq
-    adata1 = adata.copy()
-    img = sq.im.ImageContainer(
-        adata1.uns["spatial"][library_id]["images"][res], library_id=library_id
-    )
-    crop_corner = img.crop_corner(crop_loc[0], crop_loc[1], size=crop_area, scale=scale,)
-    adata1.obsm['spatial1'] = adata1.obsm[spatial_key]*\
-                adata1.uns['spatial'][library_id]['scalefactors'][f'tissue_{res}_scalef']
-    adata_crop = crop_corner.subset(adata1, spatial_key='spatial1')
-    adata_crop.uns["spatial"][library_id]["images"][res] = np.squeeze(crop_corner['image'].data, axis=2)
-    adata_crop.obsm[spatial_key][:,0] = (adata_crop.obsm['spatial1'][:,0]-crop_loc[1])/adata.uns['spatial'][library_id]['scalefactors'][f'tissue_{res}_scalef']
-    adata_crop.obsm[spatial_key][:,1] = (adata_crop.obsm['spatial1'][:,1]-crop_loc[0])/adata.uns['spatial'][library_id]['scalefactors'][f'tissue_{res}_scalef']
-    
-    return adata_crop
+    if scale != 1:
+        raise NotImplementedError(
+            "scale != 1 is not yet supported in the squidpy-free implementation. "
+            "Use scale=1 or install squidpy for rescaled crops."
+        )
 
-import numpy as np
-import scipy.ndimage  # 导入 scipy.ndimage 库用于图像旋转
+    adata1 = adata.copy()
+    scalef = adata1.uns['spatial'][library_id]['scalefactors'][f'tissue_{res}_scalef']
+    full_img = adata1.uns["spatial"][library_id]["images"][res]
+
+    # crop_loc = (y0, x0) in pixel coords of the hires image
+    # crop_area = (height, width) in pixel coords of the hires image
+    # Following squidpy crop_corner(y, x, size) convention
+    y0, x0 = int(crop_loc[0]), int(crop_loc[1])
+    h, w = int(crop_area[0]), int(crop_area[1])
+
+    # Clamp to image bounds
+    img_h, img_w = full_img.shape[:2]
+    y0 = max(0, min(y0, img_h))
+    x0 = max(0, min(x0, img_w))
+    y1 = max(0, min(y0 + h, img_h))
+    x1 = max(0, min(x0 + w, img_w))
+
+    # Crop image
+    cropped_img = full_img[y0:y1, x0:x1]
+
+    # Scale spatial coords to hires pixel coords
+    # Visium obsm['spatial'] columns are (x=col, y=row)
+    pixel_coords = adata1.obsm[spatial_key] * scalef
+
+    # Filter spots within the crop region [x0, x1) x [y0, y1)
+    mask = (
+        (pixel_coords[:, 0] >= x0) & (pixel_coords[:, 0] < x1) &
+        (pixel_coords[:, 1] >= y0) & (pixel_coords[:, 1] < y1)
+    )
+    adata_crop = adata1[mask].copy()
+
+    # Update image
+    adata_crop.uns["spatial"][library_id]["images"][res] = cropped_img
+
+    # Adjust spatial coordinates relative to the cropped region
+    adata_crop.obsm[spatial_key] = np.column_stack([
+        (adata_crop.obsm[spatial_key][:, 0] * scalef - x0) / scalef,
+        (adata_crop.obsm[spatial_key][:, 1] * scalef - y0) / scalef,
+    ])
+
+    return adata_crop
 
 @register_function(
     aliases=["旋转空间数据", "rotate_space_visium", "rotate_visium", "空间数据旋转", "Visium旋转"],
@@ -208,6 +235,7 @@ def rotate_space_visium(
     )
 
     # 4. 旋转图像 (默认逆时针)，使用转换后的像素坐标中心
+    import scipy.ndimage
     rotated_image = scipy.ndimage.rotate(
         original_image,
         angle=angle,           # 图像旋转角度 (逆时针)

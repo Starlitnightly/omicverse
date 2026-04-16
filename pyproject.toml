@@ -88,6 +88,7 @@ dependencies = [
 full = [
   "dynamo-release",
   "squidpy",
+  "s3fs>=2023.1.0",  # pin to avoid ancient s3fs pulled by squidpy→spatialdata→ome-zarr chain
   "tangram-sc",
   "pertpy",
   "toytree",

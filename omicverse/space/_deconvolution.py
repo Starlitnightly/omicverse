@@ -488,8 +488,15 @@ class Deconvolution(object):
                     print(f"you need to provide the gene signature for starfysh")
                     return
 
+                # Prepare raw counts adata for starfysh (expects raw counts as first arg)
+                if 'counts' in self.adata_sp.layers:
+                    adata_raw = self.adata_sp.copy()
+                    adata_raw.X = adata_raw.layers['counts'].copy()
+                else:
+                    adata_raw = self.adata_sp.copy()
+
                 # Parameters for training
-                visium_args = utils.VisiumArguments(self.adata_sp,
+                visium_args = utils.VisiumArguments(adata_raw,
                                                     self.adata_sp,
                                                     gene_sig,
                                                     img_metadata,

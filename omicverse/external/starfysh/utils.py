@@ -116,8 +116,11 @@ class VisiumArguments:
         self.sig_mean_norm = self.sig_mean_norm.div(self.sig_mean_norm.sum(1), axis=0)
         self.sig_mean_norm.fillna(1/self.sig_mean_norm.shape[1], inplace=True)
 
-        self.pure_spots, self.pure_dict, self.pure_idx = anchor_info        
-        del self.adata.raw, self.adata_norm.raw 
+        self.pure_spots, self.pure_dict, self.pure_idx = anchor_info
+        if self.adata.raw is not None:
+            del self.adata.raw
+        if self.adata_norm.raw is not None:
+            del self.adata_norm.raw
 
     def get_adata(self):
         """Return adata after preprocessing & HVG gene selection"""
@@ -139,7 +142,7 @@ class VisiumArguments:
                                  anchors_df.columns[empty_indices].to_list()
                             ))
         
-        return anchors_df.applymap(
+        return anchors_df.map(
             lambda x:
             -1 if x is None else np.where(self.adata.obs.index == x)[0][0]
         )
@@ -368,7 +371,18 @@ def run_starfysh(
     LOGGER.info('Running Starfysh with {} restarts, choose the model with best parameters...'.format(n_repeats))
     
     count = 0
+    max_retries = n_repeats * 10  # Prevent infinite loop on repeated bad initializations
+    total_attempts = 0
     while count < n_repeats:
+        total_attempts += 1
+        if total_attempts > max_retries:
+            if count == 0:
+                raise RuntimeError(
+                    f"Starfysh failed to complete any successful training run after {max_retries} attempts "
+                    f"due to numerical instability. Try adjusting `alpha_mul`, `lr`, or `batch_size`."
+                )
+            LOGGER.warning("Reached max retries (%d), using %d/%d successful runs.", max_retries, count, n_repeats)
+            break
         best_loss_c = np.inf
         if poe:
             model = AVAE_PoE(

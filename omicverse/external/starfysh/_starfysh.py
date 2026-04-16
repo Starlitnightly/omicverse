@@ -19,6 +19,11 @@ from .post_analysis import get_z_umap
 random.seed(0)
 np.random.seed(0)
 
+# Max value for library size log-space clamp: exp(12)≈163k, safely below float32 range
+# while covering typical Visium library sizes (up to ~50k counts per spot).
+# Adjust if targeting platforms with very different library size distributions.
+_QL_CLAMP_MAX = 12.0
+
 import os
 import multiprocessing
 import logging
@@ -203,7 +208,7 @@ class AVAE(nn.Module):
 
         hidden = self.px_hidden_decoder(qz)
         px_scale = self.px_scale_decoder(hidden)
-        px_rate = torch.exp(ql) * px_scale + self.eps
+        px_rate = torch.exp(torch.clamp(ql, max=_QL_CLAMP_MAX)) * px_scale + self.eps
         pc_p = xs_k + self.eps
 
         return dict(
@@ -248,8 +253,8 @@ class AVAE(nn.Module):
         ).sum(dim=1).mean()
 
         kl_divergence_c = kl(
-            Dirichlet(qc_m * self.alpha),
-            Dirichlet(pc_p * self.alpha)
+            Dirichlet(qc_m * self.alpha + self.eps),
+            Dirichlet(pc_p * self.alpha + self.eps)
         ).mean()
 
         pz_m = (qu.unsqueeze(0) * qc).sum(axis=1)
@@ -501,7 +506,7 @@ class AVAE_PoE(nn.Module):
 
         hidden = self.z_to_hidden_decoder(qz)
         px_scale = self.px_scale_decoder(hidden)
-        px_rate = torch.exp(ql) * px_scale + self.eps
+        px_rate = torch.exp(torch.clamp(ql, max=_QL_CLAMP_MAX)) * px_scale + self.eps
         pc_p = xs_k + self.eps
 
         return dict(
@@ -584,7 +589,7 @@ class AVAE_PoE(nn.Module):
 
         # p(x | z_poe)
         px_scale = self.px_scale_poe_decoder(hidden)
-        px_rate = torch.exp(ql) * px_scale + self.eps
+        px_rate = torch.exp(torch.clamp(ql, max=_QL_CLAMP_MAX)) * px_scale + self.eps
 
         # p(y | z_poe)
         py_m = self.py_mu_poe_decoder(hidden)
@@ -676,8 +681,8 @@ class AVAE_PoE(nn.Module):
         ).sum(dim=1).mean()
 
         kl_divergence_c = kl(
-            Dirichlet(qc_m * self.alpha), # q(c | x; α) = Dir(α * λ(x))
-            Dirichlet(pc_p * self.alpha)
+            Dirichlet(qc_m * self.alpha + self.eps), # q(c | x; α) = Dir(α * λ(x))
+            Dirichlet(pc_p * self.alpha + self.eps)
         ).mean()
 
         reconst_loss_x = -NegBinom(px_rate, torch.exp(px_r)).log_prob(x).sum(-1).mean()
@@ -742,21 +747,18 @@ def train(
     corr_list = []
     for i, (x, xs_k, x_peri, library_i) in enumerate(dataloader):
 
-        counter += 1
         x = x.float()
         x = x.to(device)
         xs_k = xs_k.to(device)
         x_peri = x_peri.to(device)
         library_i = library_i.to(device)
 
+        # Check for NaNs before inference to avoid Dirichlet ValueError
+        if any(torch.isnan(p).any() for p in model.parameters()):
+            raise ValueError('NaN detected in model parameters')
+
         inference_outputs = model.inference(x)
         generative_outputs = model.generative(inference_outputs, xs_k)
-
-        # Check for NaNs
-        #if torch.isnan(loss) or any(torch.isnan(p).any() for p in model.parameters()):
-        if any(torch.isnan(p).any() for p in model.parameters()):
-            LOGGER.warning('NaNs detected in model parameters, Skipping current epoch...')
-            continue
 
         (loss,
          reconst_loss,
@@ -774,9 +776,16 @@ def train(
 
         optimizer.zero_grad()
         loss.backward()
-        
+
+        # Skip batch if gradients contain NaN (recoverable), don't corrupt parameters
+        if any(p.grad is not None and torch.isnan(p.grad).any() for p in model.parameters()):
+            LOGGER.warning('NaN gradient in batch %d, skipping step', i)
+            optimizer.zero_grad()
+            continue
+
         nn.utils.clip_grad_norm_(model.parameters(), 5)
         optimizer.step()
+        counter += 1
 
         running_loss += loss.item()
         running_reconst += reconst_loss.item()
@@ -785,6 +794,8 @@ def train(
         running_c += kl_divergence_c.item()
         running_l += kl_divergence_l.item()
 
+    if counter == 0:
+        raise ValueError('All batches produced NaN gradients')
     train_loss = running_loss / counter
     train_reconst = running_reconst / counter
     train_u = running_u / counter
@@ -818,7 +829,6 @@ def train_poe(
             data_loc,
             xs_k,
             ) in enumerate(dataloader):
-        counter += 1
         mini_batch, _ = x.shape
 
         x = x.float()
@@ -830,15 +840,14 @@ def train_poe(
         img = img.reshape(mini_batch, -1).float()
         img = img.to(device)
 
+        # Check for NaNs before inference to avoid Dirichlet ValueError
+        if any(torch.isnan(p).any() for p in model.parameters()):
+            raise ValueError('NaN detected in model parameters')
+
         inference_outputs = model.inference(x,img)  # inference for 1D expr. data
         generative_outputs = model.generative(inference_outputs, xs_k)
         img_outputs = model.predictor_img(img)  # inference & generative for 2D img. data
         poe_outputs = model.predictor_poe(inference_outputs, img_outputs)  # PoE generative outputs
-
-        # Check for NaNs
-        if any(torch.isnan(p).any() for p in model.parameters()):
-            LOGGER.warning('NaNs detected in model parameters, Skipping current epoch...')
-            continue
 
         (loss,
          reconst_loss,
@@ -860,8 +869,15 @@ def train_poe(
         optimizer.zero_grad()
         loss.backward()
 
+        # Skip batch if gradients contain NaN (recoverable), don't corrupt parameters
+        if any(p.grad is not None and torch.isnan(p.grad).any() for p in model.parameters()):
+            LOGGER.warning('NaN gradient in batch %d, skipping step', i)
+            optimizer.zero_grad()
+            continue
+
         nn.utils.clip_grad_norm_(model.parameters(), 5)
         optimizer.step()
+        counter += 1
 
         running_loss += loss.item()
         running_reconst += reconst_loss.item()
@@ -869,7 +885,9 @@ def train_poe(
         running_c += kl_divergence_c.item()
         running_l += kl_divergence_l.item()
         running_u += kl_divergence_u.item()
-    
+
+    if counter == 0:
+        raise ValueError('All batches produced NaN gradients')
     train_loss = running_loss / counter
     train_reconst = running_reconst / counter
     train_z = running_z / counter
