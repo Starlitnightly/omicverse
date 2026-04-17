@@ -6,6 +6,7 @@ Implements reduceDimension() with DDRTree, ICA, and tSNE methods.
 
 import numpy as np
 from scipy import sparse
+from scipy.sparse import csr_matrix
 from scipy.spatial.distance import pdist, squareform
 from scipy.sparse.csgraph import minimum_spanning_tree
 import igraph as ig
@@ -212,16 +213,14 @@ def reduce_dimension(adata, max_components=2, reduction_method='DDRTree',
         dp = squareform(pdist(Y.T))
         adata.uns['monocle']['cellPairwiseDistances'] = dp
 
-        # Build igraph MST
+        # Build MST directly from scipy (O(K^2 log K)) — avoids
+        # materializing a full K*(K-1)/2 edge list. K is usually <=500.
         K = Y.shape[1]
-        g = ig.Graph.Full(K)
-        g.vs['name'] = [f'Y_{i}' for i in range(K)]
-        weights = []
-        for e in g.es:
-            i, j = e.source, e.target
-            weights.append(dp[i, j])
-        g.es['weight'] = weights
-        mst = g.spanning_tree(weights=weights)
+        mst_sp = minimum_spanning_tree(csr_matrix(dp)).tocoo()
+        mst = ig.Graph(n=K, directed=False)
+        mst.vs['name'] = [f'Y_{i}' for i in range(K)]
+        mst.add_edges(list(zip(mst_sp.row.tolist(), mst_sp.col.tolist())))
+        mst.es['weight'] = mst_sp.data.tolist()
         adata.uns['monocle']['mst'] = mst
         adata.uns['monocle']['mst_adj'] = np.array(mst.get_adjacency(attribute='weight').data)
 
@@ -262,14 +261,11 @@ def reduce_dimension(adata, max_components=2, reduction_method='DDRTree',
         adata.uns['monocle']['cellPairwiseDistances'] = dp
 
         N = S.shape[0]
-        g = ig.Graph.Full(N)
-        g.vs['name'] = list(adata.obs_names)
-        weights = []
-        for e in g.es:
-            i, j = e.source, e.target
-            weights.append(dp[i, j])
-        g.es['weight'] = weights
-        mst = g.spanning_tree(weights=weights)
+        mst_sp = minimum_spanning_tree(csr_matrix(dp)).tocoo()
+        mst = ig.Graph(n=N, directed=False)
+        mst.vs['name'] = list(adata.obs_names)
+        mst.add_edges(list(zip(mst_sp.row.tolist(), mst_sp.col.tolist())))
+        mst.es['weight'] = mst_sp.data.tolist()
         adata.uns['monocle']['mst'] = mst
     else:
         raise ValueError(f"Unrecognized reduction method: {reduction_method}")

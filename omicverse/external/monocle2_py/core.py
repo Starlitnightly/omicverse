@@ -186,6 +186,7 @@ def estimate_dispersions(adata, min_cells_detected=1, verbose=False):
             def _parametric_dispersion_fit(mu_v, disp_v, start_coefs):
                 """Match R's parametricDispersionFit exactly."""
                 coefs = start_coefs.copy()
+                fit_result = None  # explicit sentinel — avoids 'in dir()' scoping bugs
                 for _iter in range(12):
                     pred = coefs[0] + coefs[1] / mu_v
                     pred[pred <= 0] = 1e-10
@@ -205,8 +206,8 @@ def estimate_dispersions(adata, min_cells_detected=1, verbose=False):
                                 y, X_design,
                                 family=sm.families.Gamma(
                                     sm.families.links.Identity()))
-                            result = glm_model.fit(start_params=coefs)
-                            new_coefs = result.params.copy()
+                            fit_result = glm_model.fit(start_params=coefs)
+                            new_coefs = fit_result.params.copy()
                     except Exception:
                         break
 
@@ -218,7 +219,7 @@ def estimate_dispersions(adata, min_cells_detected=1, verbose=False):
                         break
                     if np.sum(np.log(coefs / old_coefs) ** 2) < 1e-6:
                         break
-                return coefs, result if 'result' in dir() else None
+                return coefs, fit_result
 
             # First fit
             coefs, fit_result = _parametric_dispersion_fit(

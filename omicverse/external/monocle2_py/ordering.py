@@ -88,16 +88,18 @@ def _project_cells_to_mst(adata):
     dp = dp + min_dist
     np.fill_diagonal(dp, 0)
 
-    # Build new MST on projected cells
+    # Build new MST on projected cells using scipy (O(N^2 log N) on the
+    # dense distance matrix — avoids materializing a fully-connected
+    # graph of ~N^2/2 edges which blows up for large N).
+    from scipy.sparse.csgraph import minimum_spanning_tree as _mst
+    from scipy.sparse import csr_matrix as _csr
     N_cells = dp.shape[0]
-    g = ig.Graph.Full(N_cells)
-    g.vs['name'] = list(adata.obs_names)
-    weights = []
-    for e in g.es:
-        i, j = e.source, e.target
-        weights.append(dp[i, j])
-    g.es['weight'] = weights
-    cell_mst = g.spanning_tree(weights=weights)
+    mst_sp = _mst(_csr(dp)).tocoo()
+    cell_mst = ig.Graph(n=N_cells, directed=False)
+    cell_mst.vs['name'] = list(adata.obs_names)
+    edges = list(zip(mst_sp.row.tolist(), mst_sp.col.tolist()))
+    cell_mst.add_edges(edges)
+    cell_mst.es['weight'] = mst_sp.data.tolist()
 
     monocle['pr_graph_cell_proj_tree'] = cell_mst
     monocle['pr_graph_cell_proj_dist'] = P
@@ -143,10 +145,36 @@ def _extract_ddrtree_ordering(adata, root_cell_name, use_cell_mst=False):
     fathers = dfs_result[2]  # parent of each vertex in BFS tree
 
     pseudotimes = np.zeros(n_vertices)
-    states = np.ones(n_vertices, dtype=int)
+    states = np.zeros(n_vertices, dtype=int)
     parents = [None] * n_vertices
-    curr_state = 1
 
+    # --- State assignment matches R Monocle2 ---------------------------
+    # R: a new state is entered when crossing an edge OUT of a branch
+    # point (deg>2). All cells downstream of that branch point on the
+    # same edge share a state. Every child of a branch point gets its
+    # own fresh state id (one per outgoing edge).
+    # Implementation: walk root-to-leaf; whenever we step from a
+    # branch vertex, mint a new state id keyed by (branch_vertex, child).
+    state_of = {}           # node_idx -> state id
+    state_of[root_idx] = 1
+    next_state = 2
+
+    # We must process nodes in BFS order so parent is always assigned first
+    for node_idx in order:
+        if node_idx < 0 or node_idx == root_idx:
+            continue
+        father_idx = fathers[node_idx]
+        if father_idx < 0:
+            state_of[node_idx] = state_of.get(root_idx, 1)
+            continue
+        # If father is a branch point (deg>2), this edge starts a new state.
+        if mst.degree(father_idx) > 2 and father_idx != root_idx:
+            state_of[node_idx] = next_state
+            next_state += 1
+        else:
+            state_of[node_idx] = state_of[father_idx]
+
+    # Pseudotime: cumulative edge length from root
     for node_idx in order:
         if node_idx < 0:
             continue
@@ -156,24 +184,18 @@ def _extract_ddrtree_ordering(adata, root_cell_name, use_cell_mst=False):
         if father_idx >= 0:
             parent_name = vertex_names[father_idx]
             parent_pseudotime = pseudotimes[father_idx]
-            parent_state = states[father_idx]
-
-            # Distance from parent
+            # Distance from parent (safe-indexed)
             if dp.shape[0] > max(node_idx, father_idx):
                 d = dp[node_idx, father_idx]
             else:
                 d = 0
             curr_node_pseudotime = parent_pseudotime + d
-
-            # Check if parent is a branch point (degree > 2)
-            if mst.degree(father_idx) > 2:
-                curr_state += 1
         else:
             parent_name = None
             curr_node_pseudotime = 0
 
         pseudotimes[node_idx] = curr_node_pseudotime
-        states[node_idx] = curr_state
+        states[node_idx] = state_of.get(node_idx, 1)
         parents[node_idx] = parent_name
 
     ordering_df = pd.DataFrame({

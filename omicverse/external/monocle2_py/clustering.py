@@ -72,15 +72,18 @@ def cluster_cells(adata, method='leiden', k=50, resolution_parameter=0.1,
     -------
     adata with 'Cluster' in .obs
     """
-    monocle = adata.uns.get('monocle', {})
+    # Ensure adata.uns['monocle'] exists and always write/read directly
+    # through adata.uns to avoid stale-copy bugs.
+    if 'monocle' not in adata.uns:
+        adata.uns['monocle'] = {}
 
     if method == 'densityPeak':
         # Density peak clustering (Rodriguez-Laio 2014) — used in Monocle2
         # tutorial when data has been embedded via tSNE.
         if 'X_tSNE' in adata.obsm:
             data = adata.obsm['X_tSNE']
-        elif 'reducedDimA' in monocle:
-            data = monocle['reducedDimA'].T
+        elif 'reducedDimA' in adata.uns['monocle']:
+            data = adata.uns['monocle']['reducedDimA'].T
         else:
             raise ValueError("densityPeak requires a prior tSNE embedding")
 
@@ -109,7 +112,7 @@ def cluster_cells(adata, method='leiden', k=50, resolution_parameter=0.1,
             delta[cur] = d[best]
             nneigh[cur] = higher[best]
 
-        adata.uns.setdefault('monocle', {})['rho'] = rho
+        adata.uns['monocle']['rho'] = rho
         adata.uns['monocle']['delta'] = delta
 
         # Select cluster centers by rho*delta
@@ -133,7 +136,7 @@ def cluster_cells(adata, method='leiden', k=50, resolution_parameter=0.1,
         adata = reduce_dimension(adata, max_components=2, reduction_method='DDRTree',
                                  verbose=verbose, ncenter=num_clusters,
                                  param_gamma=100, **kwargs)
-        closest = monocle.get('pr_graph_cell_proj_closest_vertex')
+        closest = adata.uns.get('monocle', {}).get('pr_graph_cell_proj_closest_vertex')
         if closest is not None:
             adata.obs['Cluster'] = pd.Categorical(closest.astype(str))
         return adata
@@ -143,8 +146,8 @@ def cluster_cells(adata, method='leiden', k=50, resolution_parameter=0.1,
         data = adata.obsm['X_DDRTree']
     elif 'X_tSNE' in adata.obsm:
         data = adata.obsm['X_tSNE']
-    elif 'reducedDimA' in monocle:
-        data = monocle['reducedDimA'].T
+    elif 'reducedDimA' in adata.uns.get('monocle', {}):
+        data = adata.uns['monocle']['reducedDimA'].T
     else:
         from sklearn.decomposition import PCA
         pca = PCA(n_components=min(50, min(adata.shape) - 1))

@@ -544,31 +544,78 @@ def BEAM(adata, branch_point=1, branch_states=None, branch_labels=None,
     # Build branch CDS subset
     if branch_states is None:
         branch_points = monocle.get('branch_points', [])
-        if branch_point > len(branch_points):
-            raise ValueError(f"Branch point {branch_point} not found")
-        # Determine states: use the two states with most cells distal to root
-        states = sorted(adata.obs['State'].unique())
-        # Root state = state containing Pseudotime=0 cell
-        if (adata.obs['Pseudotime'] == 0).any():
-            root_state = adata.obs.loc[
-                adata.obs['Pseudotime'] == adata.obs['Pseudotime'].min(), 'State'
-            ].iloc[0]
-        else:
-            root_state = adata.obs['State'].value_counts().idxmax()
-        non_root = [s for s in states if s != root_state]
-        # Prefer two states closest (in pseudotime) to the branch point
-        if len(non_root) >= 2:
-            # Use two states with highest mean pseudotime (tips furthest out)
+        if branch_point < 1 or branch_point > len(branch_points):
+            raise ValueError(
+                f"Branch point index {branch_point} out of range "
+                f"(found {len(branch_points)} branch points)."
+            )
+        # Find the children states specific to THIS branch point by
+        # traversing the Y-centre MST: for the selected branch vertex,
+        # enumerate its adjacent subtrees, drop the one containing the
+        # root (Pseudotime==0) cell, and take the two with highest-mean
+        # pseudotime as the competing lineages.
+        mst = monocle.get('mst')
+        closest_vertex = monocle.get('pr_graph_cell_proj_closest_vertex')
+        branch_vertex_name = branch_points[branch_point - 1]
+
+        if mst is None or closest_vertex is None:
+            # Fallback: keep previous heuristic if MST metadata missing
+            states_all = sorted(adata.obs['State'].unique())
+            if (adata.obs['Pseudotime'] == 0).any():
+                root_state = adata.obs.loc[
+                    adata.obs['Pseudotime'] == adata.obs['Pseudotime'].min(),
+                    'State'].iloc[0]
+            else:
+                root_state = adata.obs['State'].value_counts().idxmax()
+            non_root = [s for s in states_all if s != root_state]
             state_pt = {s: adata.obs.loc[adata.obs['State'] == s, 'Pseudotime'].mean()
                         for s in non_root}
             branch_states = sorted(state_pt, key=state_pt.get, reverse=True)[:2]
         else:
-            branch_states = non_root[:2]
+            branch_vertex = mst.vs['name'].index(branch_vertex_name)
+            # Identify root state (min pseudotime)
+            root_state = adata.obs.loc[adata.obs['Pseudotime'].idxmin(), 'State']
+            # Remove the branch vertex, find connected components of children
+            neighbours = mst.neighbors(branch_vertex)
+            g_no_bp = mst.copy()
+            g_no_bp.delete_vertices([branch_vertex])
+            components = g_no_bp.connected_components()
+            # Which Y-vertex is in which component?
+            name_to_comp = {v['name']: components.membership[v.index]
+                            for v in g_no_bp.vs}
+            # Map each cell to a Y-vertex → component
+            candidate_state_pt = {}
+            for st in adata.obs['State'].unique():
+                if st == root_state:
+                    continue
+                cells = adata.obs.index[adata.obs['State'] == st]
+                y_ids = closest_vertex[np.isin(adata.obs_names, cells)]
+                y_names = [f'Y_{y}' if isinstance(y, (int, np.integer))
+                           else (mst.vs[y]['name'] if y < mst.vcount() else None)
+                           for y in np.atleast_1d(y_ids).ravel()]
+                # Count which component dominates
+                comps = [name_to_comp[n] for n in y_names
+                         if n in name_to_comp]
+                if not comps:
+                    continue
+                dominant = max(set(comps), key=comps.count)
+                key = dominant
+                if key not in candidate_state_pt:
+                    candidate_state_pt[key] = (
+                        st,
+                        adata.obs.loc[adata.obs['State'] == st,
+                                      'Pseudotime'].mean(),
+                    )
+            # Take the two components with highest-mean-pseudotime state
+            picked = sorted(candidate_state_pt.values(),
+                            key=lambda t: t[1], reverse=True)[:2]
+            branch_states = [p[0] for p in picked]
 
     if len(branch_states) < 2:
+        n_states = adata.obs['State'].nunique()
         raise ValueError(
             f"Need at least 2 branch states for BEAM, found {branch_states}. "
-            f"Only {len(states)} total states in trajectory — increase ncenter "
+            f"Only {n_states} total states in trajectory — increase ncenter "
             f"or use reduce_dimension(..., ncenter=N//8)."
         )
 
