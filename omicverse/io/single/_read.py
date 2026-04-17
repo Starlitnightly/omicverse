@@ -1,3 +1,5 @@
+import os
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -8,6 +10,38 @@ except ImportError:
     from anndata import read_h5ad as _anndata_read_h5ad
 
 from ..._registry import register_function
+
+
+def _log_rust_read(path: str, size_mb: float | None, elapsed: float) -> None:
+    size_str = f"  ({size_mb:.1f} MB)" if size_mb is not None else ""
+    print(
+        "📂 Reading with anndata-rs (Rust · out-of-memory)\n"
+        f"   {path}{size_str}\n"
+        f"   ✓ Loaded in {elapsed:.2f}s\n\n"
+        "💡 Data stays on disk. Use ov.pp.* for chunked processing.\n"
+        "   adata.close() when done · adata.to_adata() to materialise"
+    )
+
+
+def _read_h5ad_rust(path, **kwargs):
+    try:
+        import anndataoom
+    except ImportError:
+        raise ImportError(
+            "Rust backend requires the 'anndataoom' package. "
+            "Install with:  pip install omicverse[rust]   (or  pip install anndataoom)"
+        ) from None
+
+    kwargs.setdefault("backed", "r")
+    try:
+        size_mb = os.path.getsize(path) / 1024**2
+    except OSError:
+        size_mb = None
+
+    t0 = time.perf_counter()
+    adata = anndataoom.read(str(path), **kwargs)
+    _log_rust_read(str(path), size_mb, time.perf_counter() - t0)
+    return adata
 
 
 @register_function(
@@ -60,63 +94,7 @@ def read(path, backend='python', **kwargs):
             return _anndata_read_h5ad(path, **kwargs)
 
         if backend == 'rust':
-            # Try backends in order of preference:
-            #   1. anndataoom (our prebuilt package, includes the Python wrapper)
-            #   2. anndata_rs (standalone, built from source)
-            #   3. snapatac2 (bundles the same Rust AnnData implementation)
-            rs_module = None
-            try:
-                import anndataoom
-                # If anndataoom is available, use its read() directly
-                # (it already wraps the result in AnnDataOOM with full API)
-                import time, os as _os
-                from ..anndata_oom._repr import _format_read_message
-                try:
-                    size_mb = _os.path.getsize(str(path)) / 1024**2
-                except Exception:
-                    size_mb = None
-                if 'backed' not in kwargs:
-                    kwargs['backed'] = 'r'
-                t0 = time.time()
-                adata = anndataoom.read(str(path), **kwargs)
-                elapsed = time.time() - t0
-                print(_format_read_message(str(path), size_mb, elapsed))
-                return adata
-            except ImportError:
-                pass
-
-            try:
-                import anndata_rs as rs_module
-            except ImportError:
-                try:
-                    import snapatac2 as rs_module  # snapatac2 bundles anndata-rs
-                except ImportError:
-                    raise ImportError(
-                        "No Rust AnnData backend available. Install one of:\n"
-                        "  1. pip install anndataoom    (prebuilt, includes full Python wrapper)\n"
-                        "  2. pip install snapatac2     (bundles anndata-rs, ~200 MB)\n"
-                        "  3. Build anndata-rs from source"
-                    )
-
-            from ..anndata_oom import AnnDataOOM
-            from ..anndata_oom._repr import _format_read_message
-            import time
-            import os
-
-            # Default to read-only mode to avoid modifying the original file
-            if 'backed' not in kwargs:
-                kwargs['backed'] = 'r'
-            try:
-                size_mb = os.path.getsize(str(path)) / 1024**2
-            except Exception:
-                size_mb = None
-
-            t0 = time.time()
-            rs_adata = rs_module.read(str(path), **kwargs)
-            elapsed = time.time() - t0
-            adata = AnnDataOOM(rs_adata)
-            print(_format_read_message(str(path), size_mb, elapsed))
-            return adata
+            return _read_h5ad_rust(path, **kwargs)
 
         raise ValueError("backend must be 'python' or 'rust'")
 
