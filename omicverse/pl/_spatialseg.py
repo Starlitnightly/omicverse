@@ -472,13 +472,15 @@ def spatialseg(
             temp_gdf = gpd.GeoDataFrame({color_key: color_data}, geometry=temp_geometries, index=valid_cells)
             plot_column = color_key
         else:
+            from scipy.sparse import issparse
+
             gene_idx = adata.var_names.get_loc(color_key)
-            if hasattr(adata.X, "toarray"):
-                expression_values = adata.X[
-                    adata.obs_names.get_indexer(valid_cells), gene_idx
-                ].toarray().flatten()
-            else:
-                expression_values = adata.X[adata.obs_names.get_indexer(valid_cells), gene_idx]
+            expression_values = adata.X[
+                adata.obs_names.get_indexer(valid_cells), gene_idx
+            ]
+            if issparse(expression_values) or hasattr(expression_values, "toarray"):
+                expression_values = expression_values.toarray()
+            expression_values = np.asarray(expression_values).flatten()
 
             color_data = pd.Series(expression_values, index=valid_cells, name=color_key)
             temp_gdf = gpd.GeoDataFrame({color_key: color_data}, geometry=temp_geometries, index=valid_cells)

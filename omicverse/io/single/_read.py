@@ -23,6 +23,50 @@ def _log_rust_read(path: str, size_mb: float | None, elapsed: float) -> None:
     )
 
 
+def _h5ad_csr_sorted(path, n_sample_lanes: int = 256) -> bool:
+    r"""Quick probe: if ``X`` is a CSR/CSC matrix, are its minor indices sorted
+    within each lane? anndata-rs panics on unsorted minor indices with a cryptic
+    Rust stack trace, so we pre-flight using ``h5py`` and up to ``n_sample_lanes``
+    evenly-spaced lanes. Returns ``True`` when sorted / not sparse / can't be
+    checked, ``False`` only when an actual violation is found.
+    """
+    try:
+        import h5py
+        import numpy as np
+    except ImportError:
+        return True
+    try:
+        with h5py.File(str(path), "r") as f:
+            if "X" not in f:
+                return True
+            X = f["X"]
+            if not isinstance(X, h5py.Group):
+                return True
+            enc = X.attrs.get("encoding-type", b"")
+            if isinstance(enc, bytes):
+                enc = enc.decode(errors="ignore")
+            if "csr" not in enc and "csc" not in enc:
+                return True
+            if "indptr" not in X or "indices" not in X:
+                return True
+            indptr = np.asarray(X["indptr"][:], dtype=np.int64)
+            indices_d = X["indices"]
+            n_lanes = indptr.shape[0] - 1
+            if n_lanes <= 0:
+                return True
+            step = max(1, n_lanes // n_sample_lanes)
+            for i in range(0, n_lanes, step):
+                s, e = int(indptr[i]), int(indptr[i + 1])
+                if e - s <= 1:
+                    continue
+                lane = np.asarray(indices_d[s:e])
+                if np.any(np.diff(lane) < 0):
+                    return False
+        return True
+    except Exception:
+        return True
+
+
 def _read_h5ad_rust(path, **kwargs):
     try:
         import anndataoom
@@ -31,6 +75,18 @@ def _read_h5ad_rust(path, **kwargs):
             "Rust backend requires the 'anndataoom' package. "
             "Install with:  pip install omicverse[rust]   (or  pip install anndataoom)"
         ) from None
+
+    if not _h5ad_csr_sorted(path):
+        raise ValueError(
+            f"Cannot read {path} with backend='rust': its sparse X matrix has "
+            "unsorted minor indices, which anndata-rs rejects.\n"
+            "Rewrite with sorted indices, e.g.:\n"
+            "    import anndata as ad\n"
+            f"    a = ad.read_h5ad('{path}')\n"
+            "    a.X.sort_indices()\n"
+            "    a.write_h5ad('<fixed>.h5ad')\n"
+            "Or use ov.utils.convert_adata_for_rust(a, output_file='<fixed>.h5ad')."
+        )
 
     kwargs.setdefault("backed", "r")
     try:

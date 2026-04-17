@@ -497,12 +497,14 @@ def nanostring(
         if color_key in adata.obs.columns:
             color_data = adata.obs.loc[cells_in_fovs, color_key]
         else:
+            from scipy.sparse import issparse
+
             gene_idx = adata.var_names.get_loc(color_key)
             X_sub = adata[fov_mask.to_numpy(), :].X
-            if hasattr(X_sub, "toarray"):
-                vals = np.asarray(X_sub[:, gene_idx].toarray()).flatten()
-            else:
-                vals = np.asarray(X_sub[:, gene_idx]).flatten()
+            vals = X_sub[:, gene_idx]
+            if issparse(vals) or hasattr(vals, "toarray"):
+                vals = vals.toarray()
+            vals = np.asarray(vals).flatten()
             color_data = pd.Series(vals, index=cells_in_fovs, name=color_key)
 
         is_categorical = (
@@ -938,12 +940,14 @@ def nanostringseg(
         if color_key in adata.obs.columns:
             color_data = adata.obs.loc[valid_cells, color_key]
         else:
+            from scipy.sparse import issparse
+
             gene_idx = adata.var_names.get_loc(color_key)
             idx_pos = adata.obs_names.get_indexer(valid_cells)
-            if hasattr(adata.X, "toarray"):
-                gene_vals = np.asarray(adata.X[idx_pos, gene_idx].toarray()).flatten()
-            else:
-                gene_vals = np.asarray(adata.X[idx_pos, gene_idx]).flatten()
+            gene_vals = adata.X[idx_pos, gene_idx]
+            if issparse(gene_vals) or hasattr(gene_vals, "toarray"):
+                gene_vals = gene_vals.toarray()
+            gene_vals = np.asarray(gene_vals).flatten()
             color_data = pd.Series(gene_vals, index=valid_cells, name=color_key)
 
         temp_gdf = gpd.GeoDataFrame({color_key: color_data}, geometry=geom_series,
