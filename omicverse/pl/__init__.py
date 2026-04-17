@@ -151,6 +151,7 @@ from ._ccc import ccc_heatmap, ccc_network_plot, ccc_stat_plot
 from ._dotplot import dotplot, rank_genes_groups_dotplot, rank_genes_groups_df, markers_dotplot
 from ._spatial import spatial, spatial_segment, spatial_segment_overlay
 from ._spatialseg import (
+    create_custom_colormap,
     highlight_spatial_region,
     spatialseg,
 )
@@ -331,6 +332,7 @@ __all__ = [
     # @ _spatialseg
     "spatialseg",
     "highlight_spatial_region",
+    "create_custom_colormap",
     # @ _nanostring
     "nanostring",
     "nanostringseg",
