@@ -665,6 +665,17 @@ def preprocess(
             "available for the OOM backend. Use 'shiftlog|pearson' instead, "
             "or switch to mode='cpu' to materialise the data."
         )
+    if is_oom and method_list_preview[0] == 'pearson':
+        # Pearson residual normalisation needs a materialised X. Rather than
+        # leave adata in a hybrid state (in-memory data wrapped in
+        # BackedArray, but _is_oom still True), refuse the combination and
+        # let the user opt into mode='cpu' explicitly.
+        raise NotImplementedError(
+            "Pearson residual normalisation is not available for the OOM "
+            "backend (it requires the full X in memory, which would leave "
+            "adata in a hybrid state). Use 'shiftlog|pearson' instead, or "
+            "switch to mode='cpu'."
+        )
 
     if is_oom:
         # OOM: save a lazy reference to raw counts (zero memory cost)
@@ -694,26 +705,15 @@ def preprocess(
             chunked_normalize_total, chunked_log1p,
         )
         data_load_start = time.time()
-        if method_list[0] == 'shiftlog':
-            chunked_normalize_total(
-                adata,
-                target_sum=target_sum,
-                exclude_highly_expressed=True,
-                max_fraction=0.2,
-            )
-            chunked_log1p(adata)
-        elif method_list[0] == 'pearson':
-            # Pearson residuals cannot be chunked — we materialise X here.
-            # This defeats part of the OOM benefit for this normalisation step.
-            print(f"{Colors.WARNING}    ⚠️  Pearson residuals require a materialised X; "
-                  f"{adata.n_obs:,} × {adata.n_vars:,} will be loaded into memory.{Colors.ENDC}")
-            from .experimental import normalize_pearson_residuals
-            from anndataoom import BackedArray
-            X_dense = adata.X[:]
-            if issparse(X_dense):
-                X_dense = X_dense.toarray()
-            adata.X = BackedArray(X_dense.astype(np.float32), shape=X_dense.shape)
-            normalize_pearson_residuals(adata)
+        # Only 'shiftlog' normalisation is supported for OOM; 'pearson' is
+        # pre-rejected at the top of this function.
+        chunked_normalize_total(
+            adata,
+            target_sum=target_sum,
+            exclude_highly_expressed=True,
+            max_fraction=0.2,
+        )
+        chunked_log1p(adata)
 
         if method_list[1] == 'pearson':
             from anndataoom import chunked_highly_variable_genes_pearson
