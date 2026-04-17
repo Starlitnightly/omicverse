@@ -251,6 +251,27 @@ def _prepare_table_for_uns(df: pd.DataFrame) -> pd.DataFrame:
 
 @dataclass
 class DynamicFeaturesResult:
+    """Container returned by :func:`dynamic_features`.
+
+    Attributes
+    ----------
+    stats
+        Per-feature goodness-of-fit dataframe across groups (R², AIC,
+        deviance, significance flags).
+    fitted
+        Long-form dataframe of predicted trend curves — one row per
+        ``(dataset, group, feature, x_pred point)``. Ready to pass to
+        :func:`omicverse.pl.dynamic_trends`.
+    raw
+        Per-cell raw values in the same long form as ``fitted`` when
+        ``keep_raw=True`` was passed; ``None`` otherwise.
+    models
+        Mapping of ``(group, feature)`` to the fitted pyGAM model for
+        users who want to inspect coefficients or re-predict.
+    config
+        Echo of the parameters the call ran with, for reproducibility.
+    """
+
     stats: pd.DataFrame
     fitted: pd.DataFrame
     raw: pd.DataFrame | None = None

@@ -25,6 +25,8 @@ import numpy as np
 import pandas as pd
 from anndata import AnnData
 
+from .._registry import register_function
+
 # NOTE: `omicverse.single` is a core domain whose modules must not
 # perform `from ..external import ...` at the module top level (see
 # ``tests/architecture/test_no_top_level_external_imports.py``). The
@@ -32,6 +34,30 @@ from anndata import AnnData
 # ``__init__`` and stores it on the instance as ``self._m2``.
 
 
+@register_function(
+    aliases=["Monocle", "monocle", "monocle2", "monocle 2", "DDRTree trajectory", "BEAM"],
+    category="trajectory",
+    description=(
+        "Monocle 2-style trajectory analysis (pure-Python re-implementation). "
+        "Covers size-factor / dispersion estimation, ordering-gene selection, "
+        "DDRTree dimension reduction, pseudotime + State assignment, branched "
+        "differential expression (BEAM), and the full family of trajectory plots."
+    ),
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix="none",
+    examples=[
+        "mono = ov.single.Monocle(adata)",
+        "mono.preprocess()",
+        "mono.select_ordering_genes()",
+        "mono.reduce_dimension(max_components=2)",
+        "mono.order_cells()",
+        "mono.plot_trajectory(color_by='clusters')",
+        "beam = mono.BEAM(branch_point=1)",
+    ],
+    related=["single.pyVIA", "single.dynamic_features", "pl.dynamic_trends"],
+)
 class Monocle:
     """
     Monocle2-style single-cell trajectory analysis.
@@ -75,9 +101,24 @@ class Monocle:
     # ------------------------------------------------------------------ #
 
     def __init__(self, adata: AnnData):
-        # Import the external backend lazily inside the method body.
-        # The architecture test forbids this at module scope but
-        # allows it inside functions/methods.
+        """Initialise the Monocle analyser.
+
+        Parameters
+        ----------
+        adata : AnnData
+            Annotated data matrix (cells × genes). The expression matrix in
+            ``adata.X`` should contain raw or normalised counts — the negative
+            binomial model used by size-factor estimation and BEAM assumes
+            count-like data. All downstream results (``Pseudotime``, ``State``,
+            dispersions, DDRTree reduction) are written back to the same
+            AnnData, so subsequent scanpy-style workflows continue to work.
+
+        Notes
+        -----
+        The external ``monocle2_py`` backend is imported lazily inside this
+        constructor (not at module scope) to keep ``omicverse.single`` free of
+        top-level ``..external`` imports, per the architecture test.
+        """
         from ..external import monocle2_py as _m2  # noqa: PLC0415
         self._m2 = _m2
 
@@ -111,27 +152,84 @@ class Monocle:
     # ------------------------------------------------------------------ #
 
     def detect_genes(self, min_expr: float = 0.1):
-        """Detect genes expressed above a threshold."""
+        """Flag genes expressed above a threshold.
+
+        Writes ``adata.var['num_cells_expressed']`` and
+        ``adata.obs['num_genes_expressed']`` for downstream filtering.
+
+        Parameters
+        ----------
+        min_expr : float, default 0.1
+            Minimum raw count for a cell to count as "expressing" the gene.
+
+        Returns
+        -------
+        Monocle
+            ``self`` for chaining.
+        """
         self.adata = self._m2.detect_genes(self.adata, min_expr=min_expr)
         return self
 
     def estimate_size_factors(self, method: str = 'mean-geometric-mean-total',
                                round_exprs: bool = True):
-        """Estimate size factors (matches Monocle2's default method)."""
+        """Estimate per-cell size factors.
+
+        Parameters
+        ----------
+        method : str, default ``'mean-geometric-mean-total'``
+            Size-factor estimator. Matches the Monocle 2 R defaults.
+        round_exprs : bool, default ``True``
+            Round the normalised matrix to integers before fitting dispersions
+            — required for the NB model downstream.
+
+        Returns
+        -------
+        Monocle
+            ``self`` for chaining. Writes ``adata.obs['size_factor']``.
+        """
         self.adata = self._m2.estimate_size_factors(
             self.adata, method=method, round_exprs=round_exprs,
         )
         return self
 
     def estimate_dispersions(self, min_cells_detected: int = 1, verbose: bool = False):
-        """Estimate gene dispersions for the negative-binomial model."""
+        """Fit per-gene dispersions under the negative-binomial model.
+
+        Parameters
+        ----------
+        min_cells_detected : int, default 1
+            Minimum number of expressing cells for a gene to be fit (genes
+            below the threshold are dropped from the dispersion table).
+        verbose : bool, default ``False``
+            Print progress while fitting.
+
+        Returns
+        -------
+        Monocle
+            ``self`` for chaining. Writes empirical / fitted dispersions into
+            ``adata.var`` and a dispersion table into ``adata.uns['monocle']``.
+        """
         self.adata = self._m2.estimate_dispersions(
             self.adata, min_cells_detected=min_cells_detected, verbose=verbose,
         )
         return self
 
     def preprocess(self, min_expr: float = 0.1, verbose: bool = False):
-        """One-shot preprocessing: detect_genes + size factors + dispersions."""
+        """Run :meth:`detect_genes`, :meth:`estimate_size_factors` and
+        :meth:`estimate_dispersions` in sequence.
+
+        Parameters
+        ----------
+        min_expr : float, default 0.1
+            Passed through to :meth:`detect_genes`.
+        verbose : bool, default ``False``
+            Passed through to :meth:`estimate_dispersions`.
+
+        Returns
+        -------
+        Monocle
+            ``self`` for chaining. Flips ``self._preprocessed = True``.
+        """
         self.detect_genes(min_expr=min_expr)
         self.estimate_size_factors()
         self.estimate_dispersions(verbose=verbose)
@@ -139,13 +237,32 @@ class Monocle:
         return self
 
     def dispersion_table(self) -> pd.DataFrame:
-        """Return the per-gene dispersion table as a DataFrame."""
+        """Return the per-gene dispersion table populated by
+        :meth:`estimate_dispersions`, as a :class:`pandas.DataFrame`.
+        """
         return self._m2.dispersion_table(self.adata)
 
     def relative2abs(self, method: str = 'num_genes',
                      expected_capture_rate: float = 0.25,
                      verbose: bool = False) -> AnnData:
-        """Census normalization (TPM/FPKM → estimated absolute counts)."""
+        """Census normalisation — convert TPM / FPKM-scaled counts into
+        estimated absolute transcript counts per cell.
+
+        Parameters
+        ----------
+        method : str, default ``'num_genes'``
+            Monocle-style census method.
+        expected_capture_rate : float, default 0.25
+            Estimated mRNA capture efficiency of the platform.
+        verbose : bool, default ``False``
+            Print per-cell diagnostics.
+
+        Returns
+        -------
+        AnnData
+            A **new** AnnData with absolute counts in ``.X`` — the original
+            ``self.adata`` is left untouched.
+        """
         return self._m2.relative2abs(
             self.adata, method=method,
             expected_capture_rate=expected_capture_rate, verbose=verbose,
@@ -310,7 +427,30 @@ class Monocle:
     def cluster_cells(self, method: str = 'leiden', k: int = 50,
                       resolution_parameter: float = 0.1, verbose: bool = False,
                       **kwargs):
-        """Cluster cells (Leiden / Louvain / densityPeak / DDRTree)."""
+        """Cluster cells on the reduced-dim space and write labels to
+        ``adata.obs['Cluster']``.
+
+        Parameters
+        ----------
+        method : {'leiden', 'louvain', 'densityPeak', 'DDRTree'}, default 'leiden'
+            Clustering algorithm. ``'densityPeak'`` matches the original
+            Monocle 2 approach.
+        k : int, default 50
+            Number of nearest neighbours used to build the k-NN graph
+            (ignored by ``'densityPeak'``).
+        resolution_parameter : float, default 0.1
+            Resolution for Leiden / Louvain — higher values yield more
+            clusters.
+        verbose : bool, default ``False``
+            Print per-step timing.
+        **kwargs
+            Forwarded to :func:`monocle2_py.cluster_cells`.
+
+        Returns
+        -------
+        Monocle
+            ``self`` for chaining.
+        """
         self.adata = self._m2.cluster_cells(
             self.adata, method=method, k=k,
             resolution_parameter=resolution_parameter, verbose=verbose, **kwargs,
@@ -319,7 +459,26 @@ class Monocle:
 
     @staticmethod
     def cluster_genes(expression_matrix, k: int, method: str = 'correlation'):
-        """Cluster genes by their expression pattern."""
+        """Cluster genes by their expression pattern along pseudotime.
+
+        Unlike the other instance methods, this is a static helper — pass
+        the expression matrix (e.g. the output of :meth:`gen_smooth_curves`)
+        directly.
+
+        Parameters
+        ----------
+        expression_matrix : pandas.DataFrame
+            Genes (rows) × samples (columns).
+        k : int
+            Target number of clusters.
+        method : {'correlation', 'kmeans', 'hclust'}, default 'correlation'
+            Distance metric / clustering backend.
+
+        Returns
+        -------
+        pandas.Series
+            Gene → cluster label mapping.
+        """
         from ..external import monocle2_py as _m2  # noqa: PLC0415
         return _m2.cluster_genes(expression_matrix, k, method=method)
 
@@ -332,7 +491,30 @@ class Monocle:
                                 reducedModelFormulaStr: str = "~1",
                                 relative_expr: bool = True,
                                 cores: int = -1, verbose: bool = False) -> pd.DataFrame:
-        """Pseudotime-dependent differential expression test."""
+        """Pseudotime-dependent differential expression via a likelihood-ratio
+        test between a full GLM (gene ~ f(Pseudotime)) and a reduced null model.
+
+        Parameters
+        ----------
+        fullModelFormulaStr : str
+            Patsy formula for the full model. The default fits a natural
+            cubic spline on pseudotime with 3 degrees of freedom.
+        reducedModelFormulaStr : str, default ``'~1'``
+            Null model (intercept only by default).
+        relative_expr : bool, default ``True``
+            Normalise by size factors before fitting.
+        cores : int, default -1
+            Worker processes for the GLM fit. ``-1`` uses all available CPUs.
+        verbose : bool, default ``False``
+            Print per-gene diagnostics.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per gene with columns ``status``, ``pval``, ``qval``,
+            ``test_type``. Sorted by ``qval`` so the most significant genes
+            come first.
+        """
         return self._m2.differential_gene_test(
             self.adata,
             fullModelFormulaStr=fullModelFormulaStr,
@@ -345,7 +527,39 @@ class Monocle:
               fullModelFormulaStr: str = "~sm.ns(Pseudotime, df=3)*Branch",
               reducedModelFormulaStr: str = "~sm.ns(Pseudotime, df=3)",
               cores: int = -1, verbose: bool = False) -> pd.DataFrame:
-        """Branch Expression Analysis Modeling."""
+        """Branched Expression Analysis Modelling.
+
+        Tests whether each gene's expression diverges across the two lineages
+        downstream of a given branch point. Compares a full model with a
+        spline-by-branch interaction against a reduced model that collapses
+        the branches into a single spline.
+
+        Parameters
+        ----------
+        branch_point : int, default 1
+            Identifier of the branch point in the learned principal graph
+            (1-indexed). See ``mono.branch_points``.
+        branch_states : sequence of int, optional
+            State IDs assigned to each child lineage. Inferred from the
+            graph when ``None``.
+        branch_labels : sequence of str, optional
+            Human-readable labels for the two child lineages (used in the
+            output dataframe / downstream plots).
+        fullModelFormulaStr, reducedModelFormulaStr : str
+            Patsy formulas for the full and reduced models. Defaults match
+            the original Monocle 2 BEAM test.
+        cores : int, default -1
+            Worker processes for the GLM fit. ``-1`` uses all available CPUs.
+        verbose : bool, default ``False``
+            Print per-gene diagnostics.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per gene with BEAM test statistics, sorted by ``qval``.
+            Feed into :meth:`plot_genes_branched_pseudotime` /
+            :meth:`plot_genes_branched_heatmap` to visualise the top hits.
+        """
         return self._m2.BEAM(
             self.adata, branch_point=branch_point, branch_states=branch_states,
             branch_labels=branch_labels,
@@ -356,25 +570,73 @@ class Monocle:
 
     def fit_model(self, modelFormulaStr: str = "~sm.ns(Pseudotime, df=3)",
                    relative_expr: bool = True, cores: int = 1):
-        """Fit a GLM per gene (used internally by DE tests)."""
+        """Fit a per-gene GLM under the NB model.
+
+        Low-level building block used by :meth:`differential_gene_test` and
+        :meth:`BEAM`. Most users want one of those higher-level methods.
+        Returns the dict of fitted models keyed by gene name.
+        """
         return self._m2.fit_model(self.adata, modelFormulaStr=modelFormulaStr,
                               relative_expr=relative_expr, cores=cores)
 
     def gen_smooth_curves(self, new_data=None,
                            trend_formula: str = "~sm.ns(Pseudotime, df=3)",
                            relative_expr: bool = True, cores: int = 1):
-        """Generate smoothed expression curves along pseudotime."""
+        """Predict smoothed expression trajectories from a fitted model.
+
+        Parameters
+        ----------
+        new_data : pandas.DataFrame or None
+            Design matrix to predict on (e.g. a uniform pseudotime grid).
+            When ``None`` the cells' own pseudotime values are used.
+        trend_formula : str
+            Same formula used when fitting — needed to reconstruct the
+            design matrix for ``new_data``.
+        relative_expr, cores
+            Forwarded to the underlying :func:`fit_model` call.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Genes (rows) × sample points (columns) of smoothed expression.
+        """
         return self._m2.gen_smooth_curves(
             self.adata, new_data=new_data, trend_formula=trend_formula,
             relative_expr=relative_expr, cores=cores,
         )
 
     def cal_ABCs(self, branch_point: int = 1, **kwargs) -> pd.DataFrame:
-        """Calculate Area Between Curves for branch-specific genes."""
+        """Compute the Area Between Curves for branch-specific genes.
+
+        ABC summarises the divergence of a gene's expression between the two
+        lineages after a branch point — higher values mean more branch-
+        dependent behaviour. Inputs are routed through :func:`monocle2_py.cal_ABCs`;
+        extra kwargs are forwarded verbatim.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per gene, columns include ``ABCs`` and supporting stats.
+        """
         return self._m2.cal_ABCs(self.adata, branch_point=branch_point, **kwargs)
 
     def cal_ILRs(self, branch_point: int = 1, return_all: bool = False, **kwargs):
-        """Calculate Intrinsic Log Ratios (per-gene lineage bias)."""
+        """Compute the Intrinsic Log-Ratio (per-gene lineage bias).
+
+        Parameters
+        ----------
+        branch_point : int, default 1
+            Branch point identifier (see :attr:`branch_points`).
+        return_all : bool, default ``False``
+            If ``True``, also return the per-timepoint expression used to
+            compute the ratio (useful for plotting).
+
+        Returns
+        -------
+        pandas.DataFrame or tuple
+            ILR dataframe, or (ILR, per-timepoint expression) when
+            ``return_all=True``.
+        """
         return self._m2.cal_ILRs(
             self.adata, branch_point=branch_point, return_all=return_all, **kwargs,
         )
