@@ -20,6 +20,7 @@ Algorithm categories:
         - STT: Spatial transition tensor
         - VIA: Velocity integration and annotation
         - cytotrace2: Developmental potential scoring
+        - monocle2_py: Pure-Python reimplementation of Monocle 2 (DDRTree)
         
     Multi-omics integration:
         - mofapy2: Multi-Omics Factor Analysis

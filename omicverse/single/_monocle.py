@@ -1,0 +1,400 @@
+r"""
+Monocle2-style trajectory analysis for AnnData.
+
+Pure-Python re-implementation of Monocle 2 (Qiu et al. 2017), exposed as
+a single `Monocle` class for convenient use within omicverse.
+
+Examples
+--------
+>>> import omicverse as ov
+>>> mono = ov.single.Monocle(adata)
+>>> mono.preprocess()
+>>> mono.select_ordering_genes()
+>>> mono.reduce_dimension(max_components=2)
+>>> mono.order_cells()
+>>> mono.plot_trajectory(color_by='clusters')
+>>> de_results = mono.differential_gene_test()
+>>> beam_results = mono.BEAM(branch_point=1)
+"""
+
+from __future__ import annotations
+
+from typing import List, Optional, Union
+
+import numpy as np
+import pandas as pd
+from anndata import AnnData
+
+from ..external import monocle2_py as _m2
+
+
+class Monocle:
+    """
+    Monocle2-style single-cell trajectory analysis.
+
+    Wraps a pure-Python implementation of Monocle 2 as a stateful analyzer
+    operating on an AnnData object. All results are stored in the AnnData
+    (``.obs``, ``.var``, ``.uns['monocle']``, ``.obsm``) so the usual scanpy
+    workflow continues to work seamlessly.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Annotated data matrix (cells × genes). Expression matrix in
+        ``adata.X`` should be raw/normalized counts (negative binomial model).
+
+    Attributes
+    ----------
+    adata : AnnData
+        The annotated data matrix with analysis results stored in-place.
+
+    Examples
+    --------
+    Basic trajectory analysis:
+
+    >>> mono = ov.single.Monocle(adata)
+    >>> mono.preprocess()              # size factors + dispersions
+    >>> mono.select_ordering_genes()   # high-variance gene selection
+    >>> mono.reduce_dimension()        # DDRTree
+    >>> mono.order_cells()             # assign pseudotime + State
+    >>> mono.plot_trajectory(color_by='clusters')
+    >>> mono.plot_genes_in_pseudotime(['Ins1', 'Gcg'])
+
+    Differential expression along pseudotime:
+
+    >>> de = mono.differential_gene_test()
+    >>> beam = mono.BEAM(branch_point=1)
+    """
+
+    # ------------------------------------------------------------------ #
+    # Construction
+    # ------------------------------------------------------------------ #
+
+    def __init__(self, adata: AnnData):
+        self.adata = adata
+        self._preprocessed = False
+        self._ordering_set = False
+        self._reduced = False
+        self._ordered = False
+
+    def __repr__(self):
+        status = []
+        status.append(f"Monocle({self.adata.n_obs} cells × {self.adata.n_vars} genes)")
+        if self._preprocessed:
+            status.append("  preprocessed: ✓")
+        if self._ordering_set:
+            n_ord = int(self.adata.var.get('use_for_ordering', pd.Series([False])).sum())
+            status.append(f"  ordering genes: {n_ord}")
+        if self._reduced:
+            method = self.adata.uns.get('monocle', {}).get('dim_reduce_type', 'unknown')
+            status.append(f"  reduced: {method}")
+        if self._ordered:
+            pt = self.adata.obs.get('Pseudotime')
+            if pt is not None:
+                n_states = self.adata.obs['State'].nunique() if 'State' in self.adata.obs.columns else 0
+                status.append(f"  ordered: pseudotime [{pt.min():.2f}, {pt.max():.2f}], "
+                              f"{n_states} states")
+        return "\n".join(status)
+
+    # ------------------------------------------------------------------ #
+    # Preprocessing
+    # ------------------------------------------------------------------ #
+
+    def detect_genes(self, min_expr: float = 0.1):
+        """Detect genes expressed above a threshold."""
+        self.adata = _m2.detect_genes(self.adata, min_expr=min_expr)
+        return self
+
+    def estimate_size_factors(self, method: str = 'mean-geometric-mean-total',
+                               round_exprs: bool = True):
+        """Estimate size factors (matches Monocle2's default method)."""
+        self.adata = _m2.estimate_size_factors(
+            self.adata, method=method, round_exprs=round_exprs,
+        )
+        return self
+
+    def estimate_dispersions(self, min_cells_detected: int = 1, verbose: bool = False):
+        """Estimate gene dispersions for the negative-binomial model."""
+        self.adata = _m2.estimate_dispersions(
+            self.adata, min_cells_detected=min_cells_detected, verbose=verbose,
+        )
+        return self
+
+    def preprocess(self, min_expr: float = 0.1, verbose: bool = False):
+        """One-shot preprocessing: detect_genes + size factors + dispersions."""
+        self.detect_genes(min_expr=min_expr)
+        self.estimate_size_factors()
+        self.estimate_dispersions(verbose=verbose)
+        self._preprocessed = True
+        return self
+
+    def dispersion_table(self) -> pd.DataFrame:
+        """Return the per-gene dispersion table as a DataFrame."""
+        return _m2.dispersion_table(self.adata)
+
+    def relative2abs(self, method: str = 'num_genes',
+                     expected_capture_rate: float = 0.25,
+                     verbose: bool = False) -> AnnData:
+        """Census normalization (TPM/FPKM → estimated absolute counts)."""
+        return _m2.relative2abs(
+            self.adata, method=method,
+            expected_capture_rate=expected_capture_rate, verbose=verbose,
+        )
+
+    # ------------------------------------------------------------------ #
+    # Ordering gene selection
+    # ------------------------------------------------------------------ #
+
+    def select_ordering_genes(self, genes: Optional[List[str]] = None,
+                               mean_expr_thresh: float = 0.1,
+                               max_genes: Optional[int] = None):
+        """
+        Select genes used for trajectory inference.
+
+        Parameters
+        ----------
+        genes : list of str or None
+            If given, use these genes directly. Otherwise auto-select by
+            ``dispersion_empirical > dispersion_fit`` and
+            ``mean_expression >= mean_expr_thresh``.
+        mean_expr_thresh : float
+            Minimum mean expression to keep a gene.
+        max_genes : int or None
+            Cap the number of ordering genes (for large datasets).
+        """
+        if genes is None:
+            disp = _m2.dispersion_table(self.adata)
+            mask = (
+                (disp['mean_expression'] >= mean_expr_thresh) &
+                (disp['dispersion_empirical'] >= disp['dispersion_fit'])
+            )
+            genes = disp[mask].index.tolist()
+
+            if max_genes is not None and len(genes) > max_genes:
+                ratio = (disp.loc[genes, 'dispersion_empirical']
+                         / disp.loc[genes, 'dispersion_fit'])
+                genes = ratio.sort_values(ascending=False).head(max_genes).index.tolist()
+
+        self.adata = _m2.set_ordering_filter(self.adata, genes)
+        self._ordering_set = True
+        return self
+
+    def set_ordering_filter(self, genes: List[str]):
+        """Explicitly set the list of ordering genes."""
+        self.adata = _m2.set_ordering_filter(self.adata, genes)
+        self._ordering_set = True
+        return self
+
+    # ------------------------------------------------------------------ #
+    # Dimension reduction & ordering
+    # ------------------------------------------------------------------ #
+
+    def reduce_dimension(self, max_components: int = 2,
+                          reduction_method: str = 'DDRTree',
+                          norm_method: str = 'log',
+                          verbose: bool = False, **kwargs):
+        """
+        Reduce dimensionality and learn the principal graph.
+
+        Parameters
+        ----------
+        max_components : int
+            Number of dimensions to reduce to (2 is standard for visualization).
+        reduction_method : {'DDRTree', 'tSNE', 'ICA'}
+        norm_method : {'log', 'none'}
+        **kwargs : additional DDRTree parameters
+            ``ncenter``, ``lambda_param``, ``param_gamma``, ``sigma``,
+            ``maxIter``, ``tol``.
+        """
+        self.adata = _m2.reduce_dimension(
+            self.adata, max_components=max_components,
+            reduction_method=reduction_method,
+            norm_method=norm_method, verbose=verbose, **kwargs,
+        )
+        self._reduced = True
+        return self
+
+    def order_cells(self, root_state=None, reverse: Optional[bool] = None):
+        """Order cells along the learned trajectory, assigning Pseudotime and State."""
+        self.adata = _m2.order_cells(self.adata, root_state=root_state, reverse=reverse)
+        self._ordered = True
+        return self
+
+    # ------------------------------------------------------------------ #
+    # Clustering
+    # ------------------------------------------------------------------ #
+
+    def cluster_cells(self, method: str = 'leiden', k: int = 50,
+                      resolution_parameter: float = 0.1, verbose: bool = False,
+                      **kwargs):
+        """Cluster cells (Leiden / Louvain / densityPeak / DDRTree)."""
+        self.adata = _m2.cluster_cells(
+            self.adata, method=method, k=k,
+            resolution_parameter=resolution_parameter, verbose=verbose, **kwargs,
+        )
+        return self
+
+    @staticmethod
+    def cluster_genes(expression_matrix, k: int, method: str = 'correlation'):
+        """Cluster genes by their expression pattern."""
+        return _m2.cluster_genes(expression_matrix, k, method=method)
+
+    # ------------------------------------------------------------------ #
+    # Differential expression
+    # ------------------------------------------------------------------ #
+
+    def differential_gene_test(self,
+                                fullModelFormulaStr: str = "~sm.ns(Pseudotime, df=3)",
+                                reducedModelFormulaStr: str = "~1",
+                                relative_expr: bool = True,
+                                cores: int = -1, verbose: bool = False) -> pd.DataFrame:
+        """Pseudotime-dependent differential expression test."""
+        return _m2.differential_gene_test(
+            self.adata,
+            fullModelFormulaStr=fullModelFormulaStr,
+            reducedModelFormulaStr=reducedModelFormulaStr,
+            relative_expr=relative_expr, cores=cores, verbose=verbose,
+        )
+
+    def BEAM(self, branch_point: int = 1, branch_states=None,
+              branch_labels=None,
+              fullModelFormulaStr: str = "~sm.ns(Pseudotime, df=3)*Branch",
+              reducedModelFormulaStr: str = "~sm.ns(Pseudotime, df=3)",
+              cores: int = -1, verbose: bool = False) -> pd.DataFrame:
+        """Branch Expression Analysis Modeling."""
+        return _m2.BEAM(
+            self.adata, branch_point=branch_point, branch_states=branch_states,
+            branch_labels=branch_labels,
+            fullModelFormulaStr=fullModelFormulaStr,
+            reducedModelFormulaStr=reducedModelFormulaStr,
+            cores=cores, verbose=verbose,
+        )
+
+    def fit_model(self, modelFormulaStr: str = "~sm.ns(Pseudotime, df=3)",
+                   relative_expr: bool = True, cores: int = 1):
+        """Fit a GLM per gene (used internally by DE tests)."""
+        return _m2.fit_model(self.adata, modelFormulaStr=modelFormulaStr,
+                              relative_expr=relative_expr, cores=cores)
+
+    def gen_smooth_curves(self, new_data=None,
+                           trend_formula: str = "~sm.ns(Pseudotime, df=3)",
+                           relative_expr: bool = True, cores: int = 1):
+        """Generate smoothed expression curves along pseudotime."""
+        return _m2.gen_smooth_curves(
+            self.adata, new_data=new_data, trend_formula=trend_formula,
+            relative_expr=relative_expr, cores=cores,
+        )
+
+    def cal_ABCs(self, branch_point: int = 1, **kwargs) -> pd.DataFrame:
+        """Calculate Area Between Curves for branch-specific genes."""
+        return _m2.cal_ABCs(self.adata, branch_point=branch_point, **kwargs)
+
+    def cal_ILRs(self, branch_point: int = 1, return_all: bool = False, **kwargs):
+        """Calculate Intrinsic Log Ratios (per-gene lineage bias)."""
+        return _m2.cal_ILRs(
+            self.adata, branch_point=branch_point, return_all=return_all, **kwargs,
+        )
+
+    # ------------------------------------------------------------------ #
+    # Visualization
+    # ------------------------------------------------------------------ #
+
+    def plot_trajectory(self, color_by: str = 'State', **kwargs):
+        """plot_cell_trajectory — main DDRTree trajectory plot."""
+        return _m2.plot_cell_trajectory(self.adata, color_by=color_by, **kwargs)
+
+    # Alias matching Monocle2 R names
+    plot_cell_trajectory = plot_trajectory
+
+    def plot_complex_cell_trajectory(self, color_by: str = 'State', **kwargs):
+        """Dendrogram-style trajectory layout (Pseudotime on Y-axis)."""
+        return _m2.plot_complex_cell_trajectory(self.adata, color_by=color_by, **kwargs)
+
+    def plot_cell_clusters(self, color_by: str = 'Cluster', **kwargs):
+        """Plot cells colored by cluster in reduced-dim space."""
+        return _m2.plot_cell_clusters(self.adata, color_by=color_by, **kwargs)
+
+    def plot_genes_in_pseudotime(self, genes: List[str], **kwargs):
+        """Gene expression vs pseudotime with smoothed curves."""
+        return _m2.plot_genes_in_pseudotime(self.adata, genes=genes, **kwargs)
+
+    def plot_genes_branched_pseudotime(self, genes: List[str], branch_point: int = 1,
+                                        **kwargs):
+        """Gene expression split by branch."""
+        return _m2.plot_genes_branched_pseudotime(
+            self.adata, genes=genes, branch_point=branch_point, **kwargs,
+        )
+
+    def plot_genes_branched_heatmap(self, branch_point: int = 1, **kwargs):
+        """Heatmap of branch-specific gene expression."""
+        return _m2.plot_genes_branched_heatmap(
+            self.adata, branch_point=branch_point, **kwargs,
+        )
+
+    def plot_multiple_branches_pseudotime(self, genes: List[str],
+                                            branches: List, **kwargs):
+        """Multi-branch gene expression curves."""
+        return _m2.plot_multiple_branches_pseudotime(
+            self.adata, genes=genes, branches=branches, **kwargs,
+        )
+
+    def plot_multiple_branches_heatmap(self, branches: List, **kwargs):
+        """Multi-branch expression heatmap."""
+        return _m2.plot_multiple_branches_heatmap(
+            self.adata, branches=branches, **kwargs,
+        )
+
+    def plot_pseudotime_heatmap(self, genes: Optional[List[str]] = None, **kwargs):
+        """Heatmap of gene expression sorted by pseudotime."""
+        return _m2.plot_pseudotime_heatmap(self.adata, genes=genes, **kwargs)
+
+    def plot_genes_jitter(self, genes: List[str], grouping: str = 'State', **kwargs):
+        """Jitter plot of gene expression by group."""
+        return _m2.plot_genes_jitter(self.adata, genes=genes, grouping=grouping, **kwargs)
+
+    def plot_genes_violin(self, genes: List[str], grouping: str = 'State', **kwargs):
+        """Violin plot of gene expression by group."""
+        return _m2.plot_genes_violin(self.adata, genes=genes, grouping=grouping, **kwargs)
+
+    def plot_ordering_genes(self, **kwargs):
+        """Dispersion vs mean-expression plot, highlighting ordering genes."""
+        return _m2.plot_ordering_genes(self.adata, **kwargs)
+
+    def plot_pc_variance_explained(self, max_components: int = 50, **kwargs):
+        """Plot variance explained by principal components."""
+        return _m2.plot_pc_variance_explained(
+            self.adata, max_components=max_components, **kwargs,
+        )
+
+    def plot_rho_delta(self, **kwargs):
+        """Plot rho vs delta for density-peak clustering."""
+        return _m2.plot_rho_delta(self.adata, **kwargs)
+
+    # ------------------------------------------------------------------ #
+    # Utility accessors
+    # ------------------------------------------------------------------ #
+
+    @property
+    def pseudotime(self) -> Optional[pd.Series]:
+        """Per-cell pseudotime (after order_cells)."""
+        return self.adata.obs.get('Pseudotime')
+
+    @property
+    def state(self) -> Optional[pd.Series]:
+        """Per-cell state (after order_cells)."""
+        return self.adata.obs.get('State')
+
+    @property
+    def branch_points(self) -> list:
+        """Branch-point vertex names in the learned tree."""
+        return self.adata.uns.get('monocle', {}).get('branch_points', [])
+
+    @property
+    def Z(self) -> Optional[np.ndarray]:
+        """Reduced-dim cell coordinates (dim × N)."""
+        return self.adata.uns.get('monocle', {}).get('reducedDimS')
+
+    @property
+    def Y(self) -> Optional[np.ndarray]:
+        """Tree-center coordinates (dim × K)."""
+        return self.adata.uns.get('monocle', {}).get('reducedDimK')
