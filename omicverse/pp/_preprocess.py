@@ -704,9 +704,11 @@ def preprocess(
             )
             chunked_log1p(adata)
         elif method_list[0] == 'pearson':
-            # Pearson residuals need materialized data — convert lazily
+            # Pearson residuals cannot be chunked — we materialise X here.
+            # This defeats part of the OOM benefit for this normalisation step.
+            print(f"{Colors.WARNING}    ⚠️  Pearson residuals require a materialised X; "
+                  f"{adata.n_obs:,} × {adata.n_vars:,} will be loaded into memory.{Colors.ENDC}")
             from .experimental import normalize_pearson_residuals
-            # Materialize X for pearson (it's already filtered to robust genes)
             from anndataoom import BackedArray
             X_dense = adata.X[:]
             if issparse(X_dense):
@@ -725,16 +727,11 @@ def preprocess(
             if no_cc:
                 remove_cc_genes(adata, organism=organism, corr_threshold=0.1)
         elif method_list[1] == 'seurat':
-            from anndataoom import chunked_highly_variable_genes_pearson
-            # seurat_v3 also uses residual variance ranking
-            chunked_highly_variable_genes_pearson(
-                adata,
-                n_top_genes=n_HVGs,
-                layer='counts',
-                batch_key=batch_key,
+            raise NotImplementedError(
+                "Seurat v3 HVG selection (Loess-smoothed dispersion) is not "
+                "available for the OOM backend. Use 'shiftlog|pearson' instead, "
+                "or switch to mode='cpu' to materialise the data."
             )
-            if no_cc:
-                remove_cc_genes(adata, organism=organism, corr_threshold=0.1)
         data_load_end = time.time()
         print(f"{Colors.BLUE}    Time to analyze data (out-of-memory): {data_load_end - data_load_start:.2f} seconds.{Colors.ENDC}")
     elif settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':

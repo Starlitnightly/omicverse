@@ -857,7 +857,16 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
             "variance_ratio": var_ratio,
             "variance": var_ratio * total_var,
         }
-        adata.varm["PCs"] = components.T[:adata.n_vars, :]
+        # components has shape (n_comps, adata_comp.n_vars); store loadings at
+        # (adata.n_vars, n_comps). If PCA ran on an HVG subset, non-selected
+        # genes get zero loadings (mirrors the CPU path).
+        loadings = components.T  # (adata_comp.n_vars, n_comps)
+        if mask_var is not None and adata_comp.n_vars != adata.n_vars:
+            pcs = np.zeros((adata.n_vars, loadings.shape[1]), dtype=loadings.dtype)
+            pcs[mask_var] = loadings
+        else:
+            pcs = loadings
+        adata.varm["PCs"] = pcs
         return adata if copy else None
 
     X = _get_obs_rep(adata_comp, layer=layer)
