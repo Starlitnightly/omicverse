@@ -111,19 +111,12 @@ def test_read_rust_backend_returns_oom(tiny_h5ad):
 
 def test_read_rust_backend_raises_without_anndataoom(tiny_h5ad, monkeypatch):
     """If anndataoom is not importable, backend='rust' must fail cleanly."""
-    # Simulate missing anndataoom by blocking its import.
+    # Mark anndataoom as unavailable in sys.modules — a subsequent `import
+    # anndataoom` inside _read_h5ad_rust will raise ImportError.
     for name in list(sys.modules):
         if name == "anndataoom" or name.startswith("anndataoom."):
             monkeypatch.delitem(sys.modules, name, raising=False)
-
-    real_import = __builtins__["__import__"] if isinstance(__builtins__, dict) else __builtins__.__import__
-
-    def blocked(name, *args, **kwargs):
-        if name == "anndataoom" or name.startswith("anndataoom."):
-            raise ImportError("simulated missing anndataoom")
-        return real_import(name, *args, **kwargs)
-
-    monkeypatch.setattr("builtins.__import__", blocked)
+    monkeypatch.setitem(sys.modules, "anndataoom", None)
 
     from omicverse.io.single._read import _read_h5ad_rust
 
@@ -163,8 +156,6 @@ def test_preprocess_seurat_raises_on_oom(tiny_h5ad):
             mode="seurat",
             min_cells=0,
             min_genes=0,
-            max_cells_ratio=100,
-            max_genes_ratio=100,
             tresh={"mito_perc": 1.0, "nUMIs": 0, "detected_genes": 0},
             mt_startswith="MT-",
             doublets=False,
@@ -187,8 +178,6 @@ def test_pca_varm_shape_matches_adata_n_vars(tiny_h5ad):
             mode="seurat",
             min_cells=0,
             min_genes=0,
-            max_cells_ratio=100,  # permissive; the rust path uses count-sum here
-            max_genes_ratio=100,
             tresh={"mito_perc": 1.0, "nUMIs": 0, "detected_genes": 0},
             mt_startswith="MT-",
             doublets=False,

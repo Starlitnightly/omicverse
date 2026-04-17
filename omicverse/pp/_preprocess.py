@@ -974,15 +974,21 @@ def scale(adata, max_value=10, layers_add='scaled', to_sparse=False, **kwargs):
     is_rust = _is_rust_backend(adata)
     is_oom = _is_oom(adata)
     if is_oom:
-        # Out-of-memory: post-HVG matrix is small enough to materialise
+        # chunked_scale hard-codes the layer name to 'scaled' and installs a
+        # lazy ScaledBackedArray. Re-wrapping/materialising it defeats the
+        # point, so we short-circuit the rest of this function.
+        if layers_add != "scaled":
+            raise ValueError(
+                "OOM scale only stores to adata.layers['scaled']; "
+                f"layers_add={layers_add!r} is not supported."
+            )
         from anndataoom import chunked_scale
         chunked_scale(adata, max_value=max_value)
-        scaled_data = adata.layers.get(layers_add, None)
-        if scaled_data is not None:
-            # Already stored by chunked_scale in layers['scaled']
-            pass
-        else:
-            scaled_data = adata.X[:]
+        if "status" not in adata.uns.keys():
+            adata.uns["status"] = {}
+        add_reference(adata, "scanpy", "scaling with scanpy")
+        adata.uns["status"]["scaled"] = True
+        return
     elif is_rust:
         from ._scale import scale_array
         x = adata.X[:]

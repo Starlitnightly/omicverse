@@ -788,7 +788,15 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
         adata.subset(obs_indices=selected_cells)
 
         selected_genes = True
-        adata.var["n_cell"] = np.array(adata.X[:].sum(axis=0)).reshape(-1)
+        # Count non-zero cells per gene. For OOM, stream in chunks rather than
+        # materialising X[:]; for raw rust, fall back to the one-shot read.
+        if _is_oom(adata):
+            from anndataoom import chunked_qc_metrics
+            if "n_cells" not in adata.var.columns:
+                chunked_qc_metrics(adata)
+            adata.var["n_cell"] = adata.var["n_cells"].values
+        else:
+            adata.var["n_cell"] = np.array((adata.X[:] != 0).sum(axis=0)).reshape(-1)
         if min_cells: selected_genes &= adata.var["n_cell"] >= min_cells
         if max_cells_ratio: selected_genes &= adata.var["n_cell"] <= max_cells_ratio*adata.shape[0]
         selected_genes = np.flatnonzero(selected_genes)
@@ -1130,7 +1138,7 @@ def qc_cpu(
     genes_before_final = adata.shape[1]
 
     if is_oom:
-        # OOM path: use _inplace_subset and chunked column sums
+        # OOM path: use _inplace_subset and chunked column counts
         selected_cells = np.ones(adata.n_obs, dtype=bool)
         if min_genes:
             selected_cells &= adata.obs["detected_genes"].values >= min_genes
@@ -1138,7 +1146,11 @@ def qc_cpu(
             selected_cells &= adata.obs["detected_genes"].values <= max_genes_ratio * adata.shape[1]
         adata._inplace_subset_obs(selected_cells)
 
-        n_cell = adata.X.sum(axis=0)
+        # Recompute n_cells after cell subsetting. Uses chunked streaming —
+        # never materialises the full X.
+        from anndataoom import chunked_qc_metrics
+        chunked_qc_metrics(adata)
+        n_cell = adata.var["n_cells"].values
         adata.var["n_cell"] = n_cell
         selected_genes = np.ones(adata.n_vars, dtype=bool)
         if min_cells:
@@ -1158,7 +1170,15 @@ def qc_cpu(
         selected_cells = np.flatnonzero(selected_cells)
         adata.subset(obs_indices=selected_cells)
         selected_genes = True
-        adata.var["n_cell"] = np.array(adata.X[:].sum(axis=0)).reshape(-1)
+        # Count non-zero cells per gene. For OOM, stream in chunks rather than
+        # materialising X[:]; for raw rust, fall back to the one-shot read.
+        if _is_oom(adata):
+            from anndataoom import chunked_qc_metrics
+            if "n_cells" not in adata.var.columns:
+                chunked_qc_metrics(adata)
+            adata.var["n_cell"] = adata.var["n_cells"].values
+        else:
+            adata.var["n_cell"] = np.array((adata.X[:] != 0).sum(axis=0)).reshape(-1)
         if min_cells: selected_genes &= adata.var["n_cell"] >= min_cells
         if max_cells_ratio: selected_genes &= adata.var["n_cell"] <= max_cells_ratio*adata.shape[0]
         selected_genes = np.flatnonzero(selected_genes)

@@ -843,6 +843,12 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
         # For OOM, use IncrementalPCA — fully chunked, never materialises
         from anndataoom import chunked_pca as _chunked_pca
         _layer = layer or "scaled"
+        if _layer not in adata_comp.layers:
+            raise ValueError(
+                f"OOM PCA requires layer {_layer!r} which is not present "
+                f"(available: {list(adata_comp.layers.keys())}). "
+                "Run ov.pp.scale(adata) first, or pass an existing layer name."
+            )
         _n = n_comps if n_comps is not None else min(N_PCS, adata_comp.n_vars - 1, adata_comp.n_obs - 1)
         X_pca, components, var_ratio = _chunked_pca(
             adata_comp, layer=_layer, n_comps=_n

@@ -82,9 +82,9 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
             f"       consider ov.single.batch_correction(adata, methods='harmony') instead."
         )
         adata_mem = adata.to_adata()
-        result = batch_correction(adata_mem, batch_key, use_rep=use_rep,
-                                  methods=methods, n_pcs=n_pcs, **kwargs)
-        # Copy results back to OOM
+        batch_correction(adata_mem, batch_key, use_rep=use_rep,
+                         methods=methods, n_pcs=n_pcs, **kwargs)
+        # Copy results back onto the OOM adata so we preserve the OOM contract.
         for k in adata_mem.obsm:
             if k not in adata.obsm:
                 adata.obsm[k] = adata_mem.obsm[k]
@@ -93,7 +93,7 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
                 adata.obs[k] = adata_mem.obs[k].values
         adata.uns.update(adata_mem.uns)
         del adata_mem
-        return result if result is not None else adata
+        return adata
 
     print(f'...Begin using {methods} to correct batch effect')
 
