@@ -822,9 +822,12 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
     # Unify new mask argument and deprecated use_highly_varible argument
     mask_var_param, mask_var = _handle_mask_var(adata, mask_var, use_highly_variable)
     del use_highly_variable
-    from ._qc import _is_rust_backend
+    from ._qc import _is_rust_backend, _is_oom
     is_rust = _is_rust_backend(adata)
-    if not is_rust:
+    is_oom = _is_oom(adata)
+    if is_oom:
+        adata_comp = adata[:, mask_var] if mask_var is not None else adata
+    elif not is_rust:
         adata_comp = adata[:, mask_var] if mask_var is not None else adata
     else:
         adata_comp = adata.subset(var_indices=np.array(adata.var_names)[mask_var],inplace=False)
@@ -836,10 +839,31 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
 
     logg.info(f"    with {n_comps=}")
 
+    if is_oom:
+        # For OOM, use IncrementalPCA — fully chunked, never materialises
+        from anndataoom import chunked_pca as _chunked_pca
+        _layer = layer or "scaled"
+        _n = n_comps if n_comps is not None else min(N_PCS, adata_comp.n_vars - 1, adata_comp.n_obs - 1)
+        X_pca, components, var_ratio = _chunked_pca(
+            adata_comp, layer=_layer, n_comps=_n
+        )
+        # Store results back into adata (not adata_comp, which may be a view)
+        adata.obsm["X_pca"] = X_pca
+        _key = f"{_layer}|original|X_pca" if _layer else "X_pca"
+        adata.obsm[_key] = X_pca
+        # Compute variance from variance_ratio (approximate: total_var ≈ n_vars for scaled data)
+        total_var = float(adata.n_vars)  # for z-scored data, total variance ≈ n_vars
+        adata.uns["pca"] = {
+            "variance_ratio": var_ratio,
+            "variance": var_ratio * total_var,
+        }
+        adata.varm["PCs"] = components.T[:adata.n_vars, :]
+        return adata if copy else None
+
     X = _get_obs_rep(adata_comp, layer=layer)
 
     # Handle rust backend X data
-    if is_rust:
+    if is_rust and not is_oom:
         # For rust backend, X might be a special object that needs slicing to get actual data
         if hasattr(X, '__getitem__') and not isinstance(X, (np.ndarray, sparse.spmatrix, sparse.sparray)):
             try:

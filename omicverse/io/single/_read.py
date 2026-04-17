@@ -60,15 +60,63 @@ def read(path, backend='python', **kwargs):
             return _anndata_read_h5ad(path, **kwargs)
 
         if backend == 'rust':
+            # Try backends in order of preference:
+            #   1. anndataoom (our prebuilt package, includes the Python wrapper)
+            #   2. anndata_rs (standalone, built from source)
+            #   3. snapatac2 (bundles the same Rust AnnData implementation)
+            rs_module = None
             try:
-                import snapatac2 as snap
+                import anndataoom
+                # If anndataoom is available, use its read() directly
+                # (it already wraps the result in AnnDataOOM with full API)
+                import time, os as _os
+                from ..anndata_oom._repr import _format_read_message
+                try:
+                    size_mb = _os.path.getsize(str(path)) / 1024**2
+                except Exception:
+                    size_mb = None
+                if 'backed' not in kwargs:
+                    kwargs['backed'] = 'r'
+                t0 = time.time()
+                adata = anndataoom.read(str(path), **kwargs)
+                elapsed = time.time() - t0
+                print(_format_read_message(str(path), size_mb, elapsed))
+                return adata
             except ImportError:
-                raise ImportError('snapatac2 is not installed. `pip install snapatac2`')
+                pass
 
-            print('Using anndata-rs to read h5ad file')
-            print('You should run adata.close() after analysis')
-            print('Not all function support Rust backend')
-            return snap.read(path, **kwargs)
+            try:
+                import anndata_rs as rs_module
+            except ImportError:
+                try:
+                    import snapatac2 as rs_module  # snapatac2 bundles anndata-rs
+                except ImportError:
+                    raise ImportError(
+                        "No Rust AnnData backend available. Install one of:\n"
+                        "  1. pip install anndataoom    (prebuilt, includes full Python wrapper)\n"
+                        "  2. pip install snapatac2     (bundles anndata-rs, ~200 MB)\n"
+                        "  3. Build anndata-rs from source"
+                    )
+
+            from ..anndata_oom import AnnDataOOM
+            from ..anndata_oom._repr import _format_read_message
+            import time
+            import os
+
+            # Default to read-only mode to avoid modifying the original file
+            if 'backed' not in kwargs:
+                kwargs['backed'] = 'r'
+            try:
+                size_mb = os.path.getsize(str(path)) / 1024**2
+            except Exception:
+                size_mb = None
+
+            t0 = time.time()
+            rs_adata = rs_module.read(str(path), **kwargs)
+            elapsed = time.time() - t0
+            adata = AnnDataOOM(rs_adata)
+            print(_format_read_message(str(path), size_mb, elapsed))
+            return adata
 
         raise ValueError("backend must be 'python' or 'rust'")
 

@@ -488,21 +488,16 @@ def _extract_data_from_adata(adata, keys, groupby, layer, use_raw):
             raise ValueError(f"groupby '{groupby}' not found in adata.obs")
 
     # Handle keys (variables)
+    _has_raw = hasattr(adata, 'raw') and adata.raw is not None
     for key in keys:
         if key in adata.obs.columns:
             # Key is in observations
             data_dict[key] = adata.obs[key]
         elif key in adata.var_names:
-            # Key is a gene/variable
-            if use_raw and hasattr(adata, 'raw') and adata.raw is not None:
-                # Check if the key exists in raw.var_names
-                if key in adata.raw.var_names:
-                    gene_idx = list(adata.raw.var_names).index(key)
-                    data_dict[key] = adata.raw.X[:, gene_idx]
-                else:
-                    # Fall back to adata.X if key not in raw
-                    gene_idx = list(adata.var_names).index(key)
-                    data_dict[key] = adata.X[:, gene_idx]
+            # Key is a gene in current var_names
+            if use_raw and _has_raw and key in adata.raw.var_names:
+                gene_idx = list(adata.raw.var_names).index(key)
+                data_dict[key] = adata.raw.X[:, gene_idx]
             elif layer is not None and layer in adata.layers:
                 gene_idx = list(adata.var_names).index(key)
                 data_dict[key] = adata.layers[layer][:, gene_idx]
@@ -510,11 +505,22 @@ def _extract_data_from_adata(adata, keys, groupby, layer, use_raw):
                 gene_idx = list(adata.var_names).index(key)
                 data_dict[key] = adata.X[:, gene_idx]
 
-            # Handle sparse matrices
+            # Handle sparse matrices and ensure 1-D
             if hasattr(data_dict[key], 'toarray'):
-                data_dict[key] = data_dict[key].toarray().flatten()
+                data_dict[key] = data_dict[key].toarray()
+            data_dict[key] = np.asarray(data_dict[key]).ravel()
+        elif use_raw and _has_raw and key in adata.raw.var_names:
+            # Key is NOT in current var_names but IS in raw (e.g. after HVG subsetting)
+            gene_idx = list(adata.raw.var_names).index(key)
+            data_dict[key] = adata.raw.X[:, gene_idx]
+            if hasattr(data_dict[key], 'toarray'):
+                data_dict[key] = data_dict[key].toarray()
+            data_dict[key] = np.asarray(data_dict[key]).ravel()
         else:
-            raise ValueError(f"Key '{key}' not found in adata.obs or adata.var_names")
+            available = "adata.obs, adata.var_names"
+            if _has_raw:
+                available += ", or adata.raw.var_names (with use_raw=True)"
+            raise ValueError(f"Key '{key}' not found in {available}")
 
     return pd.DataFrame(data_dict)
 

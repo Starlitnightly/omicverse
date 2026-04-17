@@ -85,6 +85,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Out-of-memory backend (Rust-powered AnnData). Install via:
+#   pip install omicverse[rust]
+# Enables ov.read(path, backend='rust') with chunked preprocessing.
+rust = [
+    "anndataoom>=0.1.0",
+]
 full = [
   "dynamo-release",
   "squidpy",

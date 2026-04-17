@@ -3,6 +3,7 @@ import scanpy as sc
 import numpy as np
 import anndata
 from .._settings import add_reference,settings
+from .._oom_compat import oom_guard as _oom_guard
 from .._registry import register_function
 from .._monitor import monitor
 
@@ -70,6 +71,30 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         and Concord object for ``'Concord'``. The integrated embeddings are
         written to ``adata.obsm``.
     """
+
+    from ..pp._qc import _is_oom
+    _oom = _is_oom(adata)
+
+    if _oom and methods not in ('harmony',):
+        print(
+            f"[AnnDataOOM] '{methods}' requires the full expression matrix in memory.\n"
+            f"  Converting to in-memory AnnData automatically.\n"
+            f"  Tip: 'harmony' works directly on PCA embeddings without materialisation —\n"
+            f"       consider ov.single.batch_correction(adata, methods='harmony') instead."
+        )
+        adata_mem = adata.to_adata()
+        result = batch_correction(adata_mem, batch_key, use_rep=use_rep,
+                                  methods=methods, n_pcs=n_pcs, **kwargs)
+        # Copy results back to OOM
+        for k in adata_mem.obsm:
+            if k not in adata.obsm:
+                adata.obsm[k] = adata_mem.obsm[k]
+        for k in adata_mem.obs.columns:
+            if k not in adata.obs.columns:
+                adata.obs[k] = adata_mem.obs[k].values
+        adata.uns.update(adata_mem.uns)
+        del adata_mem
+        return result if result is not None else adata
 
     print(f'...Begin using {methods} to correct batch effect')
 

@@ -110,7 +110,7 @@ def pca(adata: AnnData,convert=True, **kwargs):
         adata: Annotated data matrix.
         **kwargs: Additional keyword arguments.
     """
-    if 'X_pca' not in adata.obsm.keys() or 'scaled|original|X_pca' not in adata.obsm.keys():
+    if 'X_pca' not in adata.obsm.keys() and 'scaled|original|X_pca' not in adata.obsm.keys():
         raise ValueError('X_pca not found in adata.obsm. Please run ov.pp.pca first.')
     if 'scaled|original|X_pca' in adata.obsm.keys():
         adata.obsm['X_pca'] = adata.obsm['scaled|original|X_pca']

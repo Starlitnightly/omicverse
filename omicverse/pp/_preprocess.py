@@ -17,6 +17,7 @@ from ._qc import _is_rust_backend
 from ..utils import load_signatures_from_file,predefined_signatures
 from .._registry import register_function
 from .._settings import settings,print_gpu_usage_color,EMOJI,Colors,add_reference
+from .._oom_compat import oom_guard as _oom_guard
 
 
 from ._normalization import normalize_total,log1p
@@ -659,9 +660,13 @@ def preprocess(
     original_adata = adata
 
     # Log-normalization, HVGs identification
-    from ._qc import _is_rust_backend
+    from ._qc import _is_rust_backend, _is_oom
     is_rust = _is_rust_backend(adata)
-    if is_rust:
+    is_oom = _is_oom(adata)
+    if is_oom:
+        # OOM: save a lazy reference to raw counts (zero memory cost)
+        adata.layers['counts'] = adata.X
+    elif is_rust:
         adata.layers['counts'] = adata.X[:]
     else:
         adata.layers['counts'] = adata.X.copy()
@@ -670,15 +675,69 @@ def preprocess(
     print(f"{EMOJI['start']} [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Running preprocessing in '{settings.mode}' mode...")
     print(f"{Colors.CYAN}Begin robust gene identification{Colors.ENDC}")
     if identify_robust:
-        identify_robust_genes(adata, percent_cells=0.05)
-        if not is_rust:
+        if is_oom:
+            from anndataoom import chunked_identify_robust_genes
+            chunked_identify_robust_genes(adata, percent_cells=0.05)
+        else:
+            identify_robust_genes(adata, percent_cells=0.05)
+        if is_oom:
+            adata._inplace_subset_var(adata.var['robust'].values)
+        elif not is_rust:
             adata = adata[:, adata.var['robust']]
         else:
             adata.subset(var_indices=np.where(adata.var['robust']==True)[0])
         print(f"{EMOJI['done']} Robust gene identification completed successfully.")
     method_list = mode.split('|')
     print(f"{Colors.CYAN}Begin size normalization: {method_list[0]} and HVGs selection {method_list[1]}{Colors.ENDC}")
-    if settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
+    if is_oom:
+        # Out-of-memory path — lazy transforms, no full materialisation
+        from anndataoom import (
+            chunked_normalize_total, chunked_log1p,
+        )
+        data_load_start = time.time()
+        if method_list[0] == 'shiftlog':
+            chunked_normalize_total(
+                adata,
+                target_sum=target_sum,
+                exclude_highly_expressed=True,
+                max_fraction=0.2,
+            )
+            chunked_log1p(adata)
+        elif method_list[0] == 'pearson':
+            # Pearson residuals need materialized data — convert lazily
+            from .experimental import normalize_pearson_residuals
+            # Materialize X for pearson (it's already filtered to robust genes)
+            from anndataoom import BackedArray
+            X_dense = adata.X[:]
+            if issparse(X_dense):
+                X_dense = X_dense.toarray()
+            adata.X = BackedArray(X_dense.astype(np.float32), shape=X_dense.shape)
+            normalize_pearson_residuals(adata)
+
+        if method_list[1] == 'pearson':
+            from anndataoom import chunked_highly_variable_genes_pearson
+            chunked_highly_variable_genes_pearson(
+                adata,
+                n_top_genes=n_HVGs,
+                layer='counts',
+                batch_key=batch_key,
+            )
+            if no_cc:
+                remove_cc_genes(adata, organism=organism, corr_threshold=0.1)
+        elif method_list[1] == 'seurat':
+            from anndataoom import chunked_highly_variable_genes_pearson
+            # seurat_v3 also uses residual variance ranking
+            chunked_highly_variable_genes_pearson(
+                adata,
+                n_top_genes=n_HVGs,
+                layer='counts',
+                batch_key=batch_key,
+            )
+            if no_cc:
+                remove_cc_genes(adata, organism=organism, corr_threshold=0.1)
+        data_load_end = time.time()
+        print(f"{Colors.BLUE}    Time to analyze data (out-of-memory): {data_load_end - data_load_start:.2f} seconds.{Colors.ENDC}")
+    elif settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
         data_load_start = time.time()
         if method_list[0] == 'shiftlog': # Size normalization + scanpy batch aware HVGs selection
             normalize_total(
@@ -688,7 +747,7 @@ def preprocess(
                 max_fraction=0.2,
             )
             log1p(adata)
-            
+
         elif method_list[0] == 'pearson':
             # Perason residuals workflow
             from .experimental import normalize_pearson_residuals
@@ -914,8 +973,20 @@ def scale(adata, max_value=10, layers_add='scaled', to_sparse=False, **kwargs):
         >>> # Scale data keeping dense format
         >>> ov.pp.scale(adata, max_value=10, to_sparse=False)
     """
+    from ._qc import _is_oom
     is_rust = _is_rust_backend(adata)
-    if is_rust:
+    is_oom = _is_oom(adata)
+    if is_oom:
+        # Out-of-memory: post-HVG matrix is small enough to materialise
+        from anndataoom import chunked_scale
+        chunked_scale(adata, max_value=max_value)
+        scaled_data = adata.layers.get(layers_add, None)
+        if scaled_data is not None:
+            # Already stored by chunked_scale in layers['scaled']
+            pass
+        else:
+            scaled_data = adata.X[:]
+    elif is_rust:
         from ._scale import scale_array
         x = adata.X[:]
         scaled_data = scale_array(
@@ -1576,6 +1647,11 @@ def leiden(
         "ov.pl.embedding(adata, basis='X_umap', color='phase')"
     ],
     related=["pp.preprocess", "pl.embedding", "utils.embedding"]
+)
+@_oom_guard(
+    materialize=True,
+    result_keys_obs=['S_score', 'G2M_score', 'phase'],
+    result_keys_uns=['*'],
 )
 def score_genes_cell_cycle(adata,species='human',s_genes=None, g2m_genes=None):
     """Score cell cycle phases using predefined or custom gene sets.

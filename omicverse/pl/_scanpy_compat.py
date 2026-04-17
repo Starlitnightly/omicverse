@@ -111,7 +111,7 @@ def _doc_params(**kwargs):
 
 
 def sanitize_anndata(adata: AnnData) -> None:
-    if not isinstance(adata, AnnData):
+    if not isinstance(adata, AnnData) and not getattr(adata, '_is_oom', False):
         raise TypeError("Expected an AnnData object.")
 
 
