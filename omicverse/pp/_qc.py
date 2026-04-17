@@ -1137,6 +1137,11 @@ def qc_cpu(
 
     if doublets is True:
         print(f"\n{Colors.HEADER}{Colors.BOLD}🔍 Step 4: Doublet Detection{Colors.ENDC}")
+        if doublets_method not in ('scrublet', 'sccomposite'):
+            raise ValueError(
+                f"Unknown doublets_method={doublets_method!r}; "
+                "expected 'scrublet' or 'sccomposite'."
+            )
         if is_oom:
             # Scrublet/sccomposite require in-memory X — convert temporarily
             print(f"   {Colors.CYAN}Converting to in-memory for doublet detection...{Colors.ENDC}")

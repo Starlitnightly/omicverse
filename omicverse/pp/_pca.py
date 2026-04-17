@@ -847,8 +847,10 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
         adata.obsm["X_pca"] = X_pca
         _key = f"{_layer}|original|X_pca"
         adata.obsm[_key] = X_pca
-        # Compute variance from variance_ratio (approximate: total_var ≈ n_vars for scaled data)
-        total_var = float(adata.n_vars)  # for z-scored data, total variance ≈ n_vars
+        # Compute variance from variance_ratio. PCA ran on adata_comp (the
+        # HVG-subsetted view); for z-scored data, total variance ≈ number of
+        # *PCA-input* vars, not the original adata.n_vars.
+        total_var = float(adata_comp.n_vars)
         adata.uns["pca"] = {
             "variance_ratio": var_ratio,
             "variance": var_ratio * total_var,

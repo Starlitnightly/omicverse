@@ -725,8 +725,14 @@ def preprocess(
             )
             if no_cc:
                 remove_cc_genes(adata, organism=organism, corr_threshold=0.1)
-        # Note: shiftlog|seurat is pre-rejected at the top of preprocess(), so
-        # no elif branch for it is needed here.
+        else:
+            # 'seurat' is pre-rejected at the top; any other unknown HVG
+            # method should fail loudly here rather than silently skip HVG
+            # selection and leave the user with no 'highly_variable' column.
+            raise NotImplementedError(
+                f"HVG method {method_list[1]!r} is not supported for the OOM "
+                "backend. Use 'pearson', or switch to mode='cpu'."
+            )
         data_load_end = time.time()
         print(f"{Colors.BLUE}    Time to analyze data (out-of-memory): {data_load_end - data_load_start:.2f} seconds.{Colors.ENDC}")
     elif settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
