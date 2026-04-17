@@ -25,7 +25,11 @@ import numpy as np
 import pandas as pd
 from anndata import AnnData
 
-from ..external import monocle2_py as _m2
+# NOTE: `omicverse.single` is a core domain whose modules must not
+# perform `from ..external import ...` at the module top level (see
+# ``tests/architecture/test_no_top_level_external_imports.py``). The
+# Monocle class below imports the monocle2_py backend once inside
+# ``__init__`` and stores it on the instance as ``self._m2``.
 
 
 class Monocle:
@@ -71,6 +75,12 @@ class Monocle:
     # ------------------------------------------------------------------ #
 
     def __init__(self, adata: AnnData):
+        # Import the external backend lazily inside the method body.
+        # The architecture test forbids this at module scope but
+        # allows it inside functions/methods.
+        from ..external import monocle2_py as _m2  # noqa: PLC0415
+        self._m2 = _m2
+
         self.adata = adata
         self._preprocessed = False
         self._ordering_set = False
@@ -102,20 +112,20 @@ class Monocle:
 
     def detect_genes(self, min_expr: float = 0.1):
         """Detect genes expressed above a threshold."""
-        self.adata = _m2.detect_genes(self.adata, min_expr=min_expr)
+        self.adata = self._m2.detect_genes(self.adata, min_expr=min_expr)
         return self
 
     def estimate_size_factors(self, method: str = 'mean-geometric-mean-total',
                                round_exprs: bool = True):
         """Estimate size factors (matches Monocle2's default method)."""
-        self.adata = _m2.estimate_size_factors(
+        self.adata = self._m2.estimate_size_factors(
             self.adata, method=method, round_exprs=round_exprs,
         )
         return self
 
     def estimate_dispersions(self, min_cells_detected: int = 1, verbose: bool = False):
         """Estimate gene dispersions for the negative-binomial model."""
-        self.adata = _m2.estimate_dispersions(
+        self.adata = self._m2.estimate_dispersions(
             self.adata, min_cells_detected=min_cells_detected, verbose=verbose,
         )
         return self
@@ -130,13 +140,13 @@ class Monocle:
 
     def dispersion_table(self) -> pd.DataFrame:
         """Return the per-gene dispersion table as a DataFrame."""
-        return _m2.dispersion_table(self.adata)
+        return self._m2.dispersion_table(self.adata)
 
     def relative2abs(self, method: str = 'num_genes',
                      expected_capture_rate: float = 0.25,
                      verbose: bool = False) -> AnnData:
         """Census normalization (TPM/FPKM → estimated absolute counts)."""
-        return _m2.relative2abs(
+        return self._m2.relative2abs(
             self.adata, method=method,
             expected_capture_rate=expected_capture_rate, verbose=verbose,
         )
@@ -163,7 +173,7 @@ class Monocle:
             Cap the number of ordering genes (for large datasets).
         """
         if genes is None:
-            disp = _m2.dispersion_table(self.adata)
+            disp = self._m2.dispersion_table(self.adata)
             mask = (
                 (disp['mean_expression'] >= mean_expr_thresh) &
                 (disp['dispersion_empirical'] >= disp['dispersion_fit'])
@@ -175,13 +185,13 @@ class Monocle:
                          / disp.loc[genes, 'dispersion_fit'])
                 genes = ratio.sort_values(ascending=False).head(max_genes).index.tolist()
 
-        self.adata = _m2.set_ordering_filter(self.adata, genes)
+        self.adata = self._m2.set_ordering_filter(self.adata, genes)
         self._ordering_set = True
         return self
 
     def set_ordering_filter(self, genes: List[str]):
         """Explicitly set the list of ordering genes."""
-        self.adata = _m2.set_ordering_filter(self.adata, genes)
+        self.adata = self._m2.set_ordering_filter(self.adata, genes)
         self._ordering_set = True
         return self
 
@@ -206,7 +216,7 @@ class Monocle:
             ``ncenter``, ``lambda_param``, ``param_gamma``, ``sigma``,
             ``maxIter``, ``tol``.
         """
-        self.adata = _m2.reduce_dimension(
+        self.adata = self._m2.reduce_dimension(
             self.adata, max_components=max_components,
             reduction_method=reduction_method,
             norm_method=norm_method, verbose=verbose, **kwargs,
@@ -216,7 +226,7 @@ class Monocle:
 
     def order_cells(self, root_state=None, reverse: Optional[bool] = None):
         """Order cells along the learned trajectory, assigning Pseudotime and State."""
-        self.adata = _m2.order_cells(self.adata, root_state=root_state, reverse=reverse)
+        self.adata = self._m2.order_cells(self.adata, root_state=root_state, reverse=reverse)
         self._ordered = True
         return self
 
@@ -228,7 +238,7 @@ class Monocle:
                       resolution_parameter: float = 0.1, verbose: bool = False,
                       **kwargs):
         """Cluster cells (Leiden / Louvain / densityPeak / DDRTree)."""
-        self.adata = _m2.cluster_cells(
+        self.adata = self._m2.cluster_cells(
             self.adata, method=method, k=k,
             resolution_parameter=resolution_parameter, verbose=verbose, **kwargs,
         )
@@ -237,6 +247,7 @@ class Monocle:
     @staticmethod
     def cluster_genes(expression_matrix, k: int, method: str = 'correlation'):
         """Cluster genes by their expression pattern."""
+        from ..external import monocle2_py as _m2  # noqa: PLC0415
         return _m2.cluster_genes(expression_matrix, k, method=method)
 
     # ------------------------------------------------------------------ #
@@ -249,7 +260,7 @@ class Monocle:
                                 relative_expr: bool = True,
                                 cores: int = -1, verbose: bool = False) -> pd.DataFrame:
         """Pseudotime-dependent differential expression test."""
-        return _m2.differential_gene_test(
+        return self._m2.differential_gene_test(
             self.adata,
             fullModelFormulaStr=fullModelFormulaStr,
             reducedModelFormulaStr=reducedModelFormulaStr,
@@ -262,7 +273,7 @@ class Monocle:
               reducedModelFormulaStr: str = "~sm.ns(Pseudotime, df=3)",
               cores: int = -1, verbose: bool = False) -> pd.DataFrame:
         """Branch Expression Analysis Modeling."""
-        return _m2.BEAM(
+        return self._m2.BEAM(
             self.adata, branch_point=branch_point, branch_states=branch_states,
             branch_labels=branch_labels,
             fullModelFormulaStr=fullModelFormulaStr,
@@ -273,25 +284,25 @@ class Monocle:
     def fit_model(self, modelFormulaStr: str = "~sm.ns(Pseudotime, df=3)",
                    relative_expr: bool = True, cores: int = 1):
         """Fit a GLM per gene (used internally by DE tests)."""
-        return _m2.fit_model(self.adata, modelFormulaStr=modelFormulaStr,
+        return self._m2.fit_model(self.adata, modelFormulaStr=modelFormulaStr,
                               relative_expr=relative_expr, cores=cores)
 
     def gen_smooth_curves(self, new_data=None,
                            trend_formula: str = "~sm.ns(Pseudotime, df=3)",
                            relative_expr: bool = True, cores: int = 1):
         """Generate smoothed expression curves along pseudotime."""
-        return _m2.gen_smooth_curves(
+        return self._m2.gen_smooth_curves(
             self.adata, new_data=new_data, trend_formula=trend_formula,
             relative_expr=relative_expr, cores=cores,
         )
 
     def cal_ABCs(self, branch_point: int = 1, **kwargs) -> pd.DataFrame:
         """Calculate Area Between Curves for branch-specific genes."""
-        return _m2.cal_ABCs(self.adata, branch_point=branch_point, **kwargs)
+        return self._m2.cal_ABCs(self.adata, branch_point=branch_point, **kwargs)
 
     def cal_ILRs(self, branch_point: int = 1, return_all: bool = False, **kwargs):
         """Calculate Intrinsic Log Ratios (per-gene lineage bias)."""
-        return _m2.cal_ILRs(
+        return self._m2.cal_ILRs(
             self.adata, branch_point=branch_point, return_all=return_all, **kwargs,
         )
 
@@ -301,74 +312,74 @@ class Monocle:
 
     def plot_trajectory(self, color_by: str = 'State', **kwargs):
         """plot_cell_trajectory — main DDRTree trajectory plot."""
-        return _m2.plot_cell_trajectory(self.adata, color_by=color_by, **kwargs)
+        return self._m2.plot_cell_trajectory(self.adata, color_by=color_by, **kwargs)
 
     # Alias matching Monocle2 R names
     plot_cell_trajectory = plot_trajectory
 
     def plot_complex_cell_trajectory(self, color_by: str = 'State', **kwargs):
         """Dendrogram-style trajectory layout (Pseudotime on Y-axis)."""
-        return _m2.plot_complex_cell_trajectory(self.adata, color_by=color_by, **kwargs)
+        return self._m2.plot_complex_cell_trajectory(self.adata, color_by=color_by, **kwargs)
 
     def plot_cell_clusters(self, color_by: str = 'Cluster', **kwargs):
         """Plot cells colored by cluster in reduced-dim space."""
-        return _m2.plot_cell_clusters(self.adata, color_by=color_by, **kwargs)
+        return self._m2.plot_cell_clusters(self.adata, color_by=color_by, **kwargs)
 
     def plot_genes_in_pseudotime(self, genes: List[str], **kwargs):
         """Gene expression vs pseudotime with smoothed curves."""
-        return _m2.plot_genes_in_pseudotime(self.adata, genes=genes, **kwargs)
+        return self._m2.plot_genes_in_pseudotime(self.adata, genes=genes, **kwargs)
 
     def plot_genes_branched_pseudotime(self, genes: List[str], branch_point: int = 1,
                                         **kwargs):
         """Gene expression split by branch."""
-        return _m2.plot_genes_branched_pseudotime(
+        return self._m2.plot_genes_branched_pseudotime(
             self.adata, genes=genes, branch_point=branch_point, **kwargs,
         )
 
     def plot_genes_branched_heatmap(self, branch_point: int = 1, **kwargs):
         """Heatmap of branch-specific gene expression."""
-        return _m2.plot_genes_branched_heatmap(
+        return self._m2.plot_genes_branched_heatmap(
             self.adata, branch_point=branch_point, **kwargs,
         )
 
     def plot_multiple_branches_pseudotime(self, genes: List[str],
                                             branches: List, **kwargs):
         """Multi-branch gene expression curves."""
-        return _m2.plot_multiple_branches_pseudotime(
+        return self._m2.plot_multiple_branches_pseudotime(
             self.adata, genes=genes, branches=branches, **kwargs,
         )
 
     def plot_multiple_branches_heatmap(self, branches: List, **kwargs):
         """Multi-branch expression heatmap."""
-        return _m2.plot_multiple_branches_heatmap(
+        return self._m2.plot_multiple_branches_heatmap(
             self.adata, branches=branches, **kwargs,
         )
 
     def plot_pseudotime_heatmap(self, genes: Optional[List[str]] = None, **kwargs):
         """Heatmap of gene expression sorted by pseudotime."""
-        return _m2.plot_pseudotime_heatmap(self.adata, genes=genes, **kwargs)
+        return self._m2.plot_pseudotime_heatmap(self.adata, genes=genes, **kwargs)
 
     def plot_genes_jitter(self, genes: List[str], grouping: str = 'State', **kwargs):
         """Jitter plot of gene expression by group."""
-        return _m2.plot_genes_jitter(self.adata, genes=genes, grouping=grouping, **kwargs)
+        return self._m2.plot_genes_jitter(self.adata, genes=genes, grouping=grouping, **kwargs)
 
     def plot_genes_violin(self, genes: List[str], grouping: str = 'State', **kwargs):
         """Violin plot of gene expression by group."""
-        return _m2.plot_genes_violin(self.adata, genes=genes, grouping=grouping, **kwargs)
+        return self._m2.plot_genes_violin(self.adata, genes=genes, grouping=grouping, **kwargs)
 
     def plot_ordering_genes(self, **kwargs):
         """Dispersion vs mean-expression plot, highlighting ordering genes."""
-        return _m2.plot_ordering_genes(self.adata, **kwargs)
+        return self._m2.plot_ordering_genes(self.adata, **kwargs)
 
     def plot_pc_variance_explained(self, max_components: int = 50, **kwargs):
         """Plot variance explained by principal components."""
-        return _m2.plot_pc_variance_explained(
+        return self._m2.plot_pc_variance_explained(
             self.adata, max_components=max_components, **kwargs,
         )
 
     def plot_rho_delta(self, **kwargs):
         """Plot rho vs delta for density-peak clustering."""
-        return _m2.plot_rho_delta(self.adata, **kwargs)
+        return self._m2.plot_rho_delta(self.adata, **kwargs)
 
     # ------------------------------------------------------------------ #
     # Utility accessors
