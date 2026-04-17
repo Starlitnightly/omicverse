@@ -95,31 +95,18 @@ def _filter_genes_impl(
         return gene_subset, n_counts
 
 
-# Helper function to detect Rust backend
-def _is_rust_backend(adata):
-    """Detect if the adata object is from Rust backend (like snapatac2)."""
-    # AnnDataOOM wraps rust backend — treat it as rust for legacy checks
-    if _is_oom(adata):
-        return True
-    # Check if it's a Rust/anndata_rs/snapatac2 backend
-    try:
-        # Check class type
-        if type(adata.obs).__name__.endswith("PyDataFrameElem"):
-            return True
-        if type(adata.X).__name__.endswith("PyArrayElem"):
-            return True
-        # Check module name
-        module = type(adata).__module__
-        if "snapatac2" in module or "pyanndata" in module or "anndata_rs" in module:
-            return True
-    except Exception:
-        pass
-    return False
-
-
 def _is_oom(adata) -> bool:
     """Detect if the adata object is an AnnDataOOM (out-of-memory) instance."""
     return getattr(adata, "_is_oom", False)
+
+
+# Deprecated alias — AnnDataOOM is the only rust-backed AnnData we support in
+# omicverse's preprocessing path. The standalone snapatac2 / anndata-rs paths
+# were never publicly exposed. Kept as an alias so call sites that still read
+# ``is_rust = _is_rust_backend(adata)`` keep working, but new code should use
+# ``_is_oom`` directly.
+def _is_rust_backend(adata) -> bool:
+    return _is_oom(adata)
 
 
 def _print_qc_metrics_table(adata):
@@ -1113,11 +1100,6 @@ def qc_cpu(
         removed_cells.extend(removed)
         total_qc_failed = len(removed)
         adata._inplace_subset_obs(passing)
-    elif is_rust:
-        removed = list(np.array(adata.obs_names)[np.where(QC_test==False)[0]])
-        removed_cells.extend(removed)
-        total_qc_failed = len(removed)
-        adata.subset(obs_indices=np.array(adata.obs_names)[np.where(QC_test==True)[0]])
     else:
         removed = QC_test.loc[lambda x : x == False]
         removed_cells.extend(list(removed.index.values))
@@ -1211,10 +1193,6 @@ def qc_cpu(
                     removed = list(adata.obs_names[~doublet_mask])
                     removed_cells.extend(removed)
                     adata._inplace_subset_obs(doublet_mask)
-                elif is_rust:
-                    removed=list(np.array(adata.obs_names)[np.where(adata.obs['predicted_doublet']==True)[0]])
-                    removed_cells.extend(removed)
-                    adata.subset(obs_indices=np.array(adata.obs_names)[np.where(adata.obs['predicted_doublet']==False)[0]])
                 else:
                     adata_remove = adata[adata.obs['predicted_doublet'], :]
                     removed_cells.extend(list(adata_remove.obs_names))
@@ -1229,15 +1207,10 @@ def qc_cpu(
                 print(f"   {Colors.CYAN}💡 Doublets retained in adata.obs['predicted_doublet'] for downstream analysis{Colors.ENDC}")
 
         elif doublets_method=='sccomposite':
-            # Pick the object sccomposite runs on:
-            # - OOM: adata_mem (materialised above), then copy labels back
-            # - plain rust: materialise in place, keep the reassignment
-            # - regular AnnData: use adata directly
+            # Pick the object sccomposite runs on: OOM uses the materialised
+            # adata_mem and copies labels back; regular AnnData uses adata.
             if is_oom:
                 sccomp_target = adata_mem
-            elif is_rust:
-                adata = adata.to_memory()
-                sccomp_target = adata
             else:
                 sccomp_target = adata
             print(f"   {Colors.WARNING}⚠️  Note: the `sccomposite` will remove more cells than `scrublet`{Colors.ENDC}")

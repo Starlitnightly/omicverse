@@ -800,16 +800,14 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
             "reproducible across different computational platforms. For exact "
             "reproducibility, choose `svd_solver='arpack'`."
         )
-    from ._qc import _is_rust_backend
-    is_rust = _is_rust_backend(data)
-
+    from ._qc import _is_oom
     if isinstance(data, AnnData):
         if layer is None and not chunked and is_backed_type(data.X):
             msg = f"PCA is not implemented for matrices of type {type(data.X)} with chunked as False"
             raise NotImplementedError(msg)
         adata = data.copy() if copy else data
         return_anndata = True
-    elif is_rust:
+    elif _is_oom(data):
         adata = data
         return_anndata = True
     elif pkg_version("anndata") < Version("0.8.0rc1"):
@@ -822,16 +820,9 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
     # Unify new mask argument and deprecated use_highly_varible argument
     mask_var_param, mask_var = _handle_mask_var(adata, mask_var, use_highly_variable)
     del use_highly_variable
-    from ._qc import _is_rust_backend, _is_oom
-    is_rust = _is_rust_backend(adata)
+    from ._qc import _is_oom
     is_oom = _is_oom(adata)
-    if is_oom:
-        adata_comp = adata[:, mask_var] if mask_var is not None else adata
-    elif not is_rust:
-        adata_comp = adata[:, mask_var] if mask_var is not None else adata
-    else:
-        adata_comp = adata.subset(var_indices=np.array(adata.var_names)[mask_var],inplace=False)
-        #print(np.array(adata.var_names)[mask_var])
+    adata_comp = adata[:, mask_var] if mask_var is not None else adata
 
     if n_comps is None:
         min_dim = min(adata_comp.n_vars, adata_comp.n_obs)
@@ -877,14 +868,9 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
 
     X = _get_obs_rep(adata_comp, layer=layer)
 
-    # Handle rust backend X data
-    if is_rust and not is_oom:
-        # For rust backend, X might be a special object that needs slicing to get actual data
-        if hasattr(X, '__getitem__') and not isinstance(X, (np.ndarray, sparse.spmatrix, sparse.sparray)):
-            try:
-                X = X[:]
-            except Exception:
-                pass
+    # Previously this block materialised X for a standalone rust/snapatac2
+    # adata. Only AnnDataOOM is supported now, and the is_oom branch above
+    # already handles it with chunked_pca.
 
     if is_backed_type(X) and layer is not None:
         msg = f"PCA is not implemented for matrices of type {type(X)} from layers"

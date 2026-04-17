@@ -13,7 +13,6 @@ import time
 
 from scipy.sparse import issparse, csr_matrix
 
-from ._qc import _is_rust_backend
 from ..utils import load_signatures_from_file,predefined_signatures
 from .._registry import register_function
 from .._settings import settings,print_gpu_usage_color,EMOJI,Colors,add_reference
@@ -92,17 +91,11 @@ def identify_robust_genes(data: anndata.AnnData, percent_cells: float = 0.05) ->
 
     prior_n = data.shape[1]
 
-    from ._qc import _is_rust_backend
-    is_rust = _is_rust_backend(data)
-
+    # OOM goes through chunked_identify_robust_genes in preprocess(); this
+    # function only runs for regular AnnData.
     if issparse(data.X):
         data.var["n_cells"] = data.X.getnnz(axis=0)
         data._inplace_subset_var(data.var["n_cells"] > 0)
-        data.var["percent_cells"] = (data.var["n_cells"] / data.shape[0]) * 100
-        data.var["robust"] = data.var["percent_cells"] >= percent_cells
-    elif is_rust:
-        data.var["n_cells"] =data.X[:].getnnz(axis=0)
-        data.subset(var_indices=np.where(data.var["n_cells"]>0)[0])
         data.var["percent_cells"] = (data.var["n_cells"] / data.shape[0]) * 100
         data.var["robust"] = data.var["percent_cells"] >= percent_cells
     else:
@@ -660,14 +653,11 @@ def preprocess(
     original_adata = adata
 
     # Log-normalization, HVGs identification
-    from ._qc import _is_rust_backend, _is_oom
-    is_rust = _is_rust_backend(adata)
+    from ._qc import _is_oom
     is_oom = _is_oom(adata)
     if is_oom:
         # OOM: save a lazy reference to raw counts (zero memory cost)
         adata.layers['counts'] = adata.X
-    elif is_rust:
-        adata.layers['counts'] = adata.X[:]
     else:
         adata.layers['counts'] = adata.X.copy()
     
@@ -682,10 +672,8 @@ def preprocess(
             identify_robust_genes(adata, percent_cells=0.05)
         if is_oom:
             adata._inplace_subset_var(adata.var['robust'].values)
-        elif not is_rust:
-            adata = adata[:, adata.var['robust']]
         else:
-            adata.subset(var_indices=np.where(adata.var['robust']==True)[0])
+            adata = adata[:, adata.var['robust']]
         print(f"{EMOJI['done']} Robust gene identification completed successfully.")
     method_list = mode.split('|')
     print(f"{Colors.CYAN}Begin size normalization: {method_list[0]} and HVGs selection {method_list[1]}{Colors.ENDC}")
@@ -971,9 +959,7 @@ def scale(adata, max_value=10, layers_add='scaled', to_sparse=False, **kwargs):
         >>> ov.pp.scale(adata, max_value=10, to_sparse=False)
     """
     from ._qc import _is_oom
-    is_rust = _is_rust_backend(adata)
-    is_oom = _is_oom(adata)
-    if is_oom:
+    if _is_oom(adata):
         # chunked_scale hard-codes the layer name to 'scaled' and installs a
         # lazy ScaledBackedArray. Re-wrapping/materialising it defeats the
         # point, so we short-circuit the rest of this function.
@@ -989,13 +975,7 @@ def scale(adata, max_value=10, layers_add='scaled', to_sparse=False, **kwargs):
         add_reference(adata, "scanpy", "scaling with scanpy")
         adata.uns["status"]["scaled"] = True
         return
-    elif is_rust:
-        from ._scale import scale_array
-        x = adata.X[:]
-        scaled_data = scale_array(
-            x, zero_center=True, max_value=max_value, copy=True, mask_obs=None
-        )
-    elif settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
+    if settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
         from ._scale import scale_anndata as scale
         adata_mock = scale(adata, copy=True, max_value=max_value, **kwargs)
         scaled_data = adata_mock.X.copy()
