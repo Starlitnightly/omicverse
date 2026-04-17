@@ -676,6 +676,15 @@ def preprocess(
             "adata in a hybrid state). Use 'shiftlog|pearson' instead, or "
             "switch to mode='cpu'."
         )
+    if is_oom and no_cc:
+        # remove_cc_genes materialises cc_genes × n_obs and hvgs × n_obs
+        # slices via `.X.toarray()`, which doesn't stream on BackedArray.
+        # Refuse rather than silently defeat OOM.
+        raise NotImplementedError(
+            "no_cc=True is not available for the OOM backend "
+            "(remove_cc_genes requires a materialised X). Run preprocess "
+            "without no_cc, or switch to mode='cpu'."
+        )
 
     if is_oom:
         # OOM: save a lazy reference to raw counts (zero memory cost)
