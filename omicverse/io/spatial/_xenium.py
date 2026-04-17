@@ -119,13 +119,20 @@ def _load_experiment_metadata(root: Path) -> dict:
         return {}
 
 
-def _load_morphology_image(root: Path, name: str) -> Optional[np.ndarray]:
-    """Load the hires morphology image (OME-TIFF) if present.
+def _load_morphology_image(
+    root: Path,
+    name: str,
+    max_dim: int = 4096,
+) -> Optional[tuple[np.ndarray, float]]:
+    """Load a morphology image (OME-TIFF) and its downsample factor.
 
-    Xenium output ships either a flat ``morphology_focus.ome.tif`` / ``morphology_mip.ome.tif``
-    (V1) or a ``morphology_focus/morphology_focus_0000.ome.tif`` directory layout (V2+).
-    Only the first page / first resolution level is read — enough for scatter-overlay
-    plotting without keeping the full multi-channel pyramid in memory.
+    Xenium output ships either a flat ``morphology_focus.ome.tif`` /
+    ``morphology_mip.ome.tif`` (V1) or a ``morphology_focus/morphology_focus_0000.ome.tif``
+    directory layout (V2+). The file is a multi-resolution pyramid; we pick the
+    highest-resolution level whose largest dimension fits under ``max_dim`` so the
+    in-memory array is bounded while remaining usable for overlay. Returns the
+    image and the ``chosen_level_size / full_res_size`` downsample factor so
+    coordinates can still be mapped into image-pixel space later.
     """
     candidates = []
     focus_dir = root / "morphology_focus"
@@ -140,14 +147,23 @@ def _load_morphology_image(root: Path, name: str) -> Optional[np.ndarray]:
 
             with tifffile.TiffFile(cand) as tif:
                 series = tif.series[0]
-                # Prefer a lower-resolution level to keep memory in check.
                 levels = getattr(series, "levels", None) or [series]
-                target = levels[-1] if len(levels) > 1 else levels[0]
+                # Full-res is levels[0]; walk down pyramid until both dims fit.
+                full_h, full_w = levels[0].shape[-2:]
+                target_idx = 0
+                for i, lvl in enumerate(levels):
+                    h, w = lvl.shape[-2:]
+                    if max(h, w) <= max_dim:
+                        target_idx = i
+                        break
+                else:
+                    target_idx = len(levels) - 1
+                target = levels[target_idx]
                 arr = target.asarray()
-            # Collapse any Z/channel axes — keep a 2-D grayscale for display.
             while arr.ndim > 2:
                 arr = arr[0]
-            return arr
+            downsample = arr.shape[0] / full_h if full_h else 1.0
+            return arr, float(downsample)
         except ImportError:
             warnings.warn(
                 "tifffile not installed — skipping morphology image. "
@@ -183,7 +199,9 @@ def read_xenium(
     library_id: Optional[str] = None,
     load_image: bool = True,
     image_key: str = "morphology_focus",
+    image_max_dim: int = 4096,
     load_boundaries: bool = True,
+    cache_file: Optional[Union[str, Path]] = None,
 ) -> AnnData:
     """Read a 10x Xenium ``outs`` directory into an AnnData object.
 
@@ -216,10 +234,22 @@ def read_xenium(
         Which morphology image to prefer when both ``morphology_focus`` and
         ``morphology_mip`` are shipped. One of ``'morphology_focus'``,
         ``'morphology_mip'``, ``'morphology'``.
+    image_max_dim
+        Xenium OME-TIFFs are multi-resolution pyramids; this is the maximum
+        pixel extent along either axis that we will load. The highest-resolution
+        pyramid level fitting under this cap is used. Default 4096 keeps the
+        in-memory array small while remaining usable for overlay. Pass a larger
+        value (e.g. 8192) for closer crops.
     load_boundaries
         When ``True`` and ``cell_boundaries.parquet`` / ``.csv.gz`` is present,
         converts per-cell polygon vertices to WKT strings stored in
         ``obs['geometry']`` — required by :func:`omicverse.pl.spatialseg`.
+    cache_file
+        Optional path to an ``.h5ad`` cache. When set and the file exists, we
+        read it back instead of re-parsing the outs directory (skipping the
+        10x HDF5 matrix, CSV metadata, and polygon-to-WKT construction).
+        When set and the file does *not* exist, it is written after the load
+        completes so subsequent calls are fast. Pass ``None`` to skip caching.
 
     Returns
     -------
@@ -237,6 +267,15 @@ def read_xenium(
             - ``'metadata'``: contents of ``experiment.xenium``
     """
     root = Path(path).resolve()
+    if cache_file is not None:
+        cache_path = Path(cache_file).expanduser().resolve()
+        if cache_path.exists():
+            import anndata as _ad
+            _progress(f"Reading cached AnnData from: {cache_path}")
+            return _ad.read_h5ad(cache_path)
+    else:
+        cache_path = None
+
     _progress(f"Reading Xenium data from: {root}")
 
     mat_path = _resolve(root, "cell_feature_matrix.h5")
@@ -316,21 +355,35 @@ def read_xenium(
             mean_diam_um = 2.0 * np.sqrt(mean_area / np.pi)
     spot_diameter_fullres = float(mean_diam_um / pixel_size_um)
 
+    # Default scalefactor assumes we'll overlay against a full-resolution image
+    # (coord_in_microns × tissue_hires_scalef → coord_in_image_pixels). If we
+    # load a downsampled pyramid level below, this is rescaled accordingly.
+    hires_scalef = 1.0 / pixel_size_um
+    spot_diameter_fullres = float(mean_diam_um / pixel_size_um)
+
     uns_spatial: dict[str, Any] = {
         "images": {},
         "scalefactors": {
-            # coord_in_microns * tissue_hires_scalef → coord_in_image_pixels
-            "tissue_hires_scalef": 1.0 / pixel_size_um,
+            "tissue_hires_scalef": hires_scalef,
             "spot_diameter_fullres": spot_diameter_fullres,
         },
         "metadata": exp_meta,
     }
 
     if load_image:
-        img = _load_morphology_image(root, image_key)
-        if img is not None:
-            _progress(f"Loaded morphology image {img.shape} from {root}")
+        loaded = _load_morphology_image(root, image_key, max_dim=image_max_dim)
+        if loaded is not None:
+            img, downsample = loaded
+            _progress(
+                f"Loaded morphology image {img.shape} "
+                f"(pyramid downsample {downsample:.4f}) from {root}"
+            )
             uns_spatial["images"]["hires"] = img
+            # Rescale so that micron × scalef lands on the downsampled image.
+            uns_spatial["scalefactors"]["tissue_hires_scalef"] = hires_scalef * downsample
+            uns_spatial["scalefactors"]["spot_diameter_fullres"] = (
+                spot_diameter_fullres * downsample
+            )
         else:
             _progress("No morphology image loaded (set load_image=False to silence).", level="warn")
 
@@ -353,6 +406,14 @@ def read_xenium(
         "type": "xenium_seg" if has_geometry else "xenium",
         "library_id": library_id,
     }
+
+    if cache_path is not None:
+        try:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            adata.write(cache_path)
+            _progress(f"Wrote cache AnnData to: {cache_path}", level="success")
+        except Exception as exc:
+            warnings.warn(f"Failed to write cache {cache_path}: {exc}")
 
     _progress(
         f"Done (n_obs={adata.n_obs}, n_vars={adata.n_vars}, library_id={library_id})",
