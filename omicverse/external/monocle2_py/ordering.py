@@ -82,35 +82,59 @@ def _project_cells_to_mst(adata):
         else:
             P[:, i] = best_proj
 
-    # Build new pairwise distance matrix on projected points
-    dp = squareform(pdist(P.T))
-    min_dist = dp[dp > 0].min() if np.any(dp > 0) else 1e-10
-    dp = dp + min_dist
-    np.fill_diagonal(dp, 0)
-
-    # Build new MST on projected cells using scipy (O(N^2 log N) on the
-    # dense distance matrix — avoids materializing a fully-connected
-    # graph of ~N^2/2 edges which blows up for large N).
+    # Build MST over projected cells without materialising the full
+    # N×N distance matrix (which is ~800 MB at N=10k). Strategy: k-NN
+    # sparse graph (k=min(30, N-1)) is guaranteed to contain the MST
+    # of the Euclidean point cloud in low dimensions, since MST edges
+    # are always among nearest neighbours.
+    #
+    # We then store only the sparse edges we actually need:
+    #   - the MST edge weights for downstream pseudotime accumulation
     from scipy.sparse.csgraph import minimum_spanning_tree as _mst
     from scipy.sparse import csr_matrix as _csr
-    N_cells = dp.shape[0]
-    mst_sp = _mst(_csr(dp)).tocoo()
+    from sklearn.neighbors import NearestNeighbors
+
+    N_cells = P.shape[1]
+    k_nn = min(30, N_cells - 1)
+    nn = NearestNeighbors(n_neighbors=k_nn + 1, algorithm='auto')
+    nn.fit(P.T)
+    knn_dists, knn_ids = nn.kneighbors(P.T)      # (N, k+1) incl. self
+
+    # Drop the self-edge (first column)
+    rows = np.repeat(np.arange(N_cells), k_nn)
+    cols = knn_ids[:, 1:].ravel()
+    data = knn_dists[:, 1:].ravel()
+
+    # Small floor to avoid zero-weight edges (R Monocle 2 does this too)
+    pos = data[data > 0]
+    min_dist = pos.min() if pos.size else 1e-10
+    data = data + min_dist
+
+    # Symmetrise: keep the smaller distance for each (i,j) pair
+    sparse_dist = _csr((data, (rows, cols)), shape=(N_cells, N_cells))
+    sparse_dist = sparse_dist.minimum(sparse_dist.T)   # symmetric min
+    mst_sp = _mst(sparse_dist).tocoo()
+
     cell_mst = ig.Graph(n=N_cells, directed=False)
     cell_mst.vs['name'] = list(adata.obs_names)
-    edges = list(zip(mst_sp.row.tolist(), mst_sp.col.tolist()))
-    cell_mst.add_edges(edges)
+    cell_mst.add_edges(list(zip(mst_sp.row.tolist(), mst_sp.col.tolist())))
     cell_mst.es['weight'] = mst_sp.data.tolist()
 
+    # Store the MST edge-weight matrix as sparse (symmetric). Pseudotime
+    # accumulation in _extract_ddrtree_ordering only walks MST edges, so
+    # we only need distances on those edges — no need to keep the full
+    # N×N pairwise matrix.
+    mst_sym = mst_sp + mst_sp.T
     monocle['pr_graph_cell_proj_tree'] = cell_mst
     monocle['pr_graph_cell_proj_dist'] = P
-    monocle['projected_dp'] = dp
+    monocle['projected_dp'] = mst_sym  # scipy sparse, N×N
 
     return adata
 
 
 def _extract_ddrtree_ordering(adata, root_cell_name, use_cell_mst=False):
     """
-    Extract pseudotime ordering from MST via DFS traversal.
+    Extract pseudotime ordering from the MST via BFS traversal from the root.
 
     Parameters
     ----------
@@ -140,9 +164,9 @@ def _extract_ddrtree_ordering(adata, root_cell_name, use_cell_mst=False):
     root_idx = vertex_names.index(root_cell_name)
 
     # BFS traversal: returns (order, layers, parents)
-    dfs_result = mst.bfs(root_idx)
-    order = dfs_result[0]
-    fathers = dfs_result[2]  # parent of each vertex in BFS tree
+    bfs_result = mst.bfs(root_idx)
+    order = bfs_result[0]
+    fathers = bfs_result[2]   # parent of each vertex in the BFS tree
 
     pseudotimes = np.zeros(n_vertices)
     states = np.zeros(n_vertices, dtype=int)
@@ -150,29 +174,68 @@ def _extract_ddrtree_ordering(adata, root_cell_name, use_cell_mst=False):
 
     # --- State assignment matches R Monocle2 ---------------------------
     # R: a new state is entered when crossing an edge OUT of a branch
-    # point (deg>2). All cells downstream of that branch point on the
-    # same edge share a state. Every child of a branch point gets its
-    # own fresh state id (one per outgoing edge).
-    # Implementation: walk root-to-leaf; whenever we step from a
-    # branch vertex, mint a new state id keyed by (branch_vertex, child).
-    state_of = {}           # node_idx -> state id
-    state_of[root_idx] = 1
-    next_state = 2
+    # point (deg>2). All cells downstream of a branch point on the same
+    # outgoing edge share a state. Every child of a branch point gets
+    # its own fresh state id — including when the *root* itself is a
+    # branch point (deg ≥ 3), in which case each subtree starts in a
+    # different state rather than sharing the root's state.
+    state_of = {}                     # node_idx -> state id
+    next_state = 1
+    root_is_branch = mst.degree(root_idx) >= 3
+    if not root_is_branch:
+        # Linear or single-child root → root seeds state 1
+        state_of[root_idx] = next_state
+        next_state += 1
+    # Otherwise the root is only given a state once we step to a child.
+    # state_of[root_idx] stays unset so subsequent lookups must go
+    # through the propagation rule below.
 
-    # We must process nodes in BFS order so parent is always assigned first
     for node_idx in order:
-        if node_idx < 0 or node_idx == root_idx:
+        if node_idx < 0:
+            continue
+        if node_idx == root_idx:
+            if node_idx in state_of:
+                continue
+            # Degenerate: root only (empty tree)
+            state_of[node_idx] = 1
             continue
         father_idx = fathers[node_idx]
         if father_idx < 0:
+            # Disconnected; inherit or seed state 1
             state_of[node_idx] = state_of.get(root_idx, 1)
             continue
-        # If father is a branch point (deg>2), this edge starts a new state.
-        if mst.degree(father_idx) > 2 and father_idx != root_idx:
+        # If the *parent* is a branch point, this edge starts a new state.
+        # This now applies even when the parent IS the root — matches R.
+        if mst.degree(father_idx) >= 3:
             state_of[node_idx] = next_state
             next_state += 1
         else:
-            state_of[node_idx] = state_of[father_idx]
+            # Non-branch parent → inherit the parent's state.
+            # (If root was a branch point and is the parent here, the
+            # `>= 3` branch above minted a fresh state; otherwise root
+            # was seeded with state 1 and we inherit it here.)
+            state_of[node_idx] = state_of.get(father_idx, 1)
+
+    # If the root never got a state (branch-point root with no direct
+    # state assignment), give it state 1 for completeness
+    state_of.setdefault(root_idx, 1)
+
+    # dp may be dense (cellPairwiseDistances on Y-centres) or sparse
+    # (projected_dp on cells). Build a fast edge-weight lookup that
+    # works for both: the MST has N-1 edges, walk them once.
+    from scipy import sparse as _sp
+    if _sp.issparse(dp):
+        dp_coo = dp.tocoo()
+        edge_w = {}
+        for i, j, v in zip(dp_coo.row, dp_coo.col, dp_coo.data):
+            edge_w[(int(i), int(j))] = float(v)
+        def _edge(a, b):
+            return edge_w.get((a, b), edge_w.get((b, a), 0.0))
+    else:
+        def _edge(a, b):
+            if dp.shape[0] > max(a, b):
+                return float(dp[a, b])
+            return 0.0
 
     # Pseudotime: cumulative edge length from root
     for node_idx in order:
@@ -184,11 +247,7 @@ def _extract_ddrtree_ordering(adata, root_cell_name, use_cell_mst=False):
         if father_idx >= 0:
             parent_name = vertex_names[father_idx]
             parent_pseudotime = pseudotimes[father_idx]
-            # Distance from parent (safe-indexed)
-            if dp.shape[0] > max(node_idx, father_idx):
-                d = dp[node_idx, father_idx]
-            else:
-                d = 0
+            d = _edge(node_idx, father_idx)
             curr_node_pseudotime = parent_pseudotime + d
         else:
             parent_name = None

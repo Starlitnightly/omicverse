@@ -124,7 +124,8 @@ __all__ = [
     'NaiveDE',
     'somde'
     ,
-    'cellcharter'
+    'cellcharter',
+    'monocle2_py',
 ]
 
 

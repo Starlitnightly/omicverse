@@ -104,7 +104,7 @@ def _get_major_eigenvalue(C, L):
 
 def DDRTree(X, dimensions=2, initial_method=None, maxIter=20, sigma=0.001,
             lambda_param=None, ncenter=None, param_gamma=10, tol=0.001,
-            verbose=False, pca_method='irlba'):
+            verbose=False, pca_method='irlba', random_state=2016):
     """
     Perform DDRTree dimensionality reduction.
 
@@ -163,7 +163,8 @@ def DDRTree(X, dimensions=2, initial_method=None, maxIter=20, sigma=0.001,
         # Sample evenly spaced points as initial centers
         indices = np.linspace(0, Z.shape[1] - 1, K, dtype=int)
         centers = Z[:, indices].T
-        kmeans = KMeans(n_clusters=K, init=centers, n_init=1, max_iter=100)
+        kmeans = KMeans(n_clusters=K, init=centers, n_init=1, max_iter=100,
+                         random_state=random_state)
         kmeans.fit(Z.T)
         Y = kmeans.cluster_centers_.T
 

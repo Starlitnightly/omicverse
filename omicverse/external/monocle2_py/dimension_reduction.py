@@ -107,7 +107,7 @@ def _normalize_expr_data(adata, norm_method='log', pseudo_expr=1):
 
 def reduce_dimension(adata, max_components=2, reduction_method='DDRTree',
                      norm_method='log', pseudo_expr=1, auto_param_selection=True,
-                     verbose=False, scaling=True, **kwargs):
+                     verbose=False, scaling=True, random_state=2016, **kwargs):
     """
     Reduce dimensionality of the data.
 
@@ -128,6 +128,10 @@ def reduce_dimension(adata, max_components=2, reduction_method='DDRTree',
     verbose : bool
     scaling : bool
         Whether to scale (z-score) genes.
+    random_state : int or None
+        Seed used for stochastic initialisation (tSNE, K-means, ICA).
+        Does NOT mutate numpy's global RNG — pass it through to
+        scikit-learn estimators directly.
     **kwargs : dict
         Additional arguments passed to DDRTree or other methods.
 
@@ -136,7 +140,6 @@ def reduce_dimension(adata, max_components=2, reduction_method='DDRTree',
     adata with updated .obsm, .uns['monocle'] fields
     """
     _init_monocle_uns(adata)
-    np.random.seed(2016)
 
     # Normalize expression
     FM, use_mask, gene_names = _normalize_expr_data(adata, norm_method, pseudo_expr)
@@ -170,8 +173,9 @@ def reduce_dimension(adata, max_components=2, reduction_method='DDRTree',
         if verbose:
             print("Learning principal graph with DDRTree")
 
-        ddr_kwargs = {}
-        for key in ['initial_method', 'maxIter', 'sigma', 'lambda_param', 'param_gamma', 'tol']:
+        ddr_kwargs = {'random_state': random_state}
+        for key in ['initial_method', 'maxIter', 'sigma', 'lambda_param',
+                    'param_gamma', 'tol', 'pca_method']:
             if key in kwargs:
                 ddr_kwargs[key] = kwargs[key]
 
@@ -237,7 +241,9 @@ def reduce_dimension(adata, max_components=2, reduction_method='DDRTree',
         pca = PCA(n_components=n_components_pca)
         pca_res = pca.fit_transform(FM.T)
 
-        tsne = TSNE(n_components=max_components, perplexity=kwargs.get('perplexity', 30))
+        tsne = TSNE(n_components=max_components,
+                    perplexity=kwargs.get('perplexity', 30),
+                    random_state=random_state)
         tsne_res = tsne.fit_transform(pca_res)
 
         adata.obsm['X_tSNE'] = tsne_res
@@ -247,7 +253,7 @@ def reduce_dimension(adata, max_components=2, reduction_method='DDRTree',
     elif reduction_method == 'ICA':
         from sklearn.decomposition import FastICA
 
-        ica = FastICA(n_components=max_components)
+        ica = FastICA(n_components=max_components, random_state=random_state)
         S = ica.fit_transform(FM.T)  # cells x components
         W_ica = ica.mixing_  # genes x components
 

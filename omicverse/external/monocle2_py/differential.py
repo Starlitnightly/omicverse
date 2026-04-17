@@ -265,7 +265,7 @@ def _diff_test_single_gene(expr, pseudotime, size_factors, df=3,
 
         return {'status': 'OK', 'pval': pval, 'family': expression_family}
 
-    except Exception as e:
+    except Exception:
         return {'status': 'FAIL', 'pval': 1.0, 'family': expression_family}
 
 

@@ -5,6 +5,9 @@ Faithfully reproduces Monocle2's ggplot2-based plots using matplotlib.
 Matches Monocle2's visual style: white background, top legend, clean theme.
 """
 
+import colorsys
+import warnings
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -12,7 +15,6 @@ import matplotlib.colors as mcolors
 from matplotlib.lines import Line2D
 from matplotlib.patches import Circle
 from scipy import sparse
-import warnings
 
 
 # ============================================================================
@@ -38,10 +40,9 @@ def _get_state_colors(states, cmap_name=None):
     color_map = {}
     for i, s in enumerate(unique_states):
         hue = (15 + (360 / n) * i) % 360
-        # HCL to RGB approximation matching ggplot2 defaults
-        import colorsys
-        # ggplot2 uses HCL(h, c=100, l=65). Approximate with HSL:
-        # Map HCL lightness 65 -> HSL lightness ~0.6, saturation ~0.7
+        # HCL to RGB approximation matching ggplot2 defaults.
+        # ggplot2 uses HCL(h, c=100, l=65); we approximate with HSL:
+        # lightness 65 → 0.58, saturation → 0.65.
         h_norm = hue / 360.0
         s_val = 0.65
         l_val = 0.58
