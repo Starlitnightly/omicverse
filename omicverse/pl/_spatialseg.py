@@ -15,7 +15,23 @@ import pandas as pd
 from matplotlib import patheffects
 from matplotlib import colors as mcolors
 
+from .._registry import register_function
 
+
+@register_function(
+    aliases=["create_custom_colormap", "transparent_colormap", "创建透明色图"],
+    category="plotting",
+    description="Build a transparent-to-opaque LinearSegmentedColormap of a single colour — useful for overlaying one marker / cell-type density on a morphology image without masking the background.",
+    prerequisites={},
+    requires={},
+    produces={},
+    auto_fix="none",
+    examples=[
+        "cmap = ov.pl.create_custom_colormap('#a51616')",
+        "ov.pl.spatialseg(adata, color='KRT7', cmap=cmap, seg_contourpx=1.5)",
+    ],
+    related=["pl.spatialseg", "pl.spatial", "pl.embedding"],
+)
 def create_custom_colormap(cell_color, *, name: str = "custom_transparent", N: int = 100):
     """Build a transparent-to-opaque LinearSegmentedColormap of a single colour.
 

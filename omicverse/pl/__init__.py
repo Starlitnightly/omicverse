@@ -97,7 +97,6 @@ from ._single import (
 from ._dynamic_trends import dynamic_trends, plot_gam_trends
 from ._general import (
     add_palue,
-    create_custom_colormap,
     create_transparent_gradient_colormap,
 )
 from ._heatmap import (
@@ -260,7 +259,6 @@ __all__ = [
     "violin_old",
     # @ _general
     "add_palue",
-    "create_custom_colormap",
     "create_transparent_gradient_colormap",
     # @ _heatmap
     "cell_cor_heatmap",
