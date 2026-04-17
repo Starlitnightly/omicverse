@@ -296,14 +296,23 @@ def _select_root_cell(adata, root_state=None, reverse=False):
         return root_cell
     else:
         mst = monocle['mst']
-        # Use diameter endpoints
+        # Match R Monocle 2's behaviour exactly: default root = the
+        # first vertex of the diameter path, `reverse=True` flips to
+        # the last vertex. R's `select_root_cell`:
+        #
+        #   diameter <- get.diameter(minSpanningTree(cds))
+        #   root_cell <- if (reverse) names(diameter[length(diameter)])
+        #                else names(diameter[1])
+        #
+        # If the resulting pseudotime direction disagrees with a known
+        # experimental variable (e.g. Hours), call
+        # ``order_cells(reverse=True)`` or pass ``root_state=N``.
         diameter_path = mst.get_diameter(directed=False)
         if len(diameter_path) == 0:
             return mst.vs[0]['name']
-        if reverse:
+        if reverse is True:
             return mst.vs[diameter_path[-1]]['name']
-        else:
-            return mst.vs[diameter_path[0]]['name']
+        return mst.vs[diameter_path[0]]['name']
 
 
 def order_cells(adata, root_state=None, reverse=None):
@@ -365,14 +374,23 @@ def order_cells(adata, root_state=None, reverse=None):
         tip_names = [cell_mst.vs[v]['name'] for v in tip_leaves_cell]
 
         root_cell_new = None
+        # Preferred: a cell mapped to the root Y-centre that is also a
+        # tip of the cell MST (matches R Monocle 2)
         for cell_idx in cells_at_root:
             cell_name = adata.obs_names[cell_idx]
             if cell_name in tip_names:
                 root_cell_new = cell_name
                 break
-
+        # Fallback: any cell at the root Y-centre
+        if root_cell_new is None and len(cells_at_root) > 0:
+            root_cell_new = adata.obs_names[int(cells_at_root[0])]
+        # Final fallback: use the cell closest (in pseudotime) to
+        # the Y-root among tip cells
         if root_cell_new is None:
-            root_cell_new = _select_root_cell(adata, root_state, reverse)
+            if tip_names:
+                root_cell_new = tip_names[0]
+            else:
+                root_cell_new = cell_mst.vs[0]['name']
 
         monocle['root_cell'] = root_cell_new
 

@@ -224,9 +224,65 @@ class Monocle:
         self._reduced = True
         return self
 
-    def order_cells(self, root_state=None, reverse: Optional[bool] = None):
-        """Order cells along the learned trajectory, assigning Pseudotime and State."""
-        self.adata = self._m2.order_cells(self.adata, root_state=root_state, reverse=reverse)
+    def order_cells(self, root_state=None, reverse: Optional[bool] = None,
+                    root_by_column: Optional[str] = None,
+                    root_by_value=None):
+        """Order cells along the learned trajectory, assigning Pseudotime and State.
+
+        Parameters
+        ----------
+        root_state : int or None
+            Numeric state id to use as the trajectory root. If given,
+            the cells in this state are used to locate the root tip on
+            the Y-centre MST.
+        reverse : bool or None
+            If ``True``, flip the default diameter-endpoint choice
+            (match R's ``orderCells(reverse=TRUE)``).
+        root_by_column : str or None
+            Name of a column in ``mono.adata.obs``. If given, the
+            state with the most cells matching ``root_by_value`` in
+            that column is auto-chosen as the root state. This
+            replicates R Monocle 2's ``GM_state()`` tutorial helper —
+            e.g. for HSMM::
+
+                mono.order_cells()                 # first pass
+                mono.order_cells(root_by_column='Hours',
+                                 root_by_value=0)  # point root at 0h
+
+            If ``root_by_value`` is ``None``, the minimum value in the
+            column is used (so the earliest-observed cells become root).
+        root_by_value
+            Value within ``root_by_column`` that marks the progenitor
+            population. Defaults to the column minimum.
+        """
+        # Auto-detect root_state from a metadata column if requested.
+        # Requires a previous order_cells() call so that `State` exists.
+        if root_by_column is not None:
+            col = self.adata.obs.get(root_by_column)
+            if col is None:
+                raise KeyError(
+                    f"root_by_column={root_by_column!r} not found in "
+                    "adata.obs. Available: "
+                    f"{list(self.adata.obs.columns)}"
+                )
+            if 'State' not in self.adata.obs.columns:
+                # Run a first ordering so `State` exists
+                self.adata = self._m2.order_cells(self.adata)
+                self._ordered = True
+            target = root_by_value if root_by_value is not None else col.min()
+            mask = col == target
+            if not mask.any():
+                raise ValueError(
+                    f"No cells matched {root_by_column}={target!r}"
+                )
+            counts = self.adata.obs.loc[mask, 'State'].value_counts()
+            if counts.empty:
+                raise ValueError("No State values under the selected mask")
+            root_state = counts.idxmax()
+
+        self.adata = self._m2.order_cells(
+            self.adata, root_state=root_state, reverse=reverse,
+        )
         self._ordered = True
         return self
 
