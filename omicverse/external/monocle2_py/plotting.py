@@ -32,6 +32,35 @@ def _monocle_theme(ax):
     ax.grid(False)
 
 
+def _resolve_gene_indices(adata, genes):
+    """Return a list of integer var-indices for `genes`, one per name.
+
+    Accepts either Ensembl IDs (matching ``adata.var_names``) or gene
+    short names (matching ``adata.var['gene_short_name']``).  Missing
+    genes yield ``None`` entries rather than raising.
+
+    O(G + k) instead of O(G·k) — caches the lookup dictionary once per
+    call so long gene lists (heatmaps, pseudotime heatmaps) don't pay
+    the per-gene `list(var_names).index()` scan cost.
+    """
+    name_to_idx = {g: i for i, g in enumerate(adata.var_names)}
+    short_to_idx = {}
+    if 'gene_short_name' in adata.var.columns:
+        for i, s in enumerate(adata.var['gene_short_name'].values):
+            # first-occurrence wins, to match the `.index(...)` semantics
+            short_to_idx.setdefault(s, i)
+
+    out = []
+    for g in genes:
+        if g in name_to_idx:
+            out.append(name_to_idx[g])
+        elif g in short_to_idx:
+            out.append(short_to_idx[g])
+        else:
+            out.append(None)
+    return out
+
+
 def _get_state_colors(states, cmap_name=None):
     """Get color mapping for categorical states, matching ggplot2 hue palette."""
     unique_states = sorted(set(states))
@@ -331,23 +360,17 @@ def plot_genes_in_pseudotime(adata, genes, min_expr=None,
                                        trend_formula=trend_formula,
                                        relative_expr=relative_expr)
 
+    # Pre-resolve all gene indices once (O(G+k)) instead of the previous
+    # per-gene O(G) linear scan. Saves real time when plotting >20 genes.
+    gene_indices = _resolve_gene_indices(adata, genes)
+
     for idx, gene in enumerate(genes):
         row = idx // ncol
         col = idx % ncol
         ax = axes[row, col]
 
-        # Find gene
-        if gene in adata.var_names:
-            gene_idx = list(adata.var_names).index(gene)
-        elif 'gene_short_name' in adata.var.columns:
-            matches = adata.var[adata.var['gene_short_name'] == gene].index
-            if len(matches) > 0:
-                gene_idx = list(adata.var_names).index(matches[0])
-            else:
-                ax.set_title(f'{gene} (not found)')
-                _monocle_theme(ax)
-                continue
-        else:
+        gene_idx = gene_indices[idx]
+        if gene_idx is None:
             ax.set_title(f'{gene} (not found)')
             _monocle_theme(ax)
             continue
@@ -553,7 +576,7 @@ def plot_genes_branched_heatmap(adata, branch_point=1, branch_states=None,
 
     Z = linkage(condensed_dist, method=hclust_method)
     cluster_labels = fcluster(Z, num_clusters, criterion='maxclust')
-    order = dendrogram(Z, no_plot=True)['leaves']
+    order = leaves_list(Z).tolist()  # iterative — matches R's pheatmap ordering
 
     # Reorder
     heatmap_ordered = heatmap_matrix[order]
@@ -1074,6 +1097,21 @@ def plot_pseudotime_heatmap(adata, genes=None, num_clusters=6,
     # Remove zero-variance
     valid = heatmap.std(axis=1) > 0
     heatmap = heatmap[valid]
+
+    if heatmap.shape[0] == 0:
+        # Nothing plottable — all genes had degenerate fits. Return an
+        # empty placeholder figure rather than indexing into a 0-row
+        # array. Upstream callers can detect this by the empty axes.
+        fig, ax = plt.subplots(1, 1, figsize=figsize or (6, 3))
+        ax.text(0.5, 0.5,
+                "No genes with non-zero variance after smoothing",
+                ha='center', va='center', transform=ax.transAxes)
+        ax.set_xticks([]); ax.set_yticks([])
+        _monocle_theme(ax)
+        fig.tight_layout()
+        if save:
+            fig.savefig(save, dpi=dpi, bbox_inches='tight')
+        return fig
 
     # Cluster
     if heatmap.shape[0] > 1:

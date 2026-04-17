@@ -334,6 +334,19 @@ def order_cells(adata, root_state=None, reverse=None):
         K = Y.shape[1]
         mst = monocle['mst']
 
+        # Bounds-check closest_vertex BEFORE using it. A corrupted value
+        # (>= K) would otherwise surface deep inside igraph or numpy as
+        # an opaque IndexError. Catch it here with a clear message.
+        _cv = monocle.get('pr_graph_cell_proj_closest_vertex')
+        if _cv is not None:
+            _cv_arr = np.asarray(_cv).ravel().astype(int)
+            if _cv_arr.size and (_cv_arr.min() < 0 or _cv_arr.max() >= K):
+                raise AssertionError(
+                    f"pr_graph_cell_proj_closest_vertex out of range: "
+                    f"min={_cv_arr.min()}, max={_cv_arr.max()}, but the "
+                    f"Y-centre MST has {K} vertices."
+                )
+
         # Initial ordering on Y-center MST
         root_cell = _select_root_cell(adata, root_state, reverse)
         cc_ordering = _extract_ddrtree_ordering(adata, root_cell, use_cell_mst=False)
@@ -369,18 +382,38 @@ def order_cells(adata, root_state=None, reverse=None):
         # Assign pseudotime
         adata.obs['Pseudotime'] = cc_ordering_new.loc[adata.obs_names, 'pseudo_time'].values
 
-        # Assign state based on Y-center MST structure
+        # Assign state based on Y-center MST structure.
+        # cc_ordering is keyed by Y-centre *vertex name* ("Y_0", ..., "Y_K-1"),
+        # not by positional index. closest_vertex is an array of integer
+        # Y-centre indices. Bounds-check, then look up by name.
         if root_state is None:
-            state_map = cc_ordering['cell_state'].values
-            cell_states = state_map[closest_vertex]
+            n_Y = mst.vcount()
+            cv = np.asarray(closest_vertex).ravel().astype(int)
+            if cv.size and (cv.min() < 0 or cv.max() >= n_Y):
+                raise AssertionError(
+                    f"closest_vertex out of range: min={cv.min()}, "
+                    f"max={cv.max()}, but MST has {n_Y} vertices"
+                )
+            y_names = [mst.vs[i]['name'] for i in cv]
+            cell_states = cc_ordering.loc[y_names, 'cell_state'].values
             adata.obs['State'] = pd.Categorical(cell_states)
         else:
             adata.obs['State'] = pd.Categorical(
                 cc_ordering_new.loc[adata.obs_names, 'cell_state'].values
             )
 
-        # Find branch points
-        branch_points = [mst.vs[v]['name'] for v in range(mst.vcount()) if mst.degree(v) > 2]
+        # Find branch points. A strictly linear trajectory has no branch
+        # points — warn the user instead of letting downstream code
+        # silently index into an empty list.
+        branch_points = [mst.vs[v]['name']
+                         for v in range(mst.vcount())
+                         if mst.degree(v) > 2]
+        if not branch_points:
+            import warnings as _warnings
+            _warnings.warn(
+                "No branch points detected; trajectory appears linear.",
+                UserWarning,
+            )
         monocle['branch_points'] = branch_points
 
     elif dim_reduce_type == 'ICA':

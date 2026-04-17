@@ -63,7 +63,12 @@ def cal_ABCs(adata, branch_point=1, branch_states=None, branch_labels=None,
     branch_col[adata_sub.obs['State'].isin([branch_states[1]]).values] = branch_labels[1]
     adata_sub.obs['Branch'] = pd.Categorical(branch_col)
 
-    # Scale pseudotime 0-100
+    # Rescale pseudotime to [0, 100] **only on the local subset** for
+    # smooth-curve fitting. We do NOT touch the caller's adata — each
+    # BEAM/ABCs/ILRs call rescales against its own subset's range so
+    # the resulting curves are always on [0, 100] regardless of which
+    # branch_point was chosen. The original `mono.adata.obs['Pseudotime']`
+    # is preserved.
     pt = adata_sub.obs['Pseudotime'].values.copy()
     if pt.max() > pt.min():
         pt = 100 * (pt - pt.min()) / (pt.max() - pt.min())

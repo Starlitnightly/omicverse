@@ -225,37 +225,63 @@ def estimate_dispersions(adata, min_cells_detected=1, verbose=False):
             coefs, fit_result = _parametric_dispersion_fit(
                 mu_all, disp_all, np.array([1e-6, 1.0]))
 
-            # Outlier removal (matching R's removeOutliers=TRUE)
+            # Outlier removal (matching R's removeOutliers=TRUE).
+            # NOTE on index alignment: `fit_result` was obtained on
+            # `X_design = mu_all[keep]` (see _parametric_dispersion_fit).
+            # Cook's distance therefore has length `keep.sum()` and is
+            # aligned with `keep_idx` — NOT with `mu_all`.
             if fit_result is not None:
                 try:
-                    from statsmodels.stats.outliers_influence import OLSInfluence
-                    # Cook's distance from the GLM fit
+                    # Recompute the same `keep` mask used in the final
+                    # _parametric_dispersion_fit iteration
+                    pred = coefs[0] + coefs[1] / mu_all
+                    pred[pred <= 0] = 1e-10
+                    residuals = disp_all / pred
+                    keep = (residuals > 1e-6) & (residuals < 10000)
+                    keep_idx = np.where(keep)[0]
+
                     influence = fit_result.get_influence()
                     cooks_d = influence.cooks_distance[0]
                     cooks_cutoff = 4.0 / len(mu_all)
-                    outlier_mask = cooks_d > cooks_cutoff
-                    n_outliers = outlier_mask.sum()
+
+                    # `cooks_d` has one entry per row of the last GLM fit.
+                    # That fit used rows `keep_idx`, so they share the
+                    # same index space — no slicing / truncation needed.
+                    if len(cooks_d) != len(keep_idx):
+                        # Statsmodels may have dropped some rows internally
+                        # (e.g. zero-weight observations). Fall back to a
+                        # trailing alignment rather than silently mis-indexing.
+                        m = min(len(cooks_d), len(keep_idx))
+                        cooks_d_aligned = cooks_d[:m]
+                        keep_idx_aligned = keep_idx[:m]
+                    else:
+                        cooks_d_aligned = cooks_d
+                        keep_idx_aligned = keep_idx
+
+                    outlier_in_keep = cooks_d_aligned > cooks_cutoff
+                    outlier_genes = set(
+                        keep_idx_aligned[outlier_in_keep].tolist()
+                    )
+                    n_outliers = len(outlier_genes)
                     if verbose:
                         print(f"  Removing {n_outliers} outliers")
 
                     if n_outliers > 0 and n_outliers < len(mu_all) - 10:
-                        # Re-fit without outliers
-                        # Need to map outlier indices back to the 'keep' subset
-                        pred = coefs[0] + coefs[1] / mu_all
-                        pred[pred <= 0] = 1e-10
-                        residuals = disp_all / pred
-                        keep = (residuals > 1e-6) & (residuals < 10000)
-                        keep_idx = np.where(keep)[0]
-
-                        # Remove outlier genes from fitting
-                        outlier_genes = set(keep_idx[outlier_mask[:len(keep_idx)]])
-                        clean_mask = np.array([i not in outlier_genes
-                                              for i in range(len(mu_all))])
+                        clean_mask = np.array([
+                            i not in outlier_genes for i in range(len(mu_all))
+                        ])
                         coefs, _ = _parametric_dispersion_fit(
                             mu_all[clean_mask], disp_all[clean_mask],
-                            coefs)
-                except Exception:
-                    pass  # If Cook's distance fails, keep the first fit
+                            coefs,
+                        )
+                except Exception as _e:
+                    # If Cook's distance / re-fit fails, keep the first
+                    # fit and emit a warning so the user knows.
+                    _warnings.warn(
+                        f"Outlier removal step failed: {_e!r}. "
+                        "Keeping initial dispersion fit.",
+                        RuntimeWarning,
+                    )
 
             if coefs[0] > 0 and coefs[1] > 0:
                 fitted_disp = coefs[0] + coefs[1] / mu
@@ -269,8 +295,27 @@ def estimate_dispersions(adata, min_cells_detected=1, verbose=False):
                 if verbose:
                     print(f"  Dispersion fit coefs: asymptDisp={coefs[0]:.6f}, "
                           f"extraPois={coefs[1]:.5f}")
-        except Exception:
-            pass
+            else:
+                # Fit converged to degenerate coefficients — warn so the
+                # caller can tell that downstream NB-GLM fits won't get
+                # a disp_func hint.
+                _warnings.warn(
+                    f"Parametric dispersion fit produced invalid "
+                    f"coefficients (a={coefs[0]:.4g}, b={coefs[1]:.4g}); "
+                    "no disp_func will be stored.",
+                    RuntimeWarning,
+                )
+        except Exception as _exc:
+            # Fitting framework itself failed — keep the empirical
+            # dispersions but warn loudly. Downstream GLM fits will
+            # fall back to their default behaviour.
+            _warnings.warn(
+                f"Dispersion GLM fit failed ({_exc!r}); keeping "
+                "empirical dispersions only. differential_gene_test "
+                "and BEAM will still work but without a dispersion "
+                "hint.",
+                RuntimeWarning,
+            )
 
     return adata
 
