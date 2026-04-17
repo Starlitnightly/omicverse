@@ -1368,8 +1368,13 @@ def _get_palette(adata, values_key: str, palette=None):
 
         if s.__class__.__module__.startswith("pandas"):
             if isinstance(s.dtype, pd.CategoricalDtype):
-                cats = [str(x) for x in s.cat.categories]
-                return pd.Categorical(pd.Series(s).astype(str), categories=cats)
+                # Prune unused categories — a subset view still inherits the
+                # full category list, which would otherwise leak into the
+                # legend/palette.
+                values_str = pd.Series(s).astype(str)
+                present = set(values_str.unique())
+                cats = [str(x) for x in s.cat.categories if str(x) in present]
+                return pd.Categorical(values_str, categories=cats)
             if getattr(s, "dtype", None) == bool:
                 return pd.Categorical(pd.Series(s).astype(str))
             return pd.Categorical(pd.Series(s, dtype="string"))
@@ -1378,8 +1383,10 @@ def _get_palette(adata, values_key: str, palette=None):
             if s.dtype == pl.Boolean:
                 return pd.Categorical(pd.Series(s.to_list()).astype(str), categories=["False", "True"])
             if s.dtype == pl.Categorical and hasattr(s.cat, "get_categories"):
-                cats = [str(x) for x in s.cat.get_categories().to_list()]
-                return pd.Categorical(pd.Series(s.to_list()).astype(str), categories=cats)
+                values_str = pd.Series(s.to_list()).astype(str)
+                present = set(values_str.unique())
+                cats = [str(x) for x in s.cat.get_categories().to_list() if str(x) in present]
+                return pd.Categorical(values_str, categories=cats)
             arr = [str(x) for x in s.cast(pl.Utf8).to_list()]
             try:
                 from natsort import natsorted
