@@ -840,9 +840,8 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
                 f"(available: {list(adata_comp.layers.keys())}). "
                 "Run ov.pp.scale(adata) first, or pass an existing layer name."
             )
-        _n = n_comps if n_comps is not None else min(N_PCS, adata_comp.n_vars - 1, adata_comp.n_obs - 1)
         X_pca, components, var_ratio = _chunked_pca(
-            adata_comp, layer=_layer, n_comps=_n
+            adata_comp, layer=_layer, n_comps=n_comps
         )
         # Store results back into adata (not adata_comp, which may be a view)
         adata.obsm["X_pca"] = X_pca

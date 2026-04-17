@@ -725,12 +725,8 @@ def preprocess(
             )
             if no_cc:
                 remove_cc_genes(adata, organism=organism, corr_threshold=0.1)
-        elif method_list[1] == 'seurat':
-            raise NotImplementedError(
-                "Seurat v3 HVG selection (Loess-smoothed dispersion) is not "
-                "available for the OOM backend. Use 'shiftlog|pearson' instead, "
-                "or switch to mode='cpu' to materialise the data."
-            )
+        # Note: shiftlog|seurat is pre-rejected at the top of preprocess(), so
+        # no elif branch for it is needed here.
         data_load_end = time.time()
         print(f"{Colors.BLUE}    Time to analyze data (out-of-memory): {data_load_end - data_load_start:.2f} seconds.{Colors.ENDC}")
     elif settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
@@ -953,6 +949,9 @@ def scale(adata, max_value=10, layers_add='scaled', to_sparse=False, **kwargs):
         adata: Annotated data matrix with n_obs x n_vars shape.
         max_value: Maximum value after scaling. Default: 10.
         layers_add: Name of the layer to store the scaled data. Default: 'scaled'.
+            OOM backend only supports layers_add='scaled' (the underlying
+            chunked_scale writes a lazy ScaledBackedArray to that fixed key);
+            passing anything else raises ValueError.
         to_sparse: If True, convert the result to csr_matrix format. Default: False.
             Scaled data is 100% dense, so sparse storage only adds overhead.
         **kwargs: Additional arguments passed to scaling functions.
