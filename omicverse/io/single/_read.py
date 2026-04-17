@@ -127,7 +127,11 @@ def read(path, backend='python', **kwargs):
     path : str or pathlib.Path
         Input file path.
     backend : {'python', 'rust'}, default='python'
-        Backend used for ``.h5ad`` reading.
+        Backend used for ``.h5ad`` reading. ``'rust'`` loads out-of-memory
+        via ``anndataoom`` / ``anndata-rs``. When the file's sparse X has
+        unsorted minor indices the call is aborted with a clear
+        ``ValueError`` (rather than an anndata-rs panic) pointing at
+        :func:`ov.utils.convert_adata_for_rust` for recovery.
     **kwargs
         Additional keyword arguments forwarded to backend readers.
 
@@ -139,9 +143,10 @@ def read(path, backend='python', **kwargs):
     Raises
     ------
     ImportError
-        If ``backend='rust'`` is requested but ``snapatac2`` is unavailable.
+        If ``backend='rust'`` is requested but ``anndataoom`` is not installed.
     ValueError
-        If ``backend`` is invalid for ``.h5ad`` reading or the file suffix is unsupported.
+        If ``backend`` is invalid for ``.h5ad`` reading, the file suffix is
+        unsupported, or the ``.h5ad`` has an unsorted sparse ``X``.
     """
     ext = Path(path).suffix.lower()
 
