@@ -131,12 +131,42 @@ def check_colornorm(vmin=None, vmax=None, vcenter=None, norm=None):
     return None
 
 
-def circles(x, y, *, s, ax: Axes, scale_factor=None, **kwargs):
-    size = np.asarray(s)
-    if scale_factor is not None:
-        size = size * float(scale_factor) ** 2
-    marker = kwargs.pop("marker", "o")
-    return ax.scatter(x, y, s=size, marker=marker, **kwargs)
+def circles(
+    x, y, *, s, ax: Axes, marker=None, c="b", vmin=None, vmax=None,
+    scale_factor=1.0, **kwargs,
+):
+    """Scatter plot where ``s`` is a radius in data units (not points**2).
+
+    Mirrors :func:`scanpy.plotting._utils.circles` — when ``scale_factor`` is
+    supplied, both the coordinates and the radii are in the *already-scaled*
+    image-pixel space; we additionally multiply ``x`` and ``y`` by
+    ``scale_factor`` here because callers in this backend pass the raw
+    fullres obsm coords through unchanged.
+    """
+    from matplotlib.collections import PatchCollection
+    from matplotlib.patches import Circle
+
+    x = np.asarray(x)
+    y = np.asarray(y)
+    if scale_factor is not None and float(scale_factor) != 1.0:
+        x = x * float(scale_factor)
+        y = y * float(scale_factor)
+
+    # PatchCollection does not accept ``marker`` or ``plotnonfinite``.
+    kwargs.pop("plotnonfinite", None)
+
+    zipped = np.broadcast(x, y, np.asarray(s))
+    patches = [Circle((x_, y_), s_) for x_, y_, s_ in zipped]
+    collection = PatchCollection(patches, **kwargs)
+
+    if isinstance(c, np.ndarray) and np.issubdtype(c.dtype, np.number):
+        collection.set_array(np.ma.masked_invalid(c))
+        collection.set_clim(vmin, vmax)
+    else:
+        collection.set_facecolor(c)
+
+    ax.add_collection(collection)
+    return collection
 
 
 def savefig_or_show(basename: str, *, show=None, save=None) -> None:
