@@ -95,9 +95,10 @@ def _filter_genes_impl(
         return gene_subset, n_counts
 
 
-def _is_oom(adata) -> bool:
-    """Detect if the adata object is an AnnDataOOM (out-of-memory) instance."""
-    return getattr(adata, "_is_oom", False)
+# Single source of truth for "is this adata an AnnDataOOM?" — delegates to
+# the compat shim so it stays in lockstep with the anndataoom package (or its
+# no-op fallback when anndataoom is not installed).
+from .._oom_compat import is_oom as _is_oom
 
 
 # Deprecated alias — AnnDataOOM is the only rust-backed AnnData we support in
@@ -1001,8 +1002,6 @@ def qc_cpu(
 
     # Print gene detection table
     _print_gene_detection_table(mt_genes_found, ribo_genes_found, hb_genes_found, mt_genes, ribo_genes, hb_genes)
-    # Check if it's a Rust backend
-    is_rust = _is_rust_backend(adata)
     is_oom = _is_oom(adata)
 
     if is_oom:
@@ -1021,23 +1020,6 @@ def qc_cpu(
         adata.obs['hb_perc'] = np.array(adata[:, adata.var["hb"]].X.sum(axis=1)).reshape(-1) / \
         adata.obs['nUMIs'].values
         adata.obs['detected_genes'] = adata.X.getnnz(axis=1)
-    elif is_rust:
-        # For Rust backend (snapatac2) - use adata.X[:] and subset method
-        adata.obs['nUMIs'] = np.array(adata.X[:].sum(axis=1)).reshape(-1)
-        # Use subset method for Rust backend slicing
-        mt_indices = np.where(adata.var["mt"])[0]
-        ribo_indices = np.where(adata.var["ribo"])[0]
-        hb_indices = np.where(adata.var["hb"])[0]
-        if len(mt_indices) > 0:
-            #adata.X[:,mt_indices].sum(axis=1) / adata.obs['nUMIs'].values
-            adata.obs['mito_perc'] = np.array(adata.X[:,mt_indices].sum(axis=1)).reshape(-1) / adata.obs['nUMIs']
-            adata.obs['ribo_perc'] = np.array(adata.X[:,ribo_indices].sum(axis=1)).reshape(-1) / adata.obs['nUMIs']
-            adata.obs['hb_perc'] = np.array(adata.X[:,hb_indices].sum(axis=1)).reshape(-1) / adata.obs['nUMIs']
-        else:
-            adata.obs['mito_perc'] = np.zeros(adata.n_obs)
-            adata.obs['ribo_perc'] = np.zeros(adata.n_obs)
-            adata.obs['hb_perc'] = np.zeros(adata.n_obs)
-        adata.obs['detected_genes'] = adata.X[:].getnnz(axis=1)
     else:
         # Regular pandas backend
         adata.obs['nUMIs'] = adata.X.sum(axis=1)
@@ -1140,24 +1122,11 @@ def qc_cpu(
         if max_cells_ratio:
             selected_genes &= n_cell <= max_cells_ratio * adata.shape[0]
         adata._inplace_subset_var(selected_genes)
-    elif not is_rust:
+    else:
         _filter_cells_impl(adata, min_genes=min_genes)
         _filter_genes_impl(adata, min_cells=min_cells)
         _filter_cells_impl(adata, max_genes=int(max_genes_ratio*adata.shape[1]))
         _filter_genes_impl(adata, max_cells=int(max_cells_ratio*adata.shape[0]))
-    else:
-        # Pure rust path (OOM is handled by the `if is_oom:` branch above).
-        selected_cells = True
-        if min_genes: selected_cells &= adata.obs["detected_genes"] >= min_genes
-        if max_genes_ratio: selected_cells &= adata.obs["detected_genes"] <= max_genes_ratio*adata.shape[1]
-        selected_cells = np.flatnonzero(selected_cells)
-        adata.subset(obs_indices=selected_cells)
-        selected_genes = True
-        adata.var["n_cell"] = np.array((adata.X[:] != 0).sum(axis=0)).reshape(-1)
-        if min_cells: selected_genes &= adata.var["n_cell"] >= min_cells
-        if max_cells_ratio: selected_genes &= adata.var["n_cell"] <= max_cells_ratio*adata.shape[0]
-        selected_genes = np.flatnonzero(selected_genes)
-        adata.subset(var_indices=selected_genes)
 
     cells_final_filtered = cells_before_final - adata.shape[0]
     genes_final_filtered = genes_before_final - adata.shape[1]

@@ -146,8 +146,9 @@ def test_read_invalid_backend_raises(tiny_h5ad):
 # ──────────────────────────────────────────────────────────────────────
 
 def test_preprocess_seurat_raises_on_oom(tiny_h5ad):
-    """shiftlog|seurat is not implemented for OOM — it must raise, not run
-    the Pearson chunked function in silence."""
+    """shiftlog|seurat is not implemented for OOM — it must raise BEFORE any
+    mutation (no normalize, no log1p, no counts layer) so the user's adata
+    isn't left in a half-processed state."""
     import omicverse as ov
 
     adata = ov.read(tiny_h5ad, backend="rust")
@@ -161,8 +162,17 @@ def test_preprocess_seurat_raises_on_oom(tiny_h5ad):
             mt_startswith="MT-",
             doublets=False,
         )
+        layers_before = set(adata.layers.keys())
+        obs_cols_before = set(adata.obs.columns)
+
         with pytest.raises(NotImplementedError, match="[Ss]eurat"):
             ov.pp.preprocess(adata, mode="shiftlog|seurat", n_HVGs=50)
+
+        # No mutation happened — adata is still usable.
+        assert set(adata.layers.keys()) == layers_before
+        assert "_norm_factor" not in adata.obs.columns  # chunked_normalize_total side-effect
+        # New obs cols must be a subset of what was there pre-call
+        assert set(adata.obs.columns) == obs_cols_before
     finally:
         adata.close()
 
@@ -195,30 +205,22 @@ def test_pca_varm_shape_matches_adata_n_vars(tiny_h5ad):
         adata.close()
 
 
-def test_oom_compat_isinstance_is_safe():
+def test_oom_compat_isinstance_is_safe(monkeypatch):
     """AnnDataOOM in the fallback shim must be a real class so that
     `isinstance(obj, AnnDataOOM)` never raises TypeError."""
-    import sys
     import importlib
 
     for name in list(sys.modules):
         if name == "anndataoom" or name.startswith("anndataoom."):
-            sys.modules.pop(name, None)
-    sys.modules["anndataoom"] = None
+            monkeypatch.delitem(sys.modules, name, raising=False)
+    monkeypatch.setitem(sys.modules, "anndataoom", None)
+    monkeypatch.delitem(sys.modules, "omicverse._oom_compat", raising=False)
 
-    try:
-        if "omicverse._oom_compat" in sys.modules:
-            del sys.modules["omicverse._oom_compat"]
-        compat = importlib.import_module("omicverse._oom_compat")
-
-        assert compat.HAS_OOM is False
-        # Must not raise — this is the regression the stub class prevents.
-        assert isinstance("not an adata", compat.AnnDataOOM) is False
-        assert isinstance(object(), compat.BackedArray) is False
-    finally:
-        sys.modules.pop("anndataoom", None)
-        sys.modules.pop("omicverse._oom_compat", None)
-        importlib.import_module("omicverse._oom_compat")
+    compat = importlib.import_module("omicverse._oom_compat")
+    assert compat.HAS_OOM is False
+    # Must not raise — this is the regression the stub class prevents.
+    assert isinstance("not an adata", compat.AnnDataOOM) is False
+    assert isinstance(object(), compat.BackedArray) is False
 
 
 def test_qc_sccomposite_oom_copies_results_back(tiny_h5ad, monkeypatch):
@@ -255,6 +257,39 @@ def test_qc_sccomposite_oom_copies_results_back(tiny_h5ad, monkeypatch):
         assert (adata.obs["sccomposite_doublet"] != 0).sum() > 0
         # OOM contract preserved
         assert getattr(adata, "_is_oom", False) is True
+    finally:
+        adata.close()
+
+
+def test_full_pipeline_through_leiden_oom(tiny_h5ad):
+    """End-to-end smoke test: qc -> preprocess -> scale -> pca -> neighbors
+    -> leiden on an OOM adata. Guards the lazy-transform chain at the
+    integration boundaries (each step adds a new wrapping layer)."""
+    import omicverse as ov
+
+    adata = ov.read(tiny_h5ad, backend="rust")
+    try:
+        ov.pp.qc(
+            adata,
+            mode="seurat",
+            min_cells=0,
+            min_genes=0,
+            tresh={"mito_perc": 1.0, "nUMIs": 0, "detected_genes": 0},
+            mt_startswith="MT-",
+            doublets=False,
+        )
+        ov.pp.preprocess(adata, mode="shiftlog|pearson", n_HVGs=50)
+        ov.pp.scale(adata)
+        ov.pp.pca(adata, layer="scaled", n_pcs=10)
+        ov.pp.neighbors(
+            adata, n_neighbors=5, n_pcs=10,
+            use_rep="scaled|original|X_pca",
+        )
+        ov.pp.leiden(adata, resolution=1.0)
+
+        assert "leiden" in adata.obs.columns
+        assert adata.obs["leiden"].nunique() >= 1
+        assert "neighbors" in adata.uns
     finally:
         adata.close()
 

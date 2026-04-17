@@ -655,6 +655,17 @@ def preprocess(
     # Log-normalization, HVGs identification
     from ._qc import _is_oom
     is_oom = _is_oom(adata)
+
+    # Validate unsupported combinations BEFORE mutating adata (otherwise the
+    # caller gets back a half-processed object with partial lazy transforms).
+    method_list_preview = mode.split('|')
+    if is_oom and len(method_list_preview) > 1 and method_list_preview[1] == 'seurat':
+        raise NotImplementedError(
+            "Seurat v3 HVG selection (Loess-smoothed dispersion) is not "
+            "available for the OOM backend. Use 'shiftlog|pearson' instead, "
+            "or switch to mode='cpu' to materialise the data."
+        )
+
     if is_oom:
         # OOM: save a lazy reference to raw counts (zero memory cost)
         adata.layers['counts'] = adata.X
