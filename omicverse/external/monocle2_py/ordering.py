@@ -82,52 +82,50 @@ def _project_cells_to_mst(adata):
         else:
             P[:, i] = best_proj
 
-    # Build MST over projected cells without materialising the full
-    # N×N distance matrix (which is ~800 MB at N=10k). Strategy: k-NN
-    # sparse graph (k=min(30, N-1)) is guaranteed to contain the MST
-    # of the Euclidean point cloud in low dimensions, since MST edges
-    # are always among nearest neighbours.
+    # Build MST over projected cells using the full pairwise distance
+    # matrix (matches R Monocle 2's project2MST verbatim):
+    #     dp <- as.matrix(dist(t(P)))
+    #     dp <- dp + min(dp[dp != 0]); diag(dp) <- 0
+    #     gp <- graph.adjacency(dp, mode="undirected", weighted=TRUE)
+    #     minimum.spanning.tree(gp)
     #
-    # We then store only the sparse edges we actually need:
-    #   - the MST edge weights for downstream pseudotime accumulation
+    # An earlier attempt to use a kNN-sparse graph + `.minimum(.T)`
+    # silently produced zero-weight MST edges (missing entries in the
+    # sparse matrix are 0, which dominates the pointwise minimum),
+    # collapsing pseudotime to near zero (1.89 vs R's 29.89 on
+    # pancreas). We therefore keep the full dense distance — O(N^2)
+    # memory but exact. Above N=15k we warn.
     from scipy.sparse.csgraph import minimum_spanning_tree as _mst
     from scipy.sparse import csr_matrix as _csr
-    from sklearn.neighbors import NearestNeighbors
 
     N_cells = P.shape[1]
-    k_nn = min(30, N_cells - 1)
-    nn = NearestNeighbors(n_neighbors=k_nn + 1, algorithm='auto')
-    nn.fit(P.T)
-    knn_dists, knn_ids = nn.kneighbors(P.T)      # (N, k+1) incl. self
+    if N_cells > 15000:
+        import warnings as _w
+        _w.warn(
+            f"project2MST on {N_cells} cells builds an O(N^2) distance "
+            f"matrix (~{(N_cells * N_cells * 8) / 1e9:.1f} GB). "
+            "Consider subsampling for very large atlases.",
+            ResourceWarning,
+        )
 
-    # Drop the self-edge (first column)
-    rows = np.repeat(np.arange(N_cells), k_nn)
-    cols = knn_ids[:, 1:].ravel()
-    data = knn_dists[:, 1:].ravel()
+    dp = squareform(pdist(P.T))                    # full N×N
+    nonzero = dp[dp > 0]
+    min_dist = nonzero.min() if nonzero.size else 1e-10
+    dp = dp + min_dist                             # avoid zero edges
+    np.fill_diagonal(dp, 0)
 
-    # Small floor to avoid zero-weight edges (R Monocle 2 does this too)
-    pos = data[data > 0]
-    min_dist = pos.min() if pos.size else 1e-10
-    data = data + min_dist
-
-    # Symmetrise: keep the smaller distance for each (i,j) pair
-    sparse_dist = _csr((data, (rows, cols)), shape=(N_cells, N_cells))
-    sparse_dist = sparse_dist.minimum(sparse_dist.T)   # symmetric min
-    mst_sp = _mst(sparse_dist).tocoo()
+    mst_sp = _mst(_csr(dp)).tocoo()
 
     cell_mst = ig.Graph(n=N_cells, directed=False)
     cell_mst.vs['name'] = list(adata.obs_names)
     cell_mst.add_edges(list(zip(mst_sp.row.tolist(), mst_sp.col.tolist())))
     cell_mst.es['weight'] = mst_sp.data.tolist()
 
-    # Store the MST edge-weight matrix as sparse (symmetric). Pseudotime
-    # accumulation in _extract_ddrtree_ordering only walks MST edges, so
-    # we only need distances on those edges — no need to keep the full
-    # N×N pairwise matrix.
-    mst_sym = mst_sp + mst_sp.T
+    # Store the full projected distance matrix — _extract_ddrtree_ordering
+    # walks MST edges and looks up distances here.
     monocle['pr_graph_cell_proj_tree'] = cell_mst
     monocle['pr_graph_cell_proj_dist'] = P
-    monocle['projected_dp'] = mst_sym  # scipy sparse, N×N
+    monocle['projected_dp'] = dp                    # dense N×N, matches R
 
     return adata
 
