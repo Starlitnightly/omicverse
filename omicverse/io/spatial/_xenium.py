@@ -52,6 +52,61 @@ def _read_cells_table(path: Path) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
+def _boundaries_to_wkt(
+    root: Path,
+    cell_index: pd.Index,
+) -> Optional[pd.Series]:
+    """Turn ``cell_boundaries.parquet`` / ``.csv.gz`` into per-cell WKT polygons.
+
+    Xenium ships cell boundaries as a long table — one row per polygon vertex,
+    with columns ``cell_id``, ``vertex_x``, ``vertex_y`` (all in microns). We
+    group by ``cell_id``, close the ring if needed, and emit a WKT ``POLYGON``
+    string. The resulting :class:`pandas.Series` indexed by cell id is what
+    :func:`omicverse.pl.spatialseg` consumes via ``adata.obs['geometry']``.
+    """
+    path = _resolve(root, "cell_boundaries.parquet", "cell_boundaries.csv.gz", "cell_boundaries.csv")
+    if path is None:
+        return None
+
+    try:
+        if path.suffix == ".parquet":
+            bnd = pd.read_parquet(path)
+        else:
+            bnd = pd.read_csv(path)
+    except Exception as exc:  # pragma: no cover
+        warnings.warn(f"Failed to read cell boundaries ({path.name}): {exc}")
+        return None
+
+    id_col = next((c for c in ("cell_id", "cellID", "CellID", "cell_ID") if c in bnd.columns), None)
+    if id_col is None or "vertex_x" not in bnd.columns or "vertex_y" not in bnd.columns:
+        warnings.warn(
+            f"Unexpected columns in {path.name}: {list(bnd.columns)}; expected "
+            "`cell_id`, `vertex_x`, `vertex_y`."
+        )
+        return None
+
+    bnd[id_col] = bnd[id_col].astype(str)
+    # Build WKT POLYGON strings per cell. Use the builtin split-by-group over
+    # sorted-by-cell data to avoid a Python loop over every vertex.
+    grouped = bnd.groupby(id_col, sort=False)[["vertex_x", "vertex_y"]]
+
+    def _to_wkt(block: pd.DataFrame) -> str:
+        xs = block["vertex_x"].to_numpy()
+        ys = block["vertex_y"].to_numpy()
+        if len(xs) < 3:
+            return ""
+        if xs[0] != xs[-1] or ys[0] != ys[-1]:
+            xs = np.append(xs, xs[0])
+            ys = np.append(ys, ys[0])
+        parts = ", ".join(f"{x:.4f} {y:.4f}" for x, y in zip(xs, ys))
+        return f"POLYGON (({parts}))"
+
+    wkts = grouped.apply(_to_wkt)
+    wkts.index = wkts.index.astype(str)
+    series = wkts.reindex(cell_index.astype(str)).fillna("")
+    return series
+
+
 def _load_experiment_metadata(root: Path) -> dict:
     path = _resolve(root, "experiment.xenium")
     if path is None:
@@ -128,6 +183,7 @@ def read_xenium(
     library_id: Optional[str] = None,
     load_image: bool = True,
     image_key: str = "morphology_focus",
+    load_boundaries: bool = True,
 ) -> AnnData:
     """Read a 10x Xenium ``outs`` directory into an AnnData object.
 
@@ -160,6 +216,10 @@ def read_xenium(
         Which morphology image to prefer when both ``morphology_focus`` and
         ``morphology_mip`` are shipped. One of ``'morphology_focus'``,
         ``'morphology_mip'``, ``'morphology'``.
+    load_boundaries
+        When ``True`` and ``cell_boundaries.parquet`` / ``.csv.gz`` is present,
+        converts per-cell polygon vertices to WKT strings stored in
+        ``obs['geometry']`` — required by :func:`omicverse.pl.spatialseg`.
 
     Returns
     -------
@@ -274,8 +334,25 @@ def read_xenium(
         else:
             _progress("No morphology image loaded (set load_image=False to silence).", level="warn")
 
+    has_geometry = False
+    if load_boundaries:
+        wkts = _boundaries_to_wkt(root, cell_index=pd.Index(adata.obs_names.astype(str)))
+        if wkts is not None:
+            adata.obs["geometry"] = wkts.values
+            has_geometry = bool((wkts != "").any())
+            if has_geometry:
+                _progress(
+                    f"Loaded cell polygons (geometry WKT) for "
+                    f"{int((wkts != '').sum())}/{len(wkts)} cells"
+                )
+            else:
+                _progress("cell_boundaries present but no valid polygons extracted.", level="warn")
+
     adata.uns["spatial"] = {library_id: uns_spatial}
-    adata.uns["omicverse_io"] = {"type": "xenium", "library_id": library_id}
+    adata.uns["omicverse_io"] = {
+        "type": "xenium_seg" if has_geometry else "xenium",
+        "library_id": library_id,
+    }
 
     _progress(
         f"Done (n_obs={adata.n_obs}, n_vars={adata.n_vars}, library_id={library_id})",
