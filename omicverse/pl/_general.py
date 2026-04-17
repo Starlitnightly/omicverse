@@ -68,29 +68,7 @@ def create_transparent_gradient_colormap(color1, color2,N=100):
     cmap = LinearSegmentedColormap.from_list('custom_transparent_gradient', colors, N=N)
     return cmap
 
-def create_custom_colormap(cell_color):
-    r"""
-    Create a custom colormap based on cell type color.
-    
-    Args:
-        cell_color: str
-            Base color for the cell type
-    
-    Returns:
-        cmap: matplotlib.colors.LinearSegmentedColormap
-            Custom colormap
-    """
-    from matplotlib.colors import LinearSegmentedColormap
-    import matplotlib.colors as mcolors
-    
-    # Convert color to RGB if it's a hex string
-    if isinstance(cell_color, str):
-        base_rgb = mcolors.to_rgb(cell_color)
-    else:
-        base_rgb = cell_color[:3] if len(cell_color) >= 3 else cell_color
-    
-    # Create gradient from light to dark
-    colors = [(1.0, 1.0, 1.0, 1), base_rgb + (1.0,)]  # White transparent to full color
-    n_bins = 100
-    cmap = LinearSegmentedColormap.from_list('custom', colors, N=n_bins)
-    return cmap
+# NOTE: An older `create_custom_colormap` helper used to live here that produced a
+# white-to-colour ramp at full opacity. It has been superseded by the
+# transparent-to-opaque implementation in :mod:`omicverse.pl._spatialseg`, which is
+# the one exported as `ov.pl.create_custom_colormap`.
