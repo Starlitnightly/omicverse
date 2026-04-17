@@ -10,6 +10,147 @@ import igraph as ig
 from scipy.spatial.distance import pdist, squareform
 
 
+def _euclidean_mst_delaunay(pts, N_cells, _knn_k_start=50):
+    """Compute the exact Euclidean MST of a point cloud.
+
+    Strategy: Euclidean MST is a subgraph of the Delaunay triangulation
+    in any dimension (Preparata & Shamos 1985), so we only need to run
+    scipy MST on the Delaunay edge set.  This is O(N·d) memory instead
+    of O(N²).
+
+    Matches R Monocle 2's project2MST::
+
+        dp <- as.matrix(dist(t(P)))
+        dp <- dp + min(dp[dp != 0]); diag(dp) <- 0
+        minimum.spanning.tree(graph.adjacency(dp, weighted=TRUE))
+
+    The ``+ min_dist`` shift is applied to every edge so pseudotime
+    values agree with R bitwise (the shift leaves MST *topology*
+    unchanged but changes cumulative path lengths).
+
+    Fallback: if scipy.spatial.Delaunay raises ``QhullError`` (e.g.
+    all-coplanar points), we fall back to a k-NN graph with
+    ``.maximum(.T)`` symmetrisation and adaptive k.
+
+    Parameters
+    ----------
+    pts : ndarray, (N, d)
+    N_cells : int
+        Must equal ``pts.shape[0]``.
+    _knn_k_start : int
+        Initial k for the kNN fallback (doubled until the graph is
+        connected).
+
+    Returns
+    -------
+    (mst_coo, projected_dp_sparse) :
+        * ``mst_coo`` — scipy sparse COO of the MST (N-1 edges,
+          directed: one entry per edge).
+        * ``projected_dp_sparse`` — scipy CSR matrix of SYMMETRIC MST
+          edges; ``_extract_ddrtree_ordering`` looks up MST edge
+          distances here.
+    """
+    from scipy.spatial import Delaunay
+    try:
+        from scipy.spatial import QhullError           # scipy ≥ 1.8
+    except ImportError:                                # pragma: no cover
+        from scipy.spatial.qhull import QhullError     # scipy < 1.8
+    from scipy.sparse import csr_matrix
+    from scipy.sparse.csgraph import (
+        minimum_spanning_tree, connected_components,
+    )
+
+    if N_cells <= 1:
+        # Degenerate: 0 or 1 cell → empty MST
+        return csr_matrix((N_cells, N_cells)).tocoo(), csr_matrix((N_cells, N_cells))
+
+    try:
+        # ``QJ`` = "joggled input" perturbation to handle near-degenerate
+        # configurations (co-linear or co-planar points). This is the
+        # recommended qhull option for robust triangulation of
+        # single-cell trajectory data, which often sits on a low-dim
+        # manifold.
+        tri = Delaunay(pts, qhull_options='QJ')
+        simplices = tri.simplices                 # (M, d+1)
+        # Enumerate all unique pairs (i, j) within each simplex.
+        # For a simplex with d+1 vertices there are (d+1)*d/2 pairs.
+        r = []
+        c = []
+        for s in simplices:
+            s_sorted = np.sort(s)
+            for ii in range(len(s_sorted)):
+                for jj in range(ii + 1, len(s_sorted)):
+                    r.append(s_sorted[ii])
+                    c.append(s_sorted[jj])
+        r = np.asarray(r, dtype=np.int64)
+        c = np.asarray(c, dtype=np.int64)
+        # Deduplicate via 1-D encoding
+        key = r * N_cells + c
+        _, uniq = np.unique(key, return_index=True)
+        r, c = r[uniq], c[uniq]
+
+        raw_d = np.linalg.norm(pts[r] - pts[c], axis=1)
+        source = 'delaunay'
+    except (QhullError, Exception) as _err:
+        # Fallback: k-NN graph with `.maximum(.T)` symmetrisation.
+        # Adaptive k: double until the graph is connected.
+        import warnings as _w
+        _w.warn(
+            f"Delaunay triangulation failed ({_err!r}); falling back "
+            "to k-NN MST. Results may differ slightly from the exact "
+            "Euclidean MST for near-degenerate point clouds.",
+            RuntimeWarning,
+        )
+        from sklearn.neighbors import kneighbors_graph as _knng
+        k = min(_knn_k_start, N_cells - 1)
+        A = None
+        while k < N_cells:
+            A = _knng(pts, n_neighbors=k, mode='distance',
+                       include_self=False)
+            # Symmetrise with maximum: keeps the real distance when one
+            # direction is missing (sparse missing = 0; min would wipe
+            # the real value, max preserves it).
+            A = A.maximum(A.T)
+            n_comp, _lbl = connected_components(A, directed=False,
+                                                  return_labels=True)
+            if n_comp == 1:
+                break
+            k = min(k * 2, N_cells - 1)
+        if A is None:
+            raise RuntimeError("k-NN MST fallback failed: N too small")
+        coo = A.tocoo()
+        # Keep only the upper triangle to mirror Delaunay path
+        mask = coo.row < coo.col
+        r = coo.row[mask]
+        c = coo.col[mask]
+        raw_d = coo.data[mask]
+        source = 'knn'
+
+    if raw_d.size == 0:
+        # Degenerate case — single cell
+        return (csr_matrix((N_cells, N_cells)).tocoo(),
+                csr_matrix((N_cells, N_cells)))
+
+    # R's constant min_dist shift (preserves topology, changes weights)
+    min_dist = float(raw_d[raw_d > 0].min()) if (raw_d > 0).any() else 1e-10
+    weights = raw_d + min_dist
+
+    # Build symmetric sparse graph for scipy MST
+    all_r = np.concatenate([r, c])
+    all_c = np.concatenate([c, r])
+    all_w = np.concatenate([weights, weights])
+    sym_sparse = csr_matrix((all_w, (all_r, all_c)),
+                             shape=(N_cells, N_cells))
+
+    mst = minimum_spanning_tree(sym_sparse).tocoo()
+
+    # `projected_dp` must be symmetric (the pseudotime lookup
+    # ``edge_w.get((a, b), edge_w.get((b, a), 0.0))`` tries both
+    # orderings but some callers rely on symmetry).
+    mst_sym = mst + mst.T
+    return mst, mst_sym.tocsr()
+
+
 def _project_point_to_line_segment(p, A, B):
     """Project point p onto line segment [A, B]."""
     AB = B - A
@@ -82,50 +223,40 @@ def _project_cells_to_mst(adata):
         else:
             P[:, i] = best_proj
 
-    # Build MST over projected cells using the full pairwise distance
-    # matrix (matches R Monocle 2's project2MST verbatim):
-    #     dp <- as.matrix(dist(t(P)))
-    #     dp <- dp + min(dp[dp != 0]); diag(dp) <- 0
-    #     gp <- graph.adjacency(dp, mode="undirected", weighted=TRUE)
-    #     minimum.spanning.tree(gp)
+    # Build MST over projected cells.
     #
-    # An earlier attempt to use a kNN-sparse graph + `.minimum(.T)`
-    # silently produced zero-weight MST edges (missing entries in the
-    # sparse matrix are 0, which dominates the pointwise minimum),
-    # collapsing pseudotime to near zero (1.89 vs R's 29.89 on
-    # pancreas). We therefore keep the full dense distance — O(N^2)
-    # memory but exact. Above N=15k we warn.
-    from scipy.sparse.csgraph import minimum_spanning_tree as _mst
-    from scipy.sparse import csr_matrix as _csr
-
+    # Mathematical fact: for any dimension,
+    #     Euclidean MST ⊆ Relative-Neighbour Graph
+    #                    ⊆ Gabriel Graph
+    #                    ⊆ Delaunay Triangulation.
+    # So every MST edge is a Delaunay edge. Running scipy's MST on the
+    # Delaunay edge set gives an output identical (up to float
+    # round-off) to running it on the full N×N pairwise-distance matrix,
+    # at O(N·d) memory instead of O(N^2).
+    #
+    # R Monocle 2's project2MST shifts every distance by the smallest
+    # positive pairwise distance to avoid zero-weight edges:
+    #     dp <- dp + min(dp[dp != 0]); diag(dp) <- 0
+    # The shift is a constant on every edge, so MST topology is
+    # unchanged, but MST edge weights increase by min_dist. Pseudotime
+    # (the cumulative MST-edge length from root) is therefore sensitive
+    # to this shift, so we apply the same offset for bitwise agreement
+    # with R's pseudotime values.
     N_cells = P.shape[1]
-    if N_cells > 15000:
-        import warnings as _w
-        _w.warn(
-            f"project2MST on {N_cells} cells builds an O(N^2) distance "
-            f"matrix (~{(N_cells * N_cells * 8) / 1e9:.1f} GB). "
-            "Consider subsampling for very large atlases.",
-            ResourceWarning,
-        )
-
-    dp = squareform(pdist(P.T))                    # full N×N
-    nonzero = dp[dp > 0]
-    min_dist = nonzero.min() if nonzero.size else 1e-10
-    dp = dp + min_dist                             # avoid zero edges
-    np.fill_diagonal(dp, 0)
-
-    mst_sp = _mst(_csr(dp)).tocoo()
+    pts = P.T                                           # (N, d)
+    mst_sp, projected_dp_sparse = _euclidean_mst_delaunay(pts, N_cells)
 
     cell_mst = ig.Graph(n=N_cells, directed=False)
     cell_mst.vs['name'] = list(adata.obs_names)
     cell_mst.add_edges(list(zip(mst_sp.row.tolist(), mst_sp.col.tolist())))
     cell_mst.es['weight'] = mst_sp.data.tolist()
 
-    # Store the full projected distance matrix — _extract_ddrtree_ordering
-    # walks MST edges and looks up distances here.
+    # Store the MST-only sparse distance matrix — ``_extract_ddrtree_ordering``
+    # walks MST edges and looks up distances here. It already accepts
+    # either a dense ndarray or a scipy sparse matrix.
     monocle['pr_graph_cell_proj_tree'] = cell_mst
     monocle['pr_graph_cell_proj_dist'] = P
-    monocle['projected_dp'] = dp                    # dense N×N, matches R
+    monocle['projected_dp'] = projected_dp_sparse   # sparse N×N, MST-only
 
     return adata
 

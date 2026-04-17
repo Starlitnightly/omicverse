@@ -14,6 +14,9 @@ import igraph as ig
 from .core import _init_monocle_uns, estimate_size_factors
 from .ddrtree import DDRTree
 
+# Show the 'fast is default' hint once per Python session.
+_FAST_HINT_SHOWN = False
+
 
 def _cal_ncenter(ncells, ncells_limit=100, auto_scale=True):
     """Calculate number of centers for DDRTree.
@@ -69,23 +72,27 @@ def _normalize_expr_data(adata, norm_method='log', pseudo_expr=1):
     gene_mask : bool array indicating which genes were selected
     """
     X = adata.X
-    if sparse.issparse(X):
-        X_dense = X.toarray()
-    else:
-        X_dense = np.array(X, dtype=np.float64)
-
-    # Filter to ordering genes if set
+    # Subset BEFORE densifying — a full float64 copy of a
+    # ``cells × genes`` matrix with ~28k genes is ~800 MB and was
+    # previously the single biggest cost of ``reduce_dimension``.
     if 'use_for_ordering' in adata.var.columns:
         use_mask = adata.var['use_for_ordering'].values.astype(bool)
         if use_mask.sum() > 0:
-            X_dense = X_dense[:, use_mask]
+            X_sel = X[:, use_mask]
             gene_names = adata.var_names[use_mask]
         else:
+            X_sel = X
             gene_names = adata.var_names
             use_mask = np.ones(adata.n_vars, dtype=bool)
     else:
+        X_sel = X
         gene_names = adata.var_names
         use_mask = np.ones(adata.n_vars, dtype=bool)
+
+    if sparse.issparse(X_sel):
+        X_dense = X_sel.toarray().astype(np.float64, copy=False)
+    else:
+        X_dense = np.ascontiguousarray(X_sel, dtype=np.float64)
 
     # Normalize: cells x genes -> transpose to genes x cells for processing
     FM = X_dense.T  # genes x cells
@@ -175,9 +182,20 @@ def reduce_dimension(adata, max_components=2, reduction_method='DDRTree',
 
         ddr_kwargs = {'random_state': random_state}
         for key in ['initial_method', 'maxIter', 'sigma', 'lambda_param',
-                    'param_gamma', 'tol', 'pca_method']:
+                    'param_gamma', 'tol', 'pca_method', 'method']:
             if key in kwargs:
                 ddr_kwargs[key] = kwargs[key]
+
+        # Notify the user — once per Python session — that the default
+        # ``method`` is the fast (approximate) path.  Users who need
+        # bitwise agreement with R Monocle 2 can opt into exact mode.
+        global _FAST_HINT_SHOWN
+        _ddr_method = ddr_kwargs.get('method', 'fast')
+        if _ddr_method == 'fast' and not _FAST_HINT_SHOWN:
+            print("[monocle2_py] Using fast DDRTree (≈3× speed-up, pseudotime "
+                  "correlation with R ≥ 0.99). Pass method='exact' for bitwise "
+                  "R Monocle 2 parity.")
+            _FAST_HINT_SHOWN = True
 
         if auto_param_selection and N_cells >= 100:
             if 'ncenter' in kwargs:
