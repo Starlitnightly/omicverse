@@ -202,6 +202,7 @@ class Monocle:
     def reduce_dimension(self, max_components: int = 2,
                           reduction_method: str = 'DDRTree',
                           norm_method: str = 'log',
+                          method: str = 'fast',
                           verbose: bool = False, **kwargs):
         """
         Reduce dimensionality and learn the principal graph.
@@ -211,7 +212,22 @@ class Monocle:
         max_components : int
             Number of dimensions to reduce to (2 is standard for visualization).
         reduction_method : {'DDRTree', 'tSNE', 'ICA'}
+            Algorithm family to use for the reduction.
         norm_method : {'log', 'none'}
+            Gene-expression normalisation applied before the reduction.
+        method : {'fast', 'exact'}, default 'fast'
+            DDRTree convergence mode (ignored for tSNE/ICA).
+
+            * ``'fast'`` (default) — Reformulated update + sparse
+              soft-assignment + cheap stopping criterion
+              (``||ΔY||_F / ||Y||_F``).  About 3× faster per call;
+              trajectory topology and pseudotime correlation with the
+              exact mode are preserved (typically 0.99+), but absolute
+              pseudotime values may shift slightly.
+            * ``'exact'`` — Matches R Monocle 2 bitwise: evaluates the
+              full objective (including the expensive ``||X − WZ||_2^2``
+              term) on every iteration and terminates when it stops
+              decreasing.  Pass this when you need bitwise R parity.
         **kwargs : additional DDRTree parameters
             ``ncenter``, ``lambda_param``, ``param_gamma``, ``sigma``,
             ``maxIter``, ``tol``.
@@ -219,7 +235,8 @@ class Monocle:
         self.adata = self._m2.reduce_dimension(
             self.adata, max_components=max_components,
             reduction_method=reduction_method,
-            norm_method=norm_method, verbose=verbose, **kwargs,
+            norm_method=norm_method, verbose=verbose,
+            method=method, **kwargs,
         )
         self._reduced = True
         return self
