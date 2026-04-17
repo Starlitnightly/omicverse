@@ -92,6 +92,10 @@ from ._deg_ct import DCT,DEG
 from ._lazy_function import lazy
 from ._lazy_report import generate_scRNA_report
 from ._lazy_checkpoint import lazy_checkpoint, resume_from_checkpoint, list_checkpoints, cleanup_checkpoints
+
+# Monocle2-style trajectory analysis (pure Python re-implementation).
+# Usage: mono = ov.single.Monocle(adata); mono.preprocess(); ...
+from ._monocle import Monocle
 from ._lazy_step_by_step import (
     lazy_step_qc, lazy_step_preprocess, lazy_step_scale, lazy_step_pca,
     lazy_step_cell_cycle, lazy_step_harmony, lazy_step_scvi, 
