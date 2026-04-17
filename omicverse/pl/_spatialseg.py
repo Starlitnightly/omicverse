@@ -16,6 +16,51 @@ from matplotlib import patheffects
 from matplotlib import colors as mcolors
 
 
+def create_custom_colormap(cell_color, *, name: str = "custom_transparent", N: int = 100):
+    """Build a transparent-to-opaque LinearSegmentedColormap of a single colour.
+
+    The colormap maps value 0 to the given colour at alpha 0 (fully transparent)
+    and value 1 to alpha 1 (fully opaque), keeping the RGB channels constant.
+    Useful for overlaying one cell-type / marker density over a morphology
+    image without masking it — low values disappear into the background, high
+    values pop in the base colour.
+
+    Parameters
+    ----------
+    cell_color : str or tuple
+        Base colour — any matplotlib-recognised spec (hex, name, RGB tuple).
+    name : str, default ``'custom_transparent'``
+        Registered colormap name.
+    N : int, default 100
+        Number of quantisation levels in the returned colormap.
+
+    Returns
+    -------
+    matplotlib.colors.LinearSegmentedColormap
+        A colormap whose alpha channel grows linearly from 0 to 1.
+    """
+    from matplotlib.colors import LinearSegmentedColormap, to_rgb
+
+    base_rgb = to_rgb(cell_color)
+    colors = [base_rgb + (0.0,), base_rgb + (1.0,)]
+    return LinearSegmentedColormap.from_list(name, colors, N=N)
+
+
+def _cmap_has_variable_alpha(cmap, eps: float = 1e-6) -> bool:
+    """True when a colormap's alpha channel varies across its domain.
+
+    Used to detect transparent-to-opaque "density" colormaps (e.g. those built
+    via :func:`create_custom_colormap`) so the numeric plotting path can honour
+    the cmap's per-value alpha instead of clobbering it with a uniform
+    ``alpha=`` kwarg.
+    """
+    try:
+        samples = cmap(np.linspace(0.0, 1.0, 5))
+        return bool(np.ptp(samples[:, 3]) > eps)
+    except Exception:
+        return False
+
+
 def _require_geopandas():
     try:
         import geopandas as gpd
@@ -632,13 +677,36 @@ def spatialseg(
                     if legend_fontsize is not None:
                         cb.ax.tick_params(labelsize=legend_fontsize)
             else:
-                plot_kwargs["column"] = plot_column
-                plot_kwargs["cmap"] = cmap
-                plot_kwargs["legend"] = False
-                if vmin is not None:
-                    plot_kwargs["vmin"] = vmin
-                if vmax is not None:
-                    plot_kwargs["vmax"] = vmax
+                # If the cmap itself encodes a varying alpha channel (e.g. a
+                # transparent-to-opaque colormap, matching scverse "spatial density"
+                # style overlays), passing `cmap=` with a uniform `alpha=` kwarg
+                # clobbers the per-value alpha. Detect that case and build the
+                # facecolor RGBA array ourselves so the colormap alpha wins.
+                cmap_obj = plt.get_cmap(cmap)
+                if _cmap_has_variable_alpha(cmap_obj):
+                    values = pd.to_numeric(temp_gdf[plot_column], errors="coerce").to_numpy()
+                    vmin_val = float(vmin) if vmin is not None else float(np.nanmin(values))
+                    vmax_val = float(vmax) if vmax is not None else float(np.nanmax(values))
+                    if not np.isfinite(vmin_val) or not np.isfinite(vmax_val) or vmax_val <= vmin_val:
+                        vmin_val, vmax_val = 0.0, 1.0
+                    norm_obj = mcolors.Normalize(vmin=vmin_val, vmax=vmax_val)
+                    face_rgba = np.asarray([
+                        cmap_obj(norm_obj(float(v))) if pd.notna(v) else mcolors.to_rgba(na_color)
+                        for v in values
+                    ])
+                    plot_kwargs["color"] = face_rgba
+                    plot_kwargs.pop("alpha", None)
+                    plot_kwargs["legend"] = False
+                    _norm_for_colorbar = norm_obj
+                else:
+                    plot_kwargs["column"] = plot_column
+                    plot_kwargs["cmap"] = cmap
+                    plot_kwargs["legend"] = False
+                    if vmin is not None:
+                        plot_kwargs["vmin"] = vmin
+                    if vmax is not None:
+                        plot_kwargs["vmax"] = vmax
+                    _norm_for_colorbar = None
                 if use_equal_aspect:
                     plot_kwargs["aspect"] = "equal"
                 try:
@@ -649,6 +717,14 @@ def spatialseg(
                         temp_gdf.plot(**plot_kwargs)
                     else:
                         raise
+                # When we manually built facecolors, matplotlib's last collection
+                # has no array — set one so the colorbar code path below works.
+                if _norm_for_colorbar is not None and len(current_ax.collections) > 0:
+                    sm = plt.cm.ScalarMappable(norm=_norm_for_colorbar, cmap=cmap_obj)
+                    sm.set_array(values)
+                    current_ax.collections[-1].set_cmap(cmap_obj)
+                    current_ax.collections[-1].set_norm(_norm_for_colorbar)
+                    current_ax.collections[-1].set_array(values)
                 if legend and colorbar_loc is not None and len(current_ax.collections) > 0:
                     try:
                         cb = plt.colorbar(
