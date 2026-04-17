@@ -91,7 +91,9 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         for k in adata_mem.obs.columns:
             if k not in adata.obs.columns:
                 adata.obs[k] = adata_mem.obs[k].values
-        adata.uns.update(adata_mem.uns)
+        for k in adata_mem.uns:
+            if k not in adata.uns:
+                adata.uns[k] = adata_mem.uns[k]
         del adata_mem
         return adata
 

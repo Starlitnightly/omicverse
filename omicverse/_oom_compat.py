@@ -31,12 +31,18 @@ try:
 except ImportError:
     HAS_OOM = False
 
-    # No-op placeholders so imports don't crash
-    AnnDataOOM = None
-    BackedArray = None
-    BackedLayers = None
-    TransformedBackedArray = None
-    ScaledBackedArray = None
+    # Stub classes — never instantiated, but usable as the second argument to
+    # ``isinstance(x, AnnDataOOM)`` without raising TypeError. Since anndataoom
+    # is missing, no real OOM object can exist, so isinstance will always be
+    # False, which is the desired behaviour.
+    class _UnavailableOOMType:
+        """Placeholder class used when anndataoom is not installed."""
+
+    class AnnDataOOM(_UnavailableOOMType): pass
+    class BackedArray(_UnavailableOOMType): pass
+    class BackedLayers(_UnavailableOOMType): pass
+    class TransformedBackedArray(_UnavailableOOMType): pass
+    class ScaledBackedArray(_UnavailableOOMType): pass
 
     def is_oom(adata) -> bool:
         """Fallback when anndataoom is not installed — always False."""

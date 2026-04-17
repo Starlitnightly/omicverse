@@ -855,7 +855,7 @@ def pca(  # noqa: PLR0912, PLR0913, PLR0915
         )
         # Store results back into adata (not adata_comp, which may be a view)
         adata.obsm["X_pca"] = X_pca
-        _key = f"{_layer}|original|X_pca" if _layer else "X_pca"
+        _key = f"{_layer}|original|X_pca"
         adata.obsm[_key] = X_pca
         # Compute variance from variance_ratio (approximate: total_var ≈ n_vars for scaled data)
         total_var = float(adata.n_vars)  # for z-scored data, total variance ≈ n_vars

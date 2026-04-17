@@ -50,7 +50,8 @@ def test_oom_compat_fallback_when_anndataoom_missing(monkeypatch):
     compat = importlib.import_module("omicverse._oom_compat")
 
     assert compat.HAS_OOM is False
-    assert compat.AnnDataOOM is None
+    # Stub is a real class so isinstance never raises; no real OOM object exists.
+    assert isinstance(compat.AnnDataOOM, type)
     assert compat.is_oom(object()) is False
 
     @compat.oom_guard(materialize=True)
@@ -190,5 +191,107 @@ def test_pca_varm_shape_matches_adata_n_vars(tiny_h5ad):
 
         assert adata.obsm["X_pca"].shape == (adata.n_obs, 10)
         assert adata.varm["PCs"].shape == (adata.n_vars, 10)
+    finally:
+        adata.close()
+
+
+def test_oom_compat_isinstance_is_safe():
+    """AnnDataOOM in the fallback shim must be a real class so that
+    `isinstance(obj, AnnDataOOM)` never raises TypeError."""
+    import sys
+    import importlib
+
+    for name in list(sys.modules):
+        if name == "anndataoom" or name.startswith("anndataoom."):
+            sys.modules.pop(name, None)
+    sys.modules["anndataoom"] = None
+
+    try:
+        if "omicverse._oom_compat" in sys.modules:
+            del sys.modules["omicverse._oom_compat"]
+        compat = importlib.import_module("omicverse._oom_compat")
+
+        assert compat.HAS_OOM is False
+        # Must not raise — this is the regression the stub class prevents.
+        assert isinstance("not an adata", compat.AnnDataOOM) is False
+        assert isinstance(object(), compat.BackedArray) is False
+    finally:
+        sys.modules.pop("anndataoom", None)
+        sys.modules.pop("omicverse._oom_compat", None)
+        importlib.import_module("omicverse._oom_compat")
+
+
+def test_qc_sccomposite_oom_copies_results_back(tiny_h5ad, monkeypatch):
+    """Regression: sccomposite on an OOM adata must copy obs labels back onto
+    the original OOM object and must not leak adata_mem."""
+    import omicverse as ov
+
+    # Replace composite_rna with a deterministic fake: flag half the cells.
+    def fake_composite_rna(a):
+        n = a.n_obs
+        labels = np.zeros(n, dtype=int)
+        labels[::2] = 1  # every other cell is a "doublet"
+        consistency = np.ones(n, dtype=float)
+        return labels, consistency
+
+    import omicverse.pp._sccomposite as sc_mod
+    monkeypatch.setattr(sc_mod, "composite_rna", fake_composite_rna)
+
+    adata = ov.read(tiny_h5ad, backend="rust")
+    try:
+        ov.pp.qc(
+            adata,
+            mode="seurat",
+            min_cells=0,
+            min_genes=0,
+            tresh={"mito_perc": 1.0, "nUMIs": 0, "detected_genes": 0},
+            mt_startswith="MT-",
+            doublets=True,
+            doublets_method="sccomposite",
+            filter_doublets=False,
+        )
+        assert "sccomposite_doublet" in adata.obs.columns
+        assert "sccomposite_consistency" in adata.obs.columns
+        assert (adata.obs["sccomposite_doublet"] != 0).sum() > 0
+        # OOM contract preserved
+        assert getattr(adata, "_is_oom", False) is True
+    finally:
+        adata.close()
+
+
+def test_batch_correction_oom_preserves_uns(tiny_h5ad):
+    """Regression: the OOM copy-back pattern must not clobber pre-existing
+    uns keys with the materialised adata_mem's uns."""
+    import omicverse as ov
+
+    adata = ov.read(tiny_h5ad, backend="rust")
+    try:
+        # Pre-existing OOM-side state that must survive the copy-back
+        adata.uns["preserve_me"] = {"oom_specific": True}
+
+        # Simulate what batch_correction does under OOM: materialise, add
+        # obsm/uns on the copy (potentially clobbering the same keys), then
+        # copy only new keys back onto the OOM object.
+        adata_mem = adata.to_adata()
+        adata_mem.obsm["X_corrected"] = np.zeros((adata.n_obs, 3), dtype=np.float32)
+        adata_mem.uns["new_key_from_bc"] = {"hello": "world"}
+        adata_mem.uns["preserve_me"] = {"clobbered": True}  # adversarial
+
+        # Copy-back logic from omicverse/single/_batch.py
+        for k in adata_mem.obsm:
+            if k not in adata.obsm:
+                adata.obsm[k] = adata_mem.obsm[k]
+        for k in adata_mem.obs.columns:
+            if k not in adata.obs.columns:
+                adata.obs[k] = adata_mem.obs[k].values
+        for k in adata_mem.uns:
+            if k not in adata.uns:
+                adata.uns[k] = adata_mem.uns[k]
+
+        # OOM-side state preserved
+        assert adata.uns["preserve_me"] == {"oom_specific": True}
+        # New state copied back
+        assert "X_corrected" in adata.obsm
+        assert "new_key_from_bc" in adata.uns
     finally:
         adata.close()

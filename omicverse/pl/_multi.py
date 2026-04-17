@@ -35,7 +35,8 @@ def embedding_multi(
     Returns:
         Plot axes or figure depending on underlying plotting function
     """
-    if isinstance(data, AnnData) or getattr(data, '_is_oom', False):
+    from .._oom_compat import is_oom as _is_oom
+    if isinstance(data, AnnData) or _is_oom(data):
         return embedding(
             data, basis=basis, color=color, use_raw=use_raw, layer=layer, **kwargs
         )

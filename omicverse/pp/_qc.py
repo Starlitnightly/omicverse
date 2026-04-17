@@ -1164,33 +1164,26 @@ def qc_cpu(
         _filter_cells_impl(adata, max_genes=int(max_genes_ratio*adata.shape[1]))
         _filter_genes_impl(adata, max_cells=int(max_cells_ratio*adata.shape[0]))
     else:
+        # Pure rust path (OOM is handled by the `if is_oom:` branch above).
         selected_cells = True
         if min_genes: selected_cells &= adata.obs["detected_genes"] >= min_genes
         if max_genes_ratio: selected_cells &= adata.obs["detected_genes"] <= max_genes_ratio*adata.shape[1]
         selected_cells = np.flatnonzero(selected_cells)
         adata.subset(obs_indices=selected_cells)
         selected_genes = True
-        # Count non-zero cells per gene. For OOM, stream in chunks rather than
-        # materialising X[:]; for raw rust, fall back to the one-shot read.
-        if _is_oom(adata):
-            from anndataoom import chunked_qc_metrics
-            if "n_cells" not in adata.var.columns:
-                chunked_qc_metrics(adata)
-            adata.var["n_cell"] = adata.var["n_cells"].values
-        else:
-            adata.var["n_cell"] = np.array((adata.X[:] != 0).sum(axis=0)).reshape(-1)
+        adata.var["n_cell"] = np.array((adata.X[:] != 0).sum(axis=0)).reshape(-1)
         if min_cells: selected_genes &= adata.var["n_cell"] >= min_cells
         if max_cells_ratio: selected_genes &= adata.var["n_cell"] <= max_cells_ratio*adata.shape[0]
         selected_genes = np.flatnonzero(selected_genes)
         adata.subset(var_indices=selected_genes)
-    
+
     cells_final_filtered = cells_before_final - adata.shape[0]
     genes_final_filtered = genes_before_final - adata.shape[1]
-    
+
     print(f"   {Colors.GREEN}✓ Final filtering: {Colors.BOLD}{cells_final_filtered:,}{Colors.ENDC}{Colors.GREEN} cells, {Colors.BOLD}{genes_final_filtered:,}{Colors.ENDC}{Colors.GREEN} genes removed{Colors.ENDC}")
-    
+
     n_after_final_filt = adata.shape[0]
-    
+
     if doublets is True:
         print(f"\n{Colors.HEADER}{Colors.BOLD}🔍 Step 4: Doublet Detection{Colors.ENDC}")
         if is_oom:
@@ -1236,30 +1229,49 @@ def qc_cpu(
                 print(f"   {Colors.CYAN}💡 Doublets retained in adata.obs['predicted_doublet'] for downstream analysis{Colors.ENDC}")
 
         elif doublets_method=='sccomposite':
-            if is_rust:
+            # Pick the object sccomposite runs on:
+            # - OOM: adata_mem (materialised above), then copy labels back
+            # - plain rust: materialise in place, keep the reassignment
+            # - regular AnnData: use adata directly
+            if is_oom:
+                sccomp_target = adata_mem
+            elif is_rust:
                 adata = adata.to_memory()
+                sccomp_target = adata
+            else:
+                sccomp_target = adata
             print(f"   {Colors.WARNING}⚠️  Note: the `sccomposite` will remove more cells than `scrublet`{Colors.ENDC}")
             print(f"   {Colors.GREEN}{EMOJI['start']} Running sccomposite doublet detection...{Colors.ENDC}")
-            adata.obs['sccomposite_doublet']=0
-            adata.obs['sccomposite_consistency']=0
+            sccomp_target.obs['sccomposite_doublet']=0
+            sccomp_target.obs['sccomposite_consistency']=0
             if batch_key is None:
                 from ._sccomposite import composite_rna
-                multiplet_classification, consistency = composite_rna(adata)
-                adata.obs['sccomposite_doublet']=multiplet_classification
-                adata.obs['sccomposite_consistency']=consistency
+                multiplet_classification, consistency = composite_rna(sccomp_target)
+                sccomp_target.obs['sccomposite_doublet']=multiplet_classification
+                sccomp_target.obs['sccomposite_consistency']=consistency
             else:
-                for batch in adata.obs[batch_key].unique():
+                for batch in sccomp_target.obs[batch_key].unique():
                     from ._sccomposite import composite_rna
-                    adata_batch=adata[adata.obs[batch_key]==batch]
+                    adata_batch=sccomp_target[sccomp_target.obs[batch_key]==batch]
                     multiplet_classification, consistency = composite_rna(adata_batch)
-                    adata.obs.loc[adata_batch.obs.index,'sccomposite_doublet']=\
+                    sccomp_target.obs.loc[adata_batch.obs.index,'sccomposite_doublet']=\
                     multiplet_classification
-                    adata.obs.loc[adata_batch.obs.index,'sccomposite_consistency']=consistency
+                    sccomp_target.obs.loc[adata_batch.obs.index,'sccomposite_consistency']=consistency
+
+            if is_oom:
+                adata.obs['sccomposite_doublet']=sccomp_target.obs['sccomposite_doublet'].values
+                adata.obs['sccomposite_consistency']=sccomp_target.obs['sccomposite_consistency'].values
+                del adata_mem
 
             if filter_doublets:
-                adata_remove = adata[adata.obs['sccomposite_doublet']!=0, :]
-                removed_cells.extend(list(adata_remove.obs_names))
-                adata = adata[adata.obs['sccomposite_doublet']==0, :]
+                if is_oom:
+                    mask = (adata.obs['sccomposite_doublet']==0).values
+                    removed_cells.extend(list(adata.obs_names[~mask]))
+                    adata._inplace_subset_obs(mask)
+                else:
+                    adata_remove = adata[adata.obs['sccomposite_doublet']!=0, :]
+                    removed_cells.extend(list(adata_remove.obs_names))
+                    adata = adata[adata.obs['sccomposite_doublet']==0, :]
                 n1 = adata.shape[0]
                 doublets_removed = n_after_final_filt-n1
                 print(f"   {Colors.GREEN}✓ sccomposite completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n_after_final_filt*100:.1f}%){Colors.ENDC}")
