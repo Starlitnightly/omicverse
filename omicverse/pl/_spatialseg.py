@@ -645,6 +645,11 @@ def spatialseg(
                 plot_kwargs["legend"] = False
                 if use_equal_aspect:
                     plot_kwargs["aspect"] = "equal"
+                # When the cmap encodes a varying alpha channel, a uniform
+                # ``alpha=`` kwarg collapses it on the matplotlib side — drop
+                # it so the per-edge alpha wins (same pattern as the fill path).
+                if _cmap_has_variable_alpha(cmap_obj):
+                    plot_kwargs.pop("alpha", None)
                 try:
                     temp_gdf.plot(**plot_kwargs)
                 except ValueError as e:
