@@ -1,3 +1,5 @@
+import os
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -8,6 +10,38 @@ except ImportError:
     from anndata import read_h5ad as _anndata_read_h5ad
 
 from ..._registry import register_function
+
+
+def _log_rust_read(path: str, size_mb: float | None, elapsed: float) -> None:
+    size_str = f"  ({size_mb:.1f} MB)" if size_mb is not None else ""
+    print(
+        "📂 Reading with anndata-rs (Rust · out-of-memory)\n"
+        f"   {path}{size_str}\n"
+        f"   ✓ Loaded in {elapsed:.2f}s\n\n"
+        "💡 Data stays on disk. Use ov.pp.* for chunked processing.\n"
+        "   adata.close() when done · adata.to_adata() to materialise"
+    )
+
+
+def _read_h5ad_rust(path, **kwargs):
+    try:
+        import anndataoom
+    except ImportError:
+        raise ImportError(
+            "Rust backend requires the 'anndataoom' package. "
+            "Install with:  pip install omicverse[rust]   (or  pip install anndataoom)"
+        ) from None
+
+    kwargs.setdefault("backed", "r")
+    try:
+        size_mb = os.path.getsize(path) / 1024**2
+    except OSError:
+        size_mb = None
+
+    t0 = time.perf_counter()
+    adata = anndataoom.read(str(path), **kwargs)
+    _log_rust_read(str(path), size_mb, time.perf_counter() - t0)
+    return adata
 
 
 @register_function(
@@ -60,15 +94,7 @@ def read(path, backend='python', **kwargs):
             return _anndata_read_h5ad(path, **kwargs)
 
         if backend == 'rust':
-            try:
-                import snapatac2 as snap
-            except ImportError:
-                raise ImportError('snapatac2 is not installed. `pip install snapatac2`')
-
-            print('Using anndata-rs to read h5ad file')
-            print('You should run adata.close() after analysis')
-            print('Not all function support Rust backend')
-            return snap.read(path, **kwargs)
+            return _read_h5ad_rust(path, **kwargs)
 
         raise ValueError("backend must be 'python' or 'rust'")
 

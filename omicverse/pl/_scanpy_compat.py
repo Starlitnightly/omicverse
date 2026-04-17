@@ -111,7 +111,8 @@ def _doc_params(**kwargs):
 
 
 def sanitize_anndata(adata: AnnData) -> None:
-    if not isinstance(adata, AnnData):
+    from .._oom_compat import is_oom as _is_oom
+    if not isinstance(adata, AnnData) and not _is_oom(adata):
         raise TypeError("Expected an AnnData object.")
 
 

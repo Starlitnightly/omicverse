@@ -71,6 +71,32 @@ def batch_correction(adata:anndata.AnnData,batch_key:str,
         written to ``adata.obsm``.
     """
 
+    from ..pp._qc import _is_oom
+    _oom = _is_oom(adata)
+
+    if _oom and methods not in ('harmony',):
+        print(
+            f"[AnnDataOOM] '{methods}' requires the full expression matrix in memory.\n"
+            f"  Converting to in-memory AnnData automatically.\n"
+            f"  Tip: 'harmony' works directly on PCA embeddings without materialisation —\n"
+            f"       consider ov.single.batch_correction(adata, methods='harmony') instead."
+        )
+        adata_mem = adata.to_adata()
+        batch_correction(adata_mem, batch_key, use_rep=use_rep,
+                         methods=methods, n_pcs=n_pcs, **kwargs)
+        # Copy results back onto the OOM adata so we preserve the OOM contract.
+        for k in adata_mem.obsm:
+            if k not in adata.obsm:
+                adata.obsm[k] = adata_mem.obsm[k]
+        for k in adata_mem.obs.columns:
+            if k not in adata.obs.columns:
+                adata.obs[k] = adata_mem.obs[k].values
+        for k in adata_mem.uns:
+            if k not in adata.uns:
+                adata.uns[k] = adata_mem.uns[k]
+        del adata_mem
+        return adata
+
     print(f'...Begin using {methods} to correct batch effect')
 
     if methods=='harmony':

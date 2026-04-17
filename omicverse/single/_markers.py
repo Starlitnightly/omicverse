@@ -13,6 +13,7 @@ from typing import Generator, Iterable, Optional, Sequence, Union
 import numpy as np
 import pandas as pd
 from anndata import AnnData
+from .._oom_compat import oom_guard as _oom_guard
 from scipy import sparse, stats
 
 from .._registry import register_function
@@ -592,6 +593,7 @@ def _cosg_add_pts(
     ],
     related=["single.get_markers", "pl.markers_dotplot", "single.cosg"],
 )
+@_oom_guard(materialize=True, result_keys_uns=['*'])
 def find_markers(
     adata: AnnData,
     groupby: str,

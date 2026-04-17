@@ -13,10 +13,10 @@ import time
 
 from scipy.sparse import issparse, csr_matrix
 
-from ._qc import _is_rust_backend
 from ..utils import load_signatures_from_file,predefined_signatures
 from .._registry import register_function
 from .._settings import settings,print_gpu_usage_color,EMOJI,Colors,add_reference
+from .._oom_compat import oom_guard as _oom_guard
 
 
 from ._normalization import normalize_total,log1p
@@ -91,17 +91,11 @@ def identify_robust_genes(data: anndata.AnnData, percent_cells: float = 0.05) ->
 
     prior_n = data.shape[1]
 
-    from ._qc import _is_rust_backend
-    is_rust = _is_rust_backend(data)
-
+    # OOM goes through chunked_identify_robust_genes in preprocess(); this
+    # function only runs for regular AnnData.
     if issparse(data.X):
         data.var["n_cells"] = data.X.getnnz(axis=0)
         data._inplace_subset_var(data.var["n_cells"] > 0)
-        data.var["percent_cells"] = (data.var["n_cells"] / data.shape[0]) * 100
-        data.var["robust"] = data.var["percent_cells"] >= percent_cells
-    elif is_rust:
-        data.var["n_cells"] =data.X[:].getnnz(axis=0)
-        data.subset(var_indices=np.where(data.var["n_cells"]>0)[0])
         data.var["percent_cells"] = (data.var["n_cells"] / data.shape[0]) * 100
         data.var["robust"] = data.var["percent_cells"] >= percent_cells
     else:
@@ -659,10 +653,42 @@ def preprocess(
     original_adata = adata
 
     # Log-normalization, HVGs identification
-    from ._qc import _is_rust_backend
-    is_rust = _is_rust_backend(adata)
-    if is_rust:
-        adata.layers['counts'] = adata.X[:]
+    from ._qc import _is_oom
+    is_oom = _is_oom(adata)
+
+    # Validate unsupported combinations BEFORE mutating adata (otherwise the
+    # caller gets back a half-processed object with partial lazy transforms).
+    method_list_preview = mode.split('|')
+    if is_oom and len(method_list_preview) > 1 and method_list_preview[1] == 'seurat':
+        raise NotImplementedError(
+            "Seurat v3 HVG selection (Loess-smoothed dispersion) is not "
+            "available for the OOM backend. Use 'shiftlog|pearson' instead, "
+            "or switch to mode='cpu' to materialise the data."
+        )
+    if is_oom and method_list_preview[0] == 'pearson':
+        # Pearson residual normalisation needs a materialised X. Rather than
+        # leave adata in a hybrid state (in-memory data wrapped in
+        # BackedArray, but _is_oom still True), refuse the combination and
+        # let the user opt into mode='cpu' explicitly.
+        raise NotImplementedError(
+            "Pearson residual normalisation is not available for the OOM "
+            "backend (it requires the full X in memory, which would leave "
+            "adata in a hybrid state). Use 'shiftlog|pearson' instead, or "
+            "switch to mode='cpu'."
+        )
+    if is_oom and no_cc:
+        # remove_cc_genes materialises cc_genes × n_obs and hvgs × n_obs
+        # slices via `.X.toarray()`, which doesn't stream on BackedArray.
+        # Refuse rather than silently defeat OOM.
+        raise NotImplementedError(
+            "no_cc=True is not available for the OOM backend "
+            "(remove_cc_genes requires a materialised X). Run preprocess "
+            "without no_cc, or switch to mode='cpu'."
+        )
+
+    if is_oom:
+        # OOM: save a lazy reference to raw counts (zero memory cost)
+        adata.layers['counts'] = adata.X
     else:
         adata.layers['counts'] = adata.X.copy()
     
@@ -670,15 +696,55 @@ def preprocess(
     print(f"{EMOJI['start']} [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Running preprocessing in '{settings.mode}' mode...")
     print(f"{Colors.CYAN}Begin robust gene identification{Colors.ENDC}")
     if identify_robust:
-        identify_robust_genes(adata, percent_cells=0.05)
-        if not is_rust:
-            adata = adata[:, adata.var['robust']]
+        if is_oom:
+            from anndataoom import chunked_identify_robust_genes
+            chunked_identify_robust_genes(adata, percent_cells=0.05)
         else:
-            adata.subset(var_indices=np.where(adata.var['robust']==True)[0])
+            identify_robust_genes(adata, percent_cells=0.05)
+        if is_oom:
+            adata._inplace_subset_var(adata.var['robust'].values)
+        else:
+            adata = adata[:, adata.var['robust']]
         print(f"{EMOJI['done']} Robust gene identification completed successfully.")
     method_list = mode.split('|')
     print(f"{Colors.CYAN}Begin size normalization: {method_list[0]} and HVGs selection {method_list[1]}{Colors.ENDC}")
-    if settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
+    if is_oom:
+        # Out-of-memory path — lazy transforms, no full materialisation
+        from anndataoom import (
+            chunked_normalize_total, chunked_log1p,
+        )
+        data_load_start = time.time()
+        # Only 'shiftlog' normalisation is supported for OOM; 'pearson' is
+        # pre-rejected at the top of this function.
+        chunked_normalize_total(
+            adata,
+            target_sum=target_sum,
+            exclude_highly_expressed=True,
+            max_fraction=0.2,
+        )
+        chunked_log1p(adata)
+
+        if method_list[1] == 'pearson':
+            from anndataoom import chunked_highly_variable_genes_pearson
+            chunked_highly_variable_genes_pearson(
+                adata,
+                n_top_genes=n_HVGs,
+                layer='counts',
+                batch_key=batch_key,
+            )
+            if no_cc:
+                remove_cc_genes(adata, organism=organism, corr_threshold=0.1)
+        else:
+            # 'seurat' is pre-rejected at the top; any other unknown HVG
+            # method should fail loudly here rather than silently skip HVG
+            # selection and leave the user with no 'highly_variable' column.
+            raise NotImplementedError(
+                f"HVG method {method_list[1]!r} is not supported for the OOM "
+                "backend. Use 'pearson', or switch to mode='cpu'."
+            )
+        data_load_end = time.time()
+        print(f"{Colors.BLUE}    Time to analyze data (out-of-memory): {data_load_end - data_load_start:.2f} seconds.{Colors.ENDC}")
+    elif settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
         data_load_start = time.time()
         if method_list[0] == 'shiftlog': # Size normalization + scanpy batch aware HVGs selection
             normalize_total(
@@ -688,7 +754,7 @@ def preprocess(
                 max_fraction=0.2,
             )
             log1p(adata)
-            
+
         elif method_list[0] == 'pearson':
             # Perason residuals workflow
             from .experimental import normalize_pearson_residuals
@@ -898,6 +964,9 @@ def scale(adata, max_value=10, layers_add='scaled', to_sparse=False, **kwargs):
         adata: Annotated data matrix with n_obs x n_vars shape.
         max_value: Maximum value after scaling. Default: 10.
         layers_add: Name of the layer to store the scaled data. Default: 'scaled'.
+            OOM backend only supports layers_add='scaled' (the underlying
+            chunked_scale writes a lazy ScaledBackedArray to that fixed key);
+            passing anything else raises ValueError.
         to_sparse: If True, convert the result to csr_matrix format. Default: False.
             Scaled data is 100% dense, so sparse storage only adds overhead.
         **kwargs: Additional arguments passed to scaling functions.
@@ -914,14 +983,24 @@ def scale(adata, max_value=10, layers_add='scaled', to_sparse=False, **kwargs):
         >>> # Scale data keeping dense format
         >>> ov.pp.scale(adata, max_value=10, to_sparse=False)
     """
-    is_rust = _is_rust_backend(adata)
-    if is_rust:
-        from ._scale import scale_array
-        x = adata.X[:]
-        scaled_data = scale_array(
-            x, zero_center=True, max_value=max_value, copy=True, mask_obs=None
-        )
-    elif settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
+    from ._qc import _is_oom
+    if _is_oom(adata):
+        # chunked_scale hard-codes the layer name to 'scaled' and installs a
+        # lazy ScaledBackedArray. Re-wrapping/materialising it defeats the
+        # point, so we short-circuit the rest of this function.
+        if layers_add != "scaled":
+            raise ValueError(
+                "OOM scale only stores to adata.layers['scaled']; "
+                f"layers_add={layers_add!r} is not supported."
+            )
+        from anndataoom import chunked_scale
+        chunked_scale(adata, max_value=max_value)
+        if "status" not in adata.uns.keys():
+            adata.uns["status"] = {}
+        add_reference(adata, "scanpy", "scaling with scanpy")
+        adata.uns["status"]["scaled"] = True
+        return
+    if settings.mode == 'cpu' or settings.mode == 'cpu-gpu-mixed':
         from ._scale import scale_anndata as scale
         adata_mock = scale(adata, copy=True, max_value=max_value, **kwargs)
         scaled_data = adata_mock.X.copy()
@@ -1576,6 +1655,11 @@ def leiden(
         "ov.pl.embedding(adata, basis='X_umap', color='phase')"
     ],
     related=["pp.preprocess", "pl.embedding", "utils.embedding"]
+)
+@_oom_guard(
+    materialize=True,
+    result_keys_obs=['S_score', 'G2M_score', 'phase'],
+    result_keys_uns=['*'],
 )
 def score_genes_cell_cycle(adata,species='human',s_genes=None, g2m_genes=None):
     """Score cell cycle phases using predefined or custom gene sets.
