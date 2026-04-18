@@ -184,7 +184,7 @@ def wrap_dataframe(df_obj):
 @register_function(
     aliases=["AnnData兼容转换", "convert_adata_for_rust", "fix_adata_compatibility", "修复兼容性", "rust_compatibility"],
     category="utils",
-    description="Convert old Python-backend h5ad AnnData to be compatible with Rust backend requirements using snapatac2.AnnData",
+    description="Rewrite an AnnData as an h5ad that ov.read(backend='rust') can open (sort CSR indices, strip NaN/Inf, preserve obsm/varm/uns/obsp/varp/layers)",
     examples=[
         "adata_rust = ov.utils.convert_adata_for_rust(adata, output_file='fixed_data.h5ad')",
         "adata = ov.read('fixed_data.h5ad', backend='rust')",
@@ -192,7 +192,10 @@ def wrap_dataframe(df_obj):
     related=["utils.read", "utils.convert_to_pandas", "pp.preprocess"]
 )
 def convert_adata_for_rust(adata, output_file=None, verbose=True, close_file=True):
-    """Convert an AnnData object into a Rust-backend compatible ``.h5ad`` file.
+    """Rewrite an AnnData object as an ``.h5ad`` file that ``ov.read(..., backend='rust')`` can open.
+
+    Sorts CSR/CSC minor indices, strips NaN/Inf, coerces problematic obs/var dtypes,
+    and preserves ``obsm``, ``varm``, ``uns``, ``obsp``, ``varp`` and ``layers``.
 
     Parameters
     ----------
@@ -203,34 +206,23 @@ def convert_adata_for_rust(adata, output_file=None, verbose=True, close_file=Tru
     verbose : bool, default=True
         Whether to print conversion progress and diagnostics.
     close_file : bool, default=True
-        Whether to close the created ``snapatac2.AnnData`` handle before returning.
+        Retained for backward compatibility; ignored (there is no persistent handle).
 
     Returns
     -------
     str
         Path to the converted Rust-compatible ``.h5ad`` file.
-
-    Raises
-    ------
-    ImportError
-        If ``snapatac2`` is not installed.
-    Exception
-        Re-raises backend conversion exceptions after cleanup.
     """
-    try:
-        import snapatac2 as snap
-    except ImportError:
-        raise ImportError("snapatac2 is required for Rust backend conversion. Install with: pip install snapatac2")
+    import anndata as ad
 
     if output_file is None:
         fd, output_file = tempfile.mkstemp(suffix='.h5ad')
         os.close(fd)
 
     if verbose:
-        print(f"{Colors.HEADER}{Colors.BOLD}🔧 Converting AnnData for Rust Backend using anndata-rs{Colors.ENDC}")
+        print(f"{Colors.HEADER}{Colors.BOLD}🔧 Converting AnnData for Rust Backend{Colors.ENDC}")
         print(f"   {Colors.CYAN}Original shape: {adata.shape}{Colors.ENDC}")
         print(f"   {Colors.CYAN}Output file: {output_file}{Colors.ENDC}")
-        print(f"   {Colors.BLUE}📝 Ensuring unique names...{Colors.ENDC}")
 
     adata_copy = adata.copy()
     adata_copy.var_names_make_unique()
@@ -333,64 +325,47 @@ def convert_adata_for_rust(adata, output_file=None, verbose=True, close_file=Tru
     obs_clean = _clean_dataframe(adata_copy.obs)
     var_clean = _clean_dataframe(adata_copy.var)
 
-    if verbose:
-        print(f"   {Colors.BLUE}🔧 Creating anndata-rs AnnData object...{Colors.ENDC}")
+    # Restore obs/var index from the original obs_names/var_names (the
+    # cleaning helper resets the index to preserve row order under column drops).
+    obs_index = pd.Index([str(n) for n in adata_copy.obs_names],
+                         name=adata_copy.obs.index.name or 'obs_names')
+    var_index = pd.Index([str(n) for n in adata_copy.var_names],
+                         name=adata_copy.var.index.name or 'var_names')
+    if obs_clean is None or obs_clean.empty:
+        obs_clean = pd.DataFrame(index=obs_index)
+    else:
+        obs_clean = obs_clean.copy()
+        obs_clean.index = obs_index
+    if var_clean is None or var_clean.empty:
+        var_clean = pd.DataFrame(index=var_index)
+    else:
+        var_clean = var_clean.copy()
+        var_clean.index = var_index
+
+    obsp_clean = {k: _clean_matrix(v) for k, v in (adata_copy.obsp or {}).items()
+                  if v is not None}
+    varp_clean = {k: _clean_matrix(v) for k, v in (adata_copy.varp or {}).items()
+                  if v is not None}
+    layers_clean = {k: _clean_matrix(v) for k, v in (adata_copy.layers or {}).items()
+                    if v is not None}
+    obsm_clean = dict(adata_copy.obsm) if getattr(adata_copy, 'obsm', None) else {}
+    varm_clean = dict(adata_copy.varm) if getattr(adata_copy, 'varm', None) else {}
+    uns_clean = _fix_uns_for_rust(dict(adata_copy.uns)) \
+                if getattr(adata_copy, 'uns', None) else {}
 
     try:
-        if verbose:
-            print(f"   {Colors.BLUE}📋 Data summary before anndata-rs creation:{Colors.ENDC}")
-            print(f"      X: {type(X_clean)} {X_clean.shape if X_clean is not None else 'None'}")
-            print(f"      obs: {type(obs_clean)} {obs_clean.shape if obs_clean is not None else 'None'}")
-            print(f"      var: {type(var_clean)} {var_clean.shape if var_clean is not None else 'None'}")
-
-        adata_snap = snap.AnnData(filename=output_file, X=X_clean)
-
-        if obs_clean is not None and not obs_clean.empty:
-            if verbose:
-                print(f"   {Colors.BLUE}📊 Adding obs data...{Colors.ENDC}")
-            for col in obs_clean.columns:
-                if obs_clean[col].dtype == 'object' or pd.api.types.is_categorical_dtype(obs_clean[col]):
-                    obs_clean[col] = obs_clean[col].astype(str)
-            adata_snap.close()
-            adata_snap = snap.AnnData(filename=output_file, X=X_clean, obs=obs_clean)
-
-        if var_clean is not None and not var_clean.empty:
-            if verbose:
-                print(f"   {Colors.BLUE}📊 Adding var data...{Colors.ENDC}")
-            for col in var_clean.columns:
-                if var_clean[col].dtype == 'object' or pd.api.types.is_categorical_dtype(var_clean[col]):
-                    var_clean[col] = var_clean[col].astype(str)
-            adata_snap.close()
-            adata_snap = snap.AnnData(filename=output_file, X=X_clean, obs=obs_clean, var=var_clean)
-
-        if verbose:
-            print(f"   {Colors.BLUE}📝 Setting obs_names and var_names...{Colors.ENDC}")
-        adata_snap.obs_names = [str(name) for name in adata_copy.obs_names]
-        adata_snap.var_names = [str(name) for name in adata_copy.var_names]
-
-        if hasattr(adata_copy, 'obsp') and adata_copy.obsp:
-            if verbose:
-                print(f"   {Colors.BLUE}📊 Adding obsp matrices...{Colors.ENDC}")
-            for key, value in adata_copy.obsp.items():
-                if value is not None:
-                    adata_snap.obsp[key] = _clean_matrix(value)
-
-        if hasattr(adata_copy, 'varp') and adata_copy.varp:
-            if verbose:
-                print(f"   {Colors.BLUE}📊 Adding varp matrices...{Colors.ENDC}")
-            for key, value in adata_copy.varp.items():
-                if value is not None:
-                    adata_snap.varp[key] = _clean_matrix(value)
-
-        if hasattr(adata_copy, 'layers') and adata_copy.layers:
-            if verbose:
-                print(f"   {Colors.BLUE}📊 Adding layers...{Colors.ENDC}")
-            for key, value in adata_copy.layers.items():
-                if value is not None:
-                    adata_snap.layers[key] = _clean_matrix(value)
-
-        if close_file:
-            adata_snap.close()
+        out = ad.AnnData(
+            X=X_clean,
+            obs=obs_clean,
+            var=var_clean,
+            obsm=obsm_clean or None,
+            varm=varm_clean or None,
+            uns=uns_clean or None,
+            obsp=obsp_clean or None,
+            varp=varp_clean or None,
+            layers=layers_clean or None,
+        )
+        out.write_h5ad(output_file, compression=None)
 
         if verbose:
             print(f"   {Colors.GREEN}🎉 Conversion completed successfully!{Colors.ENDC}")
