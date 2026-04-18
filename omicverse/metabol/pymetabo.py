@@ -8,12 +8,14 @@ artifacts on ``self`` for later inspection/plotting.
 Usage
 -----
 >>> from omicverse.metabol import pyMetabo, read_metaboanalyst
->>> adata = read_metaboanalyst("human_cachexia.csv")
+>>> # group_col is required — pass the factor column name from your CSV
+>>> adata = read_metaboanalyst("human_cachexia.csv", group_col="Muscle loss")
 >>> m = pyMetabo(adata)
->>> (m.impute(method="qrilc")
+>>> (m.impute(method="qrilc", seed=0)
 ...    .normalize(method="pqn")
-...    .transform(method="pareto")
-...    .differential(method="welch_t")
+...    .transform(method="log")
+...    .differential(method="welch_t", log_transformed=True)
+...    .transform(method="pareto", stash_raw=False)
 ...    .plsda(n_components=2))
 >>> m.deg_table.head()
 >>> m.plsda_result.to_vip_table(m.adata.var_names).head()
@@ -48,6 +50,7 @@ class pyMetabo:
     """
 
     adata: AnnData
+    random_state: int = 0
     raw: AnnData = field(init=False)
     deg_table: Optional[pd.DataFrame] = field(default=None, init=False)
     plsda_result: Optional[_pls.PLSDAResult] = field(default=None, init=False)
@@ -75,8 +78,13 @@ class pyMetabo:
         self.adata = _qc_mod.blank_filter(self.adata, blank_mask=blank_mask, ratio=ratio)
         return self
 
-    def impute(self, *, method: str = "qrilc", **kwargs) -> "pyMetabo":
-        self.adata = _imp.impute(self.adata, method=method, **kwargs)
+    def impute(self, *, method: str = "qrilc", seed: Optional[int] = None,
+               **kwargs) -> "pyMetabo":
+        # Default to the class's own random_state so the chainable pipeline
+        # is reproducible under a single seed.
+        if seed is None:
+            seed = self.random_state
+        self.adata = _imp.impute(self.adata, method=method, seed=seed, **kwargs)
         return self
 
     def normalize(self, *, method: str = "pqn", **kwargs) -> "pyMetabo":

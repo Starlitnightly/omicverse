@@ -168,22 +168,34 @@ def _online_fallback(table: pd.DataFrame, missing: list[str],
                 if t in hit.columns:
                     table.loc[name, t] = hit.iloc[0][t]
             continue
-        # Online query — ChEBI first, then KEGG
+        # Online query — ChEBI first, then KEGG. Silent-on-fail isn't OK
+        # here: users would silently get empty mappings with no clue why.
+        # Emit a warning per failing backend so network / rate-limit issues
+        # are visible.
+        import warnings
         row = {"name": key}
         try:
             ch = ChEBI()
             res = ch.getLiteEntity(key, searchCategory="ALL NAMES")
             if isinstance(res, list) and res:
                 row["chebi"] = res[0].get("chebiId", "")
-        except Exception:  # pragma: no cover
-            pass
+        except Exception as exc:  # pragma: no cover
+            warnings.warn(
+                f"ChEBI online lookup failed for {name!r}: "
+                f"{type(exc).__name__}: {exc}",
+                UserWarning, stacklevel=2,
+            )
         try:
             kg = KEGG()
             found = kg.find("compound", key)
             if found:
                 row["kegg"] = found.split("\t")[0].replace("cpd:", "")
-        except Exception:  # pragma: no cover
-            pass
+        except Exception as exc:  # pragma: no cover
+            warnings.warn(
+                f"KEGG online lookup failed for {name!r}: "
+                f"{type(exc).__name__}: {exc}",
+                UserWarning, stacklevel=2,
+            )
         for t in targets:
             if t in row and row[t]:
                 table.loc[name, t] = row[t]

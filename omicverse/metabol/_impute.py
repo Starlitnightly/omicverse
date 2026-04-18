@@ -38,6 +38,7 @@ def impute(
     missing_threshold: float = 0.5,
     n_neighbors: int = 5,
     q: float = 0.01,
+    seed: int = 0,
 ) -> AnnData:
     """Impute missing values (NaN / 0) in ``adata.X``.
 
@@ -60,6 +61,10 @@ def impute(
         kNN neighborhood size (only used when ``method='knn'``).
     q
         Quantile defining the "below-detection-limit" band for QRILC.
+    seed
+        RNG seed for the QRILC truncated-normal draws. Default 0 — pass
+        a different integer to bootstrap or change the imputation
+        realization across pipeline runs.
 
     Returns
     -------
@@ -91,7 +96,7 @@ def impute(
     elif method == "knn":
         X = _knn_impute(X, missing, n_neighbors=n_neighbors)
     elif method == "qrilc":
-        X = _qrilc_impute(X, missing, q=q)
+        X = _qrilc_impute(X, missing, q=q, seed=seed)
     else:
         raise ValueError(f"unknown method={method!r}")
 
@@ -109,14 +114,17 @@ def _knn_impute(X: np.ndarray, missing: np.ndarray, n_neighbors: int) -> np.ndar
     return imputer.fit_transform(X_nan)
 
 
-def _qrilc_impute(X: np.ndarray, missing: np.ndarray, q: float) -> np.ndarray:
+def _qrilc_impute(X: np.ndarray, missing: np.ndarray, q: float, seed: int = 0) -> np.ndarray:
     """Quantile Regression Imputation of Left-Censored data.
 
     For each feature: estimate the left-tail mean μ and sd σ from the
     ``q``-quantile of the log-transformed observed values, then impute
     missing entries as ``exp(TruncatedNormal(μ, σ, upper=log(q-quantile)))``.
     Works in log-space to keep intensities non-negative.
+
+    ``seed`` is threaded through from ``impute(..., seed=...)``. Deterministic.
     """
+    rng = np.random.default_rng(seed)
     out = X.copy()
     for j in range(X.shape[1]):
         col_missing = missing[:, j]
@@ -142,6 +150,6 @@ def _qrilc_impute(X: np.ndarray, missing: np.ndarray, q: float) -> np.ndarray:
         a = (-np.inf - mu) / sigma
         b = (threshold - mu) / sigma
         draws = stats.truncnorm.rvs(a, b, loc=mu, scale=sigma,
-                                    size=n_miss, random_state=42)
+                                    size=n_miss, random_state=rng)
         out[col_missing, j] = np.exp(draws)
     return out

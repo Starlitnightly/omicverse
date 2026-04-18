@@ -15,12 +15,15 @@ upstream, then bring the peak table here.
 Quick-start
 -----------
 >>> from omicverse.metabol import pyMetabo, read_metaboanalyst
->>> adata = read_metaboanalyst("human_cachexia.csv")
+>>> # group_col is required — pass the exact header name of the factor
+>>> # column in your CSV (e.g. "Muscle loss" for the cachexia demo).
+>>> adata = read_metaboanalyst("human_cachexia.csv", group_col="Muscle loss")
 >>> m = pyMetabo(adata)
->>> (m.impute(method="qrilc")
+>>> (m.impute(method="qrilc", seed=0)
 ...    .normalize(method="pqn")
-...    .transform(method="pareto")
-...    .differential(method="welch_t")
+...    .transform(method="log")
+...    .differential(method="welch_t", log_transformed=True)
+...    .transform(method="pareto", stash_raw=False)
 ...    .opls_da(n_ortho=1))
 >>> m.deg_table.head()                         # univariate hits
 >>> m.vip_table().head()                       # multivariate VIP

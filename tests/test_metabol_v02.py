@@ -49,6 +49,9 @@ def test_msea_ora_finds_relevant_pathways_on_cachexia(cachexia_adata):
 
 
 def test_msea_gsea_runs_and_returns_results(cachexia_adata):
+    # Vendored gseapy path — skip gracefully if the omicverse install is
+    # missing the external subpackage (e.g. a stripped-down build).
+    pytest.importorskip("omicverse.external.gseapy")
     from omicverse.metabol import differential, msea_gsea, normalize, transform
 
     a = normalize(cachexia_adata, method="pqn")
@@ -153,6 +156,53 @@ def test_lipidomics_annotate_and_aggregate():
     expected = np.asarray(adata.X[:, pc_cols]).sum(axis=1)
     got = np.asarray(agg.X[:, list(agg.var_names).index("PC")])
     np.testing.assert_allclose(got, expected, rtol=0, atol=1e-9)
+
+
+def test_msea_ora_empty_when_no_hits_resolve_to_kegg():
+    """Edge case: user hits all unresolvable → clear ValueError, not
+    confusing IndexError downstream."""
+    from omicverse.metabol import msea_ora
+    with pytest.raises(ValueError, match="resolve to KEGG"):
+        msea_ora(
+            hits=["totally_made_up_1", "fake_compound_2"],
+            background=["totally_made_up_1", "fake_compound_2", "another_fake"],
+        )
+
+
+def test_differential_single_group_raises():
+    """Edge case: group column has only one level → clear error."""
+    import anndata as ad
+    from omicverse.metabol import differential
+
+    adata = ad.AnnData(
+        X=np.random.default_rng(0).normal(size=(5, 10)),
+        obs=pd.DataFrame({"group": ["a"] * 5},
+                         index=[f"s{i}" for i in range(5)]),
+        var=pd.DataFrame(index=[f"m{i}" for i in range(10)]),
+    )
+    with pytest.raises(ValueError, match="fewer than 2 unique"):
+        differential(adata, group_col="group")
+
+
+def test_impute_seed_is_deterministic_and_overridable():
+    """QRILC should be deterministic per seed, and different seeds should
+    produce different imputations (bugfix: seed was hardcoded to 42)."""
+    import anndata as ad
+    from omicverse.metabol import impute
+
+    rng = np.random.default_rng(0)
+    X = rng.uniform(1, 100, size=(30, 20))
+    X[rng.random(X.shape) < 0.2] = np.nan
+    adata = ad.AnnData(X=X,
+                       obs=pd.DataFrame(index=[f"s{i}" for i in range(30)]),
+                       var=pd.DataFrame(index=[f"m{i}" for i in range(20)]))
+    a = impute(adata, method="qrilc", seed=0).X
+    a2 = impute(adata, method="qrilc", seed=0).X
+    b = impute(adata, method="qrilc", seed=123).X
+    # Same seed ⇒ same draws
+    np.testing.assert_allclose(a, a2, rtol=0, atol=0)
+    # Different seed ⇒ different imputed values (at least somewhere)
+    assert not np.allclose(a, b)
 
 
 def test_lion_enrichment_spots_glycerophospholipid_hit():

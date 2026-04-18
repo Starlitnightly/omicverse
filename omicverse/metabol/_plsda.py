@@ -255,7 +255,16 @@ def _q2_loo(X, y, *, n_components, scale):
                                 scale=scale).fit(X[mask], y[mask])
             pred = pls.predict(X[[i]]).ravel()[0]
             press += (y[i] - pred) ** 2
-        except Exception:
+        except (np.linalg.LinAlgError, ValueError) as exc:
+            # Rank-deficient or degenerate fold — warn so users can see why
+            # Q² is undefined instead of getting a silent NaN.
+            import warnings
+            warnings.warn(
+                f"PLS-DA Q² LOO fold {i} failed ({type(exc).__name__}: {exc}); "
+                "returning NaN. Usually caused by a rank-deficient X after "
+                "excluding one sample.",
+                UserWarning, stacklevel=2,
+            )
             return np.nan
     return float(1 - press / tss) if tss > 0 else 0.0
 
