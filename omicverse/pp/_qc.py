@@ -512,7 +512,7 @@ def qc(adata,**kwargs):
         max_genes_ratio : The maximum number of genes ratio for a cell to pass QC. Default is 1.
         nmads : The number of MADs to use for MADs filtering. Default is 5.
         doublets : Whether to perform doublet detection. Default is True.
-        doublets_method : The doublet detection method to use. Options are 'scrublet' or 'sccomposite'. Default is 'scrublet'.
+        doublets_method : The doublet detection method to use. Options are 'scrublet', 'sccomposite', or 'doubletfinder'. Default is 'scrublet'.
         filter_doublets : Whether to filter out doublets (True) or just flag them (False). Default is True.
         path_viz : The path to save the QC plots. Default is None.
         tresh : A dictionary of QC thresholds. The keys should be 'mito_perc',
@@ -582,7 +582,7 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
         max_genes_ratio : The maximum number of genes ratio for a cell to pass QC. Default is 1.
         nmads : The number of MADs to use for MADs filtering. Default is 5.
         doublets : Whether to perform doublet detection. Default is True.
-        doublets_method : The doublet detection method to use. Options are 'scrublet' or 'sccomposite'. Default is 'scrublet'.
+        doublets_method : The doublet detection method to use. Options are 'scrublet', 'sccomposite', or 'doubletfinder'. Default is 'scrublet'.
         filter_doublets : Whether to filter out doublets (True) or just flag them (False). Default is True.
         path_viz : The path to save the QC plots. Default is None.
         tresh : A dictionary of QC thresholds. The keys should be 'mito_perc',
@@ -826,6 +826,30 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
                 print(f"   {Colors.GREEN}✓ Scrublet completed: {Colors.BOLD}{doublets_flagged:,}{Colors.ENDC}{Colors.GREEN} doublets flagged ({doublets_flagged/n_after_final_filt*100:.1f}%){Colors.ENDC}")
                 print(f"   {Colors.CYAN}💡 Doublets retained in adata.obs['predicted_doublet'] for downstream analysis{Colors.ENDC}")
 
+        elif doublets_method=='doubletfinder':
+            from ._doubletfinder import doubletfinder as _run_df
+            print(f"   {Colors.CYAN}💡 Running py-DoubletFinder (Python port of R DoubletFinder){Colors.ENDC}")
+            print(f"   {Colors.GREEN}{EMOJI['start']} Running doubletfinder detection...{Colors.ENDC}")
+            _run_df(adata, batch_key=batch_key, random_state=1234)
+            if filter_doublets:
+                if is_rust:
+                    mask = ~adata.obs['predicted_doublet'].values
+                    removed = list(adata.obs_names[~mask])
+                    removed_cells.extend(removed)
+                    adata.subset(obs_indices=np.array(adata.obs_names)[np.where(adata.obs['predicted_doublet']==False)[0]])
+                else:
+                    adata_remove = adata[adata.obs['predicted_doublet'], :]
+                    removed_cells.extend(list(adata_remove.obs_names))
+                    adata = adata[~adata.obs['predicted_doublet'], :]
+                n1 = adata.shape[0]
+                doublets_removed = n_after_final_filt-n1
+                print(f"   {Colors.GREEN}✓ DoubletFinder completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n_after_final_filt*100:.1f}%){Colors.ENDC}")
+            else:
+                n1 = adata.shape[0]
+                doublets_flagged = adata.obs['predicted_doublet'].sum()
+                print(f"   {Colors.GREEN}✓ DoubletFinder completed: {Colors.BOLD}{doublets_flagged:,}{Colors.ENDC}{Colors.GREEN} doublets flagged ({doublets_flagged/n_after_final_filt*100:.1f}%){Colors.ENDC}")
+                print(f"   {Colors.CYAN}💡 Doublets retained in adata.obs['predicted_doublet']; pANN in adata.obs['doublet_score']{Colors.ENDC}")
+
         elif doublets_method=='sccomposite':
             if is_rust:
                 adata=adata.to_memory()
@@ -931,7 +955,7 @@ def qc_cpu(
         max_genes_ratio : The maximum number of genes ratio for a cell to pass QC. Default is 1.
         nmads : The number of MADs to use for MADs filtering. Default is 5.
         doublets : Whether to perform doublet detection. Default is True.
-        doublets_method : The doublet detection method to use. Options are 'scrublet' or 'sccomposite'. Default is 'scrublet'.
+        doublets_method : The doublet detection method to use. Options are 'scrublet', 'sccomposite', or 'doubletfinder'. Default is 'scrublet'.
         filter_doublets : Whether to filter out doublets (True) or just flag them (False). Default is True.
         path_viz : The path to save the QC plots. Default is None.
         tresh : A dictionary of QC thresholds. The keys should be 'mito_perc',
@@ -1137,10 +1161,10 @@ def qc_cpu(
 
     if doublets is True:
         print(f"\n{Colors.HEADER}{Colors.BOLD}🔍 Step 4: Doublet Detection{Colors.ENDC}")
-        if doublets_method not in ('scrublet', 'sccomposite'):
+        if doublets_method not in ('scrublet', 'sccomposite', 'doubletfinder'):
             raise ValueError(
                 f"Unknown doublets_method={doublets_method!r}; "
-                "expected 'scrublet' or 'sccomposite'."
+                "expected 'scrublet', 'sccomposite', or 'doubletfinder'."
             )
         if is_oom:
             # Scrublet/sccomposite require in-memory X — convert temporarily
@@ -1179,6 +1203,37 @@ def qc_cpu(
                 doublets_flagged = adata.obs['predicted_doublet'].sum()
                 print(f"   {Colors.GREEN}✓ Scrublet completed: {Colors.BOLD}{doublets_flagged:,}{Colors.ENDC}{Colors.GREEN} doublets flagged ({doublets_flagged/n_after_final_filt*100:.1f}%){Colors.ENDC}")
                 print(f"   {Colors.CYAN}💡 Doublets retained in adata.obs['predicted_doublet'] for downstream analysis{Colors.ENDC}")
+
+        elif doublets_method=='doubletfinder':
+            from ._doubletfinder import doubletfinder as _run_df
+            print(f"   {Colors.CYAN}💡 Running py-DoubletFinder (Python port of R DoubletFinder){Colors.ENDC}")
+            print(f"   {Colors.GREEN}{EMOJI['start']} Running doubletfinder detection...{Colors.ENDC}")
+            if is_oom:
+                _run_df(adata_mem, batch_key=batch_key, random_state=1234)
+                adata.obs['predicted_doublet'] = adata_mem.obs['predicted_doublet'].values
+                adata.obs['doublet_score']     = adata_mem.obs['doublet_score'].values
+                del adata_mem
+            else:
+                _run_df(adata, batch_key=batch_key, random_state=1234)
+
+            if filter_doublets:
+                if is_oom:
+                    mask = ~adata.obs['predicted_doublet'].values
+                    removed = list(adata.obs_names[~mask])
+                    removed_cells.extend(removed)
+                    adata._inplace_subset_obs(mask)
+                else:
+                    adata_remove = adata[adata.obs['predicted_doublet'], :]
+                    removed_cells.extend(list(adata_remove.obs_names))
+                    adata = adata[~adata.obs['predicted_doublet'], :]
+                n1 = adata.shape[0]
+                doublets_removed = n_after_final_filt-n1
+                print(f"   {Colors.GREEN}✓ DoubletFinder completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n_after_final_filt*100:.1f}%){Colors.ENDC}")
+            else:
+                n1 = adata.shape[0]
+                doublets_flagged = adata.obs['predicted_doublet'].sum()
+                print(f"   {Colors.GREEN}✓ DoubletFinder completed: {Colors.BOLD}{doublets_flagged:,}{Colors.ENDC}{Colors.GREEN} doublets flagged ({doublets_flagged/n_after_final_filt*100:.1f}%){Colors.ENDC}")
+                print(f"   {Colors.CYAN}💡 Doublets retained in adata.obs['predicted_doublet']; pANN in adata.obs['doublet_score']{Colors.ENDC}")
 
         elif doublets_method=='sccomposite':
             # Pick the object sccomposite runs on: OOM uses the materialised
