@@ -62,8 +62,12 @@ def doubletfinder(
         ) from exc
 
     def _run_one(sub: anndata.AnnData) -> tuple[np.ndarray, np.ndarray]:
-        """Return (predicted_doublet, pANN) for a single (sub-)AnnData."""
-        df = DoubletFinder(sub.copy(), random_state=random_state)
+        """Return (predicted_doublet, pANN) for a single (sub-)AnnData.
+
+        ``sub`` is always a fresh, in-memory slice handed in by the caller —
+        no extra ``.copy()`` is needed here before giving it to DoubletFinder.
+        """
+        df = DoubletFinder(sub, random_state=random_state)
         if pK is None:
             df.param_sweep(PCs=PCs, n_top_genes=n_top_genes)
             df.summarize_sweep()
@@ -80,8 +84,20 @@ def doubletfinder(
             annotations=homotypic_annotations if homotypic_annotations in sub.obs.columns else None,
             PCs=PCs, n_top_genes=n_top_genes,
         )
-        dfcol = next(c for c in df.adata.obs.columns if c.startswith("DF.classifications_"))
-        pcol  = next(c for c in df.adata.obs.columns if c.startswith("pANN_"))
+        # Robust lookup — if pydoubletfinder changes its column naming we want
+        # a clear message, not a bare StopIteration.
+        cols = df.adata.obs.columns
+        df_matches = [c for c in cols if c.startswith("DF.classifications_")]
+        pa_matches = [c for c in cols if c.startswith("pANN_")]
+        if not df_matches or not pa_matches:
+            raise RuntimeError(
+                "pydoubletfinder did not produce the expected obs columns "
+                "(DF.classifications_* and pANN_*). "
+                f"Got: {list(cols)}. This usually means the installed "
+                "pydoubletfinder version is incompatible — check "
+                "`pip show pydoubletfinder`."
+            )
+        dfcol, pcol = df_matches[0], pa_matches[0]
         return (
             (df.adata.obs[dfcol].values == "Doublet"),
             df.adata.obs[pcol].astype(float).values,
@@ -91,7 +107,7 @@ def doubletfinder(
     scores = np.zeros(adata.n_obs, dtype=np.float64)
 
     if batch_key is None or batch_key not in adata.obs.columns:
-        predicted, scores = _run_one(adata)
+        predicted, scores = _run_one(adata.copy())
     else:
         for batch in adata.obs[batch_key].unique():
             mask = (adata.obs[batch_key] == batch).values

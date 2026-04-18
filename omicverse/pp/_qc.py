@@ -800,6 +800,11 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
     
     if doublets is True:
         print(f"\n{Colors.HEADER}{Colors.BOLD}🔍 Step 4: Doublet Detection{Colors.ENDC}")
+        if doublets_method not in ('scrublet', 'sccomposite', 'doubletfinder'):
+            raise ValueError(
+                f"Unknown doublets_method={doublets_method!r}; "
+                "expected 'scrublet', 'sccomposite', or 'doubletfinder'."
+            )
         if doublets_method=='scrublet':
             # Post doublets removal QC plot
             print(f"   {Colors.WARNING}⚠️  Note: 'scrublet' detection is legacy and may not work optimally{Colors.ENDC}")
@@ -830,13 +835,16 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
             from ._doubletfinder import doubletfinder as _run_df
             print(f"   {Colors.CYAN}💡 Running py-DoubletFinder (Python port of R DoubletFinder){Colors.ENDC}")
             print(f"   {Colors.GREEN}{EMOJI['start']} Running doubletfinder detection...{Colors.ENDC}")
+            if is_rust:
+                # Match the sccomposite branch: DoubletFinder needs an in-memory X
+                adata = adata.to_memory()
             _run_df(adata, batch_key=batch_key, random_state=1234)
             if filter_doublets:
                 if is_rust:
                     mask = ~adata.obs['predicted_doublet'].values
                     removed = list(adata.obs_names[~mask])
                     removed_cells.extend(removed)
-                    adata.subset(obs_indices=np.array(adata.obs_names)[np.where(adata.obs['predicted_doublet']==False)[0]])
+                    adata = adata[~adata.obs['predicted_doublet'], :]
                 else:
                     adata_remove = adata[adata.obs['predicted_doublet'], :]
                     removed_cells.extend(list(adata_remove.obs_names))
@@ -1210,8 +1218,11 @@ def qc_cpu(
             print(f"   {Colors.GREEN}{EMOJI['start']} Running doubletfinder detection...{Colors.ENDC}")
             if is_oom:
                 _run_df(adata_mem, batch_key=batch_key, random_state=1234)
-                adata.obs['predicted_doublet'] = adata_mem.obs['predicted_doublet'].values
-                adata.obs['doublet_score']     = adata_mem.obs['doublet_score'].values
+                # Copy all four columns the wrapper writes — not just the generic pair
+                for col in ("predicted_doublet", "doublet_score",
+                            "doubletfinder_doublet", "doubletfinder_pANN"):
+                    if col in adata_mem.obs.columns:
+                        adata.obs[col] = adata_mem.obs[col].values
                 del adata_mem
             else:
                 _run_df(adata, batch_key=batch_key, random_state=1234)
@@ -1470,6 +1481,11 @@ def qc_gpu(adata, mode='seurat',
     
     if doublets is True:
         print(f"\n{Colors.HEADER}{Colors.BOLD}🔍 Step 4: Doublet Detection{Colors.ENDC}")
+        if doublets_method not in ('scrublet', 'sccomposite', 'doubletfinder'):
+            raise ValueError(
+                f"Unknown doublets_method={doublets_method!r}; "
+                "expected 'scrublet', 'sccomposite', or 'doubletfinder'."
+            )
         if doublets_method=='scrublet':
             print(f"   {Colors.GREEN}{EMOJI['start']} Running GPU-accelerated scrublet...{Colors.ENDC}")
             rsc.pp.scrublet(adata, random_state=1234,batch_key=batch_key)
@@ -1486,6 +1502,24 @@ def qc_gpu(adata, mode='seurat',
                 doublets_flagged = adata.obs['predicted_doublet'].sum()
                 print(f"   {Colors.GREEN}✓ Scrublet completed: {Colors.BOLD}{doublets_flagged:,}{Colors.ENDC}{Colors.GREEN} doublets flagged ({doublets_flagged/n_after_final_filt*100:.1f}%){Colors.ENDC}")
                 print(f"   {Colors.CYAN}💡 Doublets retained in adata.obs['predicted_doublet'] for downstream analysis{Colors.ENDC}")
+
+        elif doublets_method=='doubletfinder':
+            from ._doubletfinder import doubletfinder as _run_df
+            print(f"   {Colors.CYAN}💡 Running py-DoubletFinder (Python port of R DoubletFinder){Colors.ENDC}")
+            print(f"   {Colors.GREEN}{EMOJI['start']} Running doubletfinder detection...{Colors.ENDC}")
+            _run_df(adata, batch_key=batch_key, random_state=1234)
+            if filter_doublets:
+                adata_remove = adata[adata.obs['predicted_doublet'], :]
+                removed_cells.extend(list(adata_remove.obs_names))
+                adata = adata[~adata.obs['predicted_doublet'], :]
+                n1 = adata.shape[0]
+                doublets_removed = n_after_final_filt-n1
+                print(f"   {Colors.GREEN}✓ DoubletFinder completed: {Colors.BOLD}{doublets_removed:,}{Colors.ENDC}{Colors.GREEN} doublets removed ({doublets_removed/n_after_final_filt*100:.1f}%){Colors.ENDC}")
+            else:
+                n1 = adata.shape[0]
+                doublets_flagged = adata.obs['predicted_doublet'].sum()
+                print(f"   {Colors.GREEN}✓ DoubletFinder completed: {Colors.BOLD}{doublets_flagged:,}{Colors.ENDC}{Colors.GREEN} doublets flagged ({doublets_flagged/n_after_final_filt*100:.1f}%){Colors.ENDC}")
+                print(f"   {Colors.CYAN}💡 Doublets retained in adata.obs['predicted_doublet']; pANN in adata.obs['doublet_score']{Colors.ENDC}")
 
         elif doublets_method=='sccomposite':
             print(f"   {Colors.GREEN}{EMOJI['start']} Running sccomposite doublet detection...{Colors.ENDC}")
