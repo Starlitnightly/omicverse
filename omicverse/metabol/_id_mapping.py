@@ -142,69 +142,24 @@ def map_ids(
 
 def _online_fallback(table: pd.DataFrame, missing: list[str],
                      targets: tuple[str, ...]) -> pd.DataFrame:
-    """Best-effort lookup via bioservices (ChEBI / KEGG REST).
+    """Resolve missing names via the Metabolomics Workbench REST API.
 
-    Results cached in ``~/.cache/omicverse/metabol/online_cache.parquet``
-    so repeated calls are free.
+    Uses :func:`omicverse.metabol.fetch_hmdb_from_name`, which calls the
+    MW RefMet service. The response carries HMDB/KEGG/ChEBI/PubChem IDs
+    in one call — no need for separate bioservices calls. Results are
+    cached by the fetcher (``~/.cache/omicverse/metabol/mw_hmdb_cache.json``),
+    so repeated lookups of the same name are free.
     """
-    try:
-        from bioservices import ChEBI, KEGG  # noqa: F401
-    except ImportError:  # pragma: no cover
-        # Silently skip — offline environments just won't resolve missing names.
-        return table
+    from ._fetchers import fetch_hmdb_from_name
 
-    cache_dir = Path.home() / ".cache" / "omicverse" / "metabol"
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_path = cache_dir / "online_cache.parquet"
-    cache = pd.read_parquet(cache_path) if cache_path.exists() else pd.DataFrame()
-
-    # Skip network calls that are already in cache
-    new_rows = []
     for name in missing:
-        key = normalize_name(name)
-        hit = cache[cache["name"] == key] if "name" in cache.columns else None
-        if hit is not None and len(hit) > 0:
-            for t in targets:
-                if t in hit.columns:
-                    table.loc[name, t] = hit.iloc[0][t]
-            continue
-        # Online query — ChEBI first, then KEGG. Silent-on-fail isn't OK
-        # here: users would silently get empty mappings with no clue why.
-        # Emit a warning per failing backend so network / rate-limit issues
-        # are visible.
-        import warnings
-        row = {"name": key}
         try:
-            ch = ChEBI()
-            res = ch.getLiteEntity(key, searchCategory="ALL NAMES")
-            if isinstance(res, list) and res:
-                row["chebi"] = res[0].get("chebiId", "")
-        except Exception as exc:  # pragma: no cover
-            warnings.warn(
-                f"ChEBI online lookup failed for {name!r}: "
-                f"{type(exc).__name__}: {exc}",
-                UserWarning, stacklevel=2,
-            )
-        try:
-            kg = KEGG()
-            found = kg.find("compound", key)
-            if found:
-                row["kegg"] = found.split("\t")[0].replace("cpd:", "")
-        except Exception as exc:  # pragma: no cover
-            warnings.warn(
-                f"KEGG online lookup failed for {name!r}: "
-                f"{type(exc).__name__}: {exc}",
-                UserWarning, stacklevel=2,
-            )
+            ids = fetch_hmdb_from_name(name)
+        except Exception:
+            continue     # _fetchers already emitted a warning
         for t in targets:
-            if t in row and row[t]:
-                table.loc[name, t] = row[t]
-        new_rows.append(row)
-
-    # Update cache
-    if new_rows:
-        new_cache = pd.concat([cache, pd.DataFrame(new_rows)], ignore_index=True)
-        new_cache.drop_duplicates("name", keep="last").to_parquet(cache_path)
+            if t in ids and ids[t]:
+                table.loc[name, t] = ids[t]
     return table
 
 

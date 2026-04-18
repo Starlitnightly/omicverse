@@ -153,7 +153,12 @@ def aggregate_by_class(adata: AnnData, *, agg: str = "sum") -> AnnData:
 
 
 def _load_lion_subset() -> dict[str, dict]:
-    """LION-inspired compact ontology (shipped in data/lion_subset.json)."""
+    """LION-inspired compact ontology (shipped in data/lion_subset.json).
+
+    For the full ~730-term LION ontology, call
+    ``ov.metabol.fetch_lion_associations()`` and pass the result to
+    :func:`lion_enrichment` via the ``ontology=`` argument.
+    """
     if not _LION_PATH.exists():
         # Fallback to a hard-coded minimal set so tests don't break if the
         # file is missing from a partial install.

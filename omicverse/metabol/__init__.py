@@ -59,6 +59,12 @@ Relationship to existing omicverse modules
 from __future__ import annotations
 
 from . import plotting
+from ._fetchers import (
+    clear_cache,
+    fetch_hmdb_from_name,
+    fetch_kegg_pathways,
+    fetch_lion_associations,
+)
 from ._id_mapping import available_metabolites, build_lookup, map_ids, normalize_name
 from ._impute import impute
 from ._lipidomics import (
@@ -112,6 +118,11 @@ __all__ = [
     "normalize_name",
     "build_lookup",
     "available_metabolites",
+    # Database fetchers (full DBs via cached on-demand download)
+    "fetch_kegg_pathways",
+    "fetch_lion_associations",
+    "fetch_hmdb_from_name",
+    "clear_cache",
     # lipidomics
     "LipidIdentity",
     "parse_lipid",
