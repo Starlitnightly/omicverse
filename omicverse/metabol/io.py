@@ -107,35 +107,69 @@ def read_lcms(
     feature_id_sep: str = "/",
     sample_col: Optional[str] = None,
     group_col: Optional[str] = None,
+    label_row: Optional[str] = None,
     transpose: bool = True,
 ) -> AnnData:
-    """Load an LC-MS peak table with ``m/z/RT`` feature IDs.
+    """Load an LC-MS peak table with ``m/z``/``RT`` feature IDs into AnnData.
 
-    MetaboAnalyst's LC-MS demo format has peaks in rows and feature IDs
-    like ``"200.1/2926"`` (m/z slash retention-time-seconds). We split
-    the IDs into numeric ``var['m_z']`` / ``var['rt']`` columns that
-    ``pyMummichog`` can consume directly.
+    Handles MetaboAnalyst's LC-MS demo layout (peaks-in-rows with a
+    dedicated "Label" row above the data), as well as plain wide tables.
+    Feature IDs of the form ``<m/z><sep><RT>`` (e.g. ``"200.1/2926"`` or
+    ``"85.065__24.64"``) are parsed into numeric ``var['m_z']`` /
+    ``var['rt']`` columns so :func:`mummichog_basic` can consume the
+    AnnData directly.
 
     Parameters
     ----------
+    feature_id_sep
+        Separator between m/z and RT inside each feature ID. MetaboAnalyst
+        uses ``"/"`` for the small demo and ``"__"`` for the malaria
+        table; XCMS exports sometimes use ``"_"``.
+    label_row
+        When the raw file has features in rows, the first "feature" is
+        often a dedicated *group-label* row (e.g. MetaboAnalyst's
+        ``"Label"`` row with values like ``"Naive"`` / ``"Semi_immue"``).
+        Pass the label of that row here and we'll lift it into
+        ``adata.obs['group']`` before treating the rest as features.
     transpose
-        Default True (peaks-in-rows → samples-in-rows, matching AnnData).
+        Default True (peaks-in-rows → samples-in-rows, AnnData orientation).
+    sample_col, group_col
+        Only used when the table is already in samples-in-rows layout;
+        both default to the first column / the first non-sample column.
     """
     df = pd.read_csv(path)
+    label_values = None
     if transpose:
         feature_id = df.columns[0]
+        # Extract the label row *before* transposing so the rest of the
+        # table stays purely numeric (otherwise pandas infers `object`
+        # dtype for the whole frame and down-stream `.astype(float)`
+        # fails).
+        if label_row is not None:
+            matches = df[df[feature_id] == label_row]
+            if matches.empty:
+                raise KeyError(
+                    f"label_row={label_row!r} not found in first column"
+                )
+            label_values = matches.iloc[0, 1:].to_numpy()
+            df = df[df[feature_id] != label_row].copy()
         df = df.set_index(feature_id).T.reset_index().rename(columns={"index": "sample"})
     sample_col_eff = sample_col or df.columns[0]
     obs_cols = [c for c in (group_col,) if c]
     obs = df[[sample_col_eff, *obs_cols]].copy().set_index(sample_col_eff)
+    if label_values is not None:
+        obs["group"] = label_values
     met_cols = [c for c in df.columns if c != sample_col_eff and c not in obs_cols]
     X = df[met_cols].to_numpy(dtype=np.float64)
     var = pd.DataFrame(index=met_cols)
-    parsed = var.index.str.split(feature_id_sep, n=1, expand=True)
-    if parsed.nlevels == 2:
+    # Parse m/z and RT from the feature IDs (mummichog wants numeric columns)
+    parts = var.index.to_series().str.split(feature_id_sep, n=1, expand=True)
+    if parts.shape[1] == 2:
         try:
-            var["m_z"] = parsed.get_level_values(0).astype(float)
-            var["rt"] = parsed.get_level_values(1).astype(float)
+            var["m_z"] = parts.iloc[:, 0].astype(float).to_numpy()
+            var["rt"] = parts.iloc[:, 1].astype(float).to_numpy()
         except (ValueError, TypeError):
-            pass  # Non-numeric feature IDs — leave as-is
+            # Non-numeric feature IDs — leave as-is so the caller can
+            # annotate manually.
+            pass
     return AnnData(X=X, obs=obs, var=var)

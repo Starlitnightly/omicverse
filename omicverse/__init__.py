@@ -84,6 +84,7 @@ _LAZY_MODULES = {
     'fm',
     'agent',
     'mcp',
+    'metabol',
 }
 
 # Lazy attribute mappings: {attribute_name: (module_path, attr_name)}
@@ -342,6 +343,7 @@ __all__ = [
     "pp",
     "space",
     "pl",
+    "metabol",
     "datasets",
     "external",
     "llm",

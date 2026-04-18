@@ -145,11 +145,15 @@ def msea_gsea(
         Columns: ``Term``, ``NES``, ``NOM p-val``, ``FDR q-val``,
         ``ES``, ``Lead_genes`` (metabolites driving the enrichment).
     """
+    # Use the vendored gseapy that ships inside omicverse.external so we
+    # don't pin a separate top-level dependency (avoids version conflicts
+    # with other GSEA-using modules).
     try:
-        import gseapy as gp
+        from ..external.gseapy import prerank as _prerank
     except ImportError as exc:  # pragma: no cover
         raise ImportError(
-            "msea_gsea requires gseapy — `pip install gseapy`."
+            "msea_gsea requires omicverse.external.gseapy — this should "
+            "be bundled with omicverse; reinstall if missing."
         ) from exc
 
     if pathways is None:
@@ -168,7 +172,7 @@ def msea_gsea(
         )
     rnk = rank_df.set_index("kegg")[stat_col].sort_values(ascending=False)
 
-    result = gp.prerank(
+    result = _prerank(
         rnk=rnk, gene_sets=pathways, min_size=min_size, max_size=max_size,
         permutation_num=n_perm, outdir=None, seed=seed, no_plot=True, verbose=False,
     )
