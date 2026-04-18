@@ -58,7 +58,12 @@ def transform(
     X = out.X.astype(np.float64, copy=True)
 
     if method == "log":
-        X = np.log2(np.where(X > 0, X, pseudocount) + pseudocount)
+        # Standard pseudo-count log: log2(max(X, 0) + pseudocount).
+        # Earlier versions used log2(where(X>0, X, pseudocount) + pseudocount)
+        # which silently applied the pseudocount *twice* for zeros, turning
+        # zero-valued intensities into log2(2*pseudocount) ≈ 1.0 at default
+        # pseudocount=1.0 and breaking subsequent Pareto centering.
+        X = np.log2(np.clip(X, 0.0, None) + pseudocount)
     elif method == "glog":
         X = _glog(X, pseudocount=pseudocount)
     elif method == "autoscale":

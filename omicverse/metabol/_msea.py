@@ -23,6 +23,7 @@ import pandas as pd
 from scipy import stats
 
 from ._id_mapping import map_ids, normalize_name
+from ._utils import bh_fdr as _bh_fdr
 
 
 _DATA_DIR = Path(__file__).parent / "data"
@@ -180,14 +181,3 @@ def msea_gsea(
     return out
 
 
-def _bh_fdr(p: np.ndarray) -> np.ndarray:
-    p = np.asarray(p, dtype=np.float64)
-    n = p.size
-    if n == 0:
-        return p
-    order = np.argsort(p)
-    ranked = p[order] * n / np.arange(1, n + 1)
-    ranked = np.minimum.accumulate(ranked[::-1])[::-1]
-    out = np.empty_like(p)
-    out[order] = np.minimum(ranked, 1.0)
-    return out

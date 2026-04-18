@@ -33,7 +33,8 @@ import numpy as np
 import pandas as pd
 
 from ._id_mapping import _load_lookup
-from ._msea import _bh_fdr, load_pathways
+from ._msea import load_pathways
+from ._utils import bh_fdr as _bh_fdr
 
 
 # Common ESI adducts — (name, delta_mass, charge_sign)
@@ -264,31 +265,37 @@ def mummichog_external(
         ) from exc
     import tempfile
 
-    # mummichog expects a file on disk
-    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+    # mummichog expects a tab-separated file on disk. Use try/finally so
+    # the temp file is unlinked even if mummichog crashes mid-run.
+    import os as _os
+
+    tmp = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False)
+    tmp_path = tmp.name
+    try:
         cols = ["mz", "rtime", "p-value", "t-score"]
-        f.write("\t".join(cols) + "\n")
+        tmp.write("\t".join(cols) + "\n")
         for i, (m, p) in enumerate(zip(mz, pvalue)):
             rt = retention_time[i] if retention_time is not None else 0.0
-            f.write(f"{m}\t{rt}\t{p}\t0\n")
-        tmp_path = f.name
+            tmp.write(f"{m}\t{rt}\t{p}\t0\n")
+        tmp.close()
 
-    outdir = outdir or tempfile.mkdtemp(prefix="mummichog_")
-    # Call mummichog's CLI-equivalent API
-    args = [
-        "-f", tmp_path,
-        "-o", outdir,
-        "-m", mode,
-        "-c", str(significance_cutoff),
-    ]
-    for k, v in kwargs.items():
-        args.extend([f"--{k}", str(v)])
-    # mumm_main prints and writes files; we capture the summary CSV
-    mumm_main(args)
-    # mummichog writes several files; the pathway enrichment is typically
-    # ``<outdir>/tables/mcg_pathwayanalysis_*.tsv``
-    summary = None
-    for p in Path(outdir).rglob("mcg_pathwayanalysis*.tsv"):
-        summary = pd.read_csv(p, sep="\t")
-        break
-    return summary
+        outdir = outdir or tempfile.mkdtemp(prefix="mummichog_")
+        args = [
+            "-f", tmp_path,
+            "-o", outdir,
+            "-m", mode,
+            "-c", str(significance_cutoff),
+        ]
+        for k, v in kwargs.items():
+            args.extend([f"--{k}", str(v)])
+        mumm_main(args)
+        summary = None
+        for p in Path(outdir).rglob("mcg_pathwayanalysis*.tsv"):
+            summary = pd.read_csv(p, sep="\t")
+            break
+        return summary
+    finally:
+        try:
+            _os.unlink(tmp_path)
+        except OSError:
+            pass

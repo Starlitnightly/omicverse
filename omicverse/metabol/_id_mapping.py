@@ -33,17 +33,60 @@ import numpy as np
 import pandas as pd
 
 
+from functools import lru_cache
+
 _DATA_DIR = Path(__file__).parent / "data"
-_LOOKUP_PATH = _DATA_DIR / "metabolite_lookup.parquet"
+_LOOKUP_CSV = _DATA_DIR / "metabolite_lookup.csv"
+_LOOKUP_PARQUET = _DATA_DIR / "metabolite_lookup.parquet"
+# Backwards-compat alias kept for tests that reference the old name
+_LOOKUP_PATH = _LOOKUP_PARQUET
 
 
+@lru_cache(maxsize=1)
 def _load_lookup() -> pd.DataFrame:
-    if not _LOOKUP_PATH.exists():
+    """Return the metabolite lookup table.
+
+    Reads the curated CSV (the source of truth), caches the parsed
+    DataFrame in-memory for the rest of the process, and lazily
+    regenerates the on-disk parquet cache so subsequent installs
+    don't re-parse the CSV every import. Safe to call repeatedly —
+    ``lru_cache`` makes the Python side O(1).
+    """
+    if _LOOKUP_PARQUET.exists():
+        try:
+            return pd.read_parquet(_LOOKUP_PARQUET)
+        except Exception:
+            # Fall through to CSV path — parquet may be corrupt
+            pass
+    if not _LOOKUP_CSV.exists():
         raise FileNotFoundError(
-            f"lookup parquet missing at {_LOOKUP_PATH}. "
-            "Rebuild it with `omicverse.metabol.build_lookup()`."
+            f"lookup CSV missing at {_LOOKUP_CSV}. "
+            "The omicverse install is incomplete; reinstall."
         )
-    return pd.read_parquet(_LOOKUP_PATH)
+    df = pd.read_csv(_LOOKUP_CSV, dtype=str, keep_default_na=False)
+    if "mw" in df.columns:
+        df["mw"] = pd.to_numeric(df["mw"], errors="coerce")
+    # Best-effort parquet cache write. If the install dir is read-only
+    # (e.g. site-packages under an admin install) silently skip.
+    try:
+        df.to_parquet(_LOOKUP_PARQUET, index=False)
+    except Exception:
+        pass
+    return df
+
+
+@lru_cache(maxsize=1)
+def _alias_to_row() -> dict[str, int]:
+    """Build the name → row-index map once per process."""
+    lu = _load_lookup()
+    mapping: dict[str, int] = {}
+    for i, row in lu.iterrows():
+        mapping[row["name"]] = i
+        for a in (row.get("aliases") or "").split(";"):
+            a_norm = normalize_name(a)
+            if a_norm and a_norm not in mapping:
+                mapping[a_norm] = i
+    return mapping
 
 
 def normalize_name(s: str) -> str:
@@ -78,20 +121,13 @@ def map_ids(
         string, with one column per requested target.
     """
     lookup = _load_lookup()
-    # Build a name → row index using canonical + aliases
-    alias_to_row: dict[str, int] = {}
-    for i, row in lookup.iterrows():
-        alias_to_row[row["name"]] = i
-        for a in (row.get("aliases") or "").split(";"):
-            a = normalize_name(a)
-            if a and a not in alias_to_row:
-                alias_to_row[a] = i
+    alias_map = _alias_to_row()      # process-cached; O(1) per call now
 
     rows = []
     missing = []
     for n in names:
         key = normalize_name(n)
-        idx = alias_to_row.get(key)
+        idx = alias_map.get(key)
         if idx is None:
             rows.append({t: "" for t in targets})
             missing.append(n)
@@ -161,25 +197,19 @@ def _online_fallback(table: pd.DataFrame, missing: list[str],
 
 
 def build_lookup(out_path: Optional[Path] = None) -> Path:
-    """Build the local metabolite lookup parquet from a curated CSV.
+    """Rebuild the parquet cache from the curated CSV.
 
-    This is what users would run once after a fresh install if the
-    shipped parquet is missing or out of date. The curated CSV lives at
-    ``omicverse/metabol/data/metabolite_lookup.csv``; we convert to
-    parquet for fast load.
+    ``_load_lookup()`` regenerates the cache automatically on first use,
+    so users don't usually need to call this. Kept public for explicit
+    cache refresh after editing ``metabolite_lookup.csv`` in a dev checkout.
     """
-    csv_path = _DATA_DIR / "metabolite_lookup.csv"
-    if not csv_path.exists():
-        raise FileNotFoundError(
-            f"Curated CSV missing at {csv_path}. "
-            "The installation is incomplete; reinstall omicverse."
-        )
-    df = pd.read_csv(csv_path, dtype=str, keep_default_na=False)
-    # Store monoisotopic mass as float64 (rest stay string for consistency)
-    if "mw" in df.columns:
-        df["mw"] = pd.to_numeric(df["mw"], errors="coerce")
-    out_path = out_path or _LOOKUP_PATH
-    df.to_parquet(out_path, index=False)
+    # Force invalidate the in-memory caches too
+    _load_lookup.cache_clear()
+    _alias_to_row.cache_clear()
+    out_path = out_path or _LOOKUP_PARQUET
+    if out_path.exists():
+        out_path.unlink()
+    df = _load_lookup()   # recomputes + writes parquet
     return out_path
 
 

@@ -67,6 +67,28 @@ def test_normalize_pqn_centres_samples(cachexia_adata):
     assert row_medians.max() / max(row_medians.min(), 1e-9) < 10.0
 
 
+def test_transform_log_zero_gives_zero():
+    """Regression for a bug where log() applied the pseudocount twice for
+    zero values — log2(0) should be log2(0 + pseudocount), i.e. log2(1)=0
+    at the default pseudocount=1.0, not log2(2)≈1.0."""
+    import anndata as ad
+    from omicverse.metabol import transform
+
+    X = np.array([[0.0, 0.0, 0.0], [1.0, 2.0, 4.0]])
+    adata = ad.AnnData(X=X,
+                       obs=pd.DataFrame(index=["s1", "s2"]),
+                       var=pd.DataFrame(index=["m1", "m2", "m3"]))
+    out = transform(adata, method="log", pseudocount=1.0)
+    # Zero row must become exactly 0 = log2(0 + 1), not log2(2)
+    np.testing.assert_allclose(out.X[0], 0.0, atol=1e-12)
+    # Positive row: log2(x + 1)
+    np.testing.assert_allclose(
+        out.X[1],
+        np.log2(np.array([1.0, 2.0, 4.0]) + 1.0),
+        atol=1e-12,
+    )
+
+
 def test_transform_pareto_zero_mean_columns(cachexia_adata):
     from omicverse.metabol import normalize, transform
 

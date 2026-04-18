@@ -28,7 +28,7 @@ from anndata import AnnData
 def read_metaboanalyst(
     path: str | Path,
     *,
-    group_col: str = "Muscle loss",
+    group_col: str,
     sample_col: Optional[str] = None,
     transpose: bool = False,
 ) -> AnnData:
@@ -41,18 +41,18 @@ def read_metaboanalyst(
         PIF_2,control,29.46,58.13,...
 
     — samples in rows, one factor (group) column, rest are metabolite
-    concentrations. The default ``group_col='Muscle loss'`` matches the
-    famous Eisner-2010 ``human_cachexia.csv`` demo; pass your own group
-    column name otherwise. If ``sample_col`` is None, the first column
-    is treated as the sample ID index.
+    concentrations. ``group_col`` is **required** (no default) because
+    every MetaboAnalyst dataset uses a different column name
+    (``"Muscle loss"`` for the Eisner-2010 cachexia demo, ``"Label"`` for
+    most others). Pass the exact column header from your CSV.
 
     Parameters
     ----------
     path
         CSV path or URL.
     group_col
-        Name of the factor column holding case/control labels. Copied
-        to ``adata.obs['group']``.
+        Name of the factor column holding case/control labels. Required;
+        copied to ``adata.obs['group']``.
     sample_col
         Name of the sample-ID column. If ``None``, the first column is
         used (matches the MetaboAnalyst default).
@@ -72,7 +72,10 @@ def read_metaboanalyst(
     sample_col_eff = sample_col or df.columns[0]
     if group_col not in df.columns:
         raise KeyError(
-            f"group_col={group_col!r} not in CSV columns: {list(df.columns[:8])}..."
+            f"group_col={group_col!r} is not a column in the CSV. "
+            f"Available columns (first 8): {list(df.columns[:8])}. "
+            f"Pass the header name of the factor column, e.g. "
+            f"read_metaboanalyst(path, group_col='{df.columns[1] if len(df.columns) > 1 else 'group'}')."
         )
     obs = df[[sample_col_eff, group_col]].copy()
     obs.columns = ["sample", "group"]

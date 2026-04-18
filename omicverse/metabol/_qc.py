@@ -109,6 +109,22 @@ def drift_correct(
 
     order = _resolve_sample_array(adata, injection_order).astype(float)
     qmask = _resolve_sample_mask(adata, qc_mask)
+
+    # Warn if real samples fall outside the QC injection range — np.interp
+    # clamps at the boundaries rather than extrapolating, so the drift
+    # correction for those edge samples is effectively ignored.
+    qc_min, qc_max = order[qmask].min(), order[qmask].max()
+    outside = ((order < qc_min) | (order > qc_max)) & ~qmask
+    if outside.any():
+        import warnings
+        warnings.warn(
+            f"{int(outside.sum())} real sample(s) were injected outside the "
+            f"QC range [{qc_min:g}, {qc_max:g}]. Their drift correction uses "
+            "the nearest-edge LOESS value (np.interp clamps; no extrapolation). "
+            "Consider bracketing your run with QC pools.",
+            UserWarning, stacklevel=2,
+        )
+
     out = adata.copy()
     X = out.X.astype(np.float64, copy=True)
     fits = np.zeros_like(X)

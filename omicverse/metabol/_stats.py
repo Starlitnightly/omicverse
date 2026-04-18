@@ -24,6 +24,8 @@ import pandas as pd
 from anndata import AnnData
 from scipy import stats
 
+from ._utils import bh_fdr as _bh_fdr
+
 
 TestMethod = Literal["t", "welch_t", "wilcoxon", "limma"]
 
@@ -128,19 +130,6 @@ def differential(
         "mean_b": mean_b,
     }, index=adata.var_names.copy())
     out.attrs.update({"group_a": group_a, "group_b": group_b, "method": method})
-    return out
-
-
-def _bh_fdr(p: np.ndarray) -> np.ndarray:
-    """Benjamini-Hochberg FDR adjustment, numpy-native."""
-    p = np.asarray(p, dtype=np.float64)
-    n = p.size
-    order = np.argsort(p)
-    ranked = p[order] * n / np.arange(1, n + 1)
-    # Enforce monotonicity on the reversed cumulative minimum
-    ranked = np.minimum.accumulate(ranked[::-1])[::-1]
-    out = np.empty_like(p)
-    out[order] = np.minimum(ranked, 1.0)
     return out
 
 

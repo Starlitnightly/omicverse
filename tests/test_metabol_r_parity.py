@@ -37,12 +37,43 @@ HERE = Path(__file__).parent
 DRIVER = HERE / "metabol_r_reference_driver.R"
 
 
+# ---------------------------------------------------------------------------
+# CI-safe driver smoke test — runs without R, catches script-file drift
+# ---------------------------------------------------------------------------
+def test_r_reference_driver_exists_and_is_well_formed():
+    """The R-parity driver script must stay syntactically valid even when
+    the full R environment isn't present on CI. Checks structural anchors
+    so any refactor drift is caught on every push, not just the dev box."""
+    assert DRIVER.is_file(), f"driver missing at {DRIVER}"
+    src = DRIVER.read_text()
+    # Anchors that the Python side (below) depends on
+    for required in (
+        "library(MetaboAnalystR)",
+        "Ttests.Anal",
+        "PLSR.Anal",
+        "norm_matrix.tsv",
+        "ttest.tsv",
+        "plsda_scores.tsv",
+        "plsda_vip.tsv",
+    ):
+        assert required in src, (
+            f"driver script missing expected anchor {required!r} — "
+            "refactor drift; update tests or driver"
+        )
+
+
 def _find_rscript() -> str | None:
-    for c in ("/scratch/users/steorra/env/CMAP/bin/Rscript",
-              shutil.which("Rscript") or ""):
-        if c and Path(c).exists():
-            return c
-    return None
+    """Locate Rscript.
+
+    In order: the ``OV_METABOL_RSCRIPT`` env var (for dev machines with
+    Rscript in a non-standard location), then whatever ``shutil.which``
+    finds on ``PATH``. Portable across machines.
+    """
+    env_path = os.environ.get("OV_METABOL_RSCRIPT")
+    if env_path and Path(env_path).exists():
+        return env_path
+    from_path = shutil.which("Rscript")
+    return from_path if from_path else None
 
 
 @pytest.fixture(scope="module")
@@ -64,9 +95,11 @@ def r_ref_dir(tmp_path_factory) -> Path:
 
     outdir = tmp_path_factory.mktemp("metabol_r_ref")
     env = os.environ.copy()
-    cmap_extra = Path("/scratch/users/steorra/env/CMAP/R_extra_libs")
-    if cmap_extra.is_dir():
-        env["R_LIBS_USER"] = str(cmap_extra)
+    # Dev machines may have a dedicated MetaboAnalystR R-lib dir; respect
+    # OV_METABOL_R_LIBS_USER to point at one without hard-coding a path.
+    r_libs = os.environ.get("OV_METABOL_R_LIBS_USER")
+    if r_libs and Path(r_libs).is_dir():
+        env["R_LIBS_USER"] = r_libs
     proc = subprocess.run(
         [rscript, str(DRIVER), str(csv_path), str(outdir)],
         capture_output=True, text=True, env=env,

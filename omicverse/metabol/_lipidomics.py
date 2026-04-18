@@ -32,7 +32,7 @@ import pandas as pd
 from anndata import AnnData
 from scipy import stats
 
-from ._msea import _bh_fdr
+from ._utils import bh_fdr as _bh_fdr
 
 
 _DATA_DIR = Path(__file__).parent / "data"
