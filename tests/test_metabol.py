@@ -17,26 +17,7 @@ import pandas as pd
 import pytest
 
 
-CACHEXIA_URL = "https://rest.xialab.ca/api/download/metaboanalyst/human_cachexia.csv"
-CACHEXIA_CACHE = Path(os.environ.get("OV_METABOL_TEST_CACHE", "/tmp")) / "human_cachexia.csv"
-
-
-@pytest.fixture(scope="session")
-def cachexia_csv() -> Path:
-    """Fetch + cache the MetaboAnalyst cachexia demo CSV."""
-    if not CACHEXIA_CACHE.exists():
-        try:
-            CACHEXIA_CACHE.parent.mkdir(parents=True, exist_ok=True)
-            urllib.request.urlretrieve(CACHEXIA_URL, CACHEXIA_CACHE)
-        except Exception as exc:  # pragma: no cover
-            pytest.skip(f"Cannot fetch cachexia CSV ({exc}) — offline CI?")
-    return CACHEXIA_CACHE
-
-
-@pytest.fixture(scope="session")
-def cachexia_adata(cachexia_csv):
-    from omicverse.metabol import read_metaboanalyst
-    return read_metaboanalyst(cachexia_csv, group_col="Muscle loss")
+# cachexia_csv + cachexia_adata fixtures are defined in tests/conftest.py
 
 
 def test_io_loads_77x63(cachexia_adata):

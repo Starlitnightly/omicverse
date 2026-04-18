@@ -56,7 +56,17 @@ Relationship to existing omicverse modules
 from __future__ import annotations
 
 from . import plotting
+from ._id_mapping import available_metabolites, build_lookup, map_ids, normalize_name
 from ._impute import impute
+from ._lipidomics import (
+    LipidIdentity,
+    aggregate_by_class,
+    annotate_lipids,
+    lion_enrichment,
+    parse_lipid,
+)
+from ._msea import load_pathways, msea_gsea, msea_ora
+from ._mummichog import annotate_peaks, mummichog_basic, mummichog_external
 from ._norm import normalize
 from ._plsda import PLSDAResult, opls_da, plsda
 from ._qc import blank_filter, cv_filter, drift_correct
@@ -87,6 +97,24 @@ __all__ = [
     "plsda",
     "opls_da",
     "PLSDAResult",
+    # pathway enrichment
+    "msea_ora",
+    "msea_gsea",
+    "load_pathways",
+    "annotate_peaks",
+    "mummichog_basic",
+    "mummichog_external",
+    # ID mapping
+    "map_ids",
+    "normalize_name",
+    "build_lookup",
+    "available_metabolites",
+    # lipidomics
+    "LipidIdentity",
+    "parse_lipid",
+    "annotate_lipids",
+    "aggregate_by_class",
+    "lion_enrichment",
     # plotting
     "plotting",
     "volcano",

@@ -10,6 +10,9 @@ aliyun_analytics_server/
 __pycache__
 meta.yaml
 data
+# but keep packaged metabolomics lookup / pathway tables
+!omicverse/metabol/data/
+!omicverse/metabol/data/**
 genesets
 temp
 result_simba

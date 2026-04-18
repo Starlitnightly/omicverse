@@ -1,0 +1,87 @@
+{
+  "Glycerophospholipids": {
+    "category": "lipid_class",
+    "members": ["PC", "PE", "PS", "PG", "PI", "PA", "BMP",
+                "LPC", "LPE", "LPS", "LPG", "LPI", "LPA"]
+  },
+  "Phosphatidylcholines": {
+    "category": "lipid_class",
+    "members": ["PC", "LPC"]
+  },
+  "Phosphatidylethanolamines": {
+    "category": "lipid_class",
+    "members": ["PE", "LPE"]
+  },
+  "Phosphatidylserines": {
+    "category": "lipid_class",
+    "members": ["PS", "LPS"]
+  },
+  "Phosphatidylinositols": {
+    "category": "lipid_class",
+    "members": ["PI", "LPI"]
+  },
+  "Lysophospholipids": {
+    "category": "lipid_class",
+    "members": ["LPC", "LPE", "LPS", "LPG", "LPI", "LPA"]
+  },
+  "Sphingolipids": {
+    "category": "lipid_class",
+    "members": ["SM", "Cer", "GlcCer", "LacCer", "Hex2Cer", "Hex3Cer"]
+  },
+  "Sphingomyelins": {
+    "category": "lipid_class",
+    "members": ["SM"]
+  },
+  "Ceramides": {
+    "category": "lipid_class",
+    "members": ["Cer", "GlcCer", "LacCer", "Hex2Cer", "Hex3Cer"]
+  },
+  "Neutral lipids": {
+    "category": "lipid_class",
+    "members": ["TAG", "TG", "DAG", "DG", "MAG", "MG", "CE"]
+  },
+  "Triacylglycerols": {
+    "category": "lipid_class",
+    "members": ["TAG", "TG"]
+  },
+  "Diacylglycerols": {
+    "category": "lipid_class",
+    "members": ["DAG", "DG"]
+  },
+  "Cholesteryl esters": {
+    "category": "lipid_class",
+    "members": ["CE"]
+  },
+  "Fatty acids": {
+    "category": "lipid_class",
+    "members": ["FA"]
+  },
+  "Membrane bilayer constituents": {
+    "category": "function",
+    "members": ["PC", "PE", "PS", "PI", "SM", "Cer"]
+  },
+  "Energy-storage lipids": {
+    "category": "function",
+    "members": ["TAG", "TG", "CE"]
+  },
+  "Lipid second messengers": {
+    "category": "function",
+    "members": ["PI", "PA", "DAG", "DG", "Cer", "LPC", "LPA", "LPE"]
+  },
+  "Mitochondrial membrane lipids": {
+    "category": "subcellular",
+    "members": ["BMP", "PG", "PI"]
+  },
+  "Plasma membrane outer leaflet": {
+    "category": "subcellular",
+    "members": ["PC", "SM", "Cer"]
+  },
+  "Plasma membrane inner leaflet": {
+    "category": "subcellular",
+    "members": ["PE", "PS", "PI", "PA"]
+  },
+  "ER membrane": {
+    "category": "subcellular",
+    "members": ["PC", "PE", "DAG"]
+  }
+}
