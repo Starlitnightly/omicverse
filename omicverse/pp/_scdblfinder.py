@@ -71,12 +71,15 @@ def scdblfinder(
             "Install it with `pip install pyscdblfinder`."
         ) from exc
 
-    effective_dbr = dbr if dbr is not None else (dbr_per1k * adata.n_obs / 1000.0)
-
     def _run_one(sub: anndata.AnnData) -> tuple[np.ndarray, np.ndarray]:
-        sdf = ScDblFinder(sub.copy(), random_state=random_state)
+        # When `dbr` is explicit, every batch shares it (user's intent). When
+        # inferred from `dbr_per1k`, compute it per-batch from `sub.n_obs` so
+        # small batches don't inherit a DBR calibrated to the full dataset
+        # (which would inflate expected-doublet counts by n_batches×).
+        batch_dbr = dbr if dbr is not None else (dbr_per1k * sub.n_obs / 1000.0)
+        sdf = ScDblFinder(sub, random_state=random_state)
         sdf.run(
-            dbr=effective_dbr,
+            dbr=batch_dbr,
             dims=dims,
             n_features=min(n_features, sub.n_vars),
             artificial_doublets=n_artificial,
@@ -96,7 +99,8 @@ def scdblfinder(
     scores = np.zeros(adata.n_obs, dtype=np.float64)
 
     if batch_key is None or batch_key not in adata.obs.columns:
-        predicted, scores = _run_one(adata)
+        # Hand in a fresh copy so ScDblFinder doesn't mutate the caller's view.
+        predicted, scores = _run_one(adata.copy())
     else:
         for batch in adata.obs[batch_key].unique():
             mask = (adata.obs[batch_key] == batch).values

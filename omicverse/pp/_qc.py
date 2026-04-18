@@ -800,10 +800,10 @@ def qc_cpu_gpu_mixed(adata:anndata.AnnData, mode='seurat',
     
     if doublets is True:
         print(f"\n{Colors.HEADER}{Colors.BOLD}🔍 Step 4: Doublet Detection{Colors.ENDC}")
-        if doublets_method not in ('scrublet', 'sccomposite', 'doubletfinder'):
+        if doublets_method not in ('scrublet', 'sccomposite', 'doubletfinder', 'scdblfinder'):
             raise ValueError(
                 f"Unknown doublets_method={doublets_method!r}; "
-                "expected 'scrublet', 'sccomposite', or 'doubletfinder'."
+                "expected 'scrublet', 'sccomposite', 'doubletfinder', or 'scdblfinder'."
             )
         if doublets_method=='scrublet':
             # Post doublets removal QC plot
@@ -1530,10 +1530,10 @@ def qc_gpu(adata, mode='seurat',
     
     if doublets is True:
         print(f"\n{Colors.HEADER}{Colors.BOLD}🔍 Step 4: Doublet Detection{Colors.ENDC}")
-        if doublets_method not in ('scrublet', 'sccomposite', 'doubletfinder'):
+        if doublets_method not in ('scrublet', 'sccomposite', 'doubletfinder', 'scdblfinder'):
             raise ValueError(
                 f"Unknown doublets_method={doublets_method!r}; "
-                "expected 'scrublet', 'sccomposite', or 'doubletfinder'."
+                "expected 'scrublet', 'sccomposite', 'doubletfinder', or 'scdblfinder'."
             )
         if doublets_method=='scrublet':
             print(f"   {Colors.GREEN}{EMOJI['start']} Running GPU-accelerated scrublet...{Colors.ENDC}")
