@@ -73,7 +73,7 @@ from ._qc import blank_filter, cv_filter, drift_correct
 from ._stats import differential
 from ._transform import transform
 from .io import read_lcms, read_metaboanalyst, read_wide
-from .plotting import s_plot, vip_bar, volcano
+from .plotting import pathway_bar, pathway_dot, s_plot, vip_bar, volcano
 from .pymetabo import pyMetabo
 
 __all__ = [
@@ -120,4 +120,6 @@ __all__ = [
     "volcano",
     "s_plot",
     "vip_bar",
+    "pathway_bar",
+    "pathway_dot",
 ]
