@@ -25,6 +25,9 @@ _INSTALL_HINTS = {
     "cutadapt": "pip install cutadapt",
     "emu": "pip install emu",
     "Rscript": "conda install -c conda-forge -y r-base bioconductor-dada2",
+    "mafft": "conda install -c bioconda -y mafft",
+    "FastTree": "conda install -c bioconda -y fasttree",
+    "FastTreeMP": "conda install -c bioconda -y fasttree",
 }
 
 
@@ -40,6 +43,9 @@ _INSTALL_COMMANDS = {
     "gzip": ["gzip", "-c", "conda-forge"],
     "vsearch": ["vsearch", "-c", "bioconda"],
     "cutadapt": ["cutadapt", "-c", "bioconda"],
+    "mafft": ["mafft", "-c", "bioconda"],
+    "FastTree": ["fasttree", "-c", "bioconda"],
+    "FastTreeMP": ["fasttree", "-c", "bioconda"],
 }
 
 
