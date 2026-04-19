@@ -220,7 +220,14 @@ def __getattr__(name):
                 module = importlib.import_module(f'.{name}', package='omicverse')
                 _lazy_modules[name] = module
                 return module
-            except ImportError as e:
+            except Exception as e:
+                # Catch Exception (not just ImportError) because transitive
+                # imports can fail with TypeError, OSError, ValueError, etc.
+                # The scipy 1.17.x _new_distributions module, for instance,
+                # runs doc-generation at import time and raises TypeError
+                # when torch isn't installed — that fires when sklearn pulls
+                # scipy.stats in during the docs build, and was masking this
+                # helper's sphinx stub.
                 _lazy_modules.pop(name, None)
                 # Under Sphinx builds, return an empty stub module instead of
                 # raising, so autosummary/autodoc can still introspect the
@@ -231,12 +238,13 @@ def __getattr__(name):
                     stub = types.ModuleType(f"omicverse.{name}")
                     stub.__doc__ = (
                         f"omicverse.{name} could not be imported in the docs "
-                        f"environment: {e}."
+                        f"environment: {type(e).__name__}: {e}."
                     )
                     _lazy_modules[name] = stub
                     return stub
                 raise AttributeError(
-                    f"Failed to import omicverse.{name}: {e}. "
+                    f"Failed to import omicverse.{name}: "
+                    f"{type(e).__name__}: {e}. "
                     f"A required dependency may not be installed."
                 ) from e
 
