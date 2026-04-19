@@ -222,6 +222,19 @@ def __getattr__(name):
                 return module
             except ImportError as e:
                 _lazy_modules.pop(name, None)
+                # Under Sphinx builds, return an empty stub module instead of
+                # raising, so autosummary/autodoc can still introspect the
+                # name without the entire build aborting when an optional
+                # heavy dependency (marsilea, torch, tangram, …) is absent.
+                if "sphinx" in sys.modules:
+                    import types
+                    stub = types.ModuleType(f"omicverse.{name}")
+                    stub.__doc__ = (
+                        f"omicverse.{name} could not be imported in the docs "
+                        f"environment: {e}."
+                    )
+                    _lazy_modules[name] = stub
+                    return stub
                 raise AttributeError(
                     f"Failed to import omicverse.{name}: {e}. "
                     f"A required dependency may not be installed."
