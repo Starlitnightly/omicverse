@@ -22,6 +22,11 @@ from . import vsearch
 from .amplicon_16s import amplicon_16s_pipeline, build_amplicon_anndata
 from ._db import fetch_sintax_ref, fetch_silva, fetch_rdp
 
+# Phylogeny (MSA + tree inference)
+from .mafft import mafft
+from .fasttree import fasttree
+from .phylogeny import build_phylogeny
+
 __all__ = [
     "single",
     "ref",
@@ -41,4 +46,8 @@ __all__ = [
     "fetch_sintax_ref",
     "fetch_silva",
     "fetch_rdp",
+    # Phylogeny
+    "mafft",
+    "fasttree",
+    "build_phylogeny",
 ]
