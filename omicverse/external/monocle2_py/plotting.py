@@ -88,6 +88,128 @@ def _rotation_matrix(theta_degrees):
 
 
 # ============================================================================
+# plot_trajectory_overlay — draw MST backbone + branch points on a caller-
+# supplied axes. Pair with ov.pl.embedding(basis='X_DDRTree', ...) for a
+# cleaner separation between cell scatter (handled by omicverse) and
+# trajectory geometry (handled here).
+# ============================================================================
+
+def plot_trajectory_overlay(
+    adata,
+    ax,
+    *,
+    x: int = 0,
+    y: int = 1,
+    show_tree: bool = True,
+    show_branch_points: bool = True,
+    backbone_color: str = 'black',
+    cell_link_size: float = 0.75,
+    branch_point_size: float = 150,
+    branch_point_color: str = 'black',
+    branch_point_label_color: str = 'white',
+    branch_point_label_fontsize: float = 8,
+    theta: float = 0.0,
+    zorder_base: int = 3,
+):
+    """Overlay the DDRTree principal-graph skeleton + branch points on an
+    existing Matplotlib axes.
+
+    Use this when the cell scatter has been rendered by a different
+    plotting backend (e.g. :func:`ov.pl.embedding(basis='X_DDRTree')`)
+    and you only want the trajectory geometry on top.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Must carry ``adata.uns['monocle']['reducedDimK']`` and
+        ``adata.uns['monocle']['mst']`` (populated by
+        ``Monocle.reduce_dimension`` with ``reduction_method='DDRTree'``).
+    ax : matplotlib.axes.Axes
+        Target axes. The tree coordinates are taken from
+        ``reducedDimK`` which shares the coordinate system of
+        ``adata.obsm['X_DDRTree']`` — if you plotted with
+        ``ov.pl.embedding(basis='X_DDRTree')`` the overlay lines up.
+    x, y : int
+        Component indices (default 0, 1).
+    show_tree : bool
+        Draw MST edges.
+    show_branch_points : bool
+        Mark each branch-point vertex with a filled dot + numeric label.
+    backbone_color : str
+    cell_link_size : float
+        Line width for MST edges.
+    branch_point_size : float
+        Scatter marker size for branch vertices.
+    branch_point_color, branch_point_label_color, branch_point_label_fontsize
+        Styling for the branch-point markers.
+    theta : float
+        Rotation angle in degrees. Only use this if you passed the same
+        ``theta`` to the underlying embedding — otherwise leave 0.
+    zorder_base : int
+        Base z-order for the overlay elements (edges use this, vertex
+        markers ``+2``, vertex labels ``+3``).
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+        The same axes, for chaining.
+    """
+    if 'monocle' not in adata.uns:
+        raise KeyError(
+            "adata.uns['monocle'] is missing — run "
+            "Monocle.reduce_dimension(method='DDRTree') first."
+        )
+    monocle = adata.uns['monocle']
+    if monocle.get('dim_reduce_type', 'DDRTree') != 'DDRTree':
+        raise ValueError(
+            f"plot_trajectory_overlay expects a DDRTree reduction, got "
+            f"{monocle.get('dim_reduce_type')!r}."
+        )
+    tree_coords = np.asarray(monocle['reducedDimK']).T  # (K, dim)
+    mst = monocle['mst']
+
+    if theta != 0:
+        rot = _rotation_matrix(theta)
+        tree_coords = np.column_stack([tree_coords[:, x], tree_coords[:, y]]) @ rot.T
+        x_plot, y_plot = 0, 1
+    else:
+        x_plot, y_plot = x, y
+
+    if show_tree:
+        for e in mst.es:
+            i, j = e.source, e.target
+            ax.plot(
+                [tree_coords[i, x_plot], tree_coords[j, x_plot]],
+                [tree_coords[i, y_plot], tree_coords[j, y_plot]],
+                color=backbone_color, linewidth=cell_link_size,
+                zorder=zorder_base,
+            )
+
+    if show_branch_points:
+        branch_points = monocle.get('branch_points', [])
+        mst_names = mst.vs['name']
+        for bp_idx, bp_name in enumerate(branch_points):
+            if bp_name not in mst_names:
+                continue
+            v_idx = mst_names.index(bp_name)
+            ax.scatter(
+                tree_coords[v_idx, x_plot], tree_coords[v_idx, y_plot],
+                s=branch_point_size, c=branch_point_color,
+                zorder=zorder_base + 2,
+                edgecolors='white', linewidths=1.5,
+            )
+            ax.text(
+                tree_coords[v_idx, x_plot], tree_coords[v_idx, y_plot],
+                str(bp_idx + 1), ha='center', va='center',
+                color=branch_point_label_color,
+                fontsize=branch_point_label_fontsize,
+                fontweight='bold',
+                zorder=zorder_base + 3,
+            )
+    return ax
+
+
+# ============================================================================
 # plot_cell_trajectory
 # ============================================================================
 
