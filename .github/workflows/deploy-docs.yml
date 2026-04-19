@@ -40,12 +40,14 @@ jobs:
           pip install -r omicverse_guide/requirements.txt
 
       # ── 5. Build Sphinx HTML ───────────────────────────────────────────
+      # -T: show full traceback on extension errors so failures are debuggable
+      #     without a second manual run.
       - name: Build docs
         run: |
           sphinx-build -b html \
             omicverse_guide/docs \
             omicverse_guide/docs/_build/html \
-            -q
+            -q -T
 
       # ── 6. Configure git identity for gh-deploy push ──────────────────
       - name: Configure git
