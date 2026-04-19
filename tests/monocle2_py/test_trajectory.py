@@ -80,10 +80,25 @@ def test_state_assignment_distinct_branches(three_branch_adata):
 
 
 def test_state_ids_are_positive_integers(small_branching_adata):
-    """No cell should carry state 0 — R's Monocle uses 1-indexed states."""
+    """No cell should carry state 0 — R's Monocle uses 1-indexed states.
+
+    State is stored as a string-keyed Categorical (matches R's
+    ``"1","2",...``) so that plotting backends whose palette keys are
+    always strings don't KeyError on integer categories. This test
+    parses the stored labels back to int for the value-range check.
+    """
     mono = Monocle(small_branching_adata.copy())
     mono.preprocess().select_ordering_genes().reduce_dimension().order_cells()
-    states = np.asarray(mono.adata.obs["State"].values)
+    raw = mono.adata.obs["State"]
+    assert str(raw.dtype) == "category", (
+        f"Expected State to be Categorical, got dtype {raw.dtype}"
+    )
+    # Every category must be a numeric string (R-Monocle convention).
+    for cat in raw.cat.categories:
+        assert isinstance(cat, str) and cat.isdigit(), (
+            f"Expected numeric-string State categories, got {cat!r}"
+        )
+    states = np.asarray(raw.astype(int).values)
     assert (states >= 1).all(), "State 0 found — R uses 1-indexed states"
 
 
