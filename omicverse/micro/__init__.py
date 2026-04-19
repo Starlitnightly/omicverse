@@ -37,6 +37,7 @@ from ._diversity import Alpha, Beta, ALPHA_METRICS, BETA_METRICS
 from ._ord import Ordinate
 from ._da import DA
 from ._pp import rarefy, filter_by_prevalence, collapse_taxa, clr, ilr
+from ._phylo import attach_tree
 
 __all__ = [
     # diversity
@@ -54,4 +55,6 @@ __all__ = [
     "collapse_taxa",
     "clr",
     "ilr",
+    # phylogeny
+    "attach_tree",
 ]
