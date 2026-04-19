@@ -10,6 +10,13 @@ aliyun_analytics_server/
 __pycache__
 meta.yaml
 data
+# Keep packaged metabolomics lookup / pathway tables (CSV is source-of-truth;
+# parquet is a generated cache and should not be committed)
+!omicverse/metabol/data/
+!omicverse/metabol/data/*.csv
+!omicverse/metabol/data/*.json
+!omicverse/metabol/data/README*
+omicverse/metabol/data/*.parquet
 genesets
 temp
 result_simba

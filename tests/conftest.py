@@ -160,3 +160,28 @@ def pytest_pyfunc_call(pyfuncitem):
         finally:
             loop.close()
         return True
+
+
+# ---------------------------------------------------------------------------
+# Shared fixtures for ov.metabol tests — avoid duplicating the cachexia
+# fetch + AnnData construction across multiple test modules.
+# ---------------------------------------------------------------------------
+_CACHEXIA_URL = "https://rest.xialab.ca/api/download/metaboanalyst/human_cachexia.csv"
+
+
+@pytest.fixture(scope="session")
+def cachexia_csv():
+    cache = _TEST_CACHE_ROOT / "human_cachexia.csv"
+    if not cache.exists():
+        import urllib.request
+        try:
+            urllib.request.urlretrieve(_CACHEXIA_URL, cache)
+        except Exception as exc:
+            pytest.skip(f"cannot fetch cachexia CSV: {exc}")
+    return cache
+
+
+@pytest.fixture(scope="session")
+def cachexia_adata(cachexia_csv):
+    from omicverse.metabol import read_metaboanalyst
+    return read_metaboanalyst(cachexia_csv, group_col="Muscle loss")
