@@ -6,6 +6,20 @@ import pandas as pd
 import pytest
 
 
+def _skbio_available() -> bool:
+    try:
+        import skbio  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+requires_skbio = pytest.mark.skipif(
+    not _skbio_available(),
+    reason="scikit-bio not installed; optional dependency for phylogenetic / diversity metrics",
+)
+
+
 def _make_adata(n_samples: int = 6, n_features: int = 8, seed: int = 0):
     import anndata as ad
     from scipy import sparse
@@ -74,6 +88,7 @@ def test_collapse_taxa_by_phylum():
     assert ag.X.toarray().sum() == adata.X.toarray().sum()
 
 
+@requires_skbio
 def test_alpha_shannon_observed_runs_and_writes_obs():
     from omicverse.micro import Alpha
     adata = _make_adata()
@@ -83,6 +98,7 @@ def test_alpha_shannon_observed_runs_and_writes_obs():
     assert "shannon" in adata.obs.columns
 
 
+@requires_skbio
 def test_beta_does_not_mutate_rarefy_depth():
     """Regression test for PR#637 review: Beta.run() mutated self.rarefy_depth."""
     from omicverse.micro import Beta
@@ -116,6 +132,7 @@ def test_da_wilcoxon_returns_expected_columns():
     assert (out["p_value"] >= 0).all() and (out["p_value"] <= 1).all()
 
 
+@requires_skbio
 def test_beta_run_then_ordinate_pcoa_writes_obsm():
     """End-to-end smoke: Beta -> Ordinate.pcoa populates adata.obsm."""
     from omicverse.micro import Beta, Ordinate
@@ -129,6 +146,7 @@ def test_beta_run_then_ordinate_pcoa_writes_obsm():
     assert adata.obsm["braycurtis_pcoa"].shape == (6, 3)
 
 
+@requires_skbio
 def test_ordinate_nmds_shape():
     from omicverse.micro import Beta, Ordinate
     adata = _make_adata(n_samples=6, n_features=8)
@@ -138,6 +156,7 @@ def test_ordinate_nmds_shape():
     assert "braycurtis_nmds" in adata.obsm.keys()
 
 
+@requires_skbio
 def test_beta_rejects_zero_depth_rarefaction():
     """Regression: auto-chosen depth of 0 should raise, not silently rarefy to 0."""
     import anndata as ad
