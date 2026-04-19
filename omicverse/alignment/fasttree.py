@@ -43,6 +43,9 @@ def fasttree(
     overwrite: bool = False,
 ) -> Dict[str, str]:
     """Run FastTree to infer a phylogenetic tree."""
+    if nt and model not in ("gtr", "jc"):
+        raise ValueError(f"Unknown nt model {model!r}; use 'gtr' or 'jc'.")
+
     out_root = ensure_dir(output_dir)
     tree = Path(out_root) / output_name
     log = Path(out_root) / "fasttree.log"
@@ -61,8 +64,6 @@ def fasttree(
         cmd.append("-nt")
         if model == "gtr":
             cmd.append("-gtr")
-        elif model != "jc":
-            raise ValueError(f"Unknown nt model {model!r}; use 'gtr' or 'jc'.")
     if gamma:
         cmd.append("-gamma")
     if extra_args:

@@ -70,16 +70,6 @@ def mafft(
     -------
     ``{"input": …, "aligned": …, "log": …}`` — absolute paths.
     """
-    out_root = ensure_dir(output_dir)
-    aligned = Path(out_root) / output_name
-    log = Path(out_root) / "mafft.log"
-
-    if not overwrite and aligned.exists() and aligned.stat().st_size > 0:
-        return {"input": str(input_fasta), "aligned": str(aligned), "log": str(log)}
-
-    mafft_bin = resolve_executable("mafft", mafft_path, auto_install=auto_install)
-    env = build_env(extra_paths=[str(Path(mafft_bin).parent)])
-
     mode_flags = {
         "auto":    ["--auto"],
         "fftns":   ["--retree", "2"],
@@ -92,6 +82,16 @@ def mafft(
         raise ValueError(
             f"Unknown MAFFT mode {mode!r}; use one of {sorted(mode_flags)}"
         )
+
+    out_root = ensure_dir(output_dir)
+    aligned = Path(out_root) / output_name
+    log = Path(out_root) / "mafft.log"
+
+    if not overwrite and aligned.exists() and aligned.stat().st_size > 0:
+        return {"input": str(input_fasta), "aligned": str(aligned), "log": str(log)}
+
+    mafft_bin = resolve_executable("mafft", mafft_path, auto_install=auto_install)
+    env = build_env(extra_paths=[str(Path(mafft_bin).parent)])
     cmd = [mafft_bin, "--thread", str(threads), *mode_flags[mode]]
     if extra_args:
         cmd.extend(str(a) for a in extra_args)
