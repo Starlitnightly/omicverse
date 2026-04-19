@@ -68,10 +68,109 @@ def _download(url: str, path: Path, *, user_agent: str = "omicverse/metabol") ->
     """HTTP GET ``url`` → ``path``, with a ``Mozilla``-style UA because
     both GitHub raw and Zenodo 403 on the default urllib UA."""
     req = urllib.request.Request(url, headers={"User-Agent": user_agent})
-    with urllib.request.urlopen(req, timeout=60) as resp:
+    with urllib.request.urlopen(req, timeout=120) as resp:
         data = resp.read()
     path.write_bytes(data)
     return path
+
+
+# ---------------------------------------------------------------------------
+# ChEBI compound master table — monoisotopic mass + KEGG/HMDB/LipidMaps xrefs
+# ---------------------------------------------------------------------------
+def fetch_chebi_compounds(
+    *,
+    cache: bool = True,
+    refresh: bool = False,
+) -> "pd.DataFrame":
+    """Build a compound master table from ChEBI's flat-file TSVs.
+
+    Downloads + joins three ChEBI distributions from the public EBI
+    FTP (over HTTPS):
+
+    - ``compounds.tsv.gz``          — ChEBI ID → canonical name
+    - ``chemical_data.tsv.gz``      — monoisotopic mass + formula
+    - ``database_accession.tsv.gz`` — HMDB / KEGG / LipidMaps xrefs
+
+    Total download is ~15 MB; the joined parquet cache persists at
+    ``~/.cache/omicverse/metabol/chebi_compounds.parquet``. This is the
+    substrate :func:`annotate_peaks` uses for mummichog mass matching.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: ``chebi_id``, ``name``, ``formula``, ``mw``
+        (monoisotopic, float), ``kegg``, ``hmdb``, ``lipidmaps``.
+        Rows without a monoisotopic mass are dropped.
+    """
+    cache_path = _cache_dir() / "chebi_compounds.parquet"
+    if cache and cache_path.exists() and not refresh:
+        try:
+            return pd.read_parquet(cache_path)
+        except Exception:
+            pass
+
+    base = "https://ftp.ebi.ac.uk/pub/databases/chebi/flat_files"
+    paths = {
+        "compounds":     (_cache_dir() / "chebi_compounds.tsv.gz", "compounds.tsv.gz"),
+        "chemical_data": (_cache_dir() / "chebi_chemical_data.tsv.gz", "chemical_data.tsv.gz"),
+        "accession":     (_cache_dir() / "chebi_database_accession.tsv.gz", "database_accession.tsv.gz"),
+    }
+    for path, fname in paths.values():
+        if not path.exists() or refresh:
+            _download(f"{base}/{fname}", path)
+
+    # compounds.tsv: id, name, status_id, chebi_accession, stars, ...
+    compounds = pd.read_csv(paths["compounds"][0], sep="\t", compression="gzip",
+                            usecols=["id", "name", "chebi_accession", "stars"],
+                            dtype=str, low_memory=False)
+    compounds = compounds[compounds["stars"].astype(str) == "3"]
+    compounds = compounds[["id", "name", "chebi_accession"]].rename(
+        columns={"id": "compound_id", "chebi_accession": "chebi_id"}
+    )
+
+    # chemical_data.tsv already has formula + monoisotopic_mass as columns
+    cdata = pd.read_csv(paths["chemical_data"][0], sep="\t", compression="gzip",
+                        usecols=["compound_id", "formula", "monoisotopic_mass"],
+                        dtype={"compound_id": str, "formula": str,
+                               "monoisotopic_mass": str},
+                        low_memory=False)
+    cdata["mw"] = pd.to_numeric(cdata["monoisotopic_mass"], errors="coerce")
+    cdata = cdata.dropna(subset=["mw"])[["compound_id", "formula", "mw"]]
+    cdata["formula"] = cdata["formula"].fillna("")
+    # Keep the first row per compound (multiple structures can exist)
+    cdata = cdata.drop_duplicates("compound_id", keep="first")
+
+    # database_accession.tsv: id, compound_id, accession_number, type, source_id
+    # Source IDs confirmed by inspection of the v260 dump:
+    #   35 → HMDB,  45 → KEGG COMPOUND,  50 → LIPID MAPS
+    acc = pd.read_csv(paths["accession"][0], sep="\t", compression="gzip",
+                      usecols=["compound_id", "accession_number", "source_id"],
+                      dtype=str, low_memory=False)
+    xref = acc.rename(columns={"accession_number": "accession"})
+    kegg = (xref[xref["source_id"] == "45"]
+            .groupby("compound_id")["accession"].first()
+            .rename("kegg").reset_index())
+    hmdb = (xref[xref["source_id"] == "35"]
+            .groupby("compound_id")["accession"].first()
+            .rename("hmdb").reset_index())
+    lipidmaps = (xref[xref["source_id"] == "50"]
+                 .groupby("compound_id")["accession"].first()
+                 .rename("lipidmaps").reset_index())
+
+    out = (compounds.merge(cdata, on="compound_id", how="inner")
+                     .merge(kegg, on="compound_id", how="left")
+                     .merge(hmdb, on="compound_id", how="left")
+                     .merge(lipidmaps, on="compound_id", how="left")
+                     .drop(columns=["compound_id"]))
+    for col in ("kegg", "hmdb", "lipidmaps", "formula"):
+        out[col] = out[col].fillna("")
+
+    if cache:
+        try:
+            out.to_parquet(cache_path, index=False)
+        except Exception:
+            pass
+    return out
 
 
 # ---------------------------------------------------------------------------

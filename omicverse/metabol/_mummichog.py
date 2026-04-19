@@ -32,7 +32,7 @@ from typing import Iterable, Optional
 import numpy as np
 import pandas as pd
 
-from ._id_mapping import _load_lookup
+from ._fetchers import fetch_chebi_compounds
 from ._msea import load_pathways
 from ._utils import bh_fdr as _bh_fdr
 
@@ -62,6 +62,7 @@ def annotate_peaks(
     polarity: str = "positive",
     ppm: float = 10.0,
     custom_adducts: Optional[list[tuple[str, float, str]]] = None,
+    mass_db: Optional[pd.DataFrame] = None,
 ) -> pd.DataFrame:
     """Map a list of m/z peaks to candidate KEGG compounds via adduct search.
 
@@ -78,6 +79,13 @@ def annotate_peaks(
     custom_adducts
         Override the default adduct list. Each entry is
         ``(name, delta_mass, sign_str)``.
+    mass_db
+        Compound master table with at least ``mw``, ``kegg``, ``name``
+        columns. Defaults to ``ov.metabol.fetch_chebi_compounds()`` —
+        ~54k ChEBI 3-star compounds with monoisotopic mass and
+        KEGG/HMDB/LIPID MAPS cross-refs. Pass your own DataFrame to
+        restrict the search space (e.g. only lipids, or a curated
+        clinical panel).
 
     Returns
     -------
@@ -93,9 +101,14 @@ def annotate_peaks(
     else:
         raise ValueError(f"polarity must be 'positive' or 'negative', got {polarity!r}")
 
-    lookup = _load_lookup()
-    lookup = lookup[lookup["mw"].notna() & (lookup["kegg"] != "")].copy()
-    masses = lookup["mw"].to_numpy()
+    lookup = mass_db if mass_db is not None else fetch_chebi_compounds()
+    for col in ("mw", "kegg", "name"):
+        if col not in lookup.columns:
+            raise ValueError(
+                f"mass_db must have column {col!r}; got {list(lookup.columns)}"
+            )
+    lookup = lookup[lookup["mw"].notna() & (lookup["kegg"].astype(str) != "")].copy()
+    masses = lookup["mw"].to_numpy(dtype=np.float64)
     kegg_arr = lookup["kegg"].to_numpy()
     name_arr = lookup["name"].to_numpy()
 
@@ -141,6 +154,7 @@ def mummichog_basic(
     n_perm: int = 1000,
     min_overlap: int = 2,
     pathways: Optional[dict[str, list[str]]] = None,
+    mass_db: Optional[pd.DataFrame] = None,
     seed: int = 0,
 ) -> pd.DataFrame:
     """Pure-Python mummichog — pathway enrichment from m/z peaks.
@@ -186,11 +200,13 @@ def mummichog_basic(
             f"Too few significant peaks ({hit_mask.sum()}) at p<{significance_cutoff}."
         )
 
-    ann = annotate_peaks(mz, polarity=polarity, ppm=ppm)
+    ann = annotate_peaks(mz, polarity=polarity, ppm=ppm, mass_db=mass_db)
     if ann.empty:
         raise ValueError(
-            "No m/z peak matched any KEGG compound — check polarity, ppm, or "
-            "extend metabolite_lookup.csv."
+            "No m/z peak matched any KEGG compound at the requested polarity "
+            "and ppm. Check that polarity matches the ionization mode of your "
+            "experiment, loosen ppm (e.g. 20 for QTOF), or pass a smaller "
+            "mass_db restricted to the compound classes you expect."
         )
 
     # Map peak_idx → set of candidate KEGG compounds (one peak can vote for many)

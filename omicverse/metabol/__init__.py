@@ -61,11 +61,12 @@ from __future__ import annotations
 from . import plotting
 from ._fetchers import (
     clear_cache,
+    fetch_chebi_compounds,
     fetch_hmdb_from_name,
     fetch_kegg_pathways,
     fetch_lion_associations,
 )
-from ._id_mapping import available_metabolites, build_lookup, map_ids, normalize_name
+from ._id_mapping import map_ids, normalize_name
 from ._impute import impute
 from ._lipidomics import (
     LipidIdentity,
@@ -116,11 +117,10 @@ __all__ = [
     # ID mapping
     "map_ids",
     "normalize_name",
-    "build_lookup",
-    "available_metabolites",
     # Database fetchers (full DBs via cached on-demand download)
     "fetch_kegg_pathways",
     "fetch_lion_associations",
+    "fetch_chebi_compounds",
     "fetch_hmdb_from_name",
     "clear_cache",
     # lipidomics

@@ -26,34 +26,32 @@ from ._id_mapping import map_ids, normalize_name
 from ._utils import bh_fdr as _bh_fdr
 
 
-_DATA_DIR = Path(__file__).parent / "data"
-_PATHWAY_PATH = _DATA_DIR / "kegg_pathways.csv"
-
-
 def load_pathways(
     path: Optional[Path] = None,
     *,
-    source: str = "shipped",
     organism: Optional[str] = None,
 ) -> dict[str, list[str]]:
-    """Return ``{pathway_name: [kegg_id, ...]}``.
+    """Return ``{pathway_name: [kegg_id, ...]}`` — the pathway database
+    used by :func:`msea_ora` / :func:`msea_gsea` / :func:`mummichog_basic`.
+
+    The default is the **full KEGG pathway database** fetched from the
+    public KEGG REST endpoint (cached under
+    ``~/.cache/omicverse/metabol/``; ~550 pathways). First call needs
+    network; subsequent calls are free.
 
     Parameters
     ----------
     path
-        Override with your own CSV (same layout as the shipped one).
-        Takes precedence over ``source``.
-    source
-        - ``"shipped"`` (default) — the ~35-pathway curated subset bundled
-          with omicverse. Fast, offline, OK for tutorial-scale data.
-        - ``"kegg"`` — fetch the **full** KEGG pathway↔compound map via
-          ``ov.metabol.fetch_kegg_pathways()``. ~550 pathways cached under
-          ``~/.cache/omicverse/metabol/``. Use this for real analysis.
+        Override with your own pathway CSV (columns: ``pathway_name``,
+        ``kegg_compounds`` — the latter a ``;``-joined list of KEGG IDs).
+        Useful for domain-specific pathway collections (e.g. SMPDB,
+        Reactome-metabolite, or a curated clinical panel). Skips the
+        network entirely.
     organism
-        Only used when ``source="kegg"``. E.g. ``"hsa"`` for human
-        (species-specific pathways). Default ``None`` → reference
-        metabolic map (species-agnostic), which is what enrichment
-        papers usually use.
+        KEGG organism code for species-specific pathways (``"hsa"``
+        human, ``"mmu"`` mouse, …). Default ``None`` → species-agnostic
+        ``map#####`` reference metabolic pathways, which is what
+        enrichment papers usually use.
     """
     if path is not None:
         df = pd.read_csv(path)
@@ -61,16 +59,8 @@ def load_pathways(
             row["pathway_name"]: row["kegg_compounds"].split(";")
             for _, row in df.iterrows()
         }
-    if source == "kegg":
-        from ._fetchers import fetch_kegg_pathways
-        return fetch_kegg_pathways(organism=organism)
-    if source != "shipped":
-        raise ValueError(f"source must be 'shipped' or 'kegg', got {source!r}")
-    df = pd.read_csv(_PATHWAY_PATH)
-    return {
-        row["pathway_name"]: row["kegg_compounds"].split(";")
-        for _, row in df.iterrows()
-    }
+    from ._fetchers import fetch_kegg_pathways
+    return fetch_kegg_pathways(organism=organism)
 
 
 def msea_ora(

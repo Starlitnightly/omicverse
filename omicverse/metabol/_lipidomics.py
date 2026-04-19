@@ -35,8 +35,6 @@ from scipy import stats
 from ._utils import bh_fdr as _bh_fdr
 
 
-_DATA_DIR = Path(__file__).parent / "data"
-_LION_PATH = _DATA_DIR / "lion_subset.json"
 
 
 @dataclass
@@ -152,19 +150,17 @@ def aggregate_by_class(adata: AnnData, *, agg: str = "sum") -> AnnData:
     return AnnData(X=X_agg, obs=adata.obs.copy(), var=new_var)
 
 
-def _load_lion_subset() -> dict[str, dict]:
-    """LION-inspired compact ontology (shipped in data/lion_subset.json).
+def _load_lion_ontology() -> dict[str, dict]:
+    """Fetch the full LION ontology via
+    :func:`omicverse.metabol.fetch_lion_associations`.
 
-    For the full ~730-term LION ontology, call
-    ``ov.metabol.fetch_lion_associations()`` and pass the result to
-    :func:`lion_enrichment` via the ``ontology=`` argument.
+    Cached on first call at ``~/.cache/omicverse/metabol/``; subsequent
+    calls are free. To use a custom ontology (dict of
+    ``{term_name: {"category": str, "members": [lipid_class, ...]}}``),
+    pass it explicitly to :func:`lion_enrichment` via ``ontology=``.
     """
-    if not _LION_PATH.exists():
-        # Fallback to a hard-coded minimal set so tests don't break if the
-        # file is missing from a partial install.
-        return _FALLBACK_LION
-    with open(_LION_PATH) as f:
-        return json.load(f)
+    from ._fetchers import fetch_lion_associations
+    return fetch_lion_associations()
 
 
 def lion_enrichment(
@@ -186,7 +182,7 @@ def lion_enrichment(
         Dict of ``{term_name: {"members": [lipid_class, ...], "category": ...}}``.
         If ``None``, the local LION subset is used.
     """
-    ont = ontology if ontology is not None else _load_lion_subset()
+    ont = ontology if ontology is not None else _load_lion_ontology()
 
     hit_classes = [p.lipid_class for p in (parse_lipid(h) for h in hits) if p]
     bg_classes = [p.lipid_class for p in (parse_lipid(b) for b in background) if p]
@@ -224,37 +220,3 @@ def lion_enrichment(
         return out
     out["padj"] = _bh_fdr(out["pvalue"].to_numpy())
     return out.sort_values("pvalue").reset_index(drop=True)
-
-
-# Fallback compact ontology if data/lion_subset.json is missing
-_FALLBACK_LION = {
-    "Glycerophospholipids": {
-        "category": "lipid_class",
-        "members": ["PC", "PE", "PS", "PG", "PI", "PA", "BMP",
-                    "LPC", "LPE", "LPS", "LPG", "LPI", "LPA"],
-    },
-    "Lysophospholipids": {
-        "category": "lipid_class",
-        "members": ["LPC", "LPE", "LPS", "LPG", "LPI", "LPA"],
-    },
-    "Sphingolipids": {
-        "category": "lipid_class",
-        "members": ["SM", "Cer", "GlcCer", "LacCer", "Hex2Cer", "Hex3Cer"],
-    },
-    "Neutral lipids": {
-        "category": "lipid_class",
-        "members": ["TAG", "TG", "DAG", "DG", "MAG", "MG", "CE"],
-    },
-    "Membrane constituents": {
-        "category": "function",
-        "members": ["PC", "PE", "PS", "PI", "SM", "Cer"],
-    },
-    "Energy storage": {
-        "category": "function",
-        "members": ["TAG", "TG", "CE"],
-    },
-    "Signaling lipids": {
-        "category": "function",
-        "members": ["PI", "PA", "DAG", "DG", "Cer", "LPC", "LPA", "LPE"],
-    },
-}
