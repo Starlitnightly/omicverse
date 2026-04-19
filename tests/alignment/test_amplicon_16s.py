@@ -55,6 +55,43 @@ def test_discover_samples_empty_dir(tmp_path):
         _discover_samples(str(tmp_path))
 
 
+def test_discover_samples_single_end_without_r2(tmp_path):
+    """R1-only (no matching R2) should still surface as (sample, fq1, None)."""
+    from omicverse.alignment.amplicon_16s import _discover_samples
+    _mk_fastq(tmp_path, "S1_R1_001.fastq")   # no S1_R2_001.fastq alongside
+    out = _discover_samples(str(tmp_path))
+    assert len(out) == 1
+    name, fq1, fq2 = out[0]
+    assert name == "S1"
+    assert fq1.endswith("_R1_001.fastq")
+    assert fq2 is None
+
+
+def test_amplicon_pipeline_rejects_rev_without_fwd():
+    from omicverse.alignment import amplicon_16s_pipeline
+    with pytest.raises(ValueError, match="primer_fwd"):
+        amplicon_16s_pipeline(
+            samples=[("S1", "/tmp/fake_R1.fq.gz", "/tmp/fake_R2.fq.gz")],
+            workdir="/tmp/whatever",
+            primer_rev="GGACTACNVGGGTWTCTAAT",  # no primer_fwd
+        )
+
+
+def test_amplicon_pipeline_rejects_missing_workdir():
+    from omicverse.alignment import amplicon_16s_pipeline
+    with pytest.raises(ValueError, match="workdir"):
+        amplicon_16s_pipeline(samples=[("S1", "/tmp/a.fq.gz", "/tmp/b.fq.gz")])
+
+
+def test_amplicon_pipeline_rejects_unsafe_sample_name(tmp_path):
+    from omicverse.alignment import amplicon_16s_pipeline
+    with pytest.raises(ValueError, match="Illegal sample name"):
+        amplicon_16s_pipeline(
+            samples=[("../escape", "/tmp/a.fq.gz", "/tmp/b.fq.gz")],
+            workdir=str(tmp_path),
+        )
+
+
 # ---------------------------------------------------------------------------
 # _parse_sintax_tsv
 # ---------------------------------------------------------------------------

@@ -114,3 +114,56 @@ def test_da_wilcoxon_returns_expected_columns():
     for col in ("feature", "U_stat", "p_value", "fdr_bh", "prevalence"):
         assert col in out.columns
     assert (out["p_value"] >= 0).all() and (out["p_value"] <= 1).all()
+
+
+def test_beta_run_then_ordinate_pcoa_writes_obsm():
+    """End-to-end smoke: Beta -> Ordinate.pcoa populates adata.obsm."""
+    from omicverse.micro import Beta, Ordinate
+    adata = _make_adata(n_samples=6, n_features=8)
+    Beta(adata).run(metric="braycurtis", rarefy=True)
+    assert "braycurtis" in adata.obsp.keys()
+
+    coords = Ordinate(adata, dist_key="braycurtis").pcoa(n=3)
+    assert coords.shape == (6, 3)
+    assert "braycurtis_pcoa" in adata.obsm.keys()
+    assert adata.obsm["braycurtis_pcoa"].shape == (6, 3)
+
+
+def test_ordinate_nmds_shape():
+    from omicverse.micro import Beta, Ordinate
+    adata = _make_adata(n_samples=6, n_features=8)
+    Beta(adata).run(metric="braycurtis")
+    coords = Ordinate(adata, dist_key="braycurtis").nmds(n=2, random_state=0)
+    assert coords.shape == (6, 2)
+    assert "braycurtis_nmds" in adata.obsm.keys()
+
+
+def test_beta_rejects_zero_depth_rarefaction():
+    """Regression: auto-chosen depth of 0 should raise, not silently rarefy to 0."""
+    import anndata as ad
+    from scipy import sparse
+    from omicverse.micro import Beta
+    # one sample with all-zero counts
+    X = np.array([[0, 0, 0], [5, 3, 2], [1, 1, 1]], dtype=np.int32)
+    adata = ad.AnnData(X=sparse.csr_matrix(X),
+                       obs=pd.DataFrame(index=["S0", "S1", "S2"]),
+                       var=pd.DataFrame(index=["A", "B", "C"]))
+    with pytest.raises(ValueError, match="depth is 0"):
+        Beta(adata).run(metric="braycurtis", rarefy=True)
+
+
+def test_pseudo_count_vectorised_matches_loop():
+    """Regression: ensure the vectorised _pseudo_count produces the same
+    result as a minimal row-loop reference implementation."""
+    from omicverse.micro._pp import _pseudo_count
+    rng = np.random.default_rng(7)
+    X = rng.integers(0, 5, size=(4, 6))
+    # reference: explicit loop
+    ref = X.astype(np.float64).copy()
+    for i in range(ref.shape[0]):
+        nz = ref[i][ref[i] > 0]
+        if len(nz) == 0:
+            continue
+        ref[i][ref[i] == 0] = nz.min() / 2.0
+    out = _pseudo_count(X.copy())
+    np.testing.assert_allclose(out, ref, rtol=0, atol=0)

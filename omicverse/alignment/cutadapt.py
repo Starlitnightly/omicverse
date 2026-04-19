@@ -111,11 +111,14 @@ def _run_cutadapt_one(
     cmd.extend(["-o", str(trim1)])
     if fq2:
         cmd.extend(["-p", str(trim2)])
+    # Extra flags must come BEFORE positional input FASTQs — cutadapt treats
+    # everything after the first non-option as a positional argument, so
+    # flags appended at the end would be misread as additional inputs.
+    if extra_args:
+        cmd.extend(str(a) for a in extra_args)
     cmd.append(str(fq1))
     if fq2:
         cmd.append(str(fq2))
-    if extra_args:
-        cmd.extend(str(a) for a in extra_args)
 
     with open(log, "w") as fh:
         print(">>", " ".join(shlex.quote(str(c)) for c in cmd), flush=True)

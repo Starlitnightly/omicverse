@@ -55,6 +55,15 @@ class Ordinate:
 
     # ----- PCoA -----
 
+    @register_function(
+        aliases=["ordinate.pcoa", "pcoa_run", "principal_coordinates"],
+        category="microbiome",
+        description="Principal Coordinates Analysis on a sample × sample distance matrix; writes coords into adata.obsm.",
+        examples=[
+            "ov.micro.Ordinate(adata, dist_key='braycurtis').pcoa(n=3)",
+        ],
+        related=["micro.Beta", "micro.Ordinate"],
+    )
     def pcoa(self, n: int = 3, write_to_obsm: bool = True) -> pd.DataFrame:
         """Principal coordinates analysis.
 
@@ -85,6 +94,15 @@ class Ordinate:
 
     # ----- NMDS (non-metric) -----
 
+    @register_function(
+        aliases=["ordinate.nmds", "nmds_run", "non_metric_mds"],
+        category="microbiome",
+        description="Non-metric multidimensional scaling on a sample × sample distance matrix (via sklearn); writes coords into adata.obsm.",
+        examples=[
+            "ov.micro.Ordinate(adata, dist_key='braycurtis').nmds(n=2)",
+        ],
+        related=["micro.Ordinate"],
+    )
     def nmds(self, n: int = 2, random_state: int = 0,
              write_to_obsm: bool = True) -> pd.DataFrame:
         """Non-metric multi-dimensional scaling (via sklearn)."""

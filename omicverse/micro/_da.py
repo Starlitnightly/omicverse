@@ -83,6 +83,15 @@ class DA:
     # wilcoxon
     # ------------------------------------------------------------------
 
+    @register_function(
+        aliases=["da.wilcoxon", "mannwhitney", "wilcoxon_da"],
+        category="microbiome",
+        description="Two-group Mann-Whitney U differential abundance (fast, non-parametric, no R dependency).",
+        examples=[
+            "ov.micro.DA(adata).wilcoxon(group_key='group', rank='genus')",
+        ],
+        related=["micro.DA"],
+    )
     def wilcoxon(
         self,
         group_key: str,
@@ -170,6 +179,15 @@ class DA:
     # DESeq2 (count-based)
     # ------------------------------------------------------------------
 
+    @register_function(
+        aliases=["da.deseq2", "deseq2_da", "negative_binomial_da"],
+        category="microbiome",
+        description="Count-based differential abundance via pydeseq2 (negative-binomial GLM).",
+        examples=[
+            "ov.micro.DA(adata).deseq2(group_key='group', rank='genus')",
+        ],
+        related=["micro.DA", "bulk.pyDEG"],
+    )
     def deseq2(
         self,
         group_key: str,
@@ -235,6 +253,15 @@ class DA:
     # ANCOM-BC (skbio 0.7+ native)
     # ------------------------------------------------------------------
 
+    @register_function(
+        aliases=["da.ancombc", "ancombc_da", "ancom_bc"],
+        category="microbiome",
+        description="ANCOM-BC compositional differential abundance via scikit-bio (skbio ≥ 0.7.1).",
+        examples=[
+            "ov.micro.DA(adata).ancombc(group_key='group')",
+        ],
+        related=["micro.DA"],
+    )
     def ancombc(
         self,
         group_key: str,
@@ -268,7 +295,9 @@ class DA:
             {group_key: self.adata.obs[group_key].values},
             index=self.adata.obs_names,
         )
-        res = _ancombc(table=table, metadata=meta, formula=group_key)
+        # scikit-bio's ANCOM-BC expects a Patsy-style formula string
+        # ("~ group"), not a bare column name.
+        res = _ancombc(table=table, metadata=meta, formula=f"~ {group_key}")
 
         try:
             df = pd.DataFrame({

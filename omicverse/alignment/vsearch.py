@@ -418,6 +418,11 @@ def uchime3_denovo(
 
     Note that UNOISE3 already applies a lightweight chimera filter; running
     ``uchime3_denovo`` as a second pass is a conservative extra step.
+
+    .. note::
+        vsearch's ``--uchime3_denovo`` is intentionally **single-threaded**
+        upstream, so there is no ``threads=`` parameter (unlike the other
+        wrappers in this module).
     """
     out_root = ensure_dir(output_dir)
     vbin, env = _vsearch_bin(vsearch_path, auto_install)

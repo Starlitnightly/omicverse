@@ -46,18 +46,43 @@ BETA_METRICS = (
 )
 
 
-def _build_tree_file(adata: "ad.AnnData") -> Optional[str]:
-    """Write ``uns['tree']`` (newick string) to a temp file for unifrac package."""
+import contextlib
+import os
+import tempfile
+
+
+@contextlib.contextmanager
+def _null_ctx():
+    """Context manager yielding ``None`` — for code paths that want the
+    same ``with … as tree_file:`` shape without actually materialising a
+    tree (e.g. pure Shannon/Observed alpha without Faith PD).
+    """
+    yield None
+
+
+@contextlib.contextmanager
+def _tree_tempfile(adata: "ad.AnnData"):
+    """Context manager that materialises ``adata.uns['tree']`` (newick) to a
+    temp ``.nwk`` file for downstream tools (unifrac / skbio Faith PD) and
+    reliably deletes it on exit — previous implementation leaked one file
+    per call in ``/tmp``.
+    """
     tree = adata.uns.get("tree") if hasattr(adata, "uns") else None
     if not tree:
-        return None
-    import tempfile, os
+        yield None
+        return
     tmp = tempfile.NamedTemporaryFile(
         mode="w", suffix=".nwk", delete=False, prefix="omicverse_micro_tree_"
     )
-    tmp.write(tree)
-    tmp.close()
-    return tmp.name
+    try:
+        tmp.write(tree)
+        tmp.close()
+        yield tmp.name
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except OSError:
+            pass
 
 
 # ----------------------------------------------------------------------------
@@ -104,6 +129,15 @@ class Alpha:
     def _counts(self) -> np.ndarray:
         return _rarefy_counts(_dense(self.adata.X), self.rarefy_depth, self.seed)
 
+    @register_function(
+        aliases=["alpha.run", "alpha_run", "shannon_observed"],
+        category="microbiome",
+        description="Compute alpha-diversity metrics (Shannon / Observed / Simpson / Chao1 / Faith PD) and merge into adata.obs.",
+        examples=[
+            "ov.micro.Alpha(adata).run(['shannon', 'observed_otus'])",
+        ],
+        related=["micro.Beta", "micro.Ordinate"],
+    )
     def run(
         self,
         metrics: Union[str, Sequence[str]] = ("shannon", "observed_otus"),
@@ -128,28 +162,27 @@ class Alpha:
         ids = list(self.adata.obs_names)
 
         results: dict[str, pd.Series] = {}
-        tree_file = None
-        for m in metrics:
-            if m not in ALPHA_METRICS:
-                # skbio accepts other names too — just pass-through
-                pass
-            if m == "faith_pd":
-                tree_file = tree_file or _build_tree_file(self.adata)
-                if not tree_file:
-                    raise ValueError(
-                        "faith_pd requires a phylogenetic tree stored at "
-                        f"adata.uns[{tree_key!r}] as a newick string."
+        # Wrap all metric calls that need the phylogenetic tree in a single
+        # context so the temp newick file is reliably deleted on exit.
+        need_tree = any(m == "faith_pd" for m in metrics)
+        with _tree_tempfile(self.adata) if need_tree else _null_ctx() as tree_file:
+            for m in metrics:
+                if m == "faith_pd":
+                    if not tree_file:
+                        raise ValueError(
+                            "faith_pd requires a phylogenetic tree stored at "
+                            f"adata.uns[{tree_key!r}] as a newick string."
+                        )
+                    series = alpha_diversity(
+                        "faith_pd",
+                        counts,
+                        ids=ids,
+                        otu_ids=list(self.adata.var_names),
+                        tree=tree_file,
                     )
-                series = alpha_diversity(
-                    "faith_pd",
-                    counts,
-                    ids=ids,
-                    otu_ids=list(self.adata.var_names),
-                    tree=tree_file,
-                )
-            else:
-                series = alpha_diversity(m, counts, ids=ids)
-            results[m] = series.reindex(ids)
+                else:
+                    series = alpha_diversity(m, counts, ids=ids)
+                results[m] = series.reindex(ids)
 
         df = pd.DataFrame(results)
         self.result_ = df
@@ -209,6 +242,15 @@ class Beta:
     def _counts(self, rarefy_depth: Optional[int]) -> np.ndarray:
         return _rarefy_counts(_dense(self.adata.X), rarefy_depth, self.seed)
 
+    @register_function(
+        aliases=["beta.run", "beta_run", "distance_matrix"],
+        category="microbiome",
+        description="Compute a sample × sample beta-diversity distance matrix (Bray-Curtis / Jaccard / Aitchison / UniFrac).",
+        examples=[
+            "ov.micro.Beta(adata).run(metric='braycurtis', rarefy=True)",
+        ],
+        related=["micro.Alpha", "micro.Ordinate"],
+    )
     def run(
         self,
         metric: str = "braycurtis",
@@ -242,6 +284,13 @@ class Beta:
         if rarefy is True and call_depth is None:
             X = _dense(self.adata.X)
             call_depth = int(X.sum(axis=1).min())
+            if call_depth <= 0:
+                raise ValueError(
+                    "Auto-selected rarefaction depth is 0 — at least one "
+                    "sample has zero total counts. Filter empty samples "
+                    "before calling Beta.run(rarefy=True), or pass an "
+                    "explicit `rarefy_depth=` to the constructor."
+                )
         elif rarefy is False:
             call_depth = None
         counts = self._counts(call_depth)
@@ -278,12 +327,13 @@ class Beta:
             raise ImportError(
                 "Beta requires scikit-bio for UniFrac metrics."
             ) from exc
-        tf = _build_tree_file(self.adata)
         ids = list(self.adata.obs_names)
         otu_ids = list(self.adata.var_names)
-        dm_skbio = beta_diversity(
-            metric, counts, ids=ids, otu_ids=otu_ids, tree=tf, validate=True
-        )
+        with _tree_tempfile(self.adata) as tf:
+            dm_skbio = beta_diversity(
+                metric, counts, ids=ids, otu_ids=otu_ids,
+                tree=tf, validate=True,
+            )
         return pd.DataFrame(dm_skbio.data, index=ids, columns=ids)
 
     def braycurtis(self, rarefy: bool = True) -> pd.DataFrame:

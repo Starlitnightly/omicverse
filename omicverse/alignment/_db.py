@@ -25,7 +25,8 @@ _SOURCES = {
         "url": "https://drive5.com/sintax/rdp_16s_v18.fa.gz",
         "filename": "rdp_16s_v18.fa.gz",
         "size_mb": 6.8,
-        "sha256": None,                  # set when verified — see notes below
+        # Verified 2026-04-18 against drive5.com mirror.
+        "sha256": "8dd858c00a89d43cca4289463adaa7f5ebba6e85c05daab950518e1b16f61ce0",
         "description": "RDP 16S SINTAX-formatted reference (v18). Small (6.8 MB), "
                        "well-tested, covers bacteria + archaea. Pre-formatted for "
                        "vsearch --sintax.",
@@ -34,6 +35,11 @@ _SOURCES = {
         "url": "https://drive5.com/sintax/silva_16s_v123.fa.gz",
         "filename": "silva_16s_v123.fa.gz",
         "size_mb": 439.0,
+        # 440 MB file; checksum deliberately not included here because
+        # (a) the reference is deprecated (SILVA v123 is from 2015) and
+        # (b) the upstream host does not publish a reference hash. Users
+        # who need integrity checking should host a mirror and pass their
+        # own fasta via `db_fasta=` instead of relying on this helper.
         "sha256": None,
         "description": "SILVA 16S SINTAX-formatted (v123). Comprehensive (~440 MB). "
                        "NOTE: v123 was released in 2015 — current SILVA is v138.1+. "
@@ -72,20 +78,30 @@ def _download(
     ensure_dir(dest.parent)
     tmp = dest.with_suffix(dest.suffix + ".part")
     print(f"Downloading {url} -> {dest}")
-    with urllib.request.urlopen(url, timeout=timeout) as resp, open(tmp, "wb") as fh:
-        shutil.copyfileobj(resp, fh)
-    if expected_sha256:
-        actual = _sha256_file(tmp)
-        if actual != expected_sha256:
-            tmp.unlink(missing_ok=True)
-            raise ValueError(
-                f"SHA-256 mismatch for downloaded {url}:\n"
-                f"  expected: {expected_sha256}\n"
-                f"  actual  : {actual}\n"
-                f"Refusing to install a corrupted file."
-            )
-    tmp.rename(dest)
-    return dest
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as resp, open(tmp, "wb") as fh:
+            shutil.copyfileobj(resp, fh)
+        if expected_sha256:
+            actual = _sha256_file(tmp)
+            if actual != expected_sha256:
+                raise ValueError(
+                    f"SHA-256 mismatch for downloaded {url}:\n"
+                    f"  expected: {expected_sha256}\n"
+                    f"  actual  : {actual}\n"
+                    f"Refusing to install a corrupted file."
+                )
+        tmp.rename(dest)
+        return dest
+    except BaseException:
+        # Any interruption — network error, checksum mismatch, KeyboardInterrupt,
+        # disk full — must not leave a stale .part behind that a subsequent run
+        # could mistake for a valid cache.
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+        raise
 
 
 def _resolve_db_dir(db_dir: Optional[str]) -> Path:

@@ -417,6 +417,12 @@ def amplicon_16s_pipeline(
         raise ValueError("Provide either `fastq_dir` or `samples`.")
     if fastq_dir and samples:
         raise ValueError("Specify only one of `fastq_dir` or `samples`.")
+    if primer_rev and not primer_fwd:
+        raise ValueError(
+            "`primer_rev` was provided without `primer_fwd`; cutadapt will "
+            "not run without a forward primer. Supply `primer_fwd=...` or "
+            "remove `primer_rev`."
+        )
     if not workdir:
         raise ValueError(
             "`workdir` is required. omicverse never writes intermediate "
