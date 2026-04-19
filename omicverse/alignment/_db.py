@@ -1,0 +1,147 @@
+"""Reference-database helpers for 16S / amplicon pipelines.
+
+Every function requires an explicit ``db_dir`` — no ``$HOME`` or other
+implicit defaults. Downloads land directly under the caller-supplied path.
+"""
+from __future__ import annotations
+
+import hashlib
+import os
+import shutil
+import urllib.request
+from pathlib import Path
+from typing import Optional
+
+from .._registry import register_function
+from ._cli_utils import ensure_dir
+
+
+_SOURCES = {
+    "rdp_16s_v18": {
+        "url": "https://drive5.com/sintax/rdp_16s_v18.fa.gz",
+        "filename": "rdp_16s_v18.fa.gz",
+        "size_mb": 6.8,
+        "description": "RDP 16S SINTAX-formatted reference (v18). Small (6.8 MB), "
+                       "well-tested, covers bacteria + archaea. Pre-formatted for "
+                       "vsearch --sintax.",
+    },
+    "silva_16s_v123": {
+        "url": "https://drive5.com/sintax/silva_16s_v123.fa.gz",
+        "filename": "silva_16s_v123.fa.gz",
+        "size_mb": 439.0,
+        "description": "SILVA 16S SINTAX-formatted (v123). Comprehensive but ~440 MB.",
+    },
+}
+
+
+def _download(url: str, dest: Path, overwrite: bool = False) -> Path:
+    if dest.exists() and dest.stat().st_size > 0 and not overwrite:
+        return dest
+    ensure_dir(dest.parent)
+    tmp = dest.with_suffix(dest.suffix + ".part")
+    print(f"Downloading {url} -> {dest}")
+    with urllib.request.urlopen(url) as resp, open(tmp, "wb") as fh:
+        shutil.copyfileobj(resp, fh)
+    tmp.rename(dest)
+    return dest
+
+
+def _resolve_db_dir(db_dir: Optional[str]) -> Path:
+    """Resolve db_dir strictly — no implicit $HOME fallback.
+
+    Order:
+      1. Explicit ``db_dir`` argument.
+      2. ``OMICVERSE_DB_DIR`` environment variable.
+      3. Raise ``ValueError`` (never write to ``$HOME``).
+    """
+    if db_dir:
+        return Path(db_dir).expanduser().resolve()
+    env_dir = os.environ.get("OMICVERSE_DB_DIR")
+    if env_dir:
+        return Path(env_dir).expanduser().resolve()
+    raise ValueError(
+        "db_dir must be specified (either as the `db_dir` argument or via the "
+        "OMICVERSE_DB_DIR environment variable). omicverse never writes reference "
+        "databases to $HOME — point db_dir at a path under /scratch or similar."
+    )
+
+
+@register_function(
+    aliases=["fetch_sintax_ref", "download_16s_db"],
+    category="alignment",
+    description="Download a SINTAX-formatted 16S reference database. db_dir is required (no $HOME writes).",
+    examples=[
+        "ov.alignment.fetch_sintax_ref("
+        "'rdp_16s_v18', db_dir='/scratch/.../db/rdp')",
+    ],
+    related=["alignment.vsearch"],
+)
+def fetch_sintax_ref(
+    source: str = "rdp_16s_v18",
+    db_dir: Optional[str] = None,
+    overwrite: bool = False,
+) -> str:
+    """Download a SINTAX-formatted 16S reference FASTA.
+
+    Parameters
+    ----------
+    source
+        One of ``'rdp_16s_v18'`` (small, 6.8 MB) or ``'silva_16s_v123'``
+        (comprehensive, ~440 MB). Both are pre-formatted for vsearch
+        ``--sintax``.
+    db_dir
+        **Required** (or set ``OMICVERSE_DB_DIR``). Target directory under
+        which the reference is saved. No ``$HOME`` fallback.
+    overwrite
+        Re-download even if the file already exists.
+
+    Returns
+    -------
+    str
+        Absolute path to the downloaded ``.fa.gz``.
+    """
+    if source not in _SOURCES:
+        raise ValueError(
+            f"Unknown source '{source}'. Known: {sorted(_SOURCES)}"
+        )
+    spec = _SOURCES[source]
+    base = _resolve_db_dir(db_dir)
+    sub = base / source
+    ensure_dir(sub)
+    dest = sub / spec["filename"]
+    _download(spec["url"], dest, overwrite=overwrite)
+    return str(dest)
+
+
+@register_function(
+    aliases=["fetch_silva", "fetch_silva_sintax"],
+    category="alignment",
+    description="Convenience alias: download SILVA (v123) SINTAX-formatted 16S reference. db_dir required.",
+    examples=[
+        "ov.alignment.fetch_silva(db_dir='/scratch/.../db/silva')",
+    ],
+    related=["alignment.fetch_sintax_ref"],
+)
+def fetch_silva(
+    db_dir: Optional[str] = None,
+    overwrite: bool = False,
+) -> str:
+    """Alias for ``fetch_sintax_ref('silva_16s_v123', db_dir=...)``."""
+    return fetch_sintax_ref("silva_16s_v123", db_dir=db_dir, overwrite=overwrite)
+
+
+@register_function(
+    aliases=["fetch_rdp", "fetch_rdp_sintax"],
+    category="alignment",
+    description="Convenience alias: download RDP 16S v18 SINTAX reference (small, 6.8 MB). db_dir required.",
+    examples=[
+        "ov.alignment.fetch_rdp(db_dir='/scratch/.../db/rdp')",
+    ],
+    related=["alignment.fetch_sintax_ref"],
+)
+def fetch_rdp(
+    db_dir: Optional[str] = None,
+    overwrite: bool = False,
+) -> str:
+    """Alias for ``fetch_sintax_ref('rdp_16s_v18', db_dir=...)``."""
+    return fetch_sintax_ref("rdp_16s_v18", db_dir=db_dir, overwrite=overwrite)
