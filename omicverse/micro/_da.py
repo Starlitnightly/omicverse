@@ -267,8 +267,19 @@ class DA:
         group_key: str,
         rank: Optional[str] = None,
         min_prevalence: float = 0.1,
+        pseudocount: float = 1.0,
     ) -> pd.DataFrame:
         """ANCOM-BC via ``skbio.stats.composition.ancombc`` (skbio ≥ 0.7.1).
+
+        Parameters
+        ----------
+        pseudocount
+            Added to every cell *before* the test so the matrix has no
+            zeros — scikit-bio's ANCOM-BC explicitly rejects tables with
+            zero or negative components. ``1.0`` (the default) is the
+            classic count pseudocount; set to ``None`` / ``0`` to skip the
+            replacement (e.g. if you've already applied
+            ``skbio.stats.composition.multi_replace`` yourself).
 
         .. note::
             The scikit-bio ANCOM-BC API is evolving (the 0.7.1 return type
@@ -288,7 +299,9 @@ class DA:
         counts, features = self._features(rank)
         prev = (counts > 0).sum(axis=0) / counts.shape[0]
         keep = prev >= min_prevalence
-        X = counts[:, keep]
+        X = counts[:, keep].astype(np.float64)
+        if pseudocount:
+            X = X + float(pseudocount)
         feats = features[keep]
         table = pd.DataFrame(X, index=self.adata.obs_names, columns=feats)
         meta = pd.DataFrame(
@@ -299,23 +312,7 @@ class DA:
         # ("~ group"), not a bare column name.
         res = _ancombc(table=table, metadata=meta, formula=f"~ {group_key}")
 
-        try:
-            df = pd.DataFrame({
-                "lfc":      pd.Series(res.lfc),
-                "se":       pd.Series(res.se),
-                "W":        pd.Series(res.W),
-                "p_value":  pd.Series(res.p),
-                "q_value":  pd.Series(res.q),
-                "diff_abn": pd.Series(res.diff_abn),
-            })
-            df.index.name = "feature"
-            df = df.reset_index()
-        except (AttributeError, TypeError) as exc:
-            raise NotImplementedError(
-                f"Installed scikit-bio returns an unsupported ANCOM-BC "
-                f"shape ({type(res).__name__}). Pin scikit-bio to a "
-                f"supported version (>=0.7.1) or open an issue."
-            ) from exc
+        df = _parse_ancombc_result(res, group_key=group_key)
 
         feat_prev = pd.Series(prev[keep], index=feats)
         df["prevalence"] = df["feature"].map(feat_prev).values
@@ -325,6 +322,70 @@ class DA:
             f"ancombc_{group_key}_{rank or 'asv'}"
         ] = df
         return df
+
+
+def _parse_ancombc_result(res, group_key: str) -> pd.DataFrame:
+    """Normalise scikit-bio ANCOM-BC output across versions.
+
+    - 0.7.1 returns a bundle with ``.lfc`` / ``.se`` / ``.W`` / ``.p`` /
+      ``.q`` / ``.diff_abn`` attributes keyed by feature.
+    - 0.7.2+ returns a pandas DataFrame with a (FeatureID, Covariate)
+      MultiIndex and columns ``Log2(FC) / SE / W / pvalue / qvalue /
+      Signif``. We keep only the rows corresponding to the treatment
+      contrast (the non-intercept covariate whose label starts with
+      ``{group_key}[``).
+    """
+    # 0.7.1 bundle shape
+    if hasattr(res, "lfc"):
+        df = pd.DataFrame({
+            "lfc":      pd.Series(res.lfc),
+            "se":       pd.Series(res.se),
+            "W":        pd.Series(res.W),
+            "p_value":  pd.Series(res.p),
+            "q_value":  pd.Series(res.q),
+            "diff_abn": pd.Series(res.diff_abn),
+        })
+        df.index.name = "feature"
+        return df.reset_index()
+
+    # 0.7.2+ DataFrame shape
+    if isinstance(res, pd.DataFrame) and isinstance(
+        res.index, pd.MultiIndex
+    ):
+        contrast_rows = res.index.get_level_values("Covariate").astype(str)
+        mask = contrast_rows.str.startswith(f"{group_key}[")
+        if not mask.any():
+            raise RuntimeError(
+                f"Could not find any ANCOM-BC contrast row for "
+                f"'{group_key}'. Covariates seen: "
+                f"{sorted(set(contrast_rows))}"
+            )
+        sub = res.loc[mask].copy()
+        sub = sub.reset_index()
+        # The "FC" reported by skbio 0.7.2+ is already log2 (column
+        # 'Log2(FC)'); expose as "lfc" (log2-fold-change) for parity with
+        # the bundle shape.
+        out = pd.DataFrame({
+            "feature":  sub["FeatureID"].values,
+            "contrast": sub["Covariate"].astype(str).values,
+            "lfc":      sub["Log2(FC)"].values,
+            "se":       sub["SE"].values,
+            "W":        sub["W"].values,
+            "p_value":  sub["pvalue"].values,
+            "q_value":  sub["qvalue"].values,
+            "diff_abn": sub["Signif"].astype(bool).values,
+        })
+        # If a single contrast level was tested, drop the helper column
+        # so callers that expect the 0.7.1 columns keep working.
+        if out["contrast"].nunique() <= 1:
+            out = out.drop(columns=["contrast"])
+        return out
+
+    raise NotImplementedError(
+        f"Installed scikit-bio returns an unsupported ANCOM-BC "
+        f"shape ({type(res).__name__}). Pin scikit-bio to a "
+        f"supported version (>=0.7.1) or open an issue."
+    )
 
 
 def _bh_fdr(pvals: np.ndarray) -> np.ndarray:
