@@ -8,6 +8,21 @@ import pandas as pd
 import pytest
 
 
+def _ete3_available() -> bool:
+    try:
+        import ete3  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+requires_ete3 = pytest.mark.skipif(
+    not _ete3_available(),
+    reason="ete3 not installed — install the [tests] extra "
+           "(`pip install -e '.[tests]'`) to run attach_tree tests.",
+)
+
+
 def _mini_adata(var_ids):
     import anndata as ad
     from scipy import sparse
@@ -19,6 +34,7 @@ def _mini_adata(var_ids):
     )
 
 
+@requires_ete3
 def test_attach_tree_exact_tip_set():
     from omicverse.micro import attach_tree
     adata = _mini_adata(["A", "B", "C"])
@@ -28,6 +44,7 @@ def test_attach_tree_exact_tip_set():
     assert adata.uns["micro"]["tree_tips"] == 3
 
 
+@requires_ete3
 def test_attach_tree_prunes_extra_tips():
     """Tips that aren't in var_names get dropped when prune=True."""
     from omicverse.micro import attach_tree
@@ -37,6 +54,7 @@ def test_attach_tree_prunes_extra_tips():
     assert adata.uns["micro"]["tree_tips"] == 2
 
 
+@requires_ete3
 def test_attach_tree_warns_on_missing_asv():
     from omicverse.micro import attach_tree
     adata = _mini_adata(["A", "B", "C", "D"])
@@ -49,6 +67,7 @@ def test_attach_tree_warns_on_missing_asv():
     assert any("no matching tip" in m for m in msgs)
 
 
+@requires_ete3
 def test_attach_tree_strict_raises_on_missing():
     from omicverse.micro import attach_tree
     adata = _mini_adata(["A", "B", "C", "D"])
@@ -66,6 +85,7 @@ def test_attach_tree_xor_newick_tree_path():
         attach_tree(adata, newick="(A:0.1);", tree_path="whatever.nwk")
 
 
+@requires_ete3
 def test_attach_tree_rejects_disjoint_tree():
     from omicverse.micro import attach_tree
     adata = _mini_adata(["X", "Y"])

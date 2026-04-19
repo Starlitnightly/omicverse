@@ -19,6 +19,7 @@ rarefy                 : Subsample counts to a common depth
 filter_by_prevalence   : Drop rare taxa below a prevalence threshold
 collapse_taxa          : Collapse ASV counts to a given rank (e.g. genus)
 clr / ilr              : Centred / isometric log-ratio transforms
+attach_tree            : Attach a newick phylogenetic tree to adata.uns
 
 Examples
 --------
@@ -32,29 +33,46 @@ Examples
 >>> # differential abundance at genus level
 >>> da    = ov.micro.DA(adata).wilcoxon(group_key='group', rank='genus')
 """
+from __future__ import annotations
 
-from ._diversity import Alpha, Beta, ALPHA_METRICS, BETA_METRICS
-from ._ord import Ordinate
-from ._da import DA
-from ._pp import rarefy, filter_by_prevalence, collapse_taxa, clr, ilr
-from ._phylo import attach_tree
+import importlib
 
-__all__ = [
+# Map each public name → (relative submodule, attribute). Imports are
+# deferred until the name is first accessed, so environments missing
+# optional extras (scikit-bio, ete3, pydeseq2, …) can still
+# ``import omicverse.micro`` without failing.
+_LAZY_ATTRS: dict[str, tuple[str, str]] = {
     # diversity
-    "Alpha",
-    "Beta",
-    "ALPHA_METRICS",
-    "BETA_METRICS",
+    "Alpha":           ("._diversity", "Alpha"),
+    "Beta":            ("._diversity", "Beta"),
+    "ALPHA_METRICS":   ("._diversity", "ALPHA_METRICS"),
+    "BETA_METRICS":    ("._diversity", "BETA_METRICS"),
     # ordination
-    "Ordinate",
+    "Ordinate":        ("._ord", "Ordinate"),
     # differential abundance
-    "DA",
+    "DA":              ("._da", "DA"),
     # preprocessing
-    "rarefy",
-    "filter_by_prevalence",
-    "collapse_taxa",
-    "clr",
-    "ilr",
+    "rarefy":               ("._pp", "rarefy"),
+    "filter_by_prevalence": ("._pp", "filter_by_prevalence"),
+    "collapse_taxa":        ("._pp", "collapse_taxa"),
+    "clr":                  ("._pp", "clr"),
+    "ilr":                  ("._pp", "ilr"),
     # phylogeny
-    "attach_tree",
-]
+    "attach_tree":          ("._phylo", "attach_tree"),
+}
+
+__all__ = sorted(_LAZY_ATTRS)
+
+
+def __getattr__(name: str):
+    if name in _LAZY_ATTRS:
+        module_path, attr_name = _LAZY_ATTRS[name]
+        module = importlib.import_module(module_path, package=__name__)
+        value = getattr(module, attr_name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    return sorted({*globals(), *_LAZY_ATTRS})
