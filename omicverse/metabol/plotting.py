@@ -22,7 +22,24 @@ import pandas as pd
 
 from ._plsda import PLSDAResult
 
+from .._registry import register_function
 
+
+@register_function(
+    aliases=[
+        'volcano',
+        'metabol_volcano',
+        '火山图代谢',
+    ],
+    category='metabolomics',
+    description='Metabolomics volcano plot — log2FC vs -log10(padj/pvalue). Supports use_pvalue=True for small-n LC-MS where BH is too strict.',
+    examples=[
+        'ov.metabol.volcano(deg, padj_thresh=0.10, log2fc_thresh=0.3, label_top_n=8)',
+    ],
+    related=[
+        'metabol.differential',
+    ],
+)
 def volcano(
     deg: pd.DataFrame,
     *,
@@ -83,6 +100,21 @@ def volcano(
     return fig, ax
 
 
+@register_function(
+    aliases=[
+        'pathway_bar',
+        '通路柱状图',
+    ],
+    category='metabolomics',
+    description='Horizontal bar of -log10(p-value) for pathway enrichment results (msea_ora / msea_gsea / lion_enrichment).',
+    examples=[
+        'ov.metabol.pathway_bar(ora_result, top_n=10)',
+    ],
+    related=[
+        'metabol.pathway_dot',
+        'metabol.msea_ora',
+    ],
+)
 def pathway_bar(
     enrichment: pd.DataFrame,
     *,
@@ -142,6 +174,23 @@ def pathway_bar(
     return fig, ax
 
 
+@register_function(
+    aliases=[
+        'pathway_dot',
+        'dotplot',
+        '代谢通路点图',
+    ],
+    category='metabolomics',
+    description='Dot plot of pathway enrichment (size=overlap, x=odds_ratio or NES, color=-log10 p). The canonical metabolomics enrichment figure.',
+    examples=[
+        "ov.metabol.pathway_dot(ora_result, size_col='overlap', x_col='odds_ratio', color_col='pvalue', top_n=10)",
+    ],
+    related=[
+        'metabol.pathway_bar',
+        'metabol.msea_ora',
+        'metabol.msea_gsea',
+    ],
+)
 def pathway_dot(
     enrichment: pd.DataFrame,
     *,
@@ -218,6 +267,21 @@ def pathway_dot(
     return fig, ax
 
 
+@register_function(
+    aliases=[
+        's_plot',
+        'Wiklund_s_plot',
+    ],
+    category='metabolomics',
+    description='OPLS-DA S-plot (Wiklund 2008) — p(cov) vs p(corr) scatter colored by VIP, the canonical OPLS-DA interpretation figure.',
+    examples=[
+        'ov.metabol.s_plot(opls_result, adata, label_top_n=10)',
+    ],
+    related=[
+        'metabol.opls_da',
+        'metabol.vip_bar',
+    ],
+)
 def s_plot(
     result: PLSDAResult,
     adata,
@@ -263,6 +327,21 @@ def s_plot(
     return fig, ax
 
 
+@register_function(
+    aliases=[
+        'vip_bar',
+        'VIP条形图',
+    ],
+    category='metabolomics',
+    description='Horizontal bar chart of the top-N VIP (Variable Importance in Projection) metabolites from a PLS-DA or OPLS-DA model.',
+    examples=[
+        'ov.metabol.vip_bar(opls_result, adata.var_names, top_n=15)',
+    ],
+    related=[
+        'metabol.plsda',
+        'metabol.opls_da',
+    ],
+)
 def vip_bar(
     result: PLSDAResult,
     var_names,

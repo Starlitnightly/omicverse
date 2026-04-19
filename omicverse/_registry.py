@@ -1028,6 +1028,7 @@ def _hydrate_registry_for_export() -> None:
         "omicverse.pp",
         "omicverse.single",
         "omicverse.space",
+        "omicverse.metabol",
     )
     for module_name in module_names:
         try:
@@ -1036,6 +1037,15 @@ def _hydrate_registry_for_export() -> None:
             # Optional dependencies may block some modules; export whatever
             # could be safely registered in the current environment.
             continue
+    # metabol is itself lazy — its __init__ doesn't import the submodules
+    # that carry the @register_function decorators. Drive its hydration hook
+    # explicitly so export_registry sees metabol functions.
+    try:
+        import omicverse.metabol as _metabol  # noqa: F401
+
+        _metabol._hydrate_registry()
+    except Exception:
+        pass
 
 
 def register_function(aliases: List[str],

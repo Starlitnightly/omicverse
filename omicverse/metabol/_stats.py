@@ -26,10 +26,29 @@ from scipy import stats
 
 from ._utils import bh_fdr as _bh_fdr
 
+from .._registry import register_function
+
 
 TestMethod = Literal["t", "welch_t", "wilcoxon", "limma"]
 
 
+@register_function(
+    aliases=[
+        'differential',
+        '代谢物差异分析',
+        'welch_t',
+        'limma_metabol',
+    ],
+    category='metabolomics',
+    description='Per-metabolite univariate two-group test (Welch t / Student t / Wilcoxon / limma-moderated) with BH-FDR. Matches pyDEG output schema.',
+    examples=[
+        "ov.metabol.differential(adata, group_col='group', group_a='case', group_b='control', method='welch_t')",
+    ],
+    related=[
+        'metabol.volcano',
+        'metabol.msea_ora',
+    ],
+)
 def differential(
     adata: AnnData,
     *,

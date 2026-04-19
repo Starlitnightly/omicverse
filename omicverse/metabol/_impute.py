@@ -27,10 +27,29 @@ import numpy as np
 from anndata import AnnData
 from scipy import stats
 
+from .._registry import register_function
+
 
 ImputeMethod = Literal["knn", "half_min", "qrilc", "zero"]
 
 
+@register_function(
+    aliases=[
+        'impute',
+        '代谢组填补',
+        'qrilc',
+        'knn_impute',
+    ],
+    category='metabolomics',
+    description='Impute missing values with kNN / half-min / QRILC / zero — QRILC is the recommended MNAR default for LC-MS, kNN for MAR-dominant NMR.',
+    examples=[
+        "ov.metabol.impute(adata, method='qrilc', seed=0)",
+    ],
+    related=[
+        'metabol.normalize',
+        'metabol.transform',
+    ],
+)
 def impute(
     adata: AnnData,
     *,

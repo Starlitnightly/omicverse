@@ -25,7 +25,24 @@ from scipy import stats
 from ._id_mapping import map_ids, normalize_name
 from ._utils import bh_fdr as _bh_fdr
 
+from .._registry import register_function
 
+
+@register_function(
+    aliases=[
+        'load_pathways',
+        'kegg_pathways',
+    ],
+    category='metabolomics',
+    description='Fetch the full KEGG pathway→compound map (~550 pathways) via KEGG REST. Cached under ~/.cache/omicverse/metabol/.',
+    examples=[
+        "ov.metabol.load_pathways(organism='hsa')",
+    ],
+    related=[
+        'metabol.fetch_kegg_pathways',
+        'metabol.msea_ora',
+    ],
+)
 def load_pathways(
     path: Optional[Path] = None,
     *,
@@ -63,6 +80,22 @@ def load_pathways(
     return fetch_kegg_pathways(organism=organism)
 
 
+@register_function(
+    aliases=[
+        'msea_ora',
+        'ora_metabolites',
+        '代谢物过表达',
+    ],
+    category='metabolomics',
+    description="Over-representation analysis (Fisher's exact) of differential metabolites against KEGG pathways.",
+    examples=[
+        'ov.metabol.msea_ora(hits, background)',
+    ],
+    related=[
+        'metabol.msea_gsea',
+        'metabol.pathway_dot',
+    ],
+)
 def msea_ora(
     hits: Iterable[str],
     background: Iterable[str],
@@ -138,6 +171,22 @@ def msea_ora(
     return out.sort_values("pvalue").reset_index(drop=True)
 
 
+@register_function(
+    aliases=[
+        'msea_gsea',
+        'gsea_metabolites',
+        'MSEA',
+    ],
+    category='metabolomics',
+    description='GSEA-style ranked enrichment of metabolites against KEGG pathways (vendored gseapy prerank backend).',
+    examples=[
+        "ov.metabol.msea_gsea(deg, stat_col='stat', n_perm=1000)",
+    ],
+    related=[
+        'metabol.msea_ora',
+        'metabol.pathway_dot',
+    ],
+)
 def msea_gsea(
     deg: pd.DataFrame,
     *,

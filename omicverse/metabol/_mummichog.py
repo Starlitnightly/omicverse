@@ -36,6 +36,8 @@ from ._fetchers import fetch_chebi_compounds
 from ._msea import load_pathways
 from ._utils import bh_fdr as _bh_fdr
 
+from .._registry import register_function
+
 
 # Common ESI adducts — (name, delta_mass, charge_sign)
 # delta is the mass shift from neutral monoisotopic mass M
@@ -56,6 +58,22 @@ NEGATIVE_ADDUCTS = [
 ]
 
 
+@register_function(
+    aliases=[
+        'annotate_peaks',
+        'adduct注释',
+        'mz_to_kegg',
+    ],
+    category='metabolomics',
+    description='Map m/z peaks to candidate KEGG compounds via adduct-aware mass matching. Default mass_db=fetch_chebi_compounds() (~54k compounds).',
+    examples=[
+        "ov.metabol.annotate_peaks(mz_values, polarity='positive', ppm=10.0)",
+    ],
+    related=[
+        'metabol.mummichog_basic',
+        'metabol.fetch_chebi_compounds',
+    ],
+)
 def annotate_peaks(
     mz: np.ndarray,
     *,
@@ -144,6 +162,22 @@ def annotate_peaks(
     return pd.concat(frames, ignore_index=True)
 
 
+@register_function(
+    aliases=[
+        'mummichog_basic',
+        'mummichog',
+        'm/z通路',
+    ],
+    category='metabolomics',
+    description='Mummichog (Li et al 2013) — pathway enrichment from m/z peaks via adduct-aware mass matching + permutation null. Pure-Python port.',
+    examples=[
+        "ov.metabol.mummichog_basic(mz, pvalue, polarity='positive', ppm=10.0, n_perm=1000)",
+    ],
+    related=[
+        'metabol.annotate_peaks',
+        'metabol.mummichog_external',
+    ],
+)
 def mummichog_basic(
     mz: np.ndarray,
     pvalue: np.ndarray,

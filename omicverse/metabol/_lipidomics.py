@@ -34,6 +34,8 @@ from scipy import stats
 
 from ._utils import bh_fdr as _bh_fdr
 
+from .._registry import register_function
+
 
 
 
@@ -71,6 +73,21 @@ _PATTERN = re.compile(
 )
 
 
+@register_function(
+    aliases=[
+        'parse_lipid',
+        '脂质解析',
+        'LIPID_MAPS',
+    ],
+    category='metabolomics',
+    description="Parse LIPID MAPS shorthand (e.g. 'PC 34:1', 'Cer d18:1/24:0') into a LipidIdentity dataclass with class / total_carbons / total_db.",
+    examples=[
+        "ov.metabol.parse_lipid('PC 34:1')",
+    ],
+    related=[
+        'metabol.annotate_lipids',
+    ],
+)
 def parse_lipid(name: str) -> Optional[LipidIdentity]:
     """Parse a LIPID MAPS-shorthand lipid name.
 
@@ -89,6 +106,21 @@ def parse_lipid(name: str) -> Optional[LipidIdentity]:
     )
 
 
+@register_function(
+    aliases=[
+        'annotate_lipids',
+        '脂质注释',
+    ],
+    category='metabolomics',
+    description='Apply parse_lipid to every var_name and write lipid_class / total_carbons / total_db / lipid_backbone to adata.var.',
+    examples=[
+        'ov.metabol.annotate_lipids(adata)',
+    ],
+    related=[
+        'metabol.aggregate_by_class',
+        'metabol.lion_enrichment',
+    ],
+)
 def annotate_lipids(adata: AnnData, *, feature_names: Optional[Iterable[str]] = None) -> AnnData:
     """Parse each ``var_name`` as a lipid and add ``lipid_class`` /
     ``total_carbons`` / ``total_db`` columns to ``adata.var``.
@@ -114,6 +146,20 @@ def annotate_lipids(adata: AnnData, *, feature_names: Optional[Iterable[str]] = 
     return out
 
 
+@register_function(
+    aliases=[
+        'aggregate_by_class',
+        '脂质类聚合',
+    ],
+    category='metabolomics',
+    description='Collapse a lipid species × sample matrix to class totals (PC, TAG, Cer, …) via sum / mean / median.',
+    examples=[
+        "ov.metabol.aggregate_by_class(adata, agg='sum')",
+    ],
+    related=[
+        'metabol.annotate_lipids',
+    ],
+)
 def aggregate_by_class(adata: AnnData, *, agg: str = "sum") -> AnnData:
     """Collapse the matrix to class-level totals.
 
@@ -163,6 +209,22 @@ def _load_lion_ontology() -> dict[str, dict]:
     return fetch_lion_associations()
 
 
+@register_function(
+    aliases=[
+        'lion_enrichment',
+        'LION富集',
+        'lipid_enrichment',
+    ],
+    category='metabolomics',
+    description='LION ontology over-representation analysis for lipid classes × functional terms. Default ontology fetched via fetch_lion_associations.',
+    examples=[
+        'ov.metabol.lion_enrichment(hits, background, min_size=2)',
+    ],
+    related=[
+        'metabol.fetch_lion_associations',
+        'metabol.parse_lipid',
+    ],
+)
 def lion_enrichment(
     hits: Iterable[str],
     background: Iterable[str],

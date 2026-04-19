@@ -24,7 +24,21 @@ import numpy as np
 import pandas as pd
 from anndata import AnnData
 
+from .._registry import register_function
 
+
+@register_function(
+    aliases=["代谢组导入", "read_metaboanalyst", "metaboanalyst_csv"],
+    category="metabolomics",
+    description=(
+        "Load a MetaboAnalyst-format peak CSV into AnnData (samples × metabolites). "
+        "group_col is required — factor column name differs per dataset."
+    ),
+    examples=[
+        "ov.metabol.read_metaboanalyst('human_cachexia.csv', group_col='Muscle loss')",
+    ],
+    related=["metabol.read_wide", "metabol.read_lcms", "metabol.pyMetabo"],
+)
 def read_metaboanalyst(
     path: str | Path,
     *,
@@ -87,6 +101,16 @@ def read_metaboanalyst(
     return AnnData(X=X, obs=obs, var=var)
 
 
+@register_function(
+    aliases=["read_wide", "代谢组宽表"],
+    category="metabolomics",
+    description=(
+        "Load a generic wide (samples × metabolites) table into AnnData. "
+        "Use when you have a plain TSV / CSV without the MetaboAnalyst convention."
+    ),
+    examples=["ov.metabol.read_wide('peak_table.tsv', group_col='condition')"],
+    related=["metabol.read_metaboanalyst", "metabol.read_lcms"],
+)
 def read_wide(
     path: str | Path,
     *,
@@ -104,6 +128,21 @@ def read_wide(
     return AnnData(X=X, obs=obs, var=pd.DataFrame(index=met_cols))
 
 
+@register_function(
+    aliases=["read_lcms", "untargeted_lcms", "非靶向LC-MS"],
+    category="metabolomics",
+    description=(
+        "Load an LC-MS peak table with m/z_RT feature IDs. Parses feature "
+        "identifiers into numeric var['m_z'] and var['rt'] so mummichog "
+        "can consume the AnnData directly. Handles both MetaboAnalyst "
+        "(features-in-rows with embedded Label row) and generic layouts."
+    ),
+    examples=[
+        "ov.metabol.read_lcms('malaria_feature_table.csv', "
+        "feature_id_sep='__', label_row='Label', transpose=True)",
+    ],
+    related=["metabol.annotate_peaks", "metabol.mummichog_basic"],
+)
 def read_lcms(
     path: str | Path,
     *,

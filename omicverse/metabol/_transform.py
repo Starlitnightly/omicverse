@@ -28,10 +28,30 @@ from typing import Literal
 import numpy as np
 from anndata import AnnData
 
+from .._registry import register_function
+
 
 TransformMethod = Literal["log", "glog", "autoscale", "pareto", "none"]
 
 
+@register_function(
+    aliases=[
+        'transform',
+        'Pareto',
+        '代谢组变换',
+    ],
+    category='metabolomics',
+    description='Feature-level transformation — log / glog / autoscale (z-score) / Pareto (damps high-variance features, MetaboAnalyst default).',
+    examples=[
+        "ov.metabol.transform(adata, method='log')",
+        "ov.metabol.transform(adata, method='pareto', stash_raw=False)",
+    ],
+    related=[
+        'metabol.normalize',
+        'metabol.plsda',
+        'metabol.opls_da',
+    ],
+)
 def transform(
     adata: AnnData,
     *,

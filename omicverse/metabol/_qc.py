@@ -27,7 +27,25 @@ import numpy as np
 import pandas as pd
 from anndata import AnnData
 
+from .._registry import register_function
 
+
+@register_function(
+    aliases=[
+        'cv_filter',
+        'CV过滤',
+        'qc_cv_filter',
+    ],
+    category='metabolomics',
+    description='Drop metabolite features with coefficient-of-variation above a threshold across pooled QC samples (metabolomics-specific QC).',
+    examples=[
+        "ov.metabol.cv_filter(adata, qc_mask='is_qc', cv_threshold=0.30)",
+    ],
+    related=[
+        'metabol.drift_correct',
+        'metabol.blank_filter',
+    ],
+)
 def cv_filter(
     adata: AnnData,
     *,
@@ -69,6 +87,21 @@ def cv_filter(
     return out
 
 
+@register_function(
+    aliases=[
+        'drift_correct',
+        'LOESS漂移校正',
+    ],
+    category='metabolomics',
+    description='Correct systematic LC-MS intensity drift across injection order via LOESS regression on pooled QC samples.',
+    examples=[
+        "ov.metabol.drift_correct(adata, injection_order='run_order', qc_mask='is_qc')",
+    ],
+    related=[
+        'metabol.cv_filter',
+        'metabol.blank_filter',
+    ],
+)
 def drift_correct(
     adata: AnnData,
     *,
@@ -145,6 +178,21 @@ def drift_correct(
     return out
 
 
+@register_function(
+    aliases=[
+        'blank_filter',
+        '空白过滤',
+    ],
+    category='metabolomics',
+    description="Drop features whose sample-mean intensity isn't at least ratio× the blank-mean intensity (contamination filter).",
+    examples=[
+        "ov.metabol.blank_filter(adata, blank_mask='is_blank', ratio=3.0)",
+    ],
+    related=[
+        'metabol.cv_filter',
+        'metabol.drift_correct',
+    ],
+)
 def blank_filter(
     adata: AnnData,
     *,

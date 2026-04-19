@@ -111,6 +111,40 @@ _LAZY_ATTRS: dict[str, tuple[str, str]] = {
 _LAZY_SUBMODULES = {"plotting"}
 
 
+# Submodules that host @register_function-decorated public API. Hydration
+# imports every entry here so ``ov.export_registry()`` / ``ov.find_function``
+# see metabol without waiting for a user to touch each function first.
+_REGISTRY_SUBMODULES = (
+    ".io",
+    "._qc",
+    "._impute",
+    "._norm",
+    "._transform",
+    "._stats",
+    "._plsda",
+    "._msea",
+    "._mummichog",
+    "._id_mapping",
+    "._fetchers",
+    "._lipidomics",
+    ".plotting",
+)
+
+
+def _hydrate_registry() -> None:
+    """Import every decorator-bearing submodule to populate the global
+    registry. Called from ``omicverse._registry._hydrate_registry_for_export``
+    because metabol's lazy ``__init__`` would otherwise leave decorators
+    un-executed at registry-export time."""
+    for mod in _REGISTRY_SUBMODULES:
+        try:
+            _importlib.import_module(mod, __name__)
+        except Exception:
+            # Optional backends (gseapy, statsmodels) may be missing —
+            # register whatever loads cleanly.
+            continue
+
+
 def __getattr__(name: str):
     """Module-level lazy import. Triggered on first access to every public
     symbol, so ``import omicverse.metabol`` itself does no heavy work."""

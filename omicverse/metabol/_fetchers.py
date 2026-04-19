@@ -37,11 +37,14 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import urllib.request
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
+
+from .._registry import register_function
 
 
 # ---------------------------------------------------------------------------
@@ -77,6 +80,21 @@ def _download(url: str, path: Path, *, user_agent: str = "omicverse/metabol") ->
 # ---------------------------------------------------------------------------
 # ChEBI compound master table — monoisotopic mass + KEGG/HMDB/LipidMaps xrefs
 # ---------------------------------------------------------------------------
+@register_function(
+    aliases=[
+        'fetch_chebi_compounds',
+        'ChEBI化合物表',
+    ],
+    category='metabolomics',
+    description="Download ChEBI's compounds + chemical_data + accession flat files; build a ~54k-row master table with name / mass / KEGG / HMDB / LIPID MAPS. Default mass_db for annotate_peaks and mummichog_basic.",
+    examples=[
+        'ov.metabol.fetch_chebi_compounds()',
+    ],
+    related=[
+        'metabol.annotate_peaks',
+        'metabol.map_ids',
+    ],
+)
 def fetch_chebi_compounds(
     *,
     cache: bool = True,
@@ -176,6 +194,21 @@ def fetch_chebi_compounds(
 # ---------------------------------------------------------------------------
 # KEGG
 # ---------------------------------------------------------------------------
+@register_function(
+    aliases=[
+        'fetch_kegg_pathways',
+        'KEGG全量通路',
+    ],
+    category='metabolomics',
+    description='Download the full KEGG pathway→compound map via KEGG REST. ~550 pathways cached at ~/.cache/omicverse/metabol/.',
+    examples=[
+        "ov.metabol.fetch_kegg_pathways(organism='hsa')",
+    ],
+    related=[
+        'metabol.load_pathways',
+        'metabol.msea_ora',
+    ],
+)
 def fetch_kegg_pathways(
     organism: Optional[str] = None,
     *,
@@ -260,6 +293,20 @@ _LION_CSV_URL = (
 )
 
 
+@register_function(
+    aliases=[
+        'fetch_lion_associations',
+        'LION脂质本体',
+    ],
+    category='metabolomics',
+    description='Download the full LION ontology (lipid classes × terms, ~150 terms). Cached at ~/.cache/omicverse/metabol/.',
+    examples=[
+        'ov.metabol.fetch_lion_associations()',
+    ],
+    related=[
+        'metabol.lion_enrichment',
+    ],
+)
 def fetch_lion_associations(
     *,
     cache: bool = True,
@@ -339,8 +386,6 @@ def fetch_lion_associations(
 # ---------------------------------------------------------------------------
 # HMDB / KEGG / ChEBI cross-references via PubChem REST
 # ---------------------------------------------------------------------------
-import re
-
 _PUBCHEM_CID_URL = (
     "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{name}/cids/JSON"
 )
@@ -353,6 +398,21 @@ _KEGG_CPD_PATTERN = re.compile(r"^C\d{5}$")
 _CHEBI_PATTERN = re.compile(r"^CHEBI:\d+$")
 
 
+@register_function(
+    aliases=[
+        'fetch_hmdb_from_name',
+        'pubchem_xref',
+        '代谢物交叉引用',
+    ],
+    category='metabolomics',
+    description='Resolve a single metabolite name to HMDB / KEGG / ChEBI / PubChem IDs via PubChem REST. Cached per-name.',
+    examples=[
+        "ov.metabol.fetch_hmdb_from_name('Glucose')",
+    ],
+    related=[
+        'metabol.map_ids',
+    ],
+)
 def fetch_hmdb_from_name(
     name: str,
     *,

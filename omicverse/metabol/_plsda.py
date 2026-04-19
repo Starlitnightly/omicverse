@@ -19,6 +19,8 @@ import numpy as np
 import pandas as pd
 from anndata import AnnData
 
+from .._registry import register_function
+
 
 @dataclass
 class PLSDAResult:
@@ -55,6 +57,22 @@ class PLSDAResult:
         )
 
 
+@register_function(
+    aliases=[
+        'plsda',
+        'PLSDA',
+        '偏最小二乘判别',
+    ],
+    category='metabolomics',
+    description='PLS-DA (Partial Least Squares Discriminant Analysis) with VIP scores and leave-one-out Q².',
+    examples=[
+        "ov.metabol.plsda(adata, group_col='group', n_components=2)",
+    ],
+    related=[
+        'metabol.opls_da',
+        'metabol.vip_bar',
+    ],
+)
 def plsda(
     adata: AnnData,
     *,
@@ -98,6 +116,23 @@ def plsda(
     )
 
 
+@register_function(
+    aliases=[
+        'opls_da',
+        'OPLS-DA',
+        '正交偏最小二乘',
+    ],
+    category='metabolomics',
+    description='OPLS-DA (Trygg & Wold 2002) — single predictive component + orthogonal components for interpretable biomarker discovery.',
+    examples=[
+        "ov.metabol.opls_da(adata, group_col='group', n_ortho=1)",
+    ],
+    related=[
+        'metabol.s_plot',
+        'metabol.vip_bar',
+        'metabol.plsda',
+    ],
+)
 def opls_da(
     adata: AnnData,
     *,

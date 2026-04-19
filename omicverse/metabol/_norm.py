@@ -26,10 +26,28 @@ from typing import Literal, Optional
 import numpy as np
 from anndata import AnnData
 
+from .._registry import register_function
+
 
 NormMethod = Literal["pqn", "tic", "median", "mstus"]
 
 
+@register_function(
+    aliases=[
+        'normalize',
+        'PQN',
+        '代谢组归一化',
+    ],
+    category='metabolomics',
+    description='Sample-level normalization for metabolomics — PQN (Dieterle 2006, recommended), TIC, median, or MSTUS.',
+    examples=[
+        "ov.metabol.normalize(adata, method='pqn')",
+    ],
+    related=[
+        'metabol.transform',
+        'metabol.impute',
+    ],
+)
 def normalize(
     adata: AnnData,
     *,

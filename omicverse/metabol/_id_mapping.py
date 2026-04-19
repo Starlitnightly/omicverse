@@ -24,12 +24,30 @@ from typing import Iterable
 
 import pandas as pd
 
+from .._registry import register_function
+
 
 def normalize_name(s: str) -> str:
     """Lowercase + collapse whitespace — the canonical form for caching."""
     return " ".join(str(s).strip().lower().split())
 
 
+@register_function(
+    aliases=[
+        'map_ids',
+        '代谢物ID映射',
+        'hmdb_kegg_chebi',
+    ],
+    category='metabolomics',
+    description='Resolve metabolite names to HMDB / KEGG / ChEBI / PubChem IDs via PubChem REST (cached). Pass mass_db=fetch_chebi_compounds() to avoid per-name HTTP round-trips.',
+    examples=[
+        "ov.metabol.map_ids(['Glucose', 'Isoleucine'])",
+    ],
+    related=[
+        'metabol.fetch_hmdb_from_name',
+        'metabol.fetch_chebi_compounds',
+    ],
+)
 def map_ids(
     names: Iterable[str],
     *,
