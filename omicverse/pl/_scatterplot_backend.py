@@ -1152,7 +1152,16 @@ def _add_categorical_legend(
 
     if legend_loc == 'right margin':
         for label in cats:
-            ax.scatter([], [], c=palette[label], label=label)
+            # `_get_palette` normalises category keys via `str(x)` (see
+            # `_obs_to_categorical`), so palette keys are strings even when
+            # the underlying Categorical still carries ints/bools/etc.
+            # Fall back to the stringified label, then na_color, before
+            # raising so integer-keyed `adata.obs` columns don't blow up
+            # the legend loop.
+            color = palette.get(label)
+            if color is None:
+                color = palette.get(str(label), na_color)
+            ax.scatter([], [], c=color, label=label)
         ax.legend(
             frameon=False,
             loc='center left',
