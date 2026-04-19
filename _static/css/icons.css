@@ -1,0 +1,56 @@
+/* ===== Card Icons ===== */
+.card-icon {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 0.75rem auto;
+    display: block;
+    opacity: 0.85;
+}
+
+.card-icon-sm {
+    width: 32px;
+    height: 32px;
+    margin: 0 auto 0.5rem auto;
+    display: block;
+    opacity: 0.85;
+}
+
+/* Equal height cards */
+.sd-row {
+    align-items: stretch !important;
+}
+
+.sd-card {
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.sd-card-body {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+}
+
+/* Icon colors — forest green brand palette */
+.icon-primary { color: #4c7a69; }
+.icon-green   { color: #10b981; }
+.icon-blue    { color: #3b82f6; }
+.icon-orange  { color: #f59e0b; }
+.icon-cyan    { color: #06b6d4; }
+.icon-red     { color: #ef4444; }
+.icon-pink    { color: #ec4899; }
+.icon-amber   { color: #d97706; }
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+    .card-icon, .card-icon-sm {
+        opacity: 0.9;
+    }
+}
+
+html[data-theme="dark"] .card-icon,
+html[data-theme="dark"] .card-icon-sm {
+    opacity: 0.9;
+}

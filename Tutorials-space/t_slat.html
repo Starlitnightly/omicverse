@@ -1,0 +1,1714 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="Single cell spatial alignment tools" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="Tutorials-space/t_slat.html" />
+<meta property="og:site_name" content="omicverse" />
+<meta property="og:description" content="SLAT (Spatially-Linked Alignment Tool), a graph-based algorithm for efficient and effective alignment of spatial slices. Adopting a graph adversarial matching strategy, SLAT is the first algorithm ..." />
+<meta property="og:image:width" content="1146" />
+<meta property="og:image:height" content="600" />
+<meta property="og:image" content="_images/social_previews/summary_Tutorials-space_t_slat_13f77670.png" />
+<meta property="og:image:alt" content="SLAT (Spatially-Linked Alignment Tool), a graph-based algorithm for efficient and effective alignment of spatial slices. Adopting a graph adversarial matching strategy, SLAT is the first algorithm ..." />
+<meta name="description" content="SLAT (Spatially-Linked Alignment Tool), a graph-based algorithm for efficient and effective alignment of spatial slices. Adopting a graph adversarial matching strategy, SLAT is the first algorithm ..." />
+<meta name="twitter:card" content="summary_large_image" />
+
+    <title>Single cell spatial alignment tools &#8212; omicverse</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster.custom.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster.bundle.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-shadow.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-punk.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-noir.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-light.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-borderless.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/micromodal.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=3a64e6d4" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/icons.css?v=b452f90d" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/override.css?v=216aaec1" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/jquery.js?v=5d32c60e"></script>
+    <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+    <script src="../_static/documentation_options.js?v=f9413015"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/js/hoverxref.js"></script>
+    <script src="../_static/js/tooltipster.bundle.min.js"></script>
+    <script src="../_static/js/micromodal.min.js"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'Tutorials-space/t_slat';</script>
+    <link rel="icon" href="../_static/favicon.ico"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Foundation Models" href="../tutorials/index_foundation.html" />
+    <link rel="prev" title="Spatial IsoDepth Calculation" href="t_gaston.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/logo.png" class="logo__image only-light" alt="omicverse - Home"/>
+    <script>document.write(`<img src="../_static/logo.png" class="logo__image only-dark" alt="omicverse - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../index.html">
+                    OmicVerse Documentation
+                </a>
+            </li>
+        </ul>
+        <ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../Installation_guild.html">OmicVerse Installation Guide</a></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../tutorials/index.html">Tutorials</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_bulk.html">Bulk RNA-seq</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_upstream.html">Upstream</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_mapping_STAR.html">Bulk RNA-seq mapping with STAR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_mapping_kbpython.html">Bulk RNA-seq mapping with kb-python</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_preprocessing.html">Preprocessing</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_bulk_combat.html">Batch correction in Bulk RNA-seq or microarray data</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_downstream.html">Downstream</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_deg.html">Different Expression Analysis</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_deseq2.html">Different Expression Analysis with DEseq2</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_network.html">Protein-Protein interaction (PPI) analysis by String-db</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_wgcna.html">WGCNA (Weighted gene co-expression network analysis) analysis</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_deconvolution.html">Deconvolution</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_decov_bulk.html">Bulk deconvolution with reference scRNA-seq</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_others.html">Others</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_tcga.html">TCGA database preprocess</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_metabol.html">Metabolomics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_01_intro.html">Metabolomics preprocessing and univariate statistics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_02_multivariate.html">Multivariate discrimination with PLS-DA and OPLS-DA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_03_pathway.html">Metabolite-set enrichment analysis (MSEA)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_04_untargeted.html">Untargeted LC-MS and mummichog pathway inference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_05_lipidomics.html">Lipidomics with LIPID MAPS and LION</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_06_batch_correction.html">Batch effect and drift correction for LC-MS</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_07_multifactor.html">Multi-factor designs — ASCA and linear mixed models</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_08_biomarker.html">Biomarker discovery — univariate AUC + multivariate panel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_09_dgca.html">Differential correlation — DGCA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_10_multiomics.html">Multi-omics integration — metabolomics + RNA-seq with MOFA</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_microbiome.html">Microbiome</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-microbiome/t_16s_amplicon.html">16S rRNA amplicon analysis with OmicVerse</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-microbiome/t_16s_phylogeny.html">16S phylogeny: MAFFT → FastTree → Faith PD + UniFrac</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-microbiome/t_16s_dada2.html">DADA2 backend: pure-Python ASV inference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-microbiome/t_16s_da_comparison.html">Differential abundance: Wilcoxon vs DESeq2 vs ANCOM-BC</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_single.html">Single-Cell RNA-seq</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_alignment.html">Alignment</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_alignment_1k.html">Alignment and analysis of single-cell RNA-seq data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_alignment_velocity.html">Alignment and RNA velocity analysis of single-cell RNA-seq data.</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_preprocessing.html">Preprocessing</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_preprocess_cpu.html">Preprocessing the data of scRNA-seq with omicverse[CPU-GPU-mixed]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_preprocess_gpu.html">Preprocessing the data of scRNA-seq with omicverse[GPU]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_preprocess_rust.html">Preprocessing the data of scRNA-seq [Rust / out-of-memory]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cluster.html">Clustering space</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_single_batch.html">Data integration and batch correction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cnmf.html">GeneModule Identified</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_lazy.html">Lazy analysis of scRNA-seq</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_annotation.html">Annotation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_anno_noref.html">Reference-free automated single-cell cell type annotation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_anno_ref.html">Reference automated single-cell cell type annotation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_gptanno.html">Automatic cell type annotation with GPT/Other</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cellmatch.html">Mapping Cell Names to the Cell Ontology/Taxonomy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cellanno.html">Celltype auto annotation with SCSA</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_metatime.html">Celltype auto annotation with MetaTiME</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_tosica.html">Celltype annotation migration(mapping) with TOSICA</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_scmulan.html">Using scMulan to annotate cell types in Heart, Lung, Liver, Bone marrow, Blood, Brain, and Thymus</a></li>
+
+
+
+
+
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cellvote.html">Consensus annotation with CellVote</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_trajectory.html">Trajectory</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cytotrace.html">Prediction of absolute developmental potential using CytoTrace2</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_traj.html">Basic Trajectory Inference</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_stavia.html">Trajectory Inference with StaVIA</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cellfate_gene.html">Timing-associated genes analysis with TimeFateKernel</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cellfate.html">Identify the driver regulators of cell fate decisions</a></li>
+
+
+
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_cell_structure.html">Cell Structure</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_metacells.html">Inference of MetaCell from Single-Cell RNA-seq</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_deg_single.html">Differential expression and celltype analysis [All Cell]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_scdeg.html">Differential expression analysis [Meta Cell]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_scenic.html">Gene Regulatory Network Analysis with SCENIC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_aucell.html">Pathway analysis with AUCell</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cellphonedb.html">Cell-cell communication with CellPhoneDB</a></li>
+
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_scdrug.html">Drug response predict with scDrug</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_simba.html">Data integration and batch correction with SIMBA</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_velocity.html">Velocity</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-velo/t_velo.html">Velocity Basic Calculation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-velo/t_graphvelo.html">Velocity Optimization</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_multi_omics.html">Multi-omics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_mofa.html">Multi omics analysis by MOFA</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_mofa_glue.html">Multi omics analysis by MOFA and GLUE</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_anno_trans.html">Celltype annotation transfer in multi-omics</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_multi_omics.html">Multi-Omics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-Multi-Omics/bulk-single/t_bulktrajblend.html">Bulk RNA-seq generate ‘interrupted’ cells to interpolate scRNA-seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-Multi-Omics/bulk-single/t_bulk2single.html">Bulk RNA-seq to Single RNA-seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-Multi-Omics/bulk-single/t_single2spatial.html">Single RNA-seq to Spatial RNA-seq</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="../tutorials/index_spatial.html">Spatial Transcriptomics</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_spatial_preprocessing.html">Preprocessing</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="t_crop_rotate.html">Crop and Rotation of spatial transcriptomic data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_cellpose.html">Cell Segmemtation (10x HD)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_nanostring_preprocess.html">Analyze NanoString data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_xenium_preprocess.html">Analyze Xenium data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_visium_hd_preprocess.html">Analyze Visium HD data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_staligner.html">Spatial integration and clustering</a></li>
+
+
+
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_spatial_clustering.html">Clustering</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="cluster/t_cluster_graphst.html">Spatial clustering with GraphST + pymclustR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cluster/t_cluster_binary.html">Spatial clustering with BINARY + pymclustR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cluster/t_cluster_stagate.html">Spatial clustering with STAGATE + pymclustR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cluster/t_cluster_cast.html">Spatial clustering with CAST + pymclustR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="cluster/t_cluster_banksy.html">Spatial clustering with BANKSY + pymclustR</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_spatial_deconvolution.html">Deconvolution</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="t_spaceflow.html">Identifying Pseudo-Spatial Map</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_decov.html">Spatial deconvolution with reference scRNA-seq</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_flashdeconv.html">FlashDeconv: Fast Spatial Deconvolution via Structure-Preserving Sketching</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_starfysh_new.html">Spatial deconvolution without reference scRNA-seq</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 current active has-children"><a class="reference internal" href="../tutorials/index_spatial_downstream.html">Downstream</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="t_stt.html">Spatial transition tensor of single cells</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_commot_flowsig.html">Spatial Communication</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_gaston.html">Spatial IsoDepth Calculation</a></li>
+<li class="toctree-l4 current active"><a class="current reference internal" href="#">Single cell spatial alignment tools</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_foundation.html">Foundation Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_overview.html">Overview</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_guide.html">ov.fm — Foundation Model Module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm.html">ov.fm — Unified Foundation Model API</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_skill_ready.html">Skill-Ready Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scgpt_guide.html">scGPT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_scgpt.html">scGPT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_geneformer_guide.html">Geneformer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_geneformer.html">GeneFormer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_uce_guide.html">UCE</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_uce.html">UCE</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scfoundation_guide.html">scFoundation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_scfoundation.html">scFoundation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_cellplm_guide.html">CellPLM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_cellplm.html">CellPLM</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_core.html">Core Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scbert_guide.html">scBERT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_genecompass_guide.html">GeneCompass</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_nicheformer_guide.html">Nicheformer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scmulan_guide.html">scMulan</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_specialized.html">Specialized Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_tgpt_guide.html">tGPT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_cellfm_guide.html">CellFM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_sccello_guide.html">scCello</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scprint_guide.html">scPRINT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_aidocell_guide.html">AIDO.Cell</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_pulsar_guide.html">PULSAR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_tabula_guide.html">Tabula</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_domain.html">Domain-Specific Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_atacformer_guide.html">ATACformer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scplantllm_guide.html">scPlantLLM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_langcell_guide.html">LangCell</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_cell2sentence_guide.html">Cell2Sentence</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_genept_guide.html">GenePT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_chatcell_guide.html">ChatCell</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_plotting.html">Visualization &amp; Plotting</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-plotting/t_visualize_single.html">Visualization of single cell RNA-seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-plotting/t_visualize_bulk.html">Visualization of Bulk RNA-seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-plotting/t_palette.html">Palette optimization for publication-quality single-cell &amp; spatial plots</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-plotting/t_publication_plotting.html">Scientific plotting for publication with OmicVerse</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-plotting/t_visualize_colorsystem.html">Color system</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../omicclaw/index.html">OmicClaw</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../omicclaw/index_gateway.html">Gateway and Channels</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_msg_bot_overview.html">OmicClaw Gateway Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_setup_auth.html">OmicClaw Setup and Auth</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_channel_telegram.html">OmicClaw Telegram Tutorial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_channel_feishu.html">OmicClaw Feishu 教程</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_channel_imessage.html">OmicClaw iMessage Tutorial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_channel_qq.html">OmicClaw QQ Tutorial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_session_commands.html">OmicClaw Session Workflow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_troubleshooting.html">OmicClaw Troubleshooting</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../omicclaw/index_mcp.html">MCP Server</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_guide.html">OmicVerse MCP Server</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_quickstart.html">OmicVerse MCP Quick Start</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_full_start.html">OmicVerse MCP Full Start</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_tools.html">OmicVerse MCP Tool Catalog</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_clients.html">OmicVerse MCP Clients and Deployment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_runtime.html">OmicVerse MCP Runtime and Troubleshooting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_reference.html">OmicVerse MCP Reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_claude_code.html">Using OmicVerse MCP with Claude Code — Step by Step</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../omicclaw/index_notebooks.html">General Notebooks</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_ov_agent_pbmc3k.html">J.A.R.V.I.S. with PBMC3k</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/ov_agent_ten_task_suite.html">J.A.R.V.I.S. with Ten-Task Suite</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../api/index.html">API Reference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../api/user.html">User API</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.generate_reference_table.html">omicverse.generate_reference_table</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.settings.cpu_gpu_mixed_init.html">omicverse.settings.cpu_gpu_mixed_init</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.settings.gpu_init.html">omicverse.settings.gpu_init</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.load.html">omicverse.io.load</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read.html">omicverse.io.read</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_10x_h5.html">omicverse.io.read_10x_h5</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_10x_mtx.html">omicverse.io.read_10x_mtx</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_csv.html">omicverse.io.read_csv</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_h5ad.html">omicverse.io.read_h5ad</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_nanostring.html">omicverse.io.read_nanostring</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_visium_hd.html">omicverse.io.read_visium_hd</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_visium_hd_bin.html">omicverse.io.read_visium_hd_bin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_visium_hd_seg.html">omicverse.io.read_visium_hd_seg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_xenium.html">omicverse.io.read_xenium</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.save.html">omicverse.io.save</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.spatial.read_visium.html">omicverse.io.spatial.read_visium</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.bulk_rnaseq_pipeline.html">omicverse.alignment.bulk_rnaseq_pipeline</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.count.html">omicverse.alignment.count</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.fastp.html">omicverse.alignment.fastp</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.featureCount.html">omicverse.alignment.featureCount</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.fqdump.html">omicverse.alignment.fqdump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.parallel_fastq_dump.html">omicverse.alignment.parallel_fastq_dump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.prefetch.html">omicverse.alignment.prefetch</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.ref.html">omicverse.alignment.ref</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.STAR.html">omicverse.alignment.STAR</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.anndata_to_CPU.html">omicverse.pp.anndata_to_CPU</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.anndata_to_GPU.html">omicverse.pp.anndata_to_GPU</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.binary_search.html">omicverse.pp.binary_search</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.filter_cells.html">omicverse.pp.filter_cells</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.filter_genes.html">omicverse.pp.filter_genes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.highly_variable_features.html">omicverse.pp.highly_variable_features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.highly_variable_genes.html">omicverse.pp.highly_variable_genes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.identify_robust_genes.html">omicverse.pp.identify_robust_genes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.leiden.html">omicverse.pp.leiden</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.log1p.html">omicverse.pp.log1p</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.louvain.html">omicverse.pp.louvain</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.mde.html">omicverse.pp.mde</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.neighbors.html">omicverse.pp.neighbors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.normalize_pearson_residuals.html">omicverse.pp.normalize_pearson_residuals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.pca.html">omicverse.pp.pca</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.preprocess.html">omicverse.pp.preprocess</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.qc.html">omicverse.pp.qc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.recover_counts.html">omicverse.pp.recover_counts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.regress.html">omicverse.pp.regress</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.regress_and_scale.html">omicverse.pp.regress_and_scale</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.remove_cc_genes.html">omicverse.pp.remove_cc_genes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.scale.html">omicverse.pp.scale</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.score_genes_cell_cycle.html">omicverse.pp.score_genes_cell_cycle</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.scrublet.html">omicverse.pp.scrublet</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.scrublet_simulate_doublets.html">omicverse.pp.scrublet_simulate_doublets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.select_hvf_pegasus.html">omicverse.pp.select_hvf_pegasus</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.sude.html">omicverse.pp.sude</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.tsne.html">omicverse.pp.tsne</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.umap.html">omicverse.pp.umap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Annotation.html">omicverse.single.Annotation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.AnnotationRef.html">omicverse.single.AnnotationRef</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.autoResolution.html">omicverse.single.autoResolution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.batch_correction.html">omicverse.single.batch_correction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.CellOntologyMapper.html">omicverse.single.CellOntologyMapper</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.CellVote.html">omicverse.single.CellVote</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.cNMF.html">omicverse.single.cNMF</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.convert_human_to_mouse_network.html">omicverse.single.convert_human_to_mouse_network</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.cosg.html">omicverse.single.cosg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.cytotrace2.html">omicverse.single.cytotrace2</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.DCT.html">omicverse.single.DCT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.DEG.html">omicverse.single.DEG</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.download_cl.html">omicverse.single.download_cl</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Drug_Response.html">omicverse.single.Drug_Response</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.dynamic_features.html">omicverse.single.dynamic_features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.factor_correlation.html">omicverse.single.factor_correlation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.factor_exact.html">omicverse.single.factor_exact</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Fate.html">omicverse.single.Fate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.find_markers.html">omicverse.single.find_markers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.gene_trends.html">omicverse.single.gene_trends</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.generate_scRNA_report.html">omicverse.single.generate_scRNA_report</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.geneset_aucell.html">omicverse.single.geneset_aucell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_celltype_marker.html">omicverse.single.get_celltype_marker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_cluster_celltype.html">omicverse.single.get_cluster_celltype</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_markers.html">omicverse.single.get_markers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_obs_value.html">omicverse.single.get_obs_value</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_weights.html">omicverse.single.get_weights</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.GLUE_pair.html">omicverse.single.GLUE_pair</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.gptcelltype.html">omicverse.single.gptcelltype</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.gptcelltype_local.html">omicverse.single.gptcelltype_local</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.lazy.html">omicverse.single.lazy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.load_human_prior_interaction_network.html">omicverse.single.load_human_prior_interaction_network</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.MetaCell.html">omicverse.single.MetaCell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.MetaTiME.html">omicverse.single.MetaTiME</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Monocle.html">omicverse.single.Monocle</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.mouse_hsc_nestorowa16.html">omicverse.single.mouse_hsc_nestorowa16</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pathway_aucell.html">omicverse.single.pathway_aucell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pathway_aucell_enrichment.html">omicverse.single.pathway_aucell_enrichment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pathway_enrichment.html">omicverse.single.pathway_enrichment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pathway_enrichment_plot.html">omicverse.single.pathway_enrichment_plot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.plot_metacells.html">omicverse.single.plot_metacells</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pyCEFCON.html">omicverse.single.pyCEFCON</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pyMOFA.html">omicverse.single.pyMOFA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pyMOFAART.html">omicverse.single.pyMOFAART</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pySCSA.html">omicverse.single.pySCSA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pySIMBA.html">omicverse.single.pySIMBA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pyTOSICA.html">omicverse.single.pyTOSICA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.run_cellphonedb_v5.html">omicverse.single.run_cellphonedb_v5</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.scanpy_cellanno_from_dict.html">omicverse.single.scanpy_cellanno_from_dict</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.SCENIC.html">omicverse.single.SCENIC</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.TrajInfer.html">omicverse.single.TrajInfer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Velo.html">omicverse.single.Velo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.batch_correction.html">omicverse.bulk.batch_correction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.Deconvolution.html">omicverse.bulk.Deconvolution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.geneset_enrichment.html">omicverse.bulk.geneset_enrichment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.geneset_plot.html">omicverse.bulk.geneset_plot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.geneset_plot_multi.html">omicverse.bulk.geneset_plot_multi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.Matrix_ID_mapping.html">omicverse.bulk.Matrix_ID_mapping</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.pyDEG.html">omicverse.bulk.pyDEG</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.pyGSEA.html">omicverse.bulk.pyGSEA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.pyPPI.html">omicverse.bulk.pyPPI</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.pyTCGA.html">omicverse.bulk.pyTCGA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.string_interaction.html">omicverse.bulk.string_interaction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.bin2cell.html">omicverse.space.bin2cell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.Cal_Spatial_Net.html">omicverse.space.Cal_Spatial_Net</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.calculate_gene_signature.html">omicverse.space.calculate_gene_signature</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.CAST.html">omicverse.space.CAST</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.cellcharter.html">omicverse.space.cellcharter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.CellLoc.html">omicverse.space.CellLoc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.CellMap.html">omicverse.space.CellMap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.clusters.html">omicverse.space.clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.create_communication_anndata.html">omicverse.space.create_communication_anndata</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.crop_space_visium.html">omicverse.space.crop_space_visium</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.Deconvolution.html">omicverse.space.Deconvolution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.GASTON.html">omicverse.space.GASTON</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.map_spatial_auto.html">omicverse.space.map_spatial_auto</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.map_spatial_manual.html">omicverse.space.map_spatial_manual</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.merge_cluster.html">omicverse.space.merge_cluster</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.moranI.html">omicverse.space.moranI</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.pySpaceFlow.html">omicverse.space.pySpaceFlow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.pySTAGATE.html">omicverse.space.pySTAGATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.pySTAligner.html">omicverse.space.pySTAligner</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.read_visium_10x.html">omicverse.space.read_visium_10x</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.rotate_space_visium.html">omicverse.space.rotate_space_visium</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.salvage_secondary_labels.html">omicverse.space.salvage_secondary_labels</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.spatial_autocorr.html">omicverse.space.spatial_autocorr</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.spatial_neighbors.html">omicverse.space.spatial_neighbors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.STT.html">omicverse.space.STT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.svg.html">omicverse.space.svg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.sync_visium_hd_seg_geometries.html">omicverse.space.sync_visium_hd_seg_geometries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.Tangram.html">omicverse.space.Tangram</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.update_classification_from_database.html">omicverse.space.update_classification_from_database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.visium_10x_hd_cellpose_expand.html">omicverse.space.visium_10x_hd_cellpose_expand</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.visium_10x_hd_cellpose_gex.html">omicverse.space.visium_10x_hd_cellpose_gex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.visium_10x_hd_cellpose_he.html">omicverse.space.visium_10x_hd_cellpose_he</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.Bulk2Single.html">omicverse.bulk2single.Bulk2Single</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.bulk2single_plot_cellprop.html">omicverse.bulk2single.bulk2single_plot_cellprop</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.bulk2single_plot_correlation.html">omicverse.bulk2single.bulk2single_plot_correlation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.BulkTrajBlend.html">omicverse.bulk2single.BulkTrajBlend</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.Single2Spatial.html">omicverse.bulk2single.Single2Spatial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.add_density_contour.html">omicverse.pl.add_density_contour</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.add_palue.html">omicverse.pl.add_palue</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.add_pie2spatial.html">omicverse.pl.add_pie2spatial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.add_streamplot.html">omicverse.pl.add_streamplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.bardotplot.html">omicverse.pl.bardotplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.boxplot.html">omicverse.pl.boxplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.calculate_gene_density.html">omicverse.pl.calculate_gene_density</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ccc_heatmap.html">omicverse.pl.ccc_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ccc_network_plot.html">omicverse.pl.ccc_network_plot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ccc_stat_plot.html">omicverse.pl.ccc_stat_plot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.cell_cor_heatmap.html">omicverse.pl.cell_cor_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.CellChatViz.html">omicverse.pl.CellChatViz</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.cellproportion.html">omicverse.pl.cellproportion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.complexheatmap.html">omicverse.pl.complexheatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.contour.html">omicverse.pl.contour</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ConvexHull.html">omicverse.pl.ConvexHull</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.create_custom_colormap.html">omicverse.pl.create_custom_colormap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.dotplot.html">omicverse.pl.dotplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.dynamic_heatmap.html">omicverse.pl.dynamic_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.dynamic_trends.html">omicverse.pl.dynamic_trends</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding.html">omicverse.pl.embedding</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding_adjust.html">omicverse.pl.embedding_adjust</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding_atlas.html">omicverse.pl.embedding_atlas</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding_celltype.html">omicverse.pl.embedding_celltype</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding_density.html">omicverse.pl.embedding_density</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.feature_heatmap.html">omicverse.pl.feature_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ForbiddenCity.html">omicverse.pl.ForbiddenCity</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.gen_mpl_labels.html">omicverse.pl.gen_mpl_labels</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.geneset_wordcloud.html">omicverse.pl.geneset_wordcloud</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.group_heatmap.html">omicverse.pl.group_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.marker_heatmap.html">omicverse.pl.marker_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.markers_dotplot.html">omicverse.pl.markers_dotplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.palette.html">omicverse.pl.palette</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_cellproportion.html">omicverse.pl.plot_cellproportion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_embedding_celltype.html">omicverse.pl.plot_embedding_celltype</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_flowsig_network.html">omicverse.pl.plot_flowsig_network</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_grouped_fractions.html">omicverse.pl.plot_grouped_fractions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_pca_variance_ratio.html">omicverse.pl.plot_pca_variance_ratio</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_set.html">omicverse.pl.plot_set</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_spatial.html">omicverse.pl.plot_spatial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_text_set.html">omicverse.pl.plot_text_set</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.rank_genes_groups_dotplot.html">omicverse.pl.rank_genes_groups_dotplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.single_group_boxplot.html">omicverse.pl.single_group_boxplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.tsne.html">omicverse.pl.tsne</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.umap.html">omicverse.pl.umap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.venn.html">omicverse.pl.venn</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.violin.html">omicverse.pl.violin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.volcano.html">omicverse.pl.volcano</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.bhattacherjee.html">omicverse.datasets.bhattacherjee</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.blobs.html">omicverse.datasets.blobs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.bm.html">omicverse.datasets.bm</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.bone_marrow.html">omicverse.datasets.bone_marrow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.burczynski06.html">omicverse.datasets.burczynski06</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.chromaffin.html">omicverse.datasets.chromaffin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.cite_seq.html">omicverse.datasets.cite_seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.create_mock_dataset.html">omicverse.datasets.create_mock_dataset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.decov_bulk_covid_bulk.html">omicverse.datasets.decov_bulk_covid_bulk</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.decov_bulk_covid_single.html">omicverse.datasets.decov_bulk_covid_single</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.dentate_gyrus.html">omicverse.datasets.dentate_gyrus</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.dentate_gyrus_scvelo.html">omicverse.datasets.dentate_gyrus_scvelo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.download_data.html">omicverse.datasets.download_data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.download_data_requests.html">omicverse.datasets.download_data_requests</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.get_adata.html">omicverse.datasets.get_adata</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.gillespie.html">omicverse.datasets.gillespie</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.haber.html">omicverse.datasets.haber</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.hematopoiesis.html">omicverse.datasets.hematopoiesis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.hematopoiesis_raw.html">omicverse.datasets.hematopoiesis_raw</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.hg_forebrain_glutamatergic.html">omicverse.datasets.hg_forebrain_glutamatergic</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.hl60.html">omicverse.datasets.hl60</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.human_tfs.html">omicverse.datasets.human_tfs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.krumsiek11.html">omicverse.datasets.krumsiek11</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.moignard15.html">omicverse.datasets.moignard15</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.multi_brain_5k.html">omicverse.datasets.multi_brain_5k</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.nascseq.html">omicverse.datasets.nascseq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.pancreas_cellrank.html">omicverse.datasets.pancreas_cellrank</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.pancreatic_endocrinogenesis.html">omicverse.datasets.pancreatic_endocrinogenesis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.paul15.html">omicverse.datasets.paul15</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.pbmc3k.html">omicverse.datasets.pbmc3k</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.pbmc8k.html">omicverse.datasets.pbmc8k</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.sc_ref_Lymph_Node.html">omicverse.datasets.sc_ref_Lymph_Node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.sceu_seq_organoid.html">omicverse.datasets.sceu_seq_organoid</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.sceu_seq_rpe1.html">omicverse.datasets.sceu_seq_rpe1</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.scifate.html">omicverse.datasets.scifate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.scnt_seq_neuron_labeling.html">omicverse.datasets.scnt_seq_neuron_labeling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.scnt_seq_neuron_splicing.html">omicverse.datasets.scnt_seq_neuron_splicing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.scslamseq.html">omicverse.datasets.scslamseq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.seqfish.html">omicverse.datasets.seqfish</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.toggleswitch.html">omicverse.datasets.toggleswitch</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.zebrafish.html">omicverse.datasets.zebrafish</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.external.GraphST.html">omicverse.external.GraphST</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.call_tool.html">omicverse.utils.biocontext.call_tool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.get_ensembl_id.html">omicverse.utils.biocontext.get_ensembl_id</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.get_fulltext.html">omicverse.utils.biocontext.get_fulltext</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.get_uniprot_id.html">omicverse.utils.biocontext.get_uniprot_id</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.list_tools.html">omicverse.utils.biocontext.list_tools</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_alphafold.html">omicverse.utils.biocontext.query_alphafold</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_cell_ontology.html">omicverse.utils.biocontext.query_cell_ontology</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_chebi.html">omicverse.utils.biocontext.query_chebi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_efo.html">omicverse.utils.biocontext.query_efo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_go.html">omicverse.utils.biocontext.query_go</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_hpa.html">omicverse.utils.biocontext.query_hpa</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_interpro.html">omicverse.utils.biocontext.query_interpro</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_opentargets.html">omicverse.utils.biocontext.query_opentargets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_panglaodb.html">omicverse.utils.biocontext.query_panglaodb</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_reactome.html">omicverse.utils.biocontext.query_reactome</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_string.html">omicverse.utils.biocontext.query_string</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_uniprot.html">omicverse.utils.biocontext.query_uniprot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_clinical_trials.html">omicverse.utils.biocontext.search_clinical_trials</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_drugs.html">omicverse.utils.biocontext.search_drugs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_interpro.html">omicverse.utils.biocontext.search_interpro</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_literature.html">omicverse.utils.biocontext.search_literature</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_preprints.html">omicverse.utils.biocontext.search_preprints</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_pride.html">omicverse.utils.biocontext.search_pride</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.cal_paga.html">omicverse.utils.cal_paga</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.cluster.html">omicverse.utils.cluster</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert2gene_id.html">omicverse.utils.convert2gene_id</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert2gene_symbol.html">omicverse.utils.convert2gene_symbol</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert2symbol.html">omicverse.utils.convert2symbol</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert_adata_for_rust.html">omicverse.utils.convert_adata_for_rust</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert_to_pandas.html">omicverse.utils.convert_to_pandas</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_CaDRReS_model.html">omicverse.utils.download_CaDRReS_model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_GDSC_data.html">omicverse.utils.download_GDSC_data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_geneid_annotation_pair.html">omicverse.utils.download_geneid_annotation_pair</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_pathway_database.html">omicverse.utils.download_pathway_database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_tosica_gmt.html">omicverse.utils.download_tosica_gmt</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.geneset_prepare.html">omicverse.utils.geneset_prepare</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.get_gene_annotation.html">omicverse.utils.get_gene_annotation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.gtf_to_pair_tsv.html">omicverse.utils.gtf_to_pair_tsv</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.LDA_topic.html">omicverse.utils.LDA_topic</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.mde.html">omicverse.utils.mde</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.plot_paga.html">omicverse.utils.plot_paga</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.refine_label.html">omicverse.utils.refine_label</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.retrieve_layers.html">omicverse.utils.retrieve_layers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.roe.html">omicverse.utils.roe</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.store_layers.html">omicverse.utils.store_layers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.symbol2id.html">omicverse.utils.symbol2id</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.weighted_knn_trainer.html">omicverse.utils.weighted_knn_trainer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.weighted_knn_transfer.html">omicverse.utils.weighted_knn_transfer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.wrap_dataframe.html">omicverse.utils.wrap_dataframe</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../Release_notes.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../Developer_guild.html">Developer guild</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../GPU_supported_registry_functions.html">Registered Functions — GPU Support Overview</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/Starlitnightly/omicverse/discussions">Discussion</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/Starlitnightly/omicverse">GitHub</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/Starlitnightly/omicverse" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/Starlitnightly/omicverse/blob/master/docs/Tutorials-space/t_slat.ipynb?plain=1" target="_blank"
+   class="btn btn-sm btn-source-file-button dropdown-item"
+   title="Show source"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-code"></i>
+  </span>
+<span class="btn__text-container">Show source</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/Starlitnightly/omicverse/edit/master/docs/Tutorials-space/t_slat.ipynb" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/Starlitnightly/omicverse/issues/new?title=Issue%20on%20page%20%2FTutorials-space/t_slat.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/Tutorials-space/t_slat.ipynb" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.ipynb</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Single cell spatial alignment tools</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#preprocess-data">Preprocess Data</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#run-slat">Run SLAT</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#visualization-of-alignment">Visualization of alignment</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#focus-on-developing-kidney">Focus on developing Kidney</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="single-cell-spatial-alignment-tools">
+<h1>Single cell spatial alignment tools<a class="headerlink" href="#single-cell-spatial-alignment-tools" title="Link to this heading">#</a></h1>
+<p>SLAT (Spatially-Linked Alignment Tool), a graph-based algorithm for efficient and effective alignment of spatial slices. Adopting a graph adversarial matching strategy, SLAT is the first algorithm capable of aligning heterogenous spatial data across distinct technologies and modalities.</p>
+<p>We made two improvements in integrating the STT algorithm in OmicVerse:</p>
+<ul class="simple">
+<li><p><strong>Fix the running error in alignment</strong>: We fixed some issues with the scSLAT package on pypi.</p></li>
+<li><p><strong>Added more downstream analysis</strong>: We have expanded on the original tutorial by combining the tutorial and reproduce code given by the authors for downstream analysis.</p></li>
+</ul>
+<p>If you found this tutorial helpful, please cite SLAT and OmicVerse:</p>
+<ul class="simple">
+<li><p>Xia, CR., Cao, ZJ., Tu, XM. et al. Spatial-linked alignment tool (SLAT) for aligning heterogenous slices. Nat Commun 14, 7236 (2023). <a class="reference external" href="https://doi.org/10.1038/s41467-023-43105-5">https://doi.org/10.1038/s41467-023-43105-5</a></p></li>
+</ul>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">omicverse</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ov</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">scanpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sc</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">plot_set</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>____            _     _    __                  
+  / __ \____ ___  (_)___| |  / /__  _____________ 
+ / / / / __ `__ \/ / ___/ | / / _ \/ ___/ ___/ _ \ 
+/ /_/ / / / / / / / /__ | |/ /  __/ /  (__  )  __/ 
+\____/_/ /_/ /_/_/\___/ |___/\___/_/  /____/\___/                                              
+
+Version: 1.6.0, Tutorials: https://omicverse.readthedocs.io/
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#import scSLAT</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">omicverse.external.scSLAT.model</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_anndatas</span><span class="p">,</span> <span class="n">Cal_Spatial_Net</span><span class="p">,</span> <span class="n">run_SLAT</span><span class="p">,</span> <span class="n">scanpy_workflow</span><span class="p">,</span> <span class="n">spatial_match</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">omicverse.external.scSLAT.viz</span><span class="w"> </span><span class="kn">import</span> <span class="n">match_3D_multi</span><span class="p">,</span> <span class="n">hist</span><span class="p">,</span> <span class="n">Sankey</span><span class="p">,</span> <span class="n">match_3D_celltype</span><span class="p">,</span> <span class="n">Sankey</span><span class="p">,</span><span class="n">Sankey_multi</span><span class="p">,</span><span class="n">build_3D</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">omicverse.external.scSLAT.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">region_statistics</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="preprocess-data">
+<h2>Preprocess Data<a class="headerlink" href="#preprocess-data" title="Link to this heading">#</a></h2>
+<p>adata1.h5ad: E11.5 mouse embryo dataset, download from <a class="reference external" href="https://drive.google.com/uc?export=download&amp;amp;id=1KkuJt6aSlKS1AJzFZjE_odypY-GINRuD">here</a></p>
+<p>adata2.h5ad: E12.5 mouse embryo dataset, download from <a class="reference external" href="https://drive.google.com/uc?export=download&amp;amp;id=1YIiEmjGfHxcDbGn4nv2kzmTHUo3_q5hJ">here</a></p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">adata1</span> <span class="o">=</span> <span class="n">sc</span><span class="o">.</span><span class="n">read_h5ad</span><span class="p">(</span><span class="s1">&#39;data/E115_Stereo.h5ad&#39;</span><span class="p">)</span>
+<span class="n">adata2</span> <span class="o">=</span> <span class="n">sc</span><span class="o">.</span><span class="n">read_h5ad</span><span class="p">(</span><span class="s1">&#39;data/E125_Stereo.h5ad&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">adata1</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;week&#39;</span><span class="p">]</span><span class="o">=</span><span class="s1">&#39;E11.5&#39;</span>
+<span class="n">adata2</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;week&#39;</span><span class="p">]</span><span class="o">=</span><span class="s1">&#39;E12.5&#39;</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">spatial</span><span class="p">(</span><span class="n">adata1</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;annotation&#39;</span><span class="p">,</span> <span class="n">spot_size</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">spatial</span><span class="p">(</span><span class="n">adata2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;annotation&#39;</span><span class="p">,</span> <span class="n">spot_size</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/8960df7abca513e6a47b4be1fbfd537373a2794d7bd7e0b521ebb89eb483c9b5.png"><img alt="../_images/8960df7abca513e6a47b4be1fbfd537373a2794d7bd7e0b521ebb89eb483c9b5.png" src="../_images/8960df7abca513e6a47b4be1fbfd537373a2794d7bd7e0b521ebb89eb483c9b5.png" style="width: 526px; height: 300px;" />
+</a>
+<a class="reference internal image-reference" href="../_images/2bdc6aaf6daa2f411fc0edbcf64584f6cb5842deb8a793848bf1c666933f0876.png"><img alt="../_images/2bdc6aaf6daa2f411fc0edbcf64584f6cb5842deb8a793848bf1c666933f0876.png" src="../_images/2bdc6aaf6daa2f411fc0edbcf64584f6cb5842deb8a793848bf1c666933f0876.png" style="width: 531px; height: 300px;" />
+</a>
+</div>
+</div>
+</section>
+<section id="run-slat">
+<h2>Run SLAT<a class="headerlink" href="#run-slat" title="Link to this heading">#</a></h2>
+<p>Then we run SLAT as usual</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">Cal_Spatial_Net</span><span class="p">(</span><span class="n">adata1</span><span class="p">,</span> <span class="n">k_cutoff</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s1">&#39;KNN&#39;</span><span class="p">)</span>
+<span class="n">Cal_Spatial_Net</span><span class="p">(</span><span class="n">adata2</span><span class="p">,</span> <span class="n">k_cutoff</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s1">&#39;KNN&#39;</span><span class="p">)</span>
+<span class="n">edges</span><span class="p">,</span> <span class="n">features</span> <span class="o">=</span> <span class="n">load_anndatas</span><span class="p">([</span><span class="n">adata1</span><span class="p">,</span> <span class="n">adata2</span><span class="p">],</span> <span class="n">feature</span><span class="o">=</span><span class="s1">&#39;DPCA&#39;</span><span class="p">,</span> <span class="n">check_order</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Calculating spatial neighbor graph ...
+The graph contains 218282 edges, 10000 cells.
+21.8282 neighbors per cell on average.
+Calculating spatial neighbor graph ...
+The graph contains 219259 edges, 10001 cells.
+21.923707629237075 neighbors per cell on average.
+Use DPCA feature to format graph
+If you pass `n_top_genes`, all cutoffs are ignored.
+extracting highly variable genes
+--&gt; added
+    &#39;highly_variable&#39;, boolean vector (adata.var)
+    &#39;highly_variable_rank&#39;, float vector (adata.var)
+    &#39;means&#39;, float vector (adata.var)
+    &#39;variances&#39;, float vector (adata.var)
+    &#39;variances_norm&#39;, float vector (adata.var)
+normalizing counts per cell
+    finished (0:00:00)
+... as `zero_center=True`, sparse input is densified and may lead to large memory consumption
+... as `zero_center=True`, sparse input is densified and may lead to large memory consumption
+Warning! Dual PCA is using GPU, which may lead to OUT OF GPU MEMORY in big dataset!
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">embd0</span><span class="p">,</span> <span class="n">embd1</span><span class="p">,</span> <span class="n">time</span> <span class="o">=</span> <span class="n">run_SLAT</span><span class="p">(</span><span class="n">features</span><span class="p">,</span> <span class="n">edges</span><span class="p">,</span> <span class="n">LGCN_layer</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Choose GPU:0 as device
+Running
+---------- epochs: 1 ----------
+---------- epochs: 2 ----------
+---------- epochs: 3 ----------
+---------- epochs: 4 ----------
+---------- epochs: 5 ----------
+---------- epochs: 6 ----------
+Training model time: 1.21
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">best</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">distance</span> <span class="o">=</span> <span class="n">spatial_match</span><span class="p">([</span><span class="n">embd0</span><span class="p">,</span> <span class="n">embd1</span><span class="p">],</span> <span class="n">reorder</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">adatas</span><span class="o">=</span><span class="p">[</span><span class="n">adata1</span><span class="p">,</span><span class="n">adata2</span><span class="p">])</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">matching</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="nb">range</span><span class="p">(</span><span class="n">index</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="n">best</span><span class="p">])</span>
+<span class="n">best_match</span> <span class="o">=</span> <span class="n">distance</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">region_statistics</span><span class="p">(</span><span class="n">best_match</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">number_of_interval</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>0.500~0.550         5          0.050%
+0.550~0.600        48          0.480%
+0.600~0.650       162          1.620%
+0.650~0.700       425          4.250%
+0.700~0.750      1004         10.039%
+0.750~0.800      1578         15.778%
+0.800~0.850      1900         18.998%
+0.850~0.900      1701         17.008%
+0.900~0.950      2141         21.408%
+0.950~1.000      1036         10.359%
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="visualization-of-alignment">
+<h2>Visualization of alignment<a class="headerlink" href="#visualization-of-alignment" title="Link to this heading">#</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="n">matching_list</span><span class="o">=</span><span class="p">[</span><span class="n">matching</span><span class="p">]</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">build_3D</span><span class="p">([</span><span class="n">adata1</span><span class="p">,</span><span class="n">adata2</span><span class="p">],</span> <span class="n">matching_list</span><span class="p">,</span><span class="n">subsample_size</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="p">)</span>
+<span class="n">ax</span><span class="o">=</span><span class="n">model</span><span class="o">.</span><span class="n">draw_3D</span><span class="p">(</span><span class="n">hide_axis</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">line_color</span><span class="o">=</span><span class="s1">&#39;#c2c2c2&#39;</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">[</span><span class="mi">6</span><span class="p">,</span><span class="mi">6</span><span class="p">],</span> <span class="n">line_width</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Mapping 0th layer
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/ce63cadbed641b5621f772681f3d56b54d156bfc08482adb7ca8bce68b428742.png"><img alt="../_images/ce63cadbed641b5621f772681f3d56b54d156bfc08482adb7ca8bce68b428742.png" src="../_images/ce63cadbed641b5621f772681f3d56b54d156bfc08482adb7ca8bce68b428742.png" style="width: 380px; height: 380px;" />
+</a>
+</div>
+</div>
+<p>Then we check the alignment quality of the whole slide</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">adata2</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;low_quality_index&#39;</span><span class="p">]</span><span class="o">=</span> <span class="n">best_match</span>
+<span class="n">adata2</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;low_quality_index&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">adata2</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;low_quality_index&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">adata2</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">&#39;spatial&#39;</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>array([[-118.07557033,  391.48711306],
+       [ -80.27430014,  356.96083362],
+       [-130.37495374,  164.18395609],
+       ...,
+       [ -91.13328399,  258.15252187],
+       [   7.42631645,  302.86275741],
+       [ -98.93455418,  344.64032554]])
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">spatial</span><span class="p">(</span><span class="n">adata2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;low_quality_index&#39;</span><span class="p">,</span> <span class="n">spot_size</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Quality&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/d212aa0543df1f03daacf04b0bafb6aa24b97c57aff1322fcd2dbb812143461c.png"><img alt="../_images/d212aa0543df1f03daacf04b0bafb6aa24b97c57aff1322fcd2dbb812143461c.png" src="../_images/d212aa0543df1f03daacf04b0bafb6aa24b97c57aff1322fcd2dbb812143461c.png" style="width: 242px; height: 300px;" />
+</a>
+</div>
+</div>
+<p>We use a Sankey diagram to show the correspondence between cell types at different stages of development</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="o">=</span><span class="n">Sankey_multi</span><span class="p">(</span><span class="n">adata_li</span><span class="o">=</span><span class="p">[</span><span class="n">adata1</span><span class="p">,</span><span class="n">adata2</span><span class="p">],</span>
+             <span class="n">prefix_li</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;E11.5&#39;</span><span class="p">,</span><span class="s1">&#39;E12.5&#39;</span><span class="p">],</span>
+             <span class="n">matching_li</span><span class="o">=</span><span class="p">[</span><span class="n">matching</span><span class="p">],</span>
+                <span class="n">clusters</span><span class="o">=</span><span class="s1">&#39;annotation&#39;</span><span class="p">,</span><span class="n">filter_num</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+             <span class="n">node_opacity</span> <span class="o">=</span> <span class="mf">0.8</span><span class="p">,</span>
+             <span class="n">link_opacity</span> <span class="o">=</span> <span class="mf">0.2</span><span class="p">,</span>
+                <span class="n">layout</span><span class="o">=</span><span class="p">[</span><span class="mi">800</span><span class="p">,</span><span class="mi">500</span><span class="p">],</span>
+           <span class="n">font_size</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+           <span class="n">font_color</span><span class="o">=</span><span class="s1">&#39;Black&#39;</span><span class="p">,</span>
+           <span class="n">save_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+           <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;png&#39;</span><span class="p">,</span>
+           <span class="n">width</span><span class="o">=</span><span class="mi">1200</span><span class="p">,</span>
+           <span class="n">height</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+           <span class="n">return_fig</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><div>                            <div id="1fe6317a-9581-420f-9a40-3d9379bea7f5" class="plotly-graph-div" style="height:500px; width:800px;"></div>            <script type="text/javascript">                require(["plotly"], function(Plotly) {                    window.PLOTLYENV=window.PLOTLYENV || {};                                    if (document.getElementById("1fe6317a-9581-420f-9a40-3d9379bea7f5")) {                    Plotly.newPlot(                        "1fe6317a-9581-420f-9a40-3d9379bea7f5",                        [{"link":{"color":["rgba(11, 211, 177, 0.2)","rgba(255, 67, 116, 0.2)","rgba(211, 36, 90, 0.2)","rgba(126, 193, 54, 0.2)","rgba(158, 123, 255, 0.2)","rgba(239, 131, 58, 0.2)","rgba(190, 155, 114, 0.2)","rgba(3, 255, 244, 0.2)","rgba(223, 202, 67, 0.2)","rgba(11, 211, 177, 0.2)","rgba(255, 67, 116, 0.2)","rgba(190, 155, 114, 0.2)","rgba(240, 98, 249, 0.2)","rgba(45, 115, 158, 0.2)","rgba(66, 143, 226, 0.2)","rgba(158, 123, 255, 0.2)","rgba(239, 131, 58, 0.2)","rgba(223, 202, 67, 0.2)","rgba(255, 67, 116, 0.2)","rgba(92, 92, 166, 0.2)","rgba(211, 36, 90, 0.2)","rgba(45, 115, 158, 0.2)","rgba(66, 143, 226, 0.2)","rgba(158, 123, 255, 0.2)","rgba(183, 76, 17, 0.2)","rgba(45, 115, 158, 0.2)","rgba(183, 76, 17, 0.2)","rgba(240, 98, 249, 0.2)","rgba(45, 115, 158, 0.2)","rgba(66, 143, 226, 0.2)","rgba(92, 92, 166, 0.2)","rgba(45, 115, 158, 0.2)","rgba(158, 123, 255, 0.2)","rgba(211, 36, 90, 0.2)","rgba(179, 139, 92, 0.2)","rgba(255, 67, 116, 0.2)","rgba(190, 155, 114, 0.2)","rgba(240, 98, 249, 0.2)","rgba(66, 143, 226, 0.2)","rgba(158, 123, 255, 0.2)","rgba(211, 36, 90, 0.2)","rgba(201, 35, 177, 0.2)","rgba(11, 211, 177, 0.2)","rgba(92, 92, 166, 0.2)","rgba(158, 123, 255, 0.2)","rgba(179, 167, 38, 0.2)","rgba(239, 131, 58, 0.2)","rgba(11, 211, 177, 0.2)","rgba(190, 155, 114, 0.2)","rgba(240, 98, 249, 0.2)","rgba(223, 202, 67, 0.2)","rgba(66, 143, 226, 0.2)","rgba(11, 211, 177, 0.2)","rgba(92, 92, 166, 0.2)","rgba(158, 123, 255, 0.2)","rgba(11, 211, 177, 0.2)","rgba(255, 67, 116, 0.2)","rgba(158, 123, 255, 0.2)","rgba(179, 139, 92, 0.2)","rgba(190, 155, 114, 0.2)","rgba(66, 143, 226, 0.2)","rgba(179, 139, 92, 0.2)","rgba(11, 211, 177, 0.2)","rgba(255, 67, 116, 0.2)","rgba(92, 92, 166, 0.2)","rgba(190, 155, 114, 0.2)","rgba(240, 98, 249, 0.2)","rgba(45, 115, 158, 0.2)","rgba(66, 143, 226, 0.2)","rgba(158, 123, 255, 0.2)","rgba(92, 92, 166, 0.2)","rgba(183, 76, 17, 0.2)","rgba(158, 123, 255, 0.2)","rgba(45, 115, 158, 0.2)","rgba(158, 123, 255, 0.2)"],"label":["Surface ectoderm_E11.5","Connective tissue_E11.5","Brain_E11.5","Spinal cord_E11.5","Branchial arch_E11.5","Urogenital ridge_E11.5","Blood vessel_E11.5","Dorsal root ganglion_E11.5","Head mesenchyme_E11.5","Dermomyotome_E11.5","Jaw and tooth_E11.5","Sclerotome_E11.5","Inner ear_E11.5","Heart_E11.5","Liver_E11.5","Lung primordium_E11.5","Meninges_E11.5","GI tract_E11.5","Ovary_E12.5","Sympathetic nerve_E12.5","Connective tissue_E12.5","Brain_E12.5","Choroid plexus_E12.5","Lung primordium_E12.5","Mucosal epithelium_E12.5","Epidermis_E12.5","Dorsal root ganglion_E12.5","Heart_E12.5","Muscle_E12.5","Cartilage primordium_E12.5","Urogenital ridge_E12.5","Mesothelium_E12.5","Meninges_E12.5","Blood vessel_E12.5","Kidney_E12.5","Jaw and tooth_E12.5","Liver_E12.5","Pancreas_E12.5","Mesentery_E12.5","GI tract_E12.5"],"source":[1,9,13,15,5,2,8,12,16,1,9,8,10,11,0,5,2,16,9,17,13,11,0,5,7,11,7,10,11,0,17,11,5,13,4,9,8,10,0,5,13,14,1,17,5,6,2,1,8,10,16,0,1,17,5,1,9,5,4,8,0,4,1,9,17,8,10,11,0,5,17,7,5,11,5],"target":[33,33,33,33,33,21,21,21,21,29,29,29,29,29,29,29,22,22,20,20,20,20,20,20,26,26,25,25,25,25,39,39,39,27,35,35,35,35,35,34,36,36,23,23,23,32,32,32,32,32,32,32,38,38,38,31,31,31,24,24,24,28,28,28,28,28,28,28,28,18,37,19,19,30,30],"value":[60,14,144,13,15,2460,11,18,89,64,121,126,27,391,27,12,77,30,180,102,108,88,101,14,252,24,18,21,16,248,236,24,27,375,100,12,176,271,34,59,29,285,17,62,31,44,142,74,285,158,287,156,29,131,21,49,38,57,23,31,47,93,42,816,23,27,68,156,28,65,13,14,13,38,179]},"node":{"color":["rgba(66, 143, 226, 0.8)","rgba(11, 211, 177, 0.8)","rgba(239, 131, 58, 0.8)","rgba(249, 213, 186, 0.8)","rgba(179, 139, 92, 0.8)","rgba(158, 123, 255, 0.8)","rgba(179, 167, 38, 0.8)","rgba(183, 76, 17, 0.8)","rgba(190, 155, 114, 0.8)","rgba(255, 67, 116, 0.8)","rgba(240, 98, 249, 0.8)","rgba(45, 115, 158, 0.8)","rgba(3, 255, 244, 0.8)","rgba(211, 36, 90, 0.8)","rgba(201, 35, 177, 0.8)","rgba(126, 193, 54, 0.8)","rgba(223, 202, 67, 0.8)","rgba(92, 92, 166, 0.8)","rgba(85, 175, 217, 0.8)","rgba(204, 90, 13, 0.8)","rgba(11, 211, 177, 0.8)","rgba(239, 131, 58, 0.8)","rgba(189, 58, 221, 0.8)","rgba(126, 193, 54, 0.8)","rgba(47, 125, 209, 0.8)","rgba(3, 109, 244, 0.8)","rgba(183, 76, 17, 0.8)","rgba(211, 36, 90, 0.8)","rgba(175, 16, 65, 0.8)","rgba(60, 180, 75, 0.8)","rgba(158, 123, 255, 0.8)","rgba(255, 131, 131, 0.8)","rgba(223, 202, 67, 0.8)","rgba(179, 167, 38, 0.8)","rgba(98, 207, 232, 0.8)","rgba(240, 98, 249, 0.8)","rgba(201, 35, 177, 0.8)","rgba(115, 155, 30, 0.8)","rgba(231, 29, 54, 0.8)","rgba(92, 92, 166, 0.8)"],"label":["Surface ectoderm_E11.5","Connective tissue_E11.5","Brain_E11.5","Spinal cord_E11.5","Branchial arch_E11.5","Urogenital ridge_E11.5","Blood vessel_E11.5","Dorsal root ganglion_E11.5","Head mesenchyme_E11.5","Dermomyotome_E11.5","Jaw and tooth_E11.5","Sclerotome_E11.5","Inner ear_E11.5","Heart_E11.5","Liver_E11.5","Lung primordium_E11.5","Meninges_E11.5","GI tract_E11.5","Ovary_E12.5","Sympathetic nerve_E12.5","Connective tissue_E12.5","Brain_E12.5","Choroid plexus_E12.5","Lung primordium_E12.5","Mucosal epithelium_E12.5","Epidermis_E12.5","Dorsal root ganglion_E12.5","Heart_E12.5","Muscle_E12.5","Cartilage primordium_E12.5","Urogenital ridge_E12.5","Mesothelium_E12.5","Meninges_E12.5","Blood vessel_E12.5","Kidney_E12.5","Jaw and tooth_E12.5","Liver_E12.5","Pancreas_E12.5","Mesentery_E12.5","GI tract_E12.5"],"line":{"color":"black","width":0.5},"pad":15,"thickness":15},"valueformat":".0f","valuesuffix":"TWh","type":"sankey"}],                        {"autosize":false,"height":500,"width":800,"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmapgl":[{"type":"heatmapgl","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"title":{"text":""},"font":{"size":12,"color":"Black"}},                        {"responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('1fe6317a-9581-420f-9a40-3d9379bea7f5');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };                });            </script>        </div></div></div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="o">.</span><span class="n">write_html</span><span class="p">(</span><span class="s2">&quot;slat_sankey.html&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="focus-on-developing-kidney">
+<h2>Focus on developing Kidney<a class="headerlink" href="#focus-on-developing-kidney" title="Link to this heading">#</a></h2>
+<p>We highlighted the “Kidney” cells in E12.5 and their aligned precursor cells in E11.5 in alignment results. Consistent with our biological priors, the precursors of the kidney are the mesonephros and the metanephros</p>
+<p>Then we focus on another organ: ‘Ovary’, and found ovary only has single spatial origin. It is interesting that precursors of ovary are spatially close to the mesonephros (see Kidney part), because mammalian ovary originates from the regressed mesonephros.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">color_dict1</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">adata1</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;annotation&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">cat</span><span class="o">.</span><span class="n">categories</span><span class="p">,</span>
+                    <span class="n">adata1</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;annotation_colors&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">()))</span>
+<span class="n">adata1_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;index&#39;</span><span class="p">:</span><span class="nb">range</span><span class="p">(</span><span class="n">embd0</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+                          <span class="s1">&#39;x&#39;</span><span class="p">:</span> <span class="n">adata1</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">&#39;spatial&#39;</span><span class="p">][:,</span><span class="mi">0</span><span class="p">],</span>
+                          <span class="s1">&#39;y&#39;</span><span class="p">:</span> <span class="n">adata1</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">&#39;spatial&#39;</span><span class="p">][:,</span><span class="mi">1</span><span class="p">],</span>
+                          <span class="s1">&#39;celltype&#39;</span><span class="p">:</span><span class="n">adata1</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;annotation&#39;</span><span class="p">],</span>
+                         <span class="s1">&#39;color&#39;</span><span class="p">:</span><span class="n">adata1</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;annotation&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">color_dict1</span><span class="p">)</span>
+                         <span class="p">}</span>
+                        <span class="p">)</span>
+<span class="n">color_dict2</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">adata2</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;annotation&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">cat</span><span class="o">.</span><span class="n">categories</span><span class="p">,</span>
+                    <span class="n">adata2</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;annotation_colors&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">()))</span>
+<span class="n">adata2_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;index&#39;</span><span class="p">:</span><span class="nb">range</span><span class="p">(</span><span class="n">embd1</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+                          <span class="s1">&#39;x&#39;</span><span class="p">:</span> <span class="n">adata2</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">&#39;spatial&#39;</span><span class="p">][:,</span><span class="mi">0</span><span class="p">],</span>
+                          <span class="s1">&#39;y&#39;</span><span class="p">:</span> <span class="n">adata2</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">&#39;spatial&#39;</span><span class="p">][:,</span><span class="mi">1</span><span class="p">],</span>
+                          <span class="s1">&#39;celltype&#39;</span><span class="p">:</span><span class="n">adata2</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;annotation&#39;</span><span class="p">],</span>
+                         <span class="s1">&#39;color&#39;</span><span class="p">:</span><span class="n">adata2</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;annotation&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">color_dict2</span><span class="p">)</span>
+                         <span class="p">}</span>
+                        <span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">kidney_align</span> <span class="o">=</span> <span class="n">match_3D_celltype</span><span class="p">(</span><span class="n">adata1_df</span><span class="p">,</span> <span class="n">adata2_df</span><span class="p">,</span> <span class="n">matching</span><span class="p">,</span> <span class="n">meta</span><span class="o">=</span><span class="s1">&#39;celltype&#39;</span><span class="p">,</span> 
+                                 <span class="n">highlight_celltype</span> <span class="o">=</span> <span class="p">[[</span><span class="s1">&#39;Urogenital ridge&#39;</span><span class="p">],[</span><span class="s1">&#39;Kidney&#39;</span><span class="p">,</span><span class="s1">&#39;Ovary&#39;</span><span class="p">]],</span>
+                                 <span class="n">subsample_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">highlight_line</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;blue&#39;</span><span class="p">],</span> <span class="n">scale_coordinate</span> <span class="o">=</span> <span class="kc">True</span> <span class="p">)</span>
+<span class="n">kidney_align</span><span class="o">.</span><span class="n">draw_3D</span><span class="p">(</span><span class="n">size</span><span class="o">=</span> <span class="p">[</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">],</span> <span class="n">line_width</span> <span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">point_size</span><span class="o">=</span><span class="p">[</span><span class="mf">0.6</span><span class="p">,</span><span class="mf">0.6</span><span class="p">],</span> <span class="n">hide_axis</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>dataset1: 18 cell types; dataset2: 22 cell types; 
+                    Total :29 celltypes; Overlap: 11 cell types 
+                    Not overlap :[[&#39;Dermomyotome&#39;, &#39;Surface ectoderm&#39;, &#39;Sclerotome&#39;, &#39;Inner ear&#39;, &#39;Spinal cord&#39;, &#39;Head mesenchyme&#39;, &#39;Branchial arch&#39;, &#39;Sympathetic nerve&#39;, &#39;Ovary&#39;, &#39;Pancreas&#39;, &#39;Mucosal epithelium&#39;, &#39;Muscle&#39;, &#39;Mesentery&#39;, &#39;Choroid plexus&#39;, &#39;Kidney&#39;, &#39;Epidermis&#39;, &#39;Cartilage primordium&#39;, &#39;Mesothelium&#39;]]
+Subsampled 10000 pairs from 10001
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/541054db9a45bf0498c61fa46ee582a8ccaefcc3cbb19de9585d395fb604f8ce.png"><img alt="../_images/541054db9a45bf0498c61fa46ee582a8ccaefcc3cbb19de9585d395fb604f8ce.png" src="../_images/541054db9a45bf0498c61fa46ee582a8ccaefcc3cbb19de9585d395fb604f8ce.png" style="width: 380px; height: 380px;" />
+</a>
+</div>
+</div>
+<p>We can get the lineage of the query’s cells and mappings using the following function</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">cal_matching_cell</span><span class="p">(</span><span class="n">target_adata</span><span class="p">,</span><span class="n">query_adata</span><span class="p">,</span><span class="n">matching</span><span class="p">,</span><span class="n">query_cell</span><span class="p">,</span><span class="n">clusters</span><span class="o">=</span><span class="s1">&#39;annotation&#39;</span><span class="p">,):</span>
+    <span class="n">adata1_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;index&#39;</span><span class="p">:</span><span class="nb">range</span><span class="p">(</span><span class="n">target_adata</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+                          <span class="s1">&#39;x&#39;</span><span class="p">:</span> <span class="n">target_adata</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">&#39;spatial&#39;</span><span class="p">][:,</span><span class="mi">0</span><span class="p">],</span>
+                          <span class="s1">&#39;y&#39;</span><span class="p">:</span> <span class="n">target_adata</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">&#39;spatial&#39;</span><span class="p">][:,</span><span class="mi">1</span><span class="p">],</span>
+                          <span class="s1">&#39;celltype&#39;</span><span class="p">:</span><span class="n">target_adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">clusters</span><span class="p">]})</span>
+    <span class="n">adata2_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;index&#39;</span><span class="p">:</span><span class="nb">range</span><span class="p">(</span><span class="n">query_adata</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+                              <span class="s1">&#39;x&#39;</span><span class="p">:</span> <span class="n">query_adata</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">&#39;spatial&#39;</span><span class="p">][:,</span><span class="mi">0</span><span class="p">],</span>
+                              <span class="s1">&#39;y&#39;</span><span class="p">:</span> <span class="n">query_adata</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">&#39;spatial&#39;</span><span class="p">][:,</span><span class="mi">1</span><span class="p">],</span>
+                              <span class="s1">&#39;celltype&#39;</span><span class="p">:</span><span class="n">query_adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">clusters</span><span class="p">]})</span>
+    <span class="n">query_adata</span> <span class="o">=</span> <span class="n">target_adata</span><span class="p">[</span><span class="n">matching</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="n">adata2_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">adata2_df</span><span class="o">.</span><span class="n">celltype</span><span class="o">==</span><span class="n">query_cell</span><span class="p">,</span><span class="s1">&#39;index&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">],:]</span>
+    <span class="c1">#adata2_df[&#39;target_celltype&#39;] = adata1_df.iloc[matching[1,:],:][&#39;celltype&#39;].to_list()</span>
+    <span class="c1">#adata2_df[&#39;target_obs_names&#39;] = adata1_df.iloc[matching[1,:],:].index.to_list()</span>
+    
+    <span class="c1">#query_obs=adata2_df.loc[adata2_df[&#39;celltype&#39;]==query_cell,&#39;target_obs_names&#39;].tolist()</span>
+    <span class="k">return</span> <span class="n">query_adata</span>
+    
+</pre></div>
+</div>
+</div>
+</div>
+<p>We find that maps mapped on 3D also show up well on 2D</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">query_adata</span><span class="o">=</span><span class="n">cal_matching_cell</span><span class="p">(</span><span class="n">target_adata</span><span class="o">=</span><span class="n">adata1</span><span class="p">,</span>
+                              <span class="n">query_adata</span><span class="o">=</span><span class="n">adata2</span><span class="p">,</span>
+                              <span class="n">matching</span><span class="o">=</span><span class="n">matching</span><span class="p">,</span>
+                              <span class="n">query_cell</span><span class="o">=</span><span class="s1">&#39;Kidney&#39;</span><span class="p">,</span><span class="n">clusters</span><span class="o">=</span><span class="s1">&#39;annotation&#39;</span><span class="p">)</span>
+<span class="n">query_adata</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>View of AnnData object with n_obs × n_vars = 59 × 26854
+    obs: &#39;n_genes_by_counts&#39;, &#39;log1p_n_genes_by_counts&#39;, &#39;total_counts&#39;, &#39;log1p_total_counts&#39;, &#39;annotation&#39;, &#39;Regulon - A1cf&#39;, &#39;kidney_c0&#39;, &#39;kidney_c1&#39;, &#39;kidney_c2&#39;, &#39;kidney_c3&#39;, &#39;kidney_anno&#39;, &#39;week&#39;
+    var: &#39;n_cells&#39;, &#39;n_cells_by_counts&#39;, &#39;mean_counts&#39;, &#39;log1p_mean_counts&#39;, &#39;pct_dropout_by_counts&#39;, &#39;total_counts&#39;
+    uns: &#39;Spatial_Net&#39;, &#39;annotation_colors&#39;, &#39;kidney_c0_colors&#39;, &#39;kidney_c1_colors&#39;, &#39;kidney_c2_colors&#39;, &#39;kidney_c3_colors&#39;, &#39;kidney_anno_colors&#39;
+    obsm: &#39;spatial&#39;
+    varm: &#39;PCs&#39;
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">adata1</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;kidney_anno&#39;</span><span class="p">]</span><span class="o">=</span><span class="s1">&#39;&#39;</span>
+<span class="n">adata1</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">query_adata</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">index</span><span class="p">,</span><span class="s1">&#39;kidney_anno&#39;</span><span class="p">]</span><span class="o">=</span><span class="n">query_adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;annotation&#39;</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">spatial</span><span class="p">(</span><span class="n">adata1</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;kidney_anno&#39;</span><span class="p">,</span> <span class="n">spot_size</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+             <span class="n">palette</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;#F5F5F5&#39;</span><span class="p">,</span><span class="s1">&#39;#ff7f0e&#39;</span><span class="p">,</span> <span class="s1">&#39;green&#39;</span><span class="p">,])</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/63370ed2cfc4dd0d2fb1d785810751c1679a8d8b887f64572e8592e6456ea862.png"><img alt="../_images/63370ed2cfc4dd0d2fb1d785810751c1679a8d8b887f64572e8592e6456ea862.png" src="../_images/63370ed2cfc4dd0d2fb1d785810751c1679a8d8b887f64572e8592e6456ea862.png" style="width: 344px; height: 300px;" />
+</a>
+</div>
+</div>
+<p>We are concerned with Kidney lineage development, so we integrated the cells corresponding to the Kidney lineage on the two sections of E11 and E12, and then we could use the method of difference analysis to study the dynamic process of Kidney lineage development.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">kidney_lineage_ad</span><span class="o">=</span><span class="n">sc</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">query_adata</span><span class="p">,</span><span class="n">adata2</span><span class="p">[</span><span class="n">adata2</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;annotation&#39;</span><span class="p">]</span><span class="o">==</span><span class="s1">&#39;Kidney&#39;</span><span class="p">]],</span><span class="n">merge</span><span class="o">=</span><span class="s1">&#39;same&#39;</span><span class="p">)</span>
+<span class="n">kidney_lineage_ad</span><span class="o">=</span><span class="n">ov</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">preprocess</span><span class="p">(</span><span class="n">kidney_lineage_ad</span><span class="p">,</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;shiftlog|pearson&#39;</span><span class="p">,</span><span class="n">n_HVGs</span><span class="o">=</span><span class="mi">3000</span><span class="p">,</span><span class="n">target_sum</span><span class="o">=</span><span class="mf">1e4</span><span class="p">)</span>
+<span class="n">kidney_lineage_ad</span><span class="o">.</span><span class="n">raw</span> <span class="o">=</span> <span class="n">kidney_lineage_ad</span>
+<span class="n">kidney_lineage_ad</span> <span class="o">=</span> <span class="n">kidney_lineage_ad</span><span class="p">[:,</span> <span class="n">kidney_lineage_ad</span><span class="o">.</span><span class="n">var</span><span class="o">.</span><span class="n">highly_variable_features</span><span class="p">]</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">scale</span><span class="p">(</span><span class="n">kidney_lineage_ad</span><span class="p">)</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">pca</span><span class="p">(</span><span class="n">kidney_lineage_ad</span><span class="p">)</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">neighbors</span><span class="p">(</span><span class="n">kidney_lineage_ad</span><span class="p">,</span><span class="n">use_rep</span><span class="o">=</span><span class="s1">&#39;scaled|original|X_pca&#39;</span><span class="p">,</span><span class="n">metric</span><span class="o">=</span><span class="s2">&quot;cosine&quot;</span><span class="p">)</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">cluster</span><span class="p">(</span><span class="n">kidney_lineage_ad</span><span class="p">,</span><span class="n">method</span><span class="o">=</span><span class="s1">&#39;leiden&#39;</span><span class="p">,</span><span class="n">resolution</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">umap</span><span class="p">(</span><span class="n">kidney_lineage_ad</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Begin robust gene identification
+After filtration, 14823/26436 genes are kept. Among 14823 genes, 14823 genes are robust.
+End of robust gene identification.
+Begin size normalization: shiftlog and HVGs selection pearson
+normalizing counts per cell The following highly-expressed genes are not considered during normalization factor computation:
+[]
+    finished (0:00:00)
+extracting highly variable genes
+--&gt; added
+    &#39;highly_variable&#39;, boolean vector (adata.var)
+    &#39;highly_variable_rank&#39;, float vector (adata.var)
+    &#39;highly_variable_nbatches&#39;, int vector (adata.var)
+    &#39;highly_variable_intersection&#39;, boolean vector (adata.var)
+    &#39;means&#39;, float vector (adata.var)
+    &#39;variances&#39;, float vector (adata.var)
+    &#39;residual_variances&#39;, float vector (adata.var)
+Time to analyze data in cpu: 0.07181000709533691 seconds.
+End of size normalization: shiftlog and HVGs selection pearson
+... as `zero_center=True`, sparse input is densified and may lead to large memory consumption
+computing neighbors
+    finished: added to `.uns[&#39;neighbors&#39;]`
+    `.obsp[&#39;distances&#39;]`, distances for each pair of neighbors
+    `.obsp[&#39;connectivities&#39;]`, weighted adjacency matrix (0:00:06)
+running Leiden clustering
+    finished: found 6 clusters and added
+    &#39;leiden&#39;, the cluster labels (adata.obs, categorical) (0:00:00)
+computing UMAP
+    finished: added
+    &#39;X_umap&#39;, UMAP coordinates (adata.obsm) (0:00:00)
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span><span class="n">kidney_lineage_ad</span><span class="p">,</span><span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span>
+               <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;annotation&#39;</span><span class="p">,</span><span class="s1">&#39;week&#39;</span><span class="p">,</span><span class="s1">&#39;leiden&#39;</span><span class="p">],</span>
+               <span class="n">frameon</span><span class="o">=</span><span class="s1">&#39;small&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/72fe75c4ad73e307696af290a2e5561ed0551d5675b4c912547429338e93223c.png"><img alt="../_images/72fe75c4ad73e307696af290a2e5561ed0551d5675b4c912547429338e93223c.png" src="../_images/72fe75c4ad73e307696af290a2e5561ed0551d5675b4c912547429338e93223c.png" style="width: 966px; height: 292px;" />
+</a>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Nphs1 https://www.nature.com/articles/s41467-021-22266-1</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">dotplot</span><span class="p">(</span><span class="n">kidney_lineage_ad</span><span class="p">,{</span><span class="s1">&#39;nephron progenitors&#39;</span><span class="p">:[</span><span class="s1">&#39;Wnt9b&#39;</span><span class="p">,</span><span class="s1">&#39;Osr1&#39;</span><span class="p">,</span><span class="s1">&#39;Nphs1&#39;</span><span class="p">,</span><span class="s1">&#39;Lhx1&#39;</span><span class="p">,</span><span class="s1">&#39;Pax2&#39;</span><span class="p">,</span><span class="s1">&#39;Pax8&#39;</span><span class="p">],</span>
+                         <span class="s1">&#39;metanephric&#39;</span><span class="p">:[</span><span class="s1">&#39;Eya1&#39;</span><span class="p">,</span><span class="s1">&#39;Shisa3&#39;</span><span class="p">,</span><span class="s1">&#39;Foxc1&#39;</span><span class="p">],</span> 
+                         <span class="s1">&#39;kidney&#39;</span><span class="p">:[</span><span class="s1">&#39;Wt1&#39;</span><span class="p">,</span><span class="s1">&#39;Wnt4&#39;</span><span class="p">,</span><span class="s1">&#39;Nr2f2&#39;</span><span class="p">,</span><span class="s1">&#39;Dach1&#39;</span><span class="p">,</span><span class="s1">&#39;Cd44&#39;</span><span class="p">]}</span> <span class="p">,</span>
+              <span class="s1">&#39;leiden&#39;</span><span class="p">,</span><span class="n">dendrogram</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">colorbar_title</span><span class="o">=</span><span class="s1">&#39;Expression&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/3e7f99587ed652c42d48e492708120b32183ab661d10a4767bd306bb24761193.png"><img alt="../_images/3e7f99587ed652c42d48e492708120b32183ab661d10a4767bd306bb24761193.png" src="../_images/3e7f99587ed652c42d48e492708120b32183ab661d10a4767bd306bb24761193.png" style="width: 448px; height: 341px;" />
+</a>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">kidney_lineage_ad</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;re_anno&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;Unknown&#39;</span>
+<span class="n">kidney_lineage_ad</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">kidney_lineage_ad</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">leiden</span><span class="o">.</span><span class="n">isin</span><span class="p">([</span><span class="s1">&#39;4&#39;</span><span class="p">]),</span><span class="s1">&#39;re_anno&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;Nephron progenitors (E11.5)&#39;</span>
+<span class="n">kidney_lineage_ad</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">kidney_lineage_ad</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">leiden</span><span class="o">.</span><span class="n">isin</span><span class="p">([</span><span class="s1">&#39;2&#39;</span><span class="p">,</span><span class="s1">&#39;3&#39;</span><span class="p">,</span><span class="s1">&#39;1&#39;</span><span class="p">,</span><span class="s1">&#39;5&#39;</span><span class="p">]),</span><span class="s1">&#39;re_anno&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;Metanephron progenitors (E11.5)&#39;</span>
+<span class="n">kidney_lineage_ad</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">kidney_lineage_ad</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">leiden</span><span class="o">==</span><span class="s1">&#39;0&#39;</span><span class="p">,</span><span class="s1">&#39;re_anno&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;Kidney (E12.5)&#39;</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># kidney_all = kidney_all[kidney_all.obs.leiden!=&#39;3&#39;,:]</span>
+<span class="n">kidney_lineage_ad</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">leiden</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">kidney_lineage_ad</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">leiden</span><span class="p">)</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span><span class="n">kidney_lineage_ad</span><span class="p">,</span><span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span>
+               <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;annotation&#39;</span><span class="p">,</span><span class="s1">&#39;re_anno&#39;</span><span class="p">],</span>
+               <span class="n">frameon</span><span class="o">=</span><span class="s1">&#39;small&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/3c856eab93227268ad62cf74d1b88725eaaaff9d55a25d325fcb47c7a58cf7aa.png"><img alt="../_images/3c856eab93227268ad62cf74d1b88725eaaaff9d55a25d325fcb47c7a58cf7aa.png" src="../_images/3c856eab93227268ad62cf74d1b88725eaaaff9d55a25d325fcb47c7a58cf7aa.png" style="width: 858px; height: 292px;" />
+</a>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">adata1</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;kidney_anno&#39;</span><span class="p">]</span><span class="o">=</span><span class="s1">&#39;&#39;</span>
+<span class="n">adata1</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">kidney_lineage_ad</span><span class="p">[</span><span class="n">kidney_lineage_ad</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;week&#39;</span><span class="p">]</span><span class="o">==</span><span class="s1">&#39;E11.5&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">index</span><span class="p">,</span><span class="s1">&#39;kidney_anno&#39;</span><span class="p">]</span><span class="o">=</span><span class="n">kidney_lineage_ad</span><span class="p">[</span><span class="n">kidney_lineage_ad</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;week&#39;</span><span class="p">]</span><span class="o">==</span><span class="s1">&#39;E11.5&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;re_anno&#39;</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">spatial</span><span class="p">(</span><span class="n">adata1</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;kidney_anno&#39;</span><span class="p">,</span> <span class="n">spot_size</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span>
+             <span class="n">palette</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;#F5F5F5&#39;</span><span class="p">,</span><span class="s1">&#39;#ff7f0e&#39;</span><span class="p">,</span> <span class="s1">&#39;green&#39;</span><span class="p">,],</span><span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>[&lt;AxesSubplot: title={&#39;center&#39;: &#39;kidney_anno&#39;}, xlabel=&#39;spatial1&#39;, ylabel=&#39;spatial2&#39;&gt;]
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/e434249ca44b03fbd4aa95861e79ed86ca19b709e72c23bd81f33e1e61fa817d.png"><img alt="../_images/e434249ca44b03fbd4aa95861e79ed86ca19b709e72c23bd81f33e1e61fa817d.png" src="../_images/e434249ca44b03fbd4aa95861e79ed86ca19b709e72c23bd81f33e1e61fa817d.png" style="width: 624px; height: 543px;" />
+</a>
+</div>
+</div>
+<p>We can also differentially analyse Kidney’s developmental pedigree to find different marker genes, and we can analyse transcription factors and thus find the regulatory units involved.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">test_adata</span><span class="o">=</span><span class="n">kidney_lineage_ad</span>
+<span class="n">dds</span><span class="o">=</span><span class="n">ov</span><span class="o">.</span><span class="n">bulk</span><span class="o">.</span><span class="n">pyDEG</span><span class="p">(</span><span class="n">test_adata</span><span class="o">.</span><span class="n">to_df</span><span class="p">(</span><span class="n">layer</span><span class="o">=</span><span class="s1">&#39;lognorm&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+<span class="n">dds</span><span class="o">.</span><span class="n">drop_duplicates_index</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;... drop_duplicates_index success&#39;</span><span class="p">)</span>
+<span class="n">treatment_groups</span><span class="o">=</span><span class="n">test_adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">test_adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;week&#39;</span><span class="p">]</span><span class="o">==</span><span class="s1">&#39;E12.5&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+<span class="n">control_groups</span><span class="o">=</span><span class="n">test_adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">test_adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;week&#39;</span><span class="p">]</span><span class="o">==</span><span class="s1">&#39;E11.5&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+<span class="n">result</span><span class="o">=</span><span class="n">dds</span><span class="o">.</span><span class="n">deg_analysis</span><span class="p">(</span><span class="n">treatment_groups</span><span class="p">,</span><span class="n">control_groups</span><span class="p">,</span><span class="n">method</span><span class="o">=</span><span class="s1">&#39;ttest&#39;</span><span class="p">)</span>
+<span class="c1"># -1 means automatically calculates</span>
+<span class="n">dds</span><span class="o">.</span><span class="n">foldchange_set</span><span class="p">(</span><span class="n">fc_threshold</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
+                   <span class="n">pval_threshold</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+                   <span class="n">logp_max</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>... drop_duplicates_index success
+... Fold change threshold: 2.1686935424804688
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">dds</span><span class="o">.</span><span class="n">plot_volcano</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s1">&#39;DEG Analysis&#39;</span><span class="p">,</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">4</span><span class="p">),</span>
+                 <span class="n">plot_genes_num</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span><span class="n">plot_genes_fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;AxesSubplot: title={&#39;center&#39;: &#39;DEG Analysis&#39;}, xlabel=&#39;$log_{2}FC$&#39;, ylabel=&#39;$-log_{10}(qvalue)$&#39;&gt;
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/11d2288fa19e3732bdb71ff515254e7f1ef7d007f56fc1ee13675735df6769f5.png"><img alt="../_images/11d2288fa19e3732bdb71ff515254e7f1ef7d007f56fc1ee13675735df6769f5.png" src="../_images/11d2288fa19e3732bdb71ff515254e7f1ef7d007f56fc1ee13675735df6769f5.png" style="width: 322px; height: 355px;" />
+</a>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">up_gene</span><span class="o">=</span><span class="n">dds</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">dds</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;sig&#39;</span><span class="p">]</span><span class="o">==</span><span class="s1">&#39;up&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s1">&#39;qvalue&#39;</span><span class="p">)[:</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+<span class="n">down_gene</span><span class="o">=</span><span class="n">dds</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">dds</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;sig&#39;</span><span class="p">]</span><span class="o">==</span><span class="s1">&#39;down&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s1">&#39;qvalue&#39;</span><span class="p">)[:</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+<span class="n">deg_gene</span><span class="o">=</span><span class="n">up_gene</span><span class="o">+</span><span class="n">down_gene</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">dotplot</span><span class="p">(</span><span class="n">kidney_lineage_ad</span><span class="p">,</span><span class="n">deg_gene</span><span class="p">,</span>
+             <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;re_anno&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/28bc7372b4fcb809d19a196bdb47f686249d1a3634fff05a24bcd3f7cb2d3aed.png"><img alt="../_images/28bc7372b4fcb809d19a196bdb47f686249d1a3634fff05a24bcd3f7cb2d3aed.png" src="../_images/28bc7372b4fcb809d19a196bdb47f686249d1a3634fff05a24bcd3f7cb2d3aed.png" style="width: 452px; height: 224px;" />
+</a>
+</div>
+</div>
+<p>In addition to analysing directly using differential expression, we can also look for weekly marker genes by considering weeks as categories.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sc</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">dendrogram</span><span class="p">(</span><span class="n">kidney_lineage_ad</span><span class="p">,</span><span class="s1">&#39;re_anno&#39;</span><span class="p">,</span><span class="n">use_rep</span><span class="o">=</span><span class="s1">&#39;scaled|original|X_pca&#39;</span><span class="p">)</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">rank_genes_groups</span><span class="p">(</span><span class="n">kidney_lineage_ad</span><span class="p">,</span> <span class="s1">&#39;re_anno&#39;</span><span class="p">,</span> <span class="n">use_rep</span><span class="o">=</span><span class="s1">&#39;scaled|original|X_pca&#39;</span><span class="p">,</span>
+                        <span class="n">method</span><span class="o">=</span><span class="s1">&#39;t-test&#39;</span><span class="p">,</span><span class="n">use_raw</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">key_added</span><span class="o">=</span><span class="s1">&#39;re_anno_ttest&#39;</span><span class="p">)</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">rank_genes_groups_dotplot</span><span class="p">(</span><span class="n">kidney_lineage_ad</span><span class="p">,</span><span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;re_anno&#39;</span><span class="p">,</span>
+                                <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;RdBu_r&#39;</span><span class="p">,</span><span class="n">key</span><span class="o">=</span><span class="s1">&#39;re_anno_ttest&#39;</span><span class="p">,</span>
+                                <span class="n">standard_scale</span><span class="o">=</span><span class="s1">&#39;var&#39;</span><span class="p">,</span><span class="n">n_genes</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Storing dendrogram info using `.uns[&#39;dendrogram_re_anno&#39;]`
+ranking genes
+    finished: added to `.uns[&#39;re_anno_ttest&#39;]`
+    &#39;names&#39;, sorted np.recarray to be indexed by group ids
+    &#39;scores&#39;, sorted np.recarray to be indexed by group ids
+    &#39;logfoldchanges&#39;, sorted np.recarray to be indexed by group ids
+    &#39;pvals&#39;, sorted np.recarray to be indexed by group ids
+    &#39;pvals_adj&#39;, sorted np.recarray to be indexed by group ids (0:00:00)
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/23345fa34a26af767271bd7053ef5de97b17482185007986f08c1acc00bf62ff.png"><img alt="../_images/23345fa34a26af767271bd7053ef5de97b17482185007986f08c1acc00bf62ff.png" src="../_images/23345fa34a26af767271bd7053ef5de97b17482185007986f08c1acc00bf62ff.png" style="width: 576px; height: 384px;" />
+</a>
+</div>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="t_gaston.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Spatial IsoDepth Calculation</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../tutorials/index_foundation.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Foundation Models</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#preprocess-data">Preprocess Data</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#run-slat">Run SLAT</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#visualization-of-alignment">Visualization of alignment</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#focus-on-developing-kidney">Focus on developing Kidney</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Zehua Zeng
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2026, 112 Lab, USTB.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

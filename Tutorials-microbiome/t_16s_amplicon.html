@@ -1,0 +1,1968 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="16S rRNA amplicon analysis with OmicVerse" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="Tutorials-microbiome/t_16s_amplicon.html" />
+<meta property="og:site_name" content="omicverse" />
+<meta property="og:description" content="This tutorial walks through an end-to-end 16S rRNA amplicon pipeline using ov.alignment. Starting from raw paired-end FASTQs, we denoise reads into ASVs with UNOISE3, assign taxonomy with SINTAX, a..." />
+<meta property="og:image:width" content="1146" />
+<meta property="og:image:height" content="600" />
+<meta property="og:image" content="_images/social_previews/summary_Tutorials-microbiome_t_16s_amplicon_f05bc807.png" />
+<meta property="og:image:alt" content="This tutorial walks through an end-to-end 16S rRNA amplicon pipeline using ov.alignment. Starting from raw paired-end FASTQs, we denoise reads into ASVs with UNOISE3, assign taxonomy with SINTAX, a..." />
+<meta name="description" content="This tutorial walks through an end-to-end 16S rRNA amplicon pipeline using ov.alignment. Starting from raw paired-end FASTQs, we denoise reads into ASVs with UNOISE3, assign taxonomy with SINTAX, a..." />
+<meta name="twitter:card" content="summary_large_image" />
+
+    <title>16S rRNA amplicon analysis with OmicVerse &#8212; omicverse</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster.custom.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster.bundle.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-shadow.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-punk.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-noir.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-light.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-borderless.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/micromodal.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=3a64e6d4" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/icons.css?v=b452f90d" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/override.css?v=216aaec1" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/jquery.js?v=5d32c60e"></script>
+    <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+    <script src="../_static/documentation_options.js?v=f9413015"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/js/hoverxref.js"></script>
+    <script src="../_static/js/tooltipster.bundle.min.js"></script>
+    <script src="../_static/js/micromodal.min.js"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'Tutorials-microbiome/t_16s_amplicon';</script>
+    <link rel="icon" href="../_static/favicon.ico"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="16S phylogeny: MAFFT → FastTree → Faith PD + UniFrac" href="t_16s_phylogeny.html" />
+    <link rel="prev" title="Microbiome" href="../tutorials/index_microbiome.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/logo.png" class="logo__image only-light" alt="omicverse - Home"/>
+    <script>document.write(`<img src="../_static/logo.png" class="logo__image only-dark" alt="omicverse - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../index.html">
+                    OmicVerse Documentation
+                </a>
+            </li>
+        </ul>
+        <ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../Installation_guild.html">OmicVerse Installation Guide</a></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../tutorials/index.html">Tutorials</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_bulk.html">Bulk RNA-seq</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_upstream.html">Upstream</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_mapping_STAR.html">Bulk RNA-seq mapping with STAR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_mapping_kbpython.html">Bulk RNA-seq mapping with kb-python</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_preprocessing.html">Preprocessing</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_bulk_combat.html">Batch correction in Bulk RNA-seq or microarray data</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_downstream.html">Downstream</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_deg.html">Different Expression Analysis</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_deseq2.html">Different Expression Analysis with DEseq2</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_network.html">Protein-Protein interaction (PPI) analysis by String-db</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_wgcna.html">WGCNA (Weighted gene co-expression network analysis) analysis</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_deconvolution.html">Deconvolution</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_decov_bulk.html">Bulk deconvolution with reference scRNA-seq</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_others.html">Others</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_tcga.html">TCGA database preprocess</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_metabol.html">Metabolomics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_01_intro.html">Metabolomics preprocessing and univariate statistics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_02_multivariate.html">Multivariate discrimination with PLS-DA and OPLS-DA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_03_pathway.html">Metabolite-set enrichment analysis (MSEA)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_04_untargeted.html">Untargeted LC-MS and mummichog pathway inference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_05_lipidomics.html">Lipidomics with LIPID MAPS and LION</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_06_batch_correction.html">Batch effect and drift correction for LC-MS</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_07_multifactor.html">Multi-factor designs — ASCA and linear mixed models</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_08_biomarker.html">Biomarker discovery — univariate AUC + multivariate panel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_09_dgca.html">Differential correlation — DGCA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_10_multiomics.html">Multi-omics integration — metabolomics + RNA-seq with MOFA</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="../tutorials/index_microbiome.html">Microbiome</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3 current active"><a class="current reference internal" href="#">16S rRNA amplicon analysis with OmicVerse</a></li>
+<li class="toctree-l3"><a class="reference internal" href="t_16s_phylogeny.html">16S phylogeny: MAFFT → FastTree → Faith PD + UniFrac</a></li>
+<li class="toctree-l3"><a class="reference internal" href="t_16s_dada2.html">DADA2 backend: pure-Python ASV inference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="t_16s_da_comparison.html">Differential abundance: Wilcoxon vs DESeq2 vs ANCOM-BC</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_single.html">Single-Cell RNA-seq</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_alignment.html">Alignment</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_alignment_1k.html">Alignment and analysis of single-cell RNA-seq data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_alignment_velocity.html">Alignment and RNA velocity analysis of single-cell RNA-seq data.</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_preprocessing.html">Preprocessing</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_preprocess_cpu.html">Preprocessing the data of scRNA-seq with omicverse[CPU-GPU-mixed]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_preprocess_gpu.html">Preprocessing the data of scRNA-seq with omicverse[GPU]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_preprocess_rust.html">Preprocessing the data of scRNA-seq [Rust / out-of-memory]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cluster.html">Clustering space</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_single_batch.html">Data integration and batch correction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cnmf.html">GeneModule Identified</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_lazy.html">Lazy analysis of scRNA-seq</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_annotation.html">Annotation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_anno_noref.html">Reference-free automated single-cell cell type annotation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_anno_ref.html">Reference automated single-cell cell type annotation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_gptanno.html">Automatic cell type annotation with GPT/Other</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cellmatch.html">Mapping Cell Names to the Cell Ontology/Taxonomy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cellanno.html">Celltype auto annotation with SCSA</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_metatime.html">Celltype auto annotation with MetaTiME</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_tosica.html">Celltype annotation migration(mapping) with TOSICA</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_scmulan.html">Using scMulan to annotate cell types in Heart, Lung, Liver, Bone marrow, Blood, Brain, and Thymus</a></li>
+
+
+
+
+
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cellvote.html">Consensus annotation with CellVote</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_trajectory.html">Trajectory</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cytotrace.html">Prediction of absolute developmental potential using CytoTrace2</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_traj.html">Basic Trajectory Inference</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_stavia.html">Trajectory Inference with StaVIA</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cellfate_gene.html">Timing-associated genes analysis with TimeFateKernel</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cellfate.html">Identify the driver regulators of cell fate decisions</a></li>
+
+
+
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_cell_structure.html">Cell Structure</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_metacells.html">Inference of MetaCell from Single-Cell RNA-seq</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_deg_single.html">Differential expression and celltype analysis [All Cell]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_scdeg.html">Differential expression analysis [Meta Cell]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_scenic.html">Gene Regulatory Network Analysis with SCENIC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_aucell.html">Pathway analysis with AUCell</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cellphonedb.html">Cell-cell communication with CellPhoneDB</a></li>
+
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_scdrug.html">Drug response predict with scDrug</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_simba.html">Data integration and batch correction with SIMBA</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_velocity.html">Velocity</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-velo/t_velo.html">Velocity Basic Calculation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-velo/t_graphvelo.html">Velocity Optimization</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_multi_omics.html">Multi-omics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_mofa.html">Multi omics analysis by MOFA</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_mofa_glue.html">Multi omics analysis by MOFA and GLUE</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_anno_trans.html">Celltype annotation transfer in multi-omics</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_multi_omics.html">Multi-Omics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-Multi-Omics/bulk-single/t_bulktrajblend.html">Bulk RNA-seq generate ‘interrupted’ cells to interpolate scRNA-seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-Multi-Omics/bulk-single/t_bulk2single.html">Bulk RNA-seq to Single RNA-seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-Multi-Omics/bulk-single/t_single2spatial.html">Single RNA-seq to Spatial RNA-seq</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_spatial.html">Spatial Transcriptomics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_spatial_preprocessing.html">Preprocessing</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_crop_rotate.html">Crop and Rotation of spatial transcriptomic data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_cellpose.html">Cell Segmemtation (10x HD)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_nanostring_preprocess.html">Analyze NanoString data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_xenium_preprocess.html">Analyze Xenium data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_visium_hd_preprocess.html">Analyze Visium HD data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_staligner.html">Spatial integration and clustering</a></li>
+
+
+
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_spatial_clustering.html">Clustering</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/cluster/t_cluster_graphst.html">Spatial clustering with GraphST + pymclustR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/cluster/t_cluster_binary.html">Spatial clustering with BINARY + pymclustR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/cluster/t_cluster_stagate.html">Spatial clustering with STAGATE + pymclustR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/cluster/t_cluster_cast.html">Spatial clustering with CAST + pymclustR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/cluster/t_cluster_banksy.html">Spatial clustering with BANKSY + pymclustR</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_spatial_deconvolution.html">Deconvolution</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_spaceflow.html">Identifying Pseudo-Spatial Map</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_decov.html">Spatial deconvolution with reference scRNA-seq</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_flashdeconv.html">FlashDeconv: Fast Spatial Deconvolution via Structure-Preserving Sketching</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_starfysh_new.html">Spatial deconvolution without reference scRNA-seq</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_spatial_downstream.html">Downstream</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_stt.html">Spatial transition tensor of single cells</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_commot_flowsig.html">Spatial Communication</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_gaston.html">Spatial IsoDepth Calculation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_slat.html">Single cell spatial alignment tools</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_foundation.html">Foundation Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_overview.html">Overview</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_guide.html">ov.fm — Foundation Model Module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm.html">ov.fm — Unified Foundation Model API</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_skill_ready.html">Skill-Ready Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scgpt_guide.html">scGPT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_scgpt.html">scGPT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_geneformer_guide.html">Geneformer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_geneformer.html">GeneFormer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_uce_guide.html">UCE</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_uce.html">UCE</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scfoundation_guide.html">scFoundation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_scfoundation.html">scFoundation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_cellplm_guide.html">CellPLM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_cellplm.html">CellPLM</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_core.html">Core Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scbert_guide.html">scBERT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_genecompass_guide.html">GeneCompass</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_nicheformer_guide.html">Nicheformer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scmulan_guide.html">scMulan</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_specialized.html">Specialized Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_tgpt_guide.html">tGPT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_cellfm_guide.html">CellFM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_sccello_guide.html">scCello</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scprint_guide.html">scPRINT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_aidocell_guide.html">AIDO.Cell</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_pulsar_guide.html">PULSAR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_tabula_guide.html">Tabula</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_domain.html">Domain-Specific Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_atacformer_guide.html">ATACformer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scplantllm_guide.html">scPlantLLM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_langcell_guide.html">LangCell</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_cell2sentence_guide.html">Cell2Sentence</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_genept_guide.html">GenePT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_chatcell_guide.html">ChatCell</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_plotting.html">Visualization &amp; Plotting</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-plotting/t_visualize_single.html">Visualization of single cell RNA-seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-plotting/t_visualize_bulk.html">Visualization of Bulk RNA-seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-plotting/t_palette.html">Palette optimization for publication-quality single-cell &amp; spatial plots</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-plotting/t_publication_plotting.html">Scientific plotting for publication with OmicVerse</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-plotting/t_visualize_colorsystem.html">Color system</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../omicclaw/index.html">OmicClaw</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../omicclaw/index_gateway.html">Gateway and Channels</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_msg_bot_overview.html">OmicClaw Gateway Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_setup_auth.html">OmicClaw Setup and Auth</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_channel_telegram.html">OmicClaw Telegram Tutorial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_channel_feishu.html">OmicClaw Feishu 教程</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_channel_imessage.html">OmicClaw iMessage Tutorial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_channel_qq.html">OmicClaw QQ Tutorial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_session_commands.html">OmicClaw Session Workflow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_troubleshooting.html">OmicClaw Troubleshooting</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../omicclaw/index_mcp.html">MCP Server</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_guide.html">OmicVerse MCP Server</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_quickstart.html">OmicVerse MCP Quick Start</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_full_start.html">OmicVerse MCP Full Start</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_tools.html">OmicVerse MCP Tool Catalog</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_clients.html">OmicVerse MCP Clients and Deployment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_runtime.html">OmicVerse MCP Runtime and Troubleshooting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_reference.html">OmicVerse MCP Reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_claude_code.html">Using OmicVerse MCP with Claude Code — Step by Step</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../omicclaw/index_notebooks.html">General Notebooks</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_ov_agent_pbmc3k.html">J.A.R.V.I.S. with PBMC3k</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/ov_agent_ten_task_suite.html">J.A.R.V.I.S. with Ten-Task Suite</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../api/index.html">API Reference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../api/user.html">User API</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.generate_reference_table.html">omicverse.generate_reference_table</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.settings.cpu_gpu_mixed_init.html">omicverse.settings.cpu_gpu_mixed_init</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.settings.gpu_init.html">omicverse.settings.gpu_init</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.load.html">omicverse.io.load</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read.html">omicverse.io.read</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_10x_h5.html">omicverse.io.read_10x_h5</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_10x_mtx.html">omicverse.io.read_10x_mtx</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_csv.html">omicverse.io.read_csv</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_h5ad.html">omicverse.io.read_h5ad</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_nanostring.html">omicverse.io.read_nanostring</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_visium_hd.html">omicverse.io.read_visium_hd</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_visium_hd_bin.html">omicverse.io.read_visium_hd_bin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_visium_hd_seg.html">omicverse.io.read_visium_hd_seg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_xenium.html">omicverse.io.read_xenium</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.save.html">omicverse.io.save</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.spatial.read_visium.html">omicverse.io.spatial.read_visium</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.bulk_rnaseq_pipeline.html">omicverse.alignment.bulk_rnaseq_pipeline</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.count.html">omicverse.alignment.count</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.fastp.html">omicverse.alignment.fastp</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.featureCount.html">omicverse.alignment.featureCount</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.fqdump.html">omicverse.alignment.fqdump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.parallel_fastq_dump.html">omicverse.alignment.parallel_fastq_dump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.prefetch.html">omicverse.alignment.prefetch</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.ref.html">omicverse.alignment.ref</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.STAR.html">omicverse.alignment.STAR</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.anndata_to_CPU.html">omicverse.pp.anndata_to_CPU</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.anndata_to_GPU.html">omicverse.pp.anndata_to_GPU</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.binary_search.html">omicverse.pp.binary_search</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.filter_cells.html">omicverse.pp.filter_cells</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.filter_genes.html">omicverse.pp.filter_genes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.highly_variable_features.html">omicverse.pp.highly_variable_features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.highly_variable_genes.html">omicverse.pp.highly_variable_genes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.identify_robust_genes.html">omicverse.pp.identify_robust_genes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.leiden.html">omicverse.pp.leiden</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.log1p.html">omicverse.pp.log1p</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.louvain.html">omicverse.pp.louvain</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.mde.html">omicverse.pp.mde</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.neighbors.html">omicverse.pp.neighbors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.normalize_pearson_residuals.html">omicverse.pp.normalize_pearson_residuals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.pca.html">omicverse.pp.pca</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.preprocess.html">omicverse.pp.preprocess</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.qc.html">omicverse.pp.qc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.recover_counts.html">omicverse.pp.recover_counts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.regress.html">omicverse.pp.regress</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.regress_and_scale.html">omicverse.pp.regress_and_scale</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.remove_cc_genes.html">omicverse.pp.remove_cc_genes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.scale.html">omicverse.pp.scale</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.score_genes_cell_cycle.html">omicverse.pp.score_genes_cell_cycle</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.scrublet.html">omicverse.pp.scrublet</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.scrublet_simulate_doublets.html">omicverse.pp.scrublet_simulate_doublets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.select_hvf_pegasus.html">omicverse.pp.select_hvf_pegasus</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.sude.html">omicverse.pp.sude</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.tsne.html">omicverse.pp.tsne</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.umap.html">omicverse.pp.umap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Annotation.html">omicverse.single.Annotation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.AnnotationRef.html">omicverse.single.AnnotationRef</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.autoResolution.html">omicverse.single.autoResolution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.batch_correction.html">omicverse.single.batch_correction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.CellOntologyMapper.html">omicverse.single.CellOntologyMapper</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.CellVote.html">omicverse.single.CellVote</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.cNMF.html">omicverse.single.cNMF</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.convert_human_to_mouse_network.html">omicverse.single.convert_human_to_mouse_network</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.cosg.html">omicverse.single.cosg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.cytotrace2.html">omicverse.single.cytotrace2</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.DCT.html">omicverse.single.DCT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.DEG.html">omicverse.single.DEG</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.download_cl.html">omicverse.single.download_cl</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Drug_Response.html">omicverse.single.Drug_Response</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.dynamic_features.html">omicverse.single.dynamic_features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.factor_correlation.html">omicverse.single.factor_correlation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.factor_exact.html">omicverse.single.factor_exact</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Fate.html">omicverse.single.Fate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.find_markers.html">omicverse.single.find_markers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.gene_trends.html">omicverse.single.gene_trends</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.generate_scRNA_report.html">omicverse.single.generate_scRNA_report</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.geneset_aucell.html">omicverse.single.geneset_aucell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_celltype_marker.html">omicverse.single.get_celltype_marker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_cluster_celltype.html">omicverse.single.get_cluster_celltype</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_markers.html">omicverse.single.get_markers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_obs_value.html">omicverse.single.get_obs_value</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_weights.html">omicverse.single.get_weights</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.GLUE_pair.html">omicverse.single.GLUE_pair</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.gptcelltype.html">omicverse.single.gptcelltype</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.gptcelltype_local.html">omicverse.single.gptcelltype_local</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.lazy.html">omicverse.single.lazy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.load_human_prior_interaction_network.html">omicverse.single.load_human_prior_interaction_network</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.MetaCell.html">omicverse.single.MetaCell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.MetaTiME.html">omicverse.single.MetaTiME</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Monocle.html">omicverse.single.Monocle</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.mouse_hsc_nestorowa16.html">omicverse.single.mouse_hsc_nestorowa16</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pathway_aucell.html">omicverse.single.pathway_aucell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pathway_aucell_enrichment.html">omicverse.single.pathway_aucell_enrichment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pathway_enrichment.html">omicverse.single.pathway_enrichment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pathway_enrichment_plot.html">omicverse.single.pathway_enrichment_plot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.plot_metacells.html">omicverse.single.plot_metacells</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pyCEFCON.html">omicverse.single.pyCEFCON</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pyMOFA.html">omicverse.single.pyMOFA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pyMOFAART.html">omicverse.single.pyMOFAART</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pySCSA.html">omicverse.single.pySCSA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pySIMBA.html">omicverse.single.pySIMBA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pyTOSICA.html">omicverse.single.pyTOSICA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.run_cellphonedb_v5.html">omicverse.single.run_cellphonedb_v5</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.scanpy_cellanno_from_dict.html">omicverse.single.scanpy_cellanno_from_dict</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.SCENIC.html">omicverse.single.SCENIC</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.TrajInfer.html">omicverse.single.TrajInfer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Velo.html">omicverse.single.Velo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.batch_correction.html">omicverse.bulk.batch_correction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.Deconvolution.html">omicverse.bulk.Deconvolution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.geneset_enrichment.html">omicverse.bulk.geneset_enrichment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.geneset_plot.html">omicverse.bulk.geneset_plot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.geneset_plot_multi.html">omicverse.bulk.geneset_plot_multi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.Matrix_ID_mapping.html">omicverse.bulk.Matrix_ID_mapping</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.pyDEG.html">omicverse.bulk.pyDEG</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.pyGSEA.html">omicverse.bulk.pyGSEA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.pyPPI.html">omicverse.bulk.pyPPI</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.pyTCGA.html">omicverse.bulk.pyTCGA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.string_interaction.html">omicverse.bulk.string_interaction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.bin2cell.html">omicverse.space.bin2cell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.Cal_Spatial_Net.html">omicverse.space.Cal_Spatial_Net</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.calculate_gene_signature.html">omicverse.space.calculate_gene_signature</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.CAST.html">omicverse.space.CAST</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.cellcharter.html">omicverse.space.cellcharter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.CellLoc.html">omicverse.space.CellLoc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.CellMap.html">omicverse.space.CellMap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.clusters.html">omicverse.space.clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.create_communication_anndata.html">omicverse.space.create_communication_anndata</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.crop_space_visium.html">omicverse.space.crop_space_visium</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.Deconvolution.html">omicverse.space.Deconvolution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.GASTON.html">omicverse.space.GASTON</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.map_spatial_auto.html">omicverse.space.map_spatial_auto</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.map_spatial_manual.html">omicverse.space.map_spatial_manual</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.merge_cluster.html">omicverse.space.merge_cluster</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.moranI.html">omicverse.space.moranI</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.pySpaceFlow.html">omicverse.space.pySpaceFlow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.pySTAGATE.html">omicverse.space.pySTAGATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.pySTAligner.html">omicverse.space.pySTAligner</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.read_visium_10x.html">omicverse.space.read_visium_10x</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.rotate_space_visium.html">omicverse.space.rotate_space_visium</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.salvage_secondary_labels.html">omicverse.space.salvage_secondary_labels</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.spatial_autocorr.html">omicverse.space.spatial_autocorr</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.spatial_neighbors.html">omicverse.space.spatial_neighbors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.STT.html">omicverse.space.STT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.svg.html">omicverse.space.svg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.sync_visium_hd_seg_geometries.html">omicverse.space.sync_visium_hd_seg_geometries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.Tangram.html">omicverse.space.Tangram</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.update_classification_from_database.html">omicverse.space.update_classification_from_database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.visium_10x_hd_cellpose_expand.html">omicverse.space.visium_10x_hd_cellpose_expand</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.visium_10x_hd_cellpose_gex.html">omicverse.space.visium_10x_hd_cellpose_gex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.visium_10x_hd_cellpose_he.html">omicverse.space.visium_10x_hd_cellpose_he</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.Bulk2Single.html">omicverse.bulk2single.Bulk2Single</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.bulk2single_plot_cellprop.html">omicverse.bulk2single.bulk2single_plot_cellprop</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.bulk2single_plot_correlation.html">omicverse.bulk2single.bulk2single_plot_correlation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.BulkTrajBlend.html">omicverse.bulk2single.BulkTrajBlend</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.Single2Spatial.html">omicverse.bulk2single.Single2Spatial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.add_density_contour.html">omicverse.pl.add_density_contour</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.add_palue.html">omicverse.pl.add_palue</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.add_pie2spatial.html">omicverse.pl.add_pie2spatial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.add_streamplot.html">omicverse.pl.add_streamplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.bardotplot.html">omicverse.pl.bardotplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.boxplot.html">omicverse.pl.boxplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.calculate_gene_density.html">omicverse.pl.calculate_gene_density</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ccc_heatmap.html">omicverse.pl.ccc_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ccc_network_plot.html">omicverse.pl.ccc_network_plot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ccc_stat_plot.html">omicverse.pl.ccc_stat_plot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.cell_cor_heatmap.html">omicverse.pl.cell_cor_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.CellChatViz.html">omicverse.pl.CellChatViz</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.cellproportion.html">omicverse.pl.cellproportion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.complexheatmap.html">omicverse.pl.complexheatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.contour.html">omicverse.pl.contour</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ConvexHull.html">omicverse.pl.ConvexHull</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.create_custom_colormap.html">omicverse.pl.create_custom_colormap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.dotplot.html">omicverse.pl.dotplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.dynamic_heatmap.html">omicverse.pl.dynamic_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.dynamic_trends.html">omicverse.pl.dynamic_trends</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding.html">omicverse.pl.embedding</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding_adjust.html">omicverse.pl.embedding_adjust</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding_atlas.html">omicverse.pl.embedding_atlas</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding_celltype.html">omicverse.pl.embedding_celltype</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding_density.html">omicverse.pl.embedding_density</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.feature_heatmap.html">omicverse.pl.feature_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ForbiddenCity.html">omicverse.pl.ForbiddenCity</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.gen_mpl_labels.html">omicverse.pl.gen_mpl_labels</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.geneset_wordcloud.html">omicverse.pl.geneset_wordcloud</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.group_heatmap.html">omicverse.pl.group_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.marker_heatmap.html">omicverse.pl.marker_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.markers_dotplot.html">omicverse.pl.markers_dotplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.palette.html">omicverse.pl.palette</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_cellproportion.html">omicverse.pl.plot_cellproportion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_embedding_celltype.html">omicverse.pl.plot_embedding_celltype</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_flowsig_network.html">omicverse.pl.plot_flowsig_network</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_grouped_fractions.html">omicverse.pl.plot_grouped_fractions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_pca_variance_ratio.html">omicverse.pl.plot_pca_variance_ratio</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_set.html">omicverse.pl.plot_set</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_spatial.html">omicverse.pl.plot_spatial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_text_set.html">omicverse.pl.plot_text_set</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.rank_genes_groups_dotplot.html">omicverse.pl.rank_genes_groups_dotplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.single_group_boxplot.html">omicverse.pl.single_group_boxplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.tsne.html">omicverse.pl.tsne</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.umap.html">omicverse.pl.umap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.venn.html">omicverse.pl.venn</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.violin.html">omicverse.pl.violin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.volcano.html">omicverse.pl.volcano</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.bhattacherjee.html">omicverse.datasets.bhattacherjee</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.blobs.html">omicverse.datasets.blobs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.bm.html">omicverse.datasets.bm</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.bone_marrow.html">omicverse.datasets.bone_marrow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.burczynski06.html">omicverse.datasets.burczynski06</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.chromaffin.html">omicverse.datasets.chromaffin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.cite_seq.html">omicverse.datasets.cite_seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.create_mock_dataset.html">omicverse.datasets.create_mock_dataset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.decov_bulk_covid_bulk.html">omicverse.datasets.decov_bulk_covid_bulk</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.decov_bulk_covid_single.html">omicverse.datasets.decov_bulk_covid_single</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.dentate_gyrus.html">omicverse.datasets.dentate_gyrus</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.dentate_gyrus_scvelo.html">omicverse.datasets.dentate_gyrus_scvelo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.download_data.html">omicverse.datasets.download_data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.download_data_requests.html">omicverse.datasets.download_data_requests</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.get_adata.html">omicverse.datasets.get_adata</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.gillespie.html">omicverse.datasets.gillespie</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.haber.html">omicverse.datasets.haber</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.hematopoiesis.html">omicverse.datasets.hematopoiesis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.hematopoiesis_raw.html">omicverse.datasets.hematopoiesis_raw</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.hg_forebrain_glutamatergic.html">omicverse.datasets.hg_forebrain_glutamatergic</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.hl60.html">omicverse.datasets.hl60</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.human_tfs.html">omicverse.datasets.human_tfs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.krumsiek11.html">omicverse.datasets.krumsiek11</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.moignard15.html">omicverse.datasets.moignard15</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.multi_brain_5k.html">omicverse.datasets.multi_brain_5k</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.nascseq.html">omicverse.datasets.nascseq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.pancreas_cellrank.html">omicverse.datasets.pancreas_cellrank</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.pancreatic_endocrinogenesis.html">omicverse.datasets.pancreatic_endocrinogenesis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.paul15.html">omicverse.datasets.paul15</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.pbmc3k.html">omicverse.datasets.pbmc3k</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.pbmc8k.html">omicverse.datasets.pbmc8k</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.sc_ref_Lymph_Node.html">omicverse.datasets.sc_ref_Lymph_Node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.sceu_seq_organoid.html">omicverse.datasets.sceu_seq_organoid</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.sceu_seq_rpe1.html">omicverse.datasets.sceu_seq_rpe1</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.scifate.html">omicverse.datasets.scifate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.scnt_seq_neuron_labeling.html">omicverse.datasets.scnt_seq_neuron_labeling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.scnt_seq_neuron_splicing.html">omicverse.datasets.scnt_seq_neuron_splicing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.scslamseq.html">omicverse.datasets.scslamseq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.seqfish.html">omicverse.datasets.seqfish</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.toggleswitch.html">omicverse.datasets.toggleswitch</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.zebrafish.html">omicverse.datasets.zebrafish</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.external.GraphST.html">omicverse.external.GraphST</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.call_tool.html">omicverse.utils.biocontext.call_tool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.get_ensembl_id.html">omicverse.utils.biocontext.get_ensembl_id</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.get_fulltext.html">omicverse.utils.biocontext.get_fulltext</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.get_uniprot_id.html">omicverse.utils.biocontext.get_uniprot_id</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.list_tools.html">omicverse.utils.biocontext.list_tools</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_alphafold.html">omicverse.utils.biocontext.query_alphafold</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_cell_ontology.html">omicverse.utils.biocontext.query_cell_ontology</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_chebi.html">omicverse.utils.biocontext.query_chebi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_efo.html">omicverse.utils.biocontext.query_efo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_go.html">omicverse.utils.biocontext.query_go</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_hpa.html">omicverse.utils.biocontext.query_hpa</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_interpro.html">omicverse.utils.biocontext.query_interpro</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_opentargets.html">omicverse.utils.biocontext.query_opentargets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_panglaodb.html">omicverse.utils.biocontext.query_panglaodb</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_reactome.html">omicverse.utils.biocontext.query_reactome</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_string.html">omicverse.utils.biocontext.query_string</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_uniprot.html">omicverse.utils.biocontext.query_uniprot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_clinical_trials.html">omicverse.utils.biocontext.search_clinical_trials</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_drugs.html">omicverse.utils.biocontext.search_drugs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_interpro.html">omicverse.utils.biocontext.search_interpro</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_literature.html">omicverse.utils.biocontext.search_literature</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_preprints.html">omicverse.utils.biocontext.search_preprints</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_pride.html">omicverse.utils.biocontext.search_pride</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.cal_paga.html">omicverse.utils.cal_paga</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.cluster.html">omicverse.utils.cluster</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert2gene_id.html">omicverse.utils.convert2gene_id</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert2gene_symbol.html">omicverse.utils.convert2gene_symbol</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert2symbol.html">omicverse.utils.convert2symbol</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert_adata_for_rust.html">omicverse.utils.convert_adata_for_rust</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert_to_pandas.html">omicverse.utils.convert_to_pandas</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_CaDRReS_model.html">omicverse.utils.download_CaDRReS_model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_GDSC_data.html">omicverse.utils.download_GDSC_data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_geneid_annotation_pair.html">omicverse.utils.download_geneid_annotation_pair</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_pathway_database.html">omicverse.utils.download_pathway_database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_tosica_gmt.html">omicverse.utils.download_tosica_gmt</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.geneset_prepare.html">omicverse.utils.geneset_prepare</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.get_gene_annotation.html">omicverse.utils.get_gene_annotation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.gtf_to_pair_tsv.html">omicverse.utils.gtf_to_pair_tsv</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.LDA_topic.html">omicverse.utils.LDA_topic</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.mde.html">omicverse.utils.mde</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.plot_paga.html">omicverse.utils.plot_paga</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.refine_label.html">omicverse.utils.refine_label</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.retrieve_layers.html">omicverse.utils.retrieve_layers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.roe.html">omicverse.utils.roe</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.store_layers.html">omicverse.utils.store_layers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.symbol2id.html">omicverse.utils.symbol2id</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.weighted_knn_trainer.html">omicverse.utils.weighted_knn_trainer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.weighted_knn_transfer.html">omicverse.utils.weighted_knn_transfer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.wrap_dataframe.html">omicverse.utils.wrap_dataframe</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../Release_notes.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../Developer_guild.html">Developer guild</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../GPU_supported_registry_functions.html">Registered Functions — GPU Support Overview</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/Starlitnightly/omicverse/discussions">Discussion</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/Starlitnightly/omicverse">GitHub</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/Starlitnightly/omicverse" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/Starlitnightly/omicverse/blob/master/docs/Tutorials-microbiome/t_16s_amplicon.ipynb?plain=1" target="_blank"
+   class="btn btn-sm btn-source-file-button dropdown-item"
+   title="Show source"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-code"></i>
+  </span>
+<span class="btn__text-container">Show source</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/Starlitnightly/omicverse/edit/master/docs/Tutorials-microbiome/t_16s_amplicon.ipynb" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/Starlitnightly/omicverse/issues/new?title=Issue%20on%20page%20%2FTutorials-microbiome/t_16s_amplicon.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/Tutorials-microbiome/t_16s_amplicon.ipynb" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.ipynb</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>16S rRNA amplicon analysis with OmicVerse</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#setup">1. Setup</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#download-test-fastq-reference-db">2. Download test FASTQ + reference DB</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#sample-metadata">3. Sample metadata</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#step-by-step-call-each-tool-directly">4. Step-by-step: call each tool directly</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#or-call-the-one-shot-orchestrator">5. …or call the one-shot orchestrator</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#inspect-the-result">6. Inspect the result</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#taxonomy-composition">7. Taxonomy composition</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#alpha-diversity">8. Alpha diversity</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#beta-diversity-braycurtis-pcoa">9. Beta diversity — Bray–Curtis PCoA</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#phylum-level-early-vs-late-differences">10. Phylum-level Early-vs-Late differences</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#save-the-anndata">11. Save the AnnData</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#notes-on-validation">Notes on validation</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="s-rrna-amplicon-analysis-with-omicverse">
+<h1>16S rRNA amplicon analysis with OmicVerse<a class="headerlink" href="#s-rrna-amplicon-analysis-with-omicverse" title="Link to this heading">#</a></h1>
+<p>This tutorial walks through an <strong>end-to-end 16S rRNA amplicon pipeline</strong> using
+<code class="docutils literal notranslate"><span class="pre">ov.alignment</span></code>. Starting from raw paired-end FASTQs, we denoise reads into
+<a class="reference external" href="https://en.wikipedia.org/wiki/Amplicon_sequence_variant">ASVs</a> with UNOISE3,
+assign taxonomy with SINTAX, and produce an <code class="docutils literal notranslate"><span class="pre">AnnData</span></code> object (samples × ASVs
+with taxonomy in <code class="docutils literal notranslate"><span class="pre">var</span></code>) ready for diversity / ordination / differential-abundance
+analysis — the same shape as a single-cell matrix.</p>
+<p><strong>Test dataset</strong>: the 20-sample
+<a class="reference external" href="https://mothur.org/wiki/miseq_sop/">mothur MiSeq SOP</a> — a mouse gut microbiome
+time-series from Schloss lab (Kozich <em>et al.</em> 2013) that’s become the canonical
+16S pipeline benchmark. Primers are already removed in this distribution.</p>
+<p><strong>Reference database</strong>: RDP 16S v18 SINTAX-formatted (6.8 MB, from
+<a class="reference external" href="https://drive5.com/sintax">drive5.com</a>) — small and fast for tutorials.</p>
+<p><strong>Pipeline</strong> (all real tool wrappers in <code class="docutils literal notranslate"><span class="pre">ov.alignment</span></code>):</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Step</p></th>
+<th class="head"><p>Tool</p></th>
+<th class="head"><p>Function</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1 (optional)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">cutadapt</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ov.alignment.cutadapt</span></code> — primer trimming</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vsearch</span> <span class="pre">--fastq_mergepairs</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ov.alignment.vsearch.merge_pairs</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vsearch</span> <span class="pre">--fastq_filter</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ov.alignment.vsearch.filter_quality</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vsearch</span> <span class="pre">--derep_fulllength</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ov.alignment.vsearch.dereplicate</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>5</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vsearch</span> <span class="pre">--cluster_unoise</span></code> (UNOISE3)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ov.alignment.vsearch.unoise3</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>6</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vsearch</span> <span class="pre">--uchime3_denovo</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ov.alignment.vsearch.uchime3_denovo</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>7</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vsearch</span> <span class="pre">--sintax</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ov.alignment.vsearch.sintax</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>8</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vsearch</span> <span class="pre">--usearch_global</span> <span class="pre">--otutabout</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ov.alignment.vsearch.usearch_global</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Or call everything in one shot with <code class="docutils literal notranslate"><span class="pre">ov.alignment.amplicon_16s_pipeline(...)</span></code>.</p>
+<blockquote>
+<div><p><strong>No <code class="docutils literal notranslate"><span class="pre">$HOME</span></code> writes.</strong> All intermediate files and reference databases
+land under paths you explicitly pass via <code class="docutils literal notranslate"><span class="pre">workdir</span></code> / <code class="docutils literal notranslate"><span class="pre">db_dir</span></code> (or the
+<code class="docutils literal notranslate"><span class="pre">OMICVERSE_DB_DIR</span></code> environment variable).</p>
+</div></blockquote>
+<section id="setup">
+<h2>1. Setup<a class="headerlink" href="#setup" title="Link to this heading">#</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">omicverse</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ov</span>
+
+<span class="n">ov</span><span class="o">.</span><span class="n">plot_set</span><span class="p">()</span>
+
+<span class="c1"># All paths under /scratch — no $HOME writes</span>
+<span class="n">ROOT</span>   <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/scratch/users/steorra/analysis/omicverse_dev/cache/16s&quot;</span><span class="p">)</span>
+<span class="n">RAW</span>    <span class="o">=</span> <span class="n">ROOT</span> <span class="o">/</span> <span class="s2">&quot;raw&quot;</span> <span class="o">/</span> <span class="s2">&quot;MiSeq_SOP&quot;</span>
+<span class="n">DBROOT</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/scratch/users/steorra/analysis/omicverse_dev/db&quot;</span><span class="p">)</span>
+<span class="n">WORK</span>   <span class="o">=</span> <span class="n">ROOT</span> <span class="o">/</span> <span class="s2">&quot;run_mothur_sop&quot;</span>
+<span class="n">ROOT</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">DBROOT</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;omicverse:&quot;</span><span class="p">,</span> <span class="n">ov</span><span class="o">.</span><span class="n">__version__</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;raw fastq:&quot;</span><span class="p">,</span> <span class="n">RAW</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;workdir  :&quot;</span><span class="p">,</span> <span class="n">WORK</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>🔬 Starting plot initialization...
+🧬 Detecting GPU devices…
+✅ NVIDIA CUDA GPUs detected: 1
+    • [CUDA 0] NVIDIA H100 80GB HBM3
+      Memory: 79.1 GB | Compute: 9.0
+
+   ____            _     _    __                  
+  / __ \____ ___  (_)___| |  / /__  _____________ 
+ / / / / __ `__ \/ / ___/ | / / _ \/ ___/ ___/ _ \ 
+/ /_/ / / / / / / / /__ | |/ /  __/ /  (__  )  __/ 
+\____/_/ /_/ /_/_/\___/ |___/\___/_/  /____/\___/                                              
+
+🔖 Version: 2.1.2rc1   📚 Tutorials: https://omicverse.readthedocs.io/
+✅ plot_set complete.
+
+omicverse: 2.1.2rc1
+raw fastq: /scratch/users/steorra/analysis/omicverse_dev/cache/16s/raw/MiSeq_SOP
+workdir  : /scratch/users/steorra/analysis/omicverse_dev/cache/16s/run_mothur_sop
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="download-test-fastq-reference-db">
+<h2>2. Download test FASTQ + reference DB<a class="headerlink" href="#download-test-fastq-reference-db" title="Link to this heading">#</a></h2>
+<p>These cells are idempotent — they skip download if the files already exist.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Mothur MiSeq SOP (20 samples, 2x250 V4, already primer-trimmed)</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">urllib.request</span><span class="o">,</span><span class="w"> </span><span class="nn">zipfile</span>
+<span class="n">SOP_ZIP</span> <span class="o">=</span> <span class="n">ROOT</span> <span class="o">/</span> <span class="s2">&quot;miseqsopdata.zip&quot;</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">RAW</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">SOP_ZIP</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="n">url</span> <span class="o">=</span> <span class="s2">&quot;https://mothur.s3.us-east-2.amazonaws.com/wiki/miseqsopdata.zip&quot;</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;downloading&quot;</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span>
+        <span class="n">urllib</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">urlretrieve</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">SOP_ZIP</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;unzipping...&quot;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">zipfile</span><span class="o">.</span><span class="n">ZipFile</span><span class="p">(</span><span class="n">SOP_ZIP</span><span class="p">)</span> <span class="k">as</span> <span class="n">zf</span><span class="p">:</span>
+        <span class="n">zf</span><span class="o">.</span><span class="n">extractall</span><span class="p">(</span><span class="n">ROOT</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;samples:&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">RAW</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s1">&#39;*_R1_001.fastq&#39;</span><span class="p">))))</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>samples: 20
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># RDP 16S v18 SINTAX-formatted reference (6.8 MB)</span>
+<span class="n">DB_FASTA</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">alignment</span><span class="o">.</span><span class="n">fetch_rdp</span><span class="p">(</span><span class="n">db_dir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">DBROOT</span> <span class="o">/</span> <span class="s2">&quot;rdp&quot;</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;SINTAX DB:&quot;</span><span class="p">,</span> <span class="n">DB_FASTA</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>SINTAX DB: /scratch/users/steorra/analysis/omicverse_dev/db/rdp/rdp_16s_v18/rdp_16s_v18.fa.gz
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="sample-metadata">
+<h2>3. Sample metadata<a class="headerlink" href="#sample-metadata" title="Link to this heading">#</a></h2>
+<p>The mothur SOP dataset is a mouse gut time-series sampled on days 0–9 (Early)
+and 141–150 (Late), plus a Mock community. We parse the sample name <code class="docutils literal notranslate"><span class="pre">F3D&lt;day&gt;</span></code>
+to build the metadata table.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">fq1</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">RAW</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;*_R1_001.fastq&quot;</span><span class="p">)):</span>
+    <span class="n">sample</span> <span class="o">=</span> <span class="n">fq1</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_L001_R1_001.fastq&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_S&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">sample</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;F3D&quot;</span><span class="p">):</span>
+        <span class="n">day</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;F3D(\d+)&quot;</span><span class="p">,</span> <span class="n">sample</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">group</span> <span class="o">=</span> <span class="s2">&quot;Early&quot;</span> <span class="k">if</span> <span class="n">day</span> <span class="o">&lt;=</span> <span class="mi">9</span> <span class="k">else</span> <span class="s2">&quot;Late&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">day</span><span class="p">,</span> <span class="n">group</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;Mock&quot;</span>
+    <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s2">&quot;sample&quot;</span><span class="p">:</span> <span class="n">sample</span><span class="p">,</span> <span class="s2">&quot;day&quot;</span><span class="p">:</span> <span class="n">day</span><span class="p">,</span> <span class="s2">&quot;group&quot;</span><span class="p">:</span> <span class="n">group</span><span class="p">})</span>
+<span class="n">meta</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">&quot;sample&quot;</span><span class="p">)</span>
+<span class="n">meta</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>        day  group
+sample            
+F3D0      0  Early
+F3D141  141   Late
+F3D142  142   Late
+F3D143  143   Late
+F3D144  144   Late
+F3D145  145   Late
+F3D146  146   Late
+F3D147  147   Late
+F3D148  148   Late
+F3D149  149   Late
+F3D150  150   Late
+F3D1      1  Early
+F3D2      2  Early
+F3D3      3  Early
+F3D5      5  Early
+F3D6      6  Early
+F3D7      7  Early
+F3D8      8  Early
+F3D9      9  Early
+Mock     -1   Mock
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="step-by-step-call-each-tool-directly">
+<h2>4. Step-by-step: call each tool directly<a class="headerlink" href="#step-by-step-call-each-tool-directly" title="Link to this heading">#</a></h2>
+<p>The amplicon pipeline is a composition of 6 real tool invocations (primer
+trimming is skipped here because the mothur SOP ships pre-trimmed reads).
+Each is exposed as its own function so you can swap parameters or stop / inspect
+after any step — useful for debugging or custom workflows.</p>
+<p>We drop everything into a <strong>separate</strong> workdir (<code class="docutils literal notranslate"><span class="pre">WORK_STEP</span></code>) so the cells
+below actually run, rather than hitting the cached outputs from the one-shot
+call in §5.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">WORK_STEP</span> <span class="o">=</span> <span class="n">ROOT</span> <span class="o">/</span> <span class="s2">&quot;run_mothur_sop_stepwise&quot;</span>
+<span class="n">WORK_STEP</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># Build (sample, fq1, fq2) tuples from the raw folder.</span>
+<span class="c1"># The one-shot pipeline has auto-discovery; here we do it explicitly.</span>
+<span class="n">samples</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">fq1</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">RAW</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;*_R1_001.fastq&quot;</span><span class="p">)):</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="n">fq1</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_L001_R1_001.fastq&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_S&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">fq2</span>  <span class="o">=</span> <span class="n">RAW</span> <span class="o">/</span> <span class="n">fq1</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_R1_001&quot;</span><span class="p">,</span> <span class="s2">&quot;_R2_001&quot;</span><span class="p">)</span>
+    <span class="n">samples</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">name</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">fq1</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">fq2</span><span class="p">)))</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;samples:&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">samples</span><span class="p">),</span> <span class="s2">&quot;— first 3:&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">samples</span><span class="p">[:</span><span class="mi">3</span><span class="p">]])</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>samples: 20 — first 3: [&#39;F3D0&#39;, &#39;F3D141&#39;, &#39;F3D142&#39;]
+</pre></div>
+</div>
+</div>
+</div>
+<p><strong>Step 1 — <code class="docutils literal notranslate"><span class="pre">vsearch</span> <span class="pre">--fastq_mergepairs</span></code></strong>  (paired-end read merging).
+Primer trimming with <code class="docutils literal notranslate"><span class="pre">ov.alignment.cutadapt(...)</span></code> would precede this if
+primers were still on the reads.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">merge_res</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">alignment</span><span class="o">.</span><span class="n">vsearch</span><span class="o">.</span><span class="n">merge_pairs</span><span class="p">(</span>
+    <span class="n">samples</span><span class="p">,</span>
+    <span class="n">output_dir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">WORK_STEP</span> <span class="o">/</span> <span class="s2">&quot;merged&quot;</span><span class="p">),</span>
+    <span class="n">max_diffs</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">min_overlap</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span>
+    <span class="n">threads</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">jobs</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;merged </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">merge_res</span><span class="p">)</span><span class="si">}</span><span class="s2"> samples&quot;</span><span class="p">)</span>
+<span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">merge_res</span><span class="p">)</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>merged 20 samples
+</pre></div>
+</div>
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>   sample                                             merged  \
+0    F3D0  /scratch/users/steorra/analysis/omicverse_dev/...   
+1  F3D141  /scratch/users/steorra/analysis/omicverse_dev/...   
+2  F3D142  /scratch/users/steorra/analysis/omicverse_dev/...   
+
+                                                 log  
+0  /scratch/users/steorra/analysis/omicverse_dev/...  
+1  /scratch/users/steorra/analysis/omicverse_dev/...  
+2  /scratch/users/steorra/analysis/omicverse_dev/...  
+</pre></div>
+</div>
+</div>
+</div>
+<p><strong>Step 2 — <code class="docutils literal notranslate"><span class="pre">vsearch</span> <span class="pre">--fastq_filter</span></code></strong>  (expected-error quality filter, FASTQ → FASTA, relabel each read <code class="docutils literal notranslate"><span class="pre">&lt;sample&gt;.&lt;n&gt;</span></code> so the per-sample identity is preserved all the way to the count matrix).</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">filt_res</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">alignment</span><span class="o">.</span><span class="n">vsearch</span><span class="o">.</span><span class="n">filter_quality</span><span class="p">(</span>
+    <span class="n">merge_res</span><span class="p">,</span>
+    <span class="n">output_dir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">WORK_STEP</span> <span class="o">/</span> <span class="s2">&quot;filtered&quot;</span><span class="p">),</span>
+    <span class="n">max_ee</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">threads</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">jobs</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;filtered </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">filt_res</span><span class="p">)</span><span class="si">}</span><span class="s2"> samples&quot;</span><span class="p">)</span>
+<span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">filt_res</span><span class="p">)</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>filtered 20 samples
+</pre></div>
+</div>
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>   sample                                               filt  \
+0    F3D0  /scratch/users/steorra/analysis/omicverse_dev/...   
+1  F3D141  /scratch/users/steorra/analysis/omicverse_dev/...   
+2  F3D142  /scratch/users/steorra/analysis/omicverse_dev/...   
+
+                                                 log  
+0  /scratch/users/steorra/analysis/omicverse_dev/...  
+1  /scratch/users/steorra/analysis/omicverse_dev/...  
+2  /scratch/users/steorra/analysis/omicverse_dev/...  
+</pre></div>
+</div>
+</div>
+</div>
+<p><strong>Step 3 — <code class="docutils literal notranslate"><span class="pre">vsearch</span> <span class="pre">--derep_fulllength</span></code></strong>  (concatenate all samples and collapse exact duplicates; the <code class="docutils literal notranslate"><span class="pre">size=</span></code> annotation tracks multiplicity for downstream denoising).</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">derep</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">alignment</span><span class="o">.</span><span class="n">vsearch</span><span class="o">.</span><span class="n">dereplicate</span><span class="p">(</span>
+    <span class="n">filt_res</span><span class="p">,</span>
+    <span class="n">output_dir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">WORK_STEP</span> <span class="o">/</span> <span class="s2">&quot;derep&quot;</span><span class="p">),</span>
+    <span class="n">min_uniq</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">threads</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">derep</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>{&#39;combined&#39;: &#39;/scratch/users/steorra/analysis/omicverse_dev/cache/16s/run_mothur_sop_stepwise/derep/combined.fasta&#39;,
+ &#39;uniques&#39;: &#39;/scratch/users/steorra/analysis/omicverse_dev/cache/16s/run_mothur_sop_stepwise/derep/uniques.fasta&#39;,
+ &#39;log&#39;: &#39;/scratch/users/steorra/analysis/omicverse_dev/cache/16s/run_mothur_sop_stepwise/derep/derep.log&#39;}
+</pre></div>
+</div>
+</div>
+</div>
+<p><strong>Step 4 — <code class="docutils literal notranslate"><span class="pre">vsearch</span> <span class="pre">--cluster_unoise</span></code> (UNOISE3)</strong>  denoising into ASVs.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">unoise</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">alignment</span><span class="o">.</span><span class="n">vsearch</span><span class="o">.</span><span class="n">unoise3</span><span class="p">(</span>
+    <span class="n">derep</span><span class="p">[</span><span class="s2">&quot;uniques&quot;</span><span class="p">],</span>
+    <span class="n">output_dir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">WORK_STEP</span> <span class="o">/</span> <span class="s2">&quot;asv&quot;</span><span class="p">),</span>
+    <span class="n">alpha</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">minsize</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">threads</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">unoise</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>{&#39;asv&#39;: &#39;/scratch/users/steorra/analysis/omicverse_dev/cache/16s/run_mothur_sop_stepwise/asv/asvs_pre.fasta&#39;,
+ &#39;log&#39;: &#39;/scratch/users/steorra/analysis/omicverse_dev/cache/16s/run_mothur_sop_stepwise/asv/unoise3.log&#39;}
+</pre></div>
+</div>
+</div>
+</div>
+<p><strong>Step 5 — <code class="docutils literal notranslate"><span class="pre">vsearch</span> <span class="pre">--uchime3_denovo</span></code></strong>  (de novo chimera removal; UNOISE3 already filters lightly, this is a conservative second pass).</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">nochim</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">alignment</span><span class="o">.</span><span class="n">vsearch</span><span class="o">.</span><span class="n">uchime3_denovo</span><span class="p">(</span>
+    <span class="n">unoise</span><span class="p">[</span><span class="s2">&quot;asv&quot;</span><span class="p">],</span>
+    <span class="n">output_dir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">WORK_STEP</span> <span class="o">/</span> <span class="s2">&quot;asv&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">nochim</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>{&#39;asv&#39;: &#39;/scratch/users/steorra/analysis/omicverse_dev/cache/16s/run_mothur_sop_stepwise/asv/asvs.fasta&#39;,
+ &#39;chimeras&#39;: &#39;/scratch/users/steorra/analysis/omicverse_dev/cache/16s/run_mothur_sop_stepwise/asv/chimeras.fasta&#39;,
+ &#39;log&#39;: &#39;/scratch/users/steorra/analysis/omicverse_dev/cache/16s/run_mothur_sop_stepwise/asv/uchime3.log&#39;}
+</pre></div>
+</div>
+</div>
+</div>
+<p><strong>Step 6 — <code class="docutils literal notranslate"><span class="pre">vsearch</span> <span class="pre">--sintax</span></code></strong>  taxonomy assignment against the SINTAX-formatted RDP reference.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">tax</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">alignment</span><span class="o">.</span><span class="n">vsearch</span><span class="o">.</span><span class="n">sintax</span><span class="p">(</span>
+    <span class="n">nochim</span><span class="p">[</span><span class="s2">&quot;asv&quot;</span><span class="p">],</span>
+    <span class="n">db_fasta</span><span class="o">=</span><span class="n">DB_FASTA</span><span class="p">,</span>
+    <span class="n">output_dir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">WORK_STEP</span> <span class="o">/</span> <span class="s2">&quot;taxonomy&quot;</span><span class="p">),</span>
+    <span class="n">cutoff</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">strand</span><span class="o">=</span><span class="s2">&quot;both&quot;</span><span class="p">,</span>
+    <span class="n">threads</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">tax</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>{&#39;tsv&#39;: &#39;/scratch/users/steorra/analysis/omicverse_dev/cache/16s/run_mothur_sop_stepwise/taxonomy/sintax.tsv&#39;,
+ &#39;log&#39;: &#39;/scratch/users/steorra/analysis/omicverse_dev/cache/16s/run_mothur_sop_stepwise/taxonomy/sintax.log&#39;}
+</pre></div>
+</div>
+</div>
+</div>
+<p><strong>Step 7 — <code class="docutils literal notranslate"><span class="pre">vsearch</span> <span class="pre">--usearch_global</span> <span class="pre">--otutabout</span></code></strong>  build the sample × ASV count matrix by mapping the labelled reads back onto the ASVs.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">otutab</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">alignment</span><span class="o">.</span><span class="n">vsearch</span><span class="o">.</span><span class="n">usearch_global</span><span class="p">(</span>
+    <span class="n">derep</span><span class="p">[</span><span class="s2">&quot;combined&quot;</span><span class="p">],</span>
+    <span class="n">nochim</span><span class="p">[</span><span class="s2">&quot;asv&quot;</span><span class="p">],</span>
+    <span class="n">output_dir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">WORK_STEP</span> <span class="o">/</span> <span class="s2">&quot;otutab&quot;</span><span class="p">),</span>
+    <span class="n">identity</span><span class="o">=</span><span class="mf">0.97</span><span class="p">,</span>
+    <span class="n">threads</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="c1"># peek at the raw count matrix</span>
+<span class="n">otu</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">otutab</span><span class="p">[</span><span class="s2">&quot;otutab&quot;</span><span class="p">],</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;matrix shape:&quot;</span><span class="p">,</span> <span class="n">otu</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="s2">&quot;(ASVs x samples)&quot;</span><span class="p">)</span>
+<span class="n">otu</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:</span><span class="mi">5</span><span class="p">,</span> <span class="p">:</span><span class="mi">5</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>matrix shape: (598, 20) (ASVs x samples)
+</pre></div>
+</div>
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>           F3D0  F3D1  F3D141  F3D142  F3D143
+#OTU ID                                      
+F3D0.1      449    35     307     170     213
+F3D0.10      62    57      16       5      11
+F3D0.1008     6     6       7       0       0
+F3D0.1014    15     2       2       3       0
+F3D0.1025    14     7       0       2       2
+</pre></div>
+</div>
+</div>
+</div>
+<p><strong>Step 8 — build AnnData</strong>.  Use <code class="docutils literal notranslate"><span class="pre">ov.alignment.build_amplicon_anndata</span></code> to assemble the stepwise outputs (otutab + ASV FASTA + SINTAX TSV) into the same <code class="docutils literal notranslate"><span class="pre">samples</span> <span class="pre">×</span> <span class="pre">ASVs</span></code> AnnData schema the one-shot orchestrator returns. Sample metadata is merged into <code class="docutils literal notranslate"><span class="pre">obs</span></code>.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">adata_step</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">alignment</span><span class="o">.</span><span class="n">build_amplicon_anndata</span><span class="p">(</span>
+    <span class="n">otutab_tsv</span><span class="o">=</span><span class="n">otutab</span><span class="p">[</span><span class="s2">&quot;otutab&quot;</span><span class="p">],</span>
+    <span class="n">asv_fasta</span><span class="o">=</span><span class="n">nochim</span><span class="p">[</span><span class="s2">&quot;asv&quot;</span><span class="p">],</span>
+    <span class="n">sintax_tsv</span><span class="o">=</span><span class="n">tax</span><span class="p">[</span><span class="s2">&quot;tsv&quot;</span><span class="p">],</span>
+    <span class="n">sample_metadata</span><span class="o">=</span><span class="n">meta</span><span class="p">,</span>
+    <span class="n">sample_order</span><span class="o">=</span><span class="p">[</span><span class="n">s</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">samples</span><span class="p">],</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;stepwise AnnData:&quot;</span><span class="p">,</span> <span class="n">adata_step</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="s2">&quot;(samples x ASVs)&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;total reads mapped:&quot;</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">adata_step</span><span class="o">.</span><span class="n">X</span><span class="o">.</span><span class="n">sum</span><span class="p">()))</span>
+<span class="n">adata_step</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>stepwise AnnData: (20, 598) (samples x ASVs)
+total reads mapped: 121910
+</pre></div>
+</div>
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>AnnData object with n_obs × n_vars = 20 × 598
+    obs: &#39;sample&#39;, &#39;day&#39;, &#39;group&#39;
+    var: &#39;sequence&#39;, &#39;domain&#39;, &#39;phylum&#39;, &#39;class&#39;, &#39;order&#39;, &#39;family&#39;, &#39;genus&#39;, &#39;species&#39;, &#39;taxonomy&#39;, &#39;sintax_raw&#39;, &#39;sintax_confidence&#39;
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="or-call-the-one-shot-orchestrator">
+<h2>5. …or call the one-shot orchestrator<a class="headerlink" href="#or-call-the-one-shot-orchestrator" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">amplicon_16s_pipeline</span></code> stitches §4’s 7 calls together, parses the SINTAX
+output into ranked taxonomy columns, and returns an <code class="docutils literal notranslate"><span class="pre">AnnData</span></code>. Each
+intermediate file is cached under <code class="docutils literal notranslate"><span class="pre">workdir</span></code> so re-running is near-instant.</p>
+<p>Behind the scenes this is exactly the same tool chain you just ran by hand.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">adata</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">alignment</span><span class="o">.</span><span class="n">amplicon_16s_pipeline</span><span class="p">(</span>
+    <span class="n">fastq_dir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">RAW</span><span class="p">),</span>
+    <span class="n">workdir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">WORK</span><span class="p">),</span>
+    <span class="n">db_fasta</span><span class="o">=</span><span class="n">DB_FASTA</span><span class="p">,</span>
+    <span class="n">threads</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">jobs</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+    <span class="c1"># mothur SOP FASTQs ship with primers already trimmed</span>
+    <span class="n">primer_fwd</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">primer_rev</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">filter_max_ee</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">unoise_minsize</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">sintax_cutoff</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span>
+    <span class="n">sample_metadata</span><span class="o">=</span><span class="n">meta</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;AnnData:&quot;</span><span class="p">,</span> <span class="n">adata</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="s2">&quot;(samples x ASVs)&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;total reads mapped:&quot;</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">adata</span><span class="o">.</span><span class="n">X</span><span class="o">.</span><span class="n">sum</span><span class="p">()))</span>
+<span class="n">adata</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>AnnData: (20, 598) (samples x ASVs)
+total reads mapped: 121910
+</pre></div>
+</div>
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>AnnData object with n_obs × n_vars = 20 × 598
+    obs: &#39;sample&#39;, &#39;day&#39;, &#39;group&#39;
+    var: &#39;sequence&#39;, &#39;domain&#39;, &#39;phylum&#39;, &#39;class&#39;, &#39;order&#39;, &#39;family&#39;, &#39;genus&#39;, &#39;species&#39;, &#39;taxonomy&#39;, &#39;sintax_raw&#39;, &#39;sintax_confidence&#39;
+    uns: &#39;pipeline&#39;
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="inspect-the-result">
+<h2>6. Inspect the result<a class="headerlink" href="#inspect-the-result" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">obs</span></code> holds one row per sample (with the metadata we passed in); <code class="docutils literal notranslate"><span class="pre">var</span></code>
+holds one row per ASV, with the inferred 7-rank taxonomy, the ASV nucleotide
+sequence, and the SINTAX bootstrap confidence.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>        sample  day  group
+sample                    
+F3D0      F3D0    0  Early
+F3D1      F3D1    1  Early
+F3D141  F3D141  141   Late
+F3D142  F3D142  142   Late
+F3D143  F3D143  143   Late
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">adata</span><span class="o">.</span><span class="n">var</span><span class="p">[[</span><span class="s1">&#39;phylum&#39;</span><span class="p">,</span><span class="s1">&#39;class&#39;</span><span class="p">,</span><span class="s1">&#39;order&#39;</span><span class="p">,</span><span class="s1">&#39;family&#39;</span><span class="p">,</span><span class="s1">&#39;genus&#39;</span><span class="p">,</span><span class="s1">&#39;species&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;sintax_confidence&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>                  phylum        class            order  \
+asv                                                      
+F3D0.1     Bacteroidetes  Bacteroidia    Bacteroidales   
+F3D0.10       Firmicutes   Clostridia    Clostridiales   
+F3D0.1008     Firmicutes      Bacilli  Lactobacillales   
+F3D0.1014     Firmicutes   Clostridia    Clostridiales   
+F3D0.1025     Firmicutes   Clostridia    Clostridiales   
+F3D0.1033     Firmicutes   Clostridia    Clostridiales   
+F3D0.1036                                                
+F3D0.1040     Firmicutes   Clostridia    Clostridiales   
+F3D0.1080     Firmicutes   Clostridia    Clostridiales   
+F3D0.115   Bacteroidetes  Bacteroidia    Bacteroidales   
+
+                                      family                genus species  \
+asv                                                                         
+F3D0.1                                                                      
+F3D0.10                      Lachnospiraceae                                
+F3D0.1008                   Lactobacillaceae  Limosilactobacillus           
+F3D0.1014                    Lachnospiraceae                                
+F3D0.1025                    Ruminococcaceae                                
+F3D0.1033  Clostridiales_Incertae_Sedis_XIII            Ihubacter           
+F3D0.1036                                                                   
+F3D0.1040                    Ruminococcaceae                                
+F3D0.1080                    Ruminococcaceae        Lawsonibacter           
+F3D0.115                      Muribaculaceae                                
+
+           sintax_confidence  
+asv                           
+F3D0.1                  0.43  
+F3D0.10                 0.53  
+F3D0.1008               0.97  
+F3D0.1014               0.13  
+F3D0.1025               0.42  
+F3D0.1033               0.94  
+F3D0.1036               0.24  
+F3D0.1040               0.71  
+F3D0.1080               0.94  
+F3D0.115                0.71  
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="taxonomy-composition">
+<h2>7. Taxonomy composition<a class="headerlink" href="#taxonomy-composition" title="Link to this heading">#</a></h2>
+<p>Phylum-level stacked bars are the quickest sanity check — mouse gut is
+dominated by <strong>Firmicutes</strong> and <strong>Bacteroidetes</strong>, with minor contributions
+from <strong>Proteobacteria</strong> and <strong>Actinobacteria</strong>.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">scipy</span><span class="w"> </span><span class="kn">import</span> <span class="n">sparse</span>
+
+<span class="n">counts</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">X</span>
+<span class="k">if</span> <span class="n">sparse</span><span class="o">.</span><span class="n">issparse</span><span class="p">(</span><span class="n">counts</span><span class="p">):</span>
+    <span class="n">counts</span> <span class="o">=</span> <span class="n">counts</span><span class="o">.</span><span class="n">toarray</span><span class="p">()</span>
+<span class="n">counts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">counts</span><span class="p">)</span>
+
+<span class="c1"># collapse by phylum</span>
+<span class="n">phyla</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;phylum&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;Unassigned&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">values</span>
+<span class="n">phylum_mat</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">counts</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">adata</span><span class="o">.</span><span class="n">obs_names</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">phyla</span><span class="p">)</span>
+<span class="n">phylum_ab</span> <span class="o">=</span> <span class="n">phylum_mat</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">T</span>
+<span class="n">phylum_rel</span> <span class="o">=</span> <span class="n">phylum_ab</span><span class="o">.</span><span class="n">div</span><span class="p">(</span><span class="n">phylum_ab</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+<span class="c1"># sort samples by day</span>
+<span class="n">order</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s1">&#39;day&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">index</span>
+<span class="n">phylum_rel</span> <span class="o">=</span> <span class="n">phylum_rel</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">order</span><span class="p">]</span>
+
+<span class="c1"># top 8 phyla, the rest -&gt; &quot;Other&quot;</span>
+<span class="n">top</span> <span class="o">=</span> <span class="n">phylum_rel</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+<span class="n">plot_df</span> <span class="o">=</span> <span class="n">phylum_rel</span><span class="p">[</span><span class="n">top</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="n">plot_df</span><span class="p">[</span><span class="s1">&#39;Other&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="n">plot_df</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">9</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+<span class="n">colors</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">Set2</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">plot_df</span><span class="o">.</span><span class="n">columns</span><span class="p">)))</span>
+<span class="n">plot_df</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s1">&#39;bar&#39;</span><span class="p">,</span> <span class="n">stacked</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mf">0.9</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Relative abundance&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Sample (ordered by day)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Phylum-level composition — mothur MiSeq SOP mouse gut&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mf">1.02</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">loc</span><span class="o">=</span><span class="s1">&#39;upper left&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Phylum&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xticks</span><span class="p">(</span><span class="n">rotation</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">ha</span><span class="o">=</span><span class="s1">&#39;right&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/c78946c2c600e3abab78f2a19ab1346f621ea1fac4c2ddedb4838c6134f0357e.png"><img alt="../_images/c78946c2c600e3abab78f2a19ab1346f621ea1fac4c2ddedb4838c6134f0357e.png" src="../_images/c78946c2c600e3abab78f2a19ab1346f621ea1fac4c2ddedb4838c6134f0357e.png" style="width: 699px; height: 301px;" />
+</a>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Top 12 genera across all samples</span>
+<span class="n">genera</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s1">&#39;genus&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="s1">&#39;Unassigned&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">values</span>
+<span class="n">g_mat</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">counts</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">adata</span><span class="o">.</span><span class="n">obs_names</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">genera</span><span class="p">)</span>
+<span class="n">g_ab</span> <span class="o">=</span> <span class="n">g_mat</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">T</span>
+<span class="n">g_rel</span> <span class="o">=</span> <span class="n">g_ab</span><span class="o">.</span><span class="n">div</span><span class="p">(</span><span class="n">g_ab</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+<span class="n">top_g</span> <span class="o">=</span> <span class="n">g_rel</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">12</span><span class="p">)</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+<span class="n">g_plot</span> <span class="o">=</span> <span class="n">g_rel</span><span class="p">[</span><span class="n">top_g</span><span class="p">]</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">order</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="n">g_plot</span><span class="p">[</span><span class="s1">&#39;Other&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="n">g_plot</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">9</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+<span class="n">colors</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">tab20</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">g_plot</span><span class="o">.</span><span class="n">columns</span><span class="p">)))</span>
+<span class="n">g_plot</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s1">&#39;bar&#39;</span><span class="p">,</span> <span class="n">stacked</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">colors</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mf">0.9</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Relative abundance&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Sample (ordered by day)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Top 12 genera&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mf">1.02</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">loc</span><span class="o">=</span><span class="s1">&#39;upper left&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xticks</span><span class="p">(</span><span class="n">rotation</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">ha</span><span class="o">=</span><span class="s1">&#39;right&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/508cea94f5f343f07abded5f7f48e4b2b489232b747268cf2dba297bc5b9cd9a.png"><img alt="../_images/508cea94f5f343f07abded5f7f48e4b2b489232b747268cf2dba297bc5b9cd9a.png" src="../_images/508cea94f5f343f07abded5f7f48e4b2b489232b747268cf2dba297bc5b9cd9a.png" style="width: 701px; height: 301px;" />
+</a>
+</div>
+</div>
+</section>
+<section id="alpha-diversity">
+<h2>8. Alpha diversity<a class="headerlink" href="#alpha-diversity" title="Link to this heading">#</a></h2>
+<p>Within-sample richness (Observed ASVs) and evenness (Shannon index), computed
+by <code class="docutils literal notranslate"><span class="pre">ov.micro.Alpha</span></code> (scikit-bio backend). We compare Early (days 0–9,
+post-weaning) to Late (days 141–150, adult) timepoints.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># ov.micro.Alpha wraps scikit-bio; rarefies first, writes results into adata.obs</span>
+<span class="n">min_depth</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">adata</span><span class="o">.</span><span class="n">X</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">micro</span><span class="o">.</span><span class="n">Alpha</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">rarefy_depth</span><span class="o">=</span><span class="n">min_depth</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;shannon&#39;</span><span class="p">,</span> <span class="s1">&#39;observed_otus&#39;</span><span class="p">,</span> <span class="s1">&#39;simpson&#39;</span><span class="p">],</span>
+<span class="p">)</span>
+<span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[[</span><span class="s1">&#39;shannon&#39;</span><span class="p">,</span> <span class="s1">&#39;observed_otus&#39;</span><span class="p">,</span> <span class="s1">&#39;simpson&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">describe</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>         shannon  observed_otus    simpson
+count  20.000000       20.00000  20.000000
+mean    3.843117      213.70000   0.954573
+std     0.353624       46.88968   0.012315
+min     2.829825       31.00000   0.931065
+25%     3.705990      212.50000   0.946059
+50%     3.877926      224.00000   0.956045
+75%     4.125809      230.25000   0.962970
+max     4.315890      258.00000   0.975751
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mf">3.5</span><span class="p">))</span>
+<span class="n">groups</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Early&#39;</span><span class="p">,</span> <span class="s1">&#39;Late&#39;</span><span class="p">,</span> <span class="s1">&#39;Mock&#39;</span><span class="p">]</span>
+<span class="n">palette</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;Early&#39;</span><span class="p">:</span> <span class="s1">&#39;#2a9d8f&#39;</span><span class="p">,</span> <span class="s1">&#39;Late&#39;</span><span class="p">:</span> <span class="s1">&#39;#e76f51&#39;</span><span class="p">,</span> <span class="s1">&#39;Mock&#39;</span><span class="p">:</span> <span class="s1">&#39;#264653&#39;</span><span class="p">}</span>
+<span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">ylabel</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">axes</span><span class="p">,</span>
+                               <span class="p">[</span><span class="s1">&#39;shannon&#39;</span><span class="p">,</span> <span class="s1">&#39;observed_otus&#39;</span><span class="p">],</span>
+                               <span class="p">[</span><span class="s1">&#39;Shannon index&#39;</span><span class="p">,</span> <span class="s1">&#39;Observed ASVs&#39;</span><span class="p">]):</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">group</span> <span class="o">==</span> <span class="n">g</span><span class="p">][</span><span class="n">metric</span><span class="p">]</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span><span class="o">.</span><span class="n">values</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">groups</span><span class="p">]</span>
+    <span class="n">bp</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">boxplot</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">groups</span><span class="p">,</span> <span class="n">patch_artist</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">widths</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">showfliers</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">patch</span><span class="p">,</span> <span class="n">g</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">bp</span><span class="p">[</span><span class="s1">&#39;boxes&#39;</span><span class="p">],</span> <span class="n">groups</span><span class="p">):</span>
+        <span class="n">patch</span><span class="o">.</span><span class="n">set_facecolor</span><span class="p">(</span><span class="n">palette</span><span class="p">[</span><span class="n">g</span><span class="p">])</span>
+        <span class="n">patch</span><span class="o">.</span><span class="n">set_alpha</span><span class="p">(</span><span class="mf">0.7</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">vals</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">groups</span><span class="p">,</span> <span class="n">data</span><span class="p">),</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">vals</span><span class="p">))</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">vals</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;k&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">18</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="n">ylabel</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">ylabel</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/2661ed769a3842d0e1c2d5b71c3675bda4dd3337528352e37a79dab2daaa5e5f.png"><img alt="../_images/2661ed769a3842d0e1c2d5b71c3675bda4dd3337528352e37a79dab2daaa5e5f.png" src="../_images/2661ed769a3842d0e1c2d5b71c3675bda4dd3337528352e37a79dab2daaa5e5f.png" style="width: 622px; height: 261px;" />
+</a>
+</div>
+</div>
+</section>
+<section id="beta-diversity-braycurtis-pcoa">
+<h2>9. Beta diversity — Bray–Curtis PCoA<a class="headerlink" href="#beta-diversity-braycurtis-pcoa" title="Link to this heading">#</a></h2>
+<p>Sample-to-sample dissimilarity computed by <code class="docutils literal notranslate"><span class="pre">ov.micro.Beta</span></code>, ordinated by
+<code class="docutils literal notranslate"><span class="pre">ov.micro.Ordinate.pcoa</span></code>. Early and Late timepoints should fall into
+distinct clusters (post-weaning gut remodelling is a well-documented
+signal in this dataset).</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># 1) distance matrix -&gt; adata.obsp[&#39;braycurtis&#39;]</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">micro</span><span class="o">.</span><span class="n">Beta</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">rarefy_depth</span><span class="o">=</span><span class="n">min_depth</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">metric</span><span class="o">=</span><span class="s1">&#39;braycurtis&#39;</span><span class="p">)</span>
+
+<span class="c1"># 2) PCoA -&gt; adata.obsm[&#39;braycurtis_pcoa&#39;] + variance-explained in uns</span>
+<span class="n">ord_</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">micro</span><span class="o">.</span><span class="n">Ordinate</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">dist_key</span><span class="o">=</span><span class="s1">&#39;braycurtis&#39;</span><span class="p">)</span>
+<span class="n">ord_</span><span class="o">.</span><span class="n">pcoa</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">pct</span> <span class="o">=</span> <span class="n">ord_</span><span class="o">.</span><span class="n">proportion_explained</span><span class="p">()</span> <span class="o">*</span> <span class="mf">100.0</span>
+<span class="n">coords</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">adata</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s1">&#39;braycurtis_pcoa&#39;</span><span class="p">],</span>
+                      <span class="n">index</span><span class="o">=</span><span class="n">adata</span><span class="o">.</span><span class="n">obs_names</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;PC1&#39;</span><span class="p">,</span><span class="s1">&#39;PC2&#39;</span><span class="p">,</span><span class="s1">&#39;PC3&#39;</span><span class="p">])</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mf">5.5</span><span class="p">,</span> <span class="mf">4.5</span><span class="p">))</span>
+<span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;Early&#39;</span><span class="p">,</span> <span class="s1">&#39;Late&#39;</span><span class="p">,</span> <span class="s1">&#39;Mock&#39;</span><span class="p">]:</span>
+    <span class="n">sub</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">group</span> <span class="o">==</span> <span class="n">g</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">sub</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span> <span class="k">continue</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">coords</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">sub</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="s1">&#39;PC1&#39;</span><span class="p">],</span>
+               <span class="n">coords</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">sub</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="s1">&#39;PC2&#39;</span><span class="p">],</span>
+               <span class="n">color</span><span class="o">=</span><span class="n">palette</span><span class="p">[</span><span class="n">g</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="n">g</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">70</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.85</span><span class="p">,</span> <span class="n">edgecolor</span><span class="o">=</span><span class="s1">&#39;k&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;PC1 (</span><span class="si">{</span><span class="n">pct</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s1">.1f</span><span class="si">}</span><span class="s1">%)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;PC2 (</span><span class="si">{</span><span class="n">pct</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s1">.1f</span><span class="si">}</span><span class="s1">%)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Bray-Curtis PCoA (rarefied depth = </span><span class="si">{</span><span class="n">min_depth</span><span class="si">:</span><span class="s1">,</span><span class="si">}</span><span class="s1">)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s1">&#39;group&#39;</span><span class="p">,</span> <span class="n">frameon</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;k&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.4</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;k&#39;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.4</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/265833be5a6d066e6c2e22b19ca5ae9f04ae0f30c08e06391dd2d5d6c4aad438.png"><img alt="../_images/265833be5a6d066e6c2e22b19ca5ae9f04ae0f30c08e06391dd2d5d6c4aad438.png" src="../_images/265833be5a6d066e6c2e22b19ca5ae9f04ae0f30c08e06391dd2d5d6c4aad438.png" style="width: 422px; height: 340px;" />
+</a>
+</div>
+</div>
+</section>
+<section id="phylum-level-early-vs-late-differences">
+<h2>10. Phylum-level Early-vs-Late differences<a class="headerlink" href="#phylum-level-early-vs-late-differences" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">ov.micro.DA.wilcoxon</span></code> collapses ASVs to the phylum rank and runs a
+Mann-Whitney U test on relative abundances with BH-FDR correction.
+Published analyses of this dataset report a Firmicutes:Bacteroidetes
+shift with host age — we should recover that signal.</p>
+<p>(Other backends available: <code class="docutils literal notranslate"><span class="pre">.deseq2(...)</span></code> via pydeseq2 for count-based
+negative-binomial GLM, and <code class="docutils literal notranslate"><span class="pre">.ancombc(...)</span></code> via scikit-bio ≥ 0.7.1.)</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">da</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">micro</span><span class="o">.</span><span class="n">DA</span><span class="p">(</span><span class="n">adata</span><span class="p">)</span><span class="o">.</span><span class="n">wilcoxon</span><span class="p">(</span>
+    <span class="n">group_key</span><span class="o">=</span><span class="s1">&#39;group&#39;</span><span class="p">,</span>
+    <span class="n">group_a</span><span class="o">=</span><span class="s1">&#39;Early&#39;</span><span class="p">,</span> <span class="n">group_b</span><span class="o">=</span><span class="s1">&#39;Late&#39;</span><span class="p">,</span>
+    <span class="n">rank</span><span class="o">=</span><span class="s1">&#39;phylum&#39;</span><span class="p">,</span>
+    <span class="n">min_prevalence</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">da</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>                       feature  mean_Early  mean_Late  log2FC(Late/Early)  \
+6                      Plantae    0.002203   0.000031           -6.159047   
+8                  Tenericutes    0.004734   0.000312           -3.921901   
+0               Actinobacteria    0.001585   0.005682            1.842352   
+3    Cyanobacteria/Chloroplast    0.000730   0.000264           -1.468469   
+1                Bacteroidetes    0.548868   0.668693            0.284885   
+4          Deinococcus-Thermus    0.000000   0.000177           27.400149   
+7               Proteobacteria    0.001375   0.000711           -0.952431   
+9                   Unassigned    0.024865   0.013213           -0.912235   
+5                   Firmicutes    0.412597   0.309718           -0.413776   
+2  Candidatus_Saccharibacteria    0.002822   0.001199           -1.234529   
+
+   U_stat   p_value  prevalence    fdr_bh  
+6    84.5  0.000575        0.45  0.004306  
+8    86.0  0.000783        0.65  0.004306  
+0     6.0  0.001669        1.00  0.006121  
+3    74.0  0.017016        0.60  0.043922  
+1    16.0  0.019964        1.00  0.043922  
+4    27.0  0.045153        0.25  0.071430  
+7    70.0  0.045455        1.00  0.071430  
+9    68.0  0.066193        1.00  0.091015  
+5    67.0  0.079179        1.00  0.096775  
+2    65.0  0.111347        0.95  0.122482  
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># visualise the top shifting phyla</span>
+<span class="n">top_da</span> <span class="o">=</span> <span class="n">da</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">6</span><span class="p">)[</span><span class="s1">&#39;feature&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mf">3.6</span><span class="p">))</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">top_da</span><span class="p">))</span>
+<span class="n">w</span> <span class="o">=</span> <span class="mf">0.35</span>
+<span class="n">e_vals</span> <span class="o">=</span> <span class="n">da</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;feature&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">top_da</span><span class="p">,</span> <span class="s1">&#39;mean_Early&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+<span class="n">l_vals</span> <span class="o">=</span> <span class="n">da</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;feature&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">top_da</span><span class="p">,</span> <span class="s1">&#39;mean_Late&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="n">w</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">e_vals</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="n">w</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Early&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">palette</span><span class="p">[</span><span class="s1">&#39;Early&#39;</span><span class="p">])</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="n">w</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">l_vals</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="n">w</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Late&#39;</span><span class="p">,</span>  <span class="n">color</span><span class="o">=</span><span class="n">palette</span><span class="p">[</span><span class="s1">&#39;Late&#39;</span><span class="p">])</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xticklabels</span><span class="p">(</span><span class="n">top_da</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">ha</span><span class="o">=</span><span class="s1">&#39;right&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Mean relative abundance&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Top shifting phyla (Early vs Late) — Wilcoxon-ranked&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/1143e37c6ad99259b13471ab5fe9a6b05a2aa2f7e49ac703adb13a0af5deca62.png"><img alt="../_images/1143e37c6ad99259b13471ab5fe9a6b05a2aa2f7e49ac703adb13a0af5deca62.png" src="../_images/1143e37c6ad99259b13471ab5fe9a6b05a2aa2f7e49ac703adb13a0af5deca62.png" style="width: 630px; height: 269px;" />
+</a>
+</div>
+</div>
+</section>
+<section id="save-the-anndata">
+<h2>11. Save the AnnData<a class="headerlink" href="#save-the-anndata" title="Link to this heading">#</a></h2>
+<p>The resulting <code class="docutils literal notranslate"><span class="pre">.h5ad</span></code> follows the same schema as a single-cell matrix — so the
+whole OmicVerse stack (<code class="docutils literal notranslate"><span class="pre">ov.pp</span></code>, <code class="docutils literal notranslate"><span class="pre">ov.pl</span></code>, <code class="docutils literal notranslate"><span class="pre">ov.single.pyDEG</span></code>, etc.) can be pointed
+at it for downstream analysis if desired.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">out</span> <span class="o">=</span> <span class="n">WORK</span> <span class="o">/</span> <span class="s2">&quot;mothur_sop_16s.h5ad&quot;</span>
+<span class="n">adata</span><span class="o">.</span><span class="n">write_h5ad</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;wrote&quot;</span><span class="p">,</span> <span class="n">out</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="n">out</span><span class="o">.</span><span class="n">stat</span><span class="p">()</span><span class="o">.</span><span class="n">st_size</span> <span class="o">//</span> <span class="mi">1024</span><span class="p">,</span> <span class="s2">&quot;KB&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>wrote /scratch/users/steorra/analysis/omicverse_dev/cache/16s/run_mothur_sop/mothur_sop_16s.h5ad - 424 KB
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="notes-on-validation">
+<h2>Notes on validation<a class="headerlink" href="#notes-on-validation" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><strong>Mouse gut expected phyla</strong>: Firmicutes + Bacteroidetes dominance, with a
+shift in their ratio between early and late timepoints — ✔ recovered above.</p></li>
+<li><p><strong>No <code class="docutils literal notranslate"><span class="pre">$HOME</span></code> writes</strong>: set <code class="docutils literal notranslate"><span class="pre">OMICVERSE_DB_DIR</span></code> or always pass an explicit
+<code class="docutils literal notranslate"><span class="pre">db_dir=</span></code> / <code class="docutils literal notranslate"><span class="pre">workdir=</span></code> under <code class="docutils literal notranslate"><span class="pre">/scratch</span></code>.</p></li>
+<li><p><strong>Backends</strong>: <code class="docutils literal notranslate"><span class="pre">backend='vsearch'</span></code> (UNOISE3) is implemented; <code class="docutils literal notranslate"><span class="pre">'dada2'</span></code>,
+<code class="docutils literal notranslate"><span class="pre">'emu'</span></code> (long-read ONT 16S), <code class="docutils literal notranslate"><span class="pre">'qiime2'</span></code> are stubs for future work.</p></li>
+<li><p><strong>Primer trimming</strong>: add <code class="docutils literal notranslate"><span class="pre">primer_fwd=</span></code> / <code class="docutils literal notranslate"><span class="pre">primer_rev=</span></code> to <code class="docutils literal notranslate"><span class="pre">amplicon_16s_pipeline</span></code>
+to run <code class="docutils literal notranslate"><span class="pre">cutadapt</span></code> before merging (unnecessary for the mothur SOP data).</p></li>
+</ul>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../tutorials/index_microbiome.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Microbiome</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="t_16s_phylogeny.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">16S phylogeny: MAFFT → FastTree → Faith PD + UniFrac</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#setup">1. Setup</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#download-test-fastq-reference-db">2. Download test FASTQ + reference DB</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#sample-metadata">3. Sample metadata</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#step-by-step-call-each-tool-directly">4. Step-by-step: call each tool directly</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#or-call-the-one-shot-orchestrator">5. …or call the one-shot orchestrator</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#inspect-the-result">6. Inspect the result</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#taxonomy-composition">7. Taxonomy composition</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#alpha-diversity">8. Alpha diversity</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#beta-diversity-braycurtis-pcoa">9. Beta diversity — Bray–Curtis PCoA</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#phylum-level-early-vs-late-differences">10. Phylum-level Early-vs-Late differences</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#save-the-anndata">11. Save the AnnData</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#notes-on-validation">Notes on validation</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Zehua Zeng
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2026, 112 Lab, USTB.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

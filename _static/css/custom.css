@@ -1,0 +1,487 @@
+/* ============================================
+   OmicVerse Documentation — Pantheon-inspired theme
+   (adapted to sphinx_book_theme, green brand)
+   ============================================ */
+
+/* ===== Variables ===== */
+:root {
+    /* Brand — forest green */
+    --primary:        #4c7a69;
+    --primary-hover:  #2f5a4a;
+    --primary-light:  #78aa95;
+    --primary-pale:   #b1d1c3;
+
+    /* Code block — deep forest */
+    --code-bg:        #0f1a16;
+    --code-text:      #e2ece6;
+    --code-border:    #1f2b24;
+
+    /* Syntax — forest palette (omicverse-notebook theme) */
+    --syn-keyword:    #84c3a0;
+    --syn-string:     #cad78f;
+    --syn-number:     #a6cbbb;
+    --syn-comment:    #708980;
+    --syn-function:   #d6b56f;
+    --syn-class:      #d6b56f;
+    --syn-builtin:    #9bcdb6;
+    --syn-attr:       #8ab7ca;
+    --syn-name:       #e2ece6;
+    --syn-punct:      #edf4ef;
+    --syn-operator:   #84c3a0;
+
+    /* Inline code */
+    --inline-bg:      #eef4f1;
+    --inline-text:    #2f5a4a;
+
+    /* UI */
+    --border:         #d8e4de;
+    --shadow:         0 1px 3px rgba(15,30,20,0.08);
+    --shadow-lg:      0 4px 12px rgba(15,30,20,0.14);
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --inline-bg:   #1b2922;
+        --inline-text: #a6cbbb;
+        --border:      #2b3a32;
+        --shadow:      0 1px 3px rgba(0,0,0,0.3);
+        --shadow-lg:   0 4px 12px rgba(0,0,0,0.4);
+    }
+}
+
+html[data-theme="dark"] {
+    --inline-bg:   #1b2922;
+    --inline-text: #a6cbbb;
+    --border:      #2b3a32;
+    --shadow:      0 1px 3px rgba(0,0,0,0.3);
+    --shadow-lg:   0 4px 12px rgba(0,0,0,0.4);
+}
+
+/* ===== Code Blocks
+   Selector uses ^="highlight-" (starts with) so it ONLY matches code-input
+   wrappers like `highlight-ipython3`, NOT notebook output wrappers whose
+   class starts with `output` (e.g. `output stream highlight-myst-ansi`).
+   If we matched those, our `overflow: hidden` would clobber the theme's
+   `.cell_output .output { overflow-x: auto }` and very wide <pre> output
+   (AnnData reprs, banner logs) would push the viewport sideways. */
+.highlight,
+div[class^="highlight-"] {
+    margin: 1rem 0 !important;
+    border-radius: 10px !important;
+    background: var(--code-bg) !important;
+    border: none !important;
+    box-shadow: var(--shadow-lg) !important;
+}
+
+.highlight::before,
+div[class^="highlight-"]::before {
+    display: none !important;
+    content: none !important;
+}
+
+.highlight pre,
+div[class^="highlight-"] pre {
+    margin: 0 !important;
+    padding: 0.5rem 0.875rem !important;
+    background: var(--code-bg) !important;
+    color: var(--code-text) !important;
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', Consolas, monospace !important;
+    font-size: 0.875rem !important;
+    line-height: 1.5 !important;
+    overflow-x: auto !important;
+    max-width: 100% !important;
+    border: none !important;
+    border-radius: 10px !important;
+}
+
+.highlight pre code,
+div[class^="highlight-"] pre code {
+    background: transparent !important;
+    color: inherit !important;
+    padding: 0 !important;
+    border: none !important;
+    font-size: inherit !important;
+    font-family: inherit !important;
+}
+
+/* ===== Syntax Highlighting (omicverse forest palette) ===== */
+.highlight .k, .highlight .kd, .highlight .kn, .highlight .kp,
+.highlight .kr, .highlight .kt, .highlight .kc, .highlight .ow {
+    color: var(--syn-keyword) !important;
+}
+
+.highlight .s, .highlight .s1, .highlight .s2, .highlight .sb,
+.highlight .sc, .highlight .sd, .highlight .se, .highlight .sh,
+.highlight .si, .highlight .sx, .highlight .sr, .highlight .ss, .highlight .sa {
+    color: var(--syn-string) !important;
+}
+
+.highlight .m, .highlight .mf, .highlight .mh, .highlight .mi,
+.highlight .mo, .highlight .mb, .highlight .il {
+    color: var(--syn-number) !important;
+}
+
+.highlight .c, .highlight .c1, .highlight .cm, .highlight .cp,
+.highlight .cs, .highlight .ch, .highlight .cpf {
+    color: var(--syn-comment) !important;
+    font-style: italic;
+}
+
+.highlight .nf, .highlight .fm {
+    color: var(--syn-function) !important;
+}
+
+.highlight .nc, .highlight .ne, .highlight .nd, .highlight .no {
+    color: var(--syn-class) !important;
+}
+
+.highlight .nb, .highlight .bp {
+    color: var(--syn-builtin) !important;
+}
+
+.highlight .na {
+    color: var(--syn-attr) !important;
+}
+
+.highlight .n, .highlight .nv, .highlight .nn,
+.highlight .ni, .highlight .nl, .highlight .nt {
+    color: var(--syn-name) !important;
+}
+
+.highlight .o {
+    color: var(--syn-operator) !important;
+}
+
+.highlight .p {
+    color: var(--syn-punct) !important;
+}
+
+/* ===== Inline Code ===== */
+code.literal,
+:not(pre) > code {
+    background: var(--inline-bg) !important;
+    color: var(--inline-text) !important;
+    padding: 0.2em 0.5em !important;
+    border-radius: 6px !important;
+    font-family: 'SF Mono', Consolas, monospace !important;
+    font-size: 0.875em !important;
+    font-weight: 500 !important;
+    border: none !important;
+}
+
+/* ===== Copy Button ===== */
+button.copybtn {
+    position: absolute !important;
+    top: 0.5rem !important;
+    right: 0.5rem !important;
+    padding: 0.4rem !important;
+    background: rgba(255,255,255,0.15) !important;
+    border: none !important;
+    border-radius: 6px !important;
+    color: #a0b0a8 !important;
+    opacity: 0 !important;
+    transition: all 0.2s !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+button.copybtn svg,
+button.copybtn img {
+    width: 18px !important;
+    height: 18px !important;
+}
+
+.highlight:hover button.copybtn,
+div[class^="highlight-"]:hover button.copybtn {
+    opacity: 1 !important;
+}
+
+button.copybtn:hover {
+    background: rgba(120,170,149,0.28) !important;
+    color: #fff !important;
+}
+
+button.copybtn.success {
+    background: rgba(76,122,105,0.35) !important;
+    color: var(--primary-light) !important;
+}
+
+button.copybtn::after,
+.copybtn[data-tooltip]::after,
+.o-tooltip--left::after {
+    background: #1e2a24 !important;
+    color: #e2ece6 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 4px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+}
+
+.copybtn .o-tooltip--left::before,
+.copybtn .o-tooltip--left::after {
+    background: #1e2a24 !important;
+    color: #e2ece6 !important;
+}
+
+[data-tooltip]::before,
+[data-tooltip]::after,
+.tooltip,
+[role="tooltip"],
+.tippy-box,
+.tippy-content {
+    background-color: #1e2a24 !important;
+    color: #e2ece6 !important;
+}
+
+/* ===== Cards ===== */
+.sd-card {
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    box-shadow: var(--shadow) !important;
+    transition: all 0.2s ease !important;
+    overflow: hidden !important;
+}
+
+.sd-card:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: var(--shadow-lg) !important;
+    border-color: var(--primary) !important;
+}
+
+.sd-card-body {
+    padding: 1.25rem !important;
+}
+
+/* ===== Admonitions ===== */
+.admonition {
+    border-radius: 10px !important;
+    border-left: 4px solid !important;
+    border-top: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+    margin: 1.25rem 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    box-shadow: var(--shadow) !important;
+}
+
+.admonition-title {
+    padding: 0.5rem 0.75rem 0.5rem 2rem !important;
+    margin: 0 !important;
+    font-weight: 600 !important;
+    position: relative !important;
+}
+
+.admonition-title::before {
+    position: absolute !important;
+    left: 0.6rem !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+}
+
+.admonition > *:not(.admonition-title) {
+    padding: 0 1rem 1rem !important;
+    margin: 0 !important;
+}
+
+.admonition.note { border-color: #3b82f6 !important; background: rgba(59,130,246,0.05) !important; }
+.admonition.note .admonition-title { background: rgba(59,130,246,0.1) !important; color: #2563eb !important; }
+
+.admonition.warning, .admonition.caution, .admonition.attention {
+    border-color: #f59e0b !important; background: rgba(245,158,11,0.05) !important;
+}
+.admonition.warning .admonition-title,
+.admonition.caution .admonition-title,
+.admonition.attention .admonition-title {
+    background: rgba(245,158,11,0.1) !important; color: #d97706 !important;
+}
+
+.admonition.tip, .admonition.hint, .admonition.important, .admonition.seealso {
+    border-color: var(--primary) !important; background: rgba(76,122,105,0.06) !important;
+}
+.admonition.tip .admonition-title,
+.admonition.hint .admonition-title,
+.admonition.important .admonition-title,
+.admonition.seealso .admonition-title {
+    background: rgba(76,122,105,0.14) !important; color: var(--primary-hover) !important;
+}
+
+.admonition.danger, .admonition.error {
+    border-color: #ef4444 !important; background: rgba(239,68,68,0.05) !important;
+}
+.admonition.danger .admonition-title,
+.admonition.error .admonition-title {
+    background: rgba(239,68,68,0.1) !important; color: #dc2626 !important;
+}
+
+/* ===== Prose tables (markdown / rst tables)
+   Excludes pandas DataFrame outputs (handled by override.css) and
+   Sphinx autodoc field lists / footnotes. */
+.bd-content table:not(.dataframe):not(.footnote):not(.field-list),
+.bd-article table:not(.dataframe):not(.footnote):not(.field-list),
+article table:not(.dataframe):not(.footnote):not(.field-list) {
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.bd-content table:not(.dataframe):not(.footnote):not(.field-list) th,
+.bd-article table:not(.dataframe):not(.footnote):not(.field-list) th,
+article table:not(.dataframe):not(.footnote):not(.field-list) th {
+    background: #eef4f1;
+    color: var(--primary-hover);
+    font-weight: 600;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.bd-content table:not(.dataframe):not(.footnote):not(.field-list) td,
+.bd-article table:not(.dataframe):not(.footnote):not(.field-list) td,
+article table:not(.dataframe):not(.footnote):not(.field-list) td {
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.bd-content table:not(.dataframe):not(.footnote):not(.field-list) tr:last-child td,
+.bd-article table:not(.dataframe):not(.footnote):not(.field-list) tr:last-child td,
+article table:not(.dataframe):not(.footnote):not(.field-list) tr:last-child td {
+    border-bottom: none;
+}
+
+.bd-content table:not(.dataframe):not(.footnote):not(.field-list) tr:hover td,
+.bd-article table:not(.dataframe):not(.footnote):not(.field-list) tr:hover td,
+article table:not(.dataframe):not(.footnote):not(.field-list) tr:hover td {
+    background: #f3f8f5;
+}
+
+html[data-theme="dark"] .bd-content table:not(.dataframe):not(.footnote):not(.field-list) th,
+html[data-theme="dark"] .bd-article table:not(.dataframe):not(.footnote):not(.field-list) th {
+    background: #1b2922;
+    color: var(--primary-light);
+}
+html[data-theme="dark"] .bd-content table:not(.dataframe):not(.footnote):not(.field-list) tr:hover td,
+html[data-theme="dark"] .bd-article table:not(.dataframe):not(.footnote):not(.field-list) tr:hover td {
+    background: #1b2922;
+}
+
+/* ===== Links ===== */
+a {
+    color: var(--primary) !important;
+    text-decoration: none !important;
+}
+
+a:hover {
+    color: var(--primary-hover) !important;
+    text-decoration: underline !important;
+}
+
+/* ===== Typography ===== */
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 700 !important;
+    letter-spacing: -0.02em !important;
+}
+
+/* ===== Sidebar / brand ===== */
+.sidebar-brand img, .navbar-brand img {
+    max-width: 120px !important;
+    background: transparent !important;
+}
+
+.sidebar-brand, .navbar-brand {
+    background: transparent !important;
+}
+
+html[data-theme="dark"] .sidebar-brand img,
+html[data-theme="dark"] .navbar-brand img,
+html[data-theme="dark"] .bd-content img:not(.only-dark, .dark-light) {
+    background-color: transparent !important;
+}
+
+/* ===== Navbar Icons (pydata-sphinx-theme / sphinx_book_theme) ===== */
+.pst-navbar-icon::before,
+.pst-navbar-icon:hover::before,
+.pst-navbar-icon:focus::before,
+html .pst-navbar-icon:hover::before,
+html .pst-navbar-icon:focus::before {
+    display: none !important;
+    border: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+
+.header-article__inner .header-article-items__end,
+.header-article__inner .header-article-items__start {
+    align-items: center !important;
+}
+
+.pst-navbar-icon {
+    height: auto !important;
+    line-height: 1 !important;
+    padding: 0 0.5rem !important;
+}
+
+.bd-header-article .btn:hover,
+.navbar-icon-links a:hover,
+.pst-navbar-icon:hover,
+.dropdown-toggle:hover,
+.dropdown-source-buttons .btn:hover {
+    background: rgba(76,122,105,0.12) !important;
+    border-radius: 6px !important;
+    text-decoration: none !important;
+}
+
+/* ===== Scrollbar ===== */
+html[data-theme="dark"] ::-webkit-scrollbar-track {
+    background: #0f1a16 !important;
+}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb {
+    background: #2b3a32 !important;
+    border-radius: 4px !important;
+}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+    background: #3e5247 !important;
+}
+
+@media (prefers-color-scheme: dark) {
+    ::-webkit-scrollbar-track {
+        background: #0f1a16 !important;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #2b3a32 !important;
+        border-radius: 4px !important;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #3e5247 !important;
+    }
+}
+
+/* ===== Misc ===== */
+html { scroll-behavior: smooth; }
+
+::selection { background: rgba(76,122,105,0.25); }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c8d5cf; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #a8bdb2; }
+
+html[data-theme="light"] ::-webkit-scrollbar-track { background: transparent !important; }
+html[data-theme="light"] ::-webkit-scrollbar-thumb { background: #c8d5cf !important; }
+html[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #a8bdb2 !important; }
+
+/* Line numbers */
+.highlight .linenos {
+    color: #708980 !important;
+    padding-right: 1rem !important;
+    margin-right: 1rem !important;
+    border-right: 1px solid #1f2b24 !important;
+    user-select: none !important;
+}

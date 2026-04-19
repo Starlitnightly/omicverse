@@ -1,0 +1,1981 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="Visualization of single cell RNA-seq" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="Tutorials-plotting/t_visualize_single.html" />
+<meta property="og:site_name" content="omicverse" />
+<meta property="og:description" content="In this part, we will introduce the tutorial of special plot of omicverse. We utilized single-cell RNA-seq data (GEO accession: GSE95753) obtained from the dentate gyrus of the hippocampus in mouse..." />
+<meta property="og:image:width" content="1146" />
+<meta property="og:image:height" content="600" />
+<meta property="og:image" content="_images/social_previews/summary_Tutorials-plotting_t_visualize_single_5b370b27.png" />
+<meta property="og:image:alt" content="In this part, we will introduce the tutorial of special plot of omicverse. We utilized single-cell RNA-seq data (GEO accession: GSE95753) obtained from the dentate gyrus of the hippocampus in mouse..." />
+<meta name="description" content="In this part, we will introduce the tutorial of special plot of omicverse. We utilized single-cell RNA-seq data (GEO accession: GSE95753) obtained from the dentate gyrus of the hippocampus in mouse..." />
+<meta name="twitter:card" content="summary_large_image" />
+
+    <title>Visualization of single cell RNA-seq &#8212; omicverse</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster.custom.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster.bundle.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-shadow.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-punk.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-noir.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-light.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-borderless.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/micromodal.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=3a64e6d4" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/icons.css?v=b452f90d" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/override.css?v=216aaec1" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/jquery.js?v=5d32c60e"></script>
+    <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+    <script src="../_static/documentation_options.js?v=f9413015"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/js/hoverxref.js"></script>
+    <script src="../_static/js/tooltipster.bundle.min.js"></script>
+    <script src="../_static/js/micromodal.min.js"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'Tutorials-plotting/t_visualize_single';</script>
+    <link rel="icon" href="../_static/favicon.ico"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Visualization of Bulk RNA-seq" href="t_visualize_bulk.html" />
+    <link rel="prev" title="Visualization &amp; Plotting" href="../tutorials/index_plotting.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/logo.png" class="logo__image only-light" alt="omicverse - Home"/>
+    <script>document.write(`<img src="../_static/logo.png" class="logo__image only-dark" alt="omicverse - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../index.html">
+                    OmicVerse Documentation
+                </a>
+            </li>
+        </ul>
+        <ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../Installation_guild.html">OmicVerse Installation Guide</a></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../tutorials/index.html">Tutorials</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_bulk.html">Bulk RNA-seq</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_upstream.html">Upstream</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_mapping_STAR.html">Bulk RNA-seq mapping with STAR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_mapping_kbpython.html">Bulk RNA-seq mapping with kb-python</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_preprocessing.html">Preprocessing</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_bulk_combat.html">Batch correction in Bulk RNA-seq or microarray data</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_downstream.html">Downstream</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_deg.html">Different Expression Analysis</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_deseq2.html">Different Expression Analysis with DEseq2</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_network.html">Protein-Protein interaction (PPI) analysis by String-db</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_wgcna.html">WGCNA (Weighted gene co-expression network analysis) analysis</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_deconvolution.html">Deconvolution</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_decov_bulk.html">Bulk deconvolution with reference scRNA-seq</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_others.html">Others</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_tcga.html">TCGA database preprocess</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_metabol.html">Metabolomics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_01_intro.html">Metabolomics preprocessing and univariate statistics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_02_multivariate.html">Multivariate discrimination with PLS-DA and OPLS-DA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_03_pathway.html">Metabolite-set enrichment analysis (MSEA)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_04_untargeted.html">Untargeted LC-MS and mummichog pathway inference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_05_lipidomics.html">Lipidomics with LIPID MAPS and LION</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_06_batch_correction.html">Batch effect and drift correction for LC-MS</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_07_multifactor.html">Multi-factor designs — ASCA and linear mixed models</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_08_biomarker.html">Biomarker discovery — univariate AUC + multivariate panel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_09_dgca.html">Differential correlation — DGCA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_10_multiomics.html">Multi-omics integration — metabolomics + RNA-seq with MOFA</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_microbiome.html">Microbiome</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-microbiome/t_16s_amplicon.html">16S rRNA amplicon analysis with OmicVerse</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-microbiome/t_16s_phylogeny.html">16S phylogeny: MAFFT → FastTree → Faith PD + UniFrac</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-microbiome/t_16s_dada2.html">DADA2 backend: pure-Python ASV inference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-microbiome/t_16s_da_comparison.html">Differential abundance: Wilcoxon vs DESeq2 vs ANCOM-BC</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_single.html">Single-Cell RNA-seq</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_alignment.html">Alignment</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_alignment_1k.html">Alignment and analysis of single-cell RNA-seq data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_alignment_velocity.html">Alignment and RNA velocity analysis of single-cell RNA-seq data.</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_preprocessing.html">Preprocessing</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_preprocess_cpu.html">Preprocessing the data of scRNA-seq with omicverse[CPU-GPU-mixed]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_preprocess_gpu.html">Preprocessing the data of scRNA-seq with omicverse[GPU]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_preprocess_rust.html">Preprocessing the data of scRNA-seq [Rust / out-of-memory]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cluster.html">Clustering space</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_single_batch.html">Data integration and batch correction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cnmf.html">GeneModule Identified</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_lazy.html">Lazy analysis of scRNA-seq</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_annotation.html">Annotation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_anno_noref.html">Reference-free automated single-cell cell type annotation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_anno_ref.html">Reference automated single-cell cell type annotation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_gptanno.html">Automatic cell type annotation with GPT/Other</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cellmatch.html">Mapping Cell Names to the Cell Ontology/Taxonomy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cellanno.html">Celltype auto annotation with SCSA</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_metatime.html">Celltype auto annotation with MetaTiME</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_tosica.html">Celltype annotation migration(mapping) with TOSICA</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_scmulan.html">Using scMulan to annotate cell types in Heart, Lung, Liver, Bone marrow, Blood, Brain, and Thymus</a></li>
+
+
+
+
+
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cellvote.html">Consensus annotation with CellVote</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_trajectory.html">Trajectory</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cytotrace.html">Prediction of absolute developmental potential using CytoTrace2</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_traj.html">Basic Trajectory Inference</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_stavia.html">Trajectory Inference with StaVIA</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cellfate_gene.html">Timing-associated genes analysis with TimeFateKernel</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cellfate.html">Identify the driver regulators of cell fate decisions</a></li>
+
+
+
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_cell_structure.html">Cell Structure</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_metacells.html">Inference of MetaCell from Single-Cell RNA-seq</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_deg_single.html">Differential expression and celltype analysis [All Cell]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_scdeg.html">Differential expression analysis [Meta Cell]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_scenic.html">Gene Regulatory Network Analysis with SCENIC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_aucell.html">Pathway analysis with AUCell</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_cellphonedb.html">Cell-cell communication with CellPhoneDB</a></li>
+
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_scdrug.html">Drug response predict with scDrug</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_simba.html">Data integration and batch correction with SIMBA</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_velocity.html">Velocity</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-velo/t_velo.html">Velocity Basic Calculation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-velo/t_graphvelo.html">Velocity Optimization</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_multi_omics.html">Multi-omics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_mofa.html">Multi omics analysis by MOFA</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_mofa_glue.html">Multi omics analysis by MOFA and GLUE</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-single/t_anno_trans.html">Celltype annotation transfer in multi-omics</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_multi_omics.html">Multi-Omics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-Multi-Omics/bulk-single/t_bulktrajblend.html">Bulk RNA-seq generate ‘interrupted’ cells to interpolate scRNA-seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-Multi-Omics/bulk-single/t_bulk2single.html">Bulk RNA-seq to Single RNA-seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-Multi-Omics/bulk-single/t_single2spatial.html">Single RNA-seq to Spatial RNA-seq</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_spatial.html">Spatial Transcriptomics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_spatial_preprocessing.html">Preprocessing</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_crop_rotate.html">Crop and Rotation of spatial transcriptomic data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_cellpose.html">Cell Segmemtation (10x HD)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_nanostring_preprocess.html">Analyze NanoString data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_xenium_preprocess.html">Analyze Xenium data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_visium_hd_preprocess.html">Analyze Visium HD data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_staligner.html">Spatial integration and clustering</a></li>
+
+
+
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_spatial_clustering.html">Clustering</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/cluster/t_cluster_graphst.html">Spatial clustering with GraphST + pymclustR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/cluster/t_cluster_binary.html">Spatial clustering with BINARY + pymclustR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/cluster/t_cluster_stagate.html">Spatial clustering with STAGATE + pymclustR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/cluster/t_cluster_cast.html">Spatial clustering with CAST + pymclustR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/cluster/t_cluster_banksy.html">Spatial clustering with BANKSY + pymclustR</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_spatial_deconvolution.html">Deconvolution</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_spaceflow.html">Identifying Pseudo-Spatial Map</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_decov.html">Spatial deconvolution with reference scRNA-seq</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_flashdeconv.html">FlashDeconv: Fast Spatial Deconvolution via Structure-Preserving Sketching</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_starfysh_new.html">Spatial deconvolution without reference scRNA-seq</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_spatial_downstream.html">Downstream</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_stt.html">Spatial transition tensor of single cells</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_commot_flowsig.html">Spatial Communication</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_gaston.html">Spatial IsoDepth Calculation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_slat.html">Single cell spatial alignment tools</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_foundation.html">Foundation Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_overview.html">Overview</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_guide.html">ov.fm — Foundation Model Module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm.html">ov.fm — Unified Foundation Model API</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_skill_ready.html">Skill-Ready Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scgpt_guide.html">scGPT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_scgpt.html">scGPT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_geneformer_guide.html">Geneformer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_geneformer.html">GeneFormer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_uce_guide.html">UCE</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_uce.html">UCE</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scfoundation_guide.html">scFoundation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_scfoundation.html">scFoundation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_cellplm_guide.html">CellPLM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_cellplm.html">CellPLM</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_core.html">Core Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scbert_guide.html">scBERT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_genecompass_guide.html">GeneCompass</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_nicheformer_guide.html">Nicheformer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scmulan_guide.html">scMulan</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_specialized.html">Specialized Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_tgpt_guide.html">tGPT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_cellfm_guide.html">CellFM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_sccello_guide.html">scCello</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scprint_guide.html">scPRINT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_aidocell_guide.html">AIDO.Cell</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_pulsar_guide.html">PULSAR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_tabula_guide.html">Tabula</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_domain.html">Domain-Specific Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_atacformer_guide.html">ATACformer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scplantllm_guide.html">scPlantLLM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_langcell_guide.html">LangCell</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_cell2sentence_guide.html">Cell2Sentence</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_genept_guide.html">GenePT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_chatcell_guide.html">ChatCell</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="../tutorials/index_plotting.html">Visualization &amp; Plotting</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3 current active"><a class="current reference internal" href="#">Visualization of single cell RNA-seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="t_visualize_bulk.html">Visualization of Bulk RNA-seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="t_palette.html">Palette optimization for publication-quality single-cell &amp; spatial plots</a></li>
+<li class="toctree-l3"><a class="reference internal" href="t_publication_plotting.html">Scientific plotting for publication with OmicVerse</a></li>
+<li class="toctree-l3"><a class="reference internal" href="t_visualize_colorsystem.html">Color system</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../omicclaw/index.html">OmicClaw</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../omicclaw/index_gateway.html">Gateway and Channels</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_msg_bot_overview.html">OmicClaw Gateway Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_setup_auth.html">OmicClaw Setup and Auth</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_channel_telegram.html">OmicClaw Telegram Tutorial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_channel_feishu.html">OmicClaw Feishu 教程</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_channel_imessage.html">OmicClaw iMessage Tutorial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_channel_qq.html">OmicClaw QQ Tutorial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_session_commands.html">OmicClaw Session Workflow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_troubleshooting.html">OmicClaw Troubleshooting</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../omicclaw/index_mcp.html">MCP Server</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_guide.html">OmicVerse MCP Server</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_quickstart.html">OmicVerse MCP Quick Start</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_full_start.html">OmicVerse MCP Full Start</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_tools.html">OmicVerse MCP Tool Catalog</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_clients.html">OmicVerse MCP Clients and Deployment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_runtime.html">OmicVerse MCP Runtime and Troubleshooting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_reference.html">OmicVerse MCP Reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_claude_code.html">Using OmicVerse MCP with Claude Code — Step by Step</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../omicclaw/index_notebooks.html">General Notebooks</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_ov_agent_pbmc3k.html">J.A.R.V.I.S. with PBMC3k</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/ov_agent_ten_task_suite.html">J.A.R.V.I.S. with Ten-Task Suite</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../api/index.html">API Reference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../api/user.html">User API</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.generate_reference_table.html">omicverse.generate_reference_table</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.settings.cpu_gpu_mixed_init.html">omicverse.settings.cpu_gpu_mixed_init</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.settings.gpu_init.html">omicverse.settings.gpu_init</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.load.html">omicverse.io.load</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read.html">omicverse.io.read</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_10x_h5.html">omicverse.io.read_10x_h5</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_10x_mtx.html">omicverse.io.read_10x_mtx</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_csv.html">omicverse.io.read_csv</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_h5ad.html">omicverse.io.read_h5ad</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_nanostring.html">omicverse.io.read_nanostring</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_visium_hd.html">omicverse.io.read_visium_hd</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_visium_hd_bin.html">omicverse.io.read_visium_hd_bin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_visium_hd_seg.html">omicverse.io.read_visium_hd_seg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_xenium.html">omicverse.io.read_xenium</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.save.html">omicverse.io.save</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.spatial.read_visium.html">omicverse.io.spatial.read_visium</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.bulk_rnaseq_pipeline.html">omicverse.alignment.bulk_rnaseq_pipeline</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.count.html">omicverse.alignment.count</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.fastp.html">omicverse.alignment.fastp</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.featureCount.html">omicverse.alignment.featureCount</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.fqdump.html">omicverse.alignment.fqdump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.parallel_fastq_dump.html">omicverse.alignment.parallel_fastq_dump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.prefetch.html">omicverse.alignment.prefetch</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.ref.html">omicverse.alignment.ref</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.STAR.html">omicverse.alignment.STAR</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.anndata_to_CPU.html">omicverse.pp.anndata_to_CPU</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.anndata_to_GPU.html">omicverse.pp.anndata_to_GPU</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.binary_search.html">omicverse.pp.binary_search</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.filter_cells.html">omicverse.pp.filter_cells</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.filter_genes.html">omicverse.pp.filter_genes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.highly_variable_features.html">omicverse.pp.highly_variable_features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.highly_variable_genes.html">omicverse.pp.highly_variable_genes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.identify_robust_genes.html">omicverse.pp.identify_robust_genes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.leiden.html">omicverse.pp.leiden</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.log1p.html">omicverse.pp.log1p</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.louvain.html">omicverse.pp.louvain</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.mde.html">omicverse.pp.mde</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.neighbors.html">omicverse.pp.neighbors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.normalize_pearson_residuals.html">omicverse.pp.normalize_pearson_residuals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.pca.html">omicverse.pp.pca</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.preprocess.html">omicverse.pp.preprocess</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.qc.html">omicverse.pp.qc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.recover_counts.html">omicverse.pp.recover_counts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.regress.html">omicverse.pp.regress</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.regress_and_scale.html">omicverse.pp.regress_and_scale</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.remove_cc_genes.html">omicverse.pp.remove_cc_genes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.scale.html">omicverse.pp.scale</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.score_genes_cell_cycle.html">omicverse.pp.score_genes_cell_cycle</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.scrublet.html">omicverse.pp.scrublet</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.scrublet_simulate_doublets.html">omicverse.pp.scrublet_simulate_doublets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.select_hvf_pegasus.html">omicverse.pp.select_hvf_pegasus</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.sude.html">omicverse.pp.sude</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.tsne.html">omicverse.pp.tsne</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.umap.html">omicverse.pp.umap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Annotation.html">omicverse.single.Annotation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.AnnotationRef.html">omicverse.single.AnnotationRef</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.autoResolution.html">omicverse.single.autoResolution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.batch_correction.html">omicverse.single.batch_correction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.CellOntologyMapper.html">omicverse.single.CellOntologyMapper</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.CellVote.html">omicverse.single.CellVote</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.cNMF.html">omicverse.single.cNMF</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.convert_human_to_mouse_network.html">omicverse.single.convert_human_to_mouse_network</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.cosg.html">omicverse.single.cosg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.cytotrace2.html">omicverse.single.cytotrace2</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.DCT.html">omicverse.single.DCT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.DEG.html">omicverse.single.DEG</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.download_cl.html">omicverse.single.download_cl</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Drug_Response.html">omicverse.single.Drug_Response</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.dynamic_features.html">omicverse.single.dynamic_features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.factor_correlation.html">omicverse.single.factor_correlation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.factor_exact.html">omicverse.single.factor_exact</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Fate.html">omicverse.single.Fate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.find_markers.html">omicverse.single.find_markers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.gene_trends.html">omicverse.single.gene_trends</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.generate_scRNA_report.html">omicverse.single.generate_scRNA_report</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.geneset_aucell.html">omicverse.single.geneset_aucell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_celltype_marker.html">omicverse.single.get_celltype_marker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_cluster_celltype.html">omicverse.single.get_cluster_celltype</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_markers.html">omicverse.single.get_markers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_obs_value.html">omicverse.single.get_obs_value</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_weights.html">omicverse.single.get_weights</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.GLUE_pair.html">omicverse.single.GLUE_pair</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.gptcelltype.html">omicverse.single.gptcelltype</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.gptcelltype_local.html">omicverse.single.gptcelltype_local</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.lazy.html">omicverse.single.lazy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.load_human_prior_interaction_network.html">omicverse.single.load_human_prior_interaction_network</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.MetaCell.html">omicverse.single.MetaCell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.MetaTiME.html">omicverse.single.MetaTiME</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Monocle.html">omicverse.single.Monocle</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.mouse_hsc_nestorowa16.html">omicverse.single.mouse_hsc_nestorowa16</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pathway_aucell.html">omicverse.single.pathway_aucell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pathway_aucell_enrichment.html">omicverse.single.pathway_aucell_enrichment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pathway_enrichment.html">omicverse.single.pathway_enrichment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pathway_enrichment_plot.html">omicverse.single.pathway_enrichment_plot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.plot_metacells.html">omicverse.single.plot_metacells</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pyCEFCON.html">omicverse.single.pyCEFCON</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pyMOFA.html">omicverse.single.pyMOFA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pyMOFAART.html">omicverse.single.pyMOFAART</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pySCSA.html">omicverse.single.pySCSA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pySIMBA.html">omicverse.single.pySIMBA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pyTOSICA.html">omicverse.single.pyTOSICA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.run_cellphonedb_v5.html">omicverse.single.run_cellphonedb_v5</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.scanpy_cellanno_from_dict.html">omicverse.single.scanpy_cellanno_from_dict</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.SCENIC.html">omicverse.single.SCENIC</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.TrajInfer.html">omicverse.single.TrajInfer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Velo.html">omicverse.single.Velo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.batch_correction.html">omicverse.bulk.batch_correction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.Deconvolution.html">omicverse.bulk.Deconvolution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.geneset_enrichment.html">omicverse.bulk.geneset_enrichment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.geneset_plot.html">omicverse.bulk.geneset_plot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.geneset_plot_multi.html">omicverse.bulk.geneset_plot_multi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.Matrix_ID_mapping.html">omicverse.bulk.Matrix_ID_mapping</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.pyDEG.html">omicverse.bulk.pyDEG</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.pyGSEA.html">omicverse.bulk.pyGSEA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.pyPPI.html">omicverse.bulk.pyPPI</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.pyTCGA.html">omicverse.bulk.pyTCGA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.string_interaction.html">omicverse.bulk.string_interaction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.bin2cell.html">omicverse.space.bin2cell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.Cal_Spatial_Net.html">omicverse.space.Cal_Spatial_Net</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.calculate_gene_signature.html">omicverse.space.calculate_gene_signature</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.CAST.html">omicverse.space.CAST</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.cellcharter.html">omicverse.space.cellcharter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.CellLoc.html">omicverse.space.CellLoc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.CellMap.html">omicverse.space.CellMap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.clusters.html">omicverse.space.clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.create_communication_anndata.html">omicverse.space.create_communication_anndata</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.crop_space_visium.html">omicverse.space.crop_space_visium</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.Deconvolution.html">omicverse.space.Deconvolution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.GASTON.html">omicverse.space.GASTON</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.map_spatial_auto.html">omicverse.space.map_spatial_auto</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.map_spatial_manual.html">omicverse.space.map_spatial_manual</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.merge_cluster.html">omicverse.space.merge_cluster</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.moranI.html">omicverse.space.moranI</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.pySpaceFlow.html">omicverse.space.pySpaceFlow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.pySTAGATE.html">omicverse.space.pySTAGATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.pySTAligner.html">omicverse.space.pySTAligner</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.read_visium_10x.html">omicverse.space.read_visium_10x</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.rotate_space_visium.html">omicverse.space.rotate_space_visium</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.salvage_secondary_labels.html">omicverse.space.salvage_secondary_labels</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.spatial_autocorr.html">omicverse.space.spatial_autocorr</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.spatial_neighbors.html">omicverse.space.spatial_neighbors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.STT.html">omicverse.space.STT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.svg.html">omicverse.space.svg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.sync_visium_hd_seg_geometries.html">omicverse.space.sync_visium_hd_seg_geometries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.Tangram.html">omicverse.space.Tangram</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.update_classification_from_database.html">omicverse.space.update_classification_from_database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.visium_10x_hd_cellpose_expand.html">omicverse.space.visium_10x_hd_cellpose_expand</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.visium_10x_hd_cellpose_gex.html">omicverse.space.visium_10x_hd_cellpose_gex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.visium_10x_hd_cellpose_he.html">omicverse.space.visium_10x_hd_cellpose_he</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.Bulk2Single.html">omicverse.bulk2single.Bulk2Single</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.bulk2single_plot_cellprop.html">omicverse.bulk2single.bulk2single_plot_cellprop</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.bulk2single_plot_correlation.html">omicverse.bulk2single.bulk2single_plot_correlation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.BulkTrajBlend.html">omicverse.bulk2single.BulkTrajBlend</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.Single2Spatial.html">omicverse.bulk2single.Single2Spatial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.add_density_contour.html">omicverse.pl.add_density_contour</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.add_palue.html">omicverse.pl.add_palue</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.add_pie2spatial.html">omicverse.pl.add_pie2spatial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.add_streamplot.html">omicverse.pl.add_streamplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.bardotplot.html">omicverse.pl.bardotplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.boxplot.html">omicverse.pl.boxplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.calculate_gene_density.html">omicverse.pl.calculate_gene_density</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ccc_heatmap.html">omicverse.pl.ccc_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ccc_network_plot.html">omicverse.pl.ccc_network_plot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ccc_stat_plot.html">omicverse.pl.ccc_stat_plot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.cell_cor_heatmap.html">omicverse.pl.cell_cor_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.CellChatViz.html">omicverse.pl.CellChatViz</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.cellproportion.html">omicverse.pl.cellproportion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.complexheatmap.html">omicverse.pl.complexheatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.contour.html">omicverse.pl.contour</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ConvexHull.html">omicverse.pl.ConvexHull</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.create_custom_colormap.html">omicverse.pl.create_custom_colormap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.dotplot.html">omicverse.pl.dotplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.dynamic_heatmap.html">omicverse.pl.dynamic_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.dynamic_trends.html">omicverse.pl.dynamic_trends</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding.html">omicverse.pl.embedding</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding_adjust.html">omicverse.pl.embedding_adjust</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding_atlas.html">omicverse.pl.embedding_atlas</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding_celltype.html">omicverse.pl.embedding_celltype</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding_density.html">omicverse.pl.embedding_density</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.feature_heatmap.html">omicverse.pl.feature_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ForbiddenCity.html">omicverse.pl.ForbiddenCity</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.gen_mpl_labels.html">omicverse.pl.gen_mpl_labels</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.geneset_wordcloud.html">omicverse.pl.geneset_wordcloud</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.group_heatmap.html">omicverse.pl.group_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.marker_heatmap.html">omicverse.pl.marker_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.markers_dotplot.html">omicverse.pl.markers_dotplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.palette.html">omicverse.pl.palette</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_cellproportion.html">omicverse.pl.plot_cellproportion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_embedding_celltype.html">omicverse.pl.plot_embedding_celltype</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_flowsig_network.html">omicverse.pl.plot_flowsig_network</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_grouped_fractions.html">omicverse.pl.plot_grouped_fractions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_pca_variance_ratio.html">omicverse.pl.plot_pca_variance_ratio</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_set.html">omicverse.pl.plot_set</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_spatial.html">omicverse.pl.plot_spatial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_text_set.html">omicverse.pl.plot_text_set</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.rank_genes_groups_dotplot.html">omicverse.pl.rank_genes_groups_dotplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.single_group_boxplot.html">omicverse.pl.single_group_boxplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.tsne.html">omicverse.pl.tsne</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.umap.html">omicverse.pl.umap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.venn.html">omicverse.pl.venn</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.violin.html">omicverse.pl.violin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.volcano.html">omicverse.pl.volcano</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.bhattacherjee.html">omicverse.datasets.bhattacherjee</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.blobs.html">omicverse.datasets.blobs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.bm.html">omicverse.datasets.bm</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.bone_marrow.html">omicverse.datasets.bone_marrow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.burczynski06.html">omicverse.datasets.burczynski06</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.chromaffin.html">omicverse.datasets.chromaffin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.cite_seq.html">omicverse.datasets.cite_seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.create_mock_dataset.html">omicverse.datasets.create_mock_dataset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.decov_bulk_covid_bulk.html">omicverse.datasets.decov_bulk_covid_bulk</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.decov_bulk_covid_single.html">omicverse.datasets.decov_bulk_covid_single</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.dentate_gyrus.html">omicverse.datasets.dentate_gyrus</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.dentate_gyrus_scvelo.html">omicverse.datasets.dentate_gyrus_scvelo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.download_data.html">omicverse.datasets.download_data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.download_data_requests.html">omicverse.datasets.download_data_requests</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.get_adata.html">omicverse.datasets.get_adata</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.gillespie.html">omicverse.datasets.gillespie</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.haber.html">omicverse.datasets.haber</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.hematopoiesis.html">omicverse.datasets.hematopoiesis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.hematopoiesis_raw.html">omicverse.datasets.hematopoiesis_raw</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.hg_forebrain_glutamatergic.html">omicverse.datasets.hg_forebrain_glutamatergic</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.hl60.html">omicverse.datasets.hl60</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.human_tfs.html">omicverse.datasets.human_tfs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.krumsiek11.html">omicverse.datasets.krumsiek11</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.moignard15.html">omicverse.datasets.moignard15</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.multi_brain_5k.html">omicverse.datasets.multi_brain_5k</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.nascseq.html">omicverse.datasets.nascseq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.pancreas_cellrank.html">omicverse.datasets.pancreas_cellrank</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.pancreatic_endocrinogenesis.html">omicverse.datasets.pancreatic_endocrinogenesis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.paul15.html">omicverse.datasets.paul15</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.pbmc3k.html">omicverse.datasets.pbmc3k</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.pbmc8k.html">omicverse.datasets.pbmc8k</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.sc_ref_Lymph_Node.html">omicverse.datasets.sc_ref_Lymph_Node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.sceu_seq_organoid.html">omicverse.datasets.sceu_seq_organoid</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.sceu_seq_rpe1.html">omicverse.datasets.sceu_seq_rpe1</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.scifate.html">omicverse.datasets.scifate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.scnt_seq_neuron_labeling.html">omicverse.datasets.scnt_seq_neuron_labeling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.scnt_seq_neuron_splicing.html">omicverse.datasets.scnt_seq_neuron_splicing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.scslamseq.html">omicverse.datasets.scslamseq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.seqfish.html">omicverse.datasets.seqfish</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.toggleswitch.html">omicverse.datasets.toggleswitch</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.zebrafish.html">omicverse.datasets.zebrafish</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.external.GraphST.html">omicverse.external.GraphST</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.call_tool.html">omicverse.utils.biocontext.call_tool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.get_ensembl_id.html">omicverse.utils.biocontext.get_ensembl_id</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.get_fulltext.html">omicverse.utils.biocontext.get_fulltext</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.get_uniprot_id.html">omicverse.utils.biocontext.get_uniprot_id</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.list_tools.html">omicverse.utils.biocontext.list_tools</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_alphafold.html">omicverse.utils.biocontext.query_alphafold</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_cell_ontology.html">omicverse.utils.biocontext.query_cell_ontology</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_chebi.html">omicverse.utils.biocontext.query_chebi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_efo.html">omicverse.utils.biocontext.query_efo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_go.html">omicverse.utils.biocontext.query_go</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_hpa.html">omicverse.utils.biocontext.query_hpa</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_interpro.html">omicverse.utils.biocontext.query_interpro</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_opentargets.html">omicverse.utils.biocontext.query_opentargets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_panglaodb.html">omicverse.utils.biocontext.query_panglaodb</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_reactome.html">omicverse.utils.biocontext.query_reactome</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_string.html">omicverse.utils.biocontext.query_string</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_uniprot.html">omicverse.utils.biocontext.query_uniprot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_clinical_trials.html">omicverse.utils.biocontext.search_clinical_trials</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_drugs.html">omicverse.utils.biocontext.search_drugs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_interpro.html">omicverse.utils.biocontext.search_interpro</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_literature.html">omicverse.utils.biocontext.search_literature</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_preprints.html">omicverse.utils.biocontext.search_preprints</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_pride.html">omicverse.utils.biocontext.search_pride</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.cal_paga.html">omicverse.utils.cal_paga</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.cluster.html">omicverse.utils.cluster</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert2gene_id.html">omicverse.utils.convert2gene_id</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert2gene_symbol.html">omicverse.utils.convert2gene_symbol</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert2symbol.html">omicverse.utils.convert2symbol</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert_adata_for_rust.html">omicverse.utils.convert_adata_for_rust</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert_to_pandas.html">omicverse.utils.convert_to_pandas</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_CaDRReS_model.html">omicverse.utils.download_CaDRReS_model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_GDSC_data.html">omicverse.utils.download_GDSC_data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_geneid_annotation_pair.html">omicverse.utils.download_geneid_annotation_pair</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_pathway_database.html">omicverse.utils.download_pathway_database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_tosica_gmt.html">omicverse.utils.download_tosica_gmt</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.geneset_prepare.html">omicverse.utils.geneset_prepare</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.get_gene_annotation.html">omicverse.utils.get_gene_annotation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.gtf_to_pair_tsv.html">omicverse.utils.gtf_to_pair_tsv</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.LDA_topic.html">omicverse.utils.LDA_topic</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.mde.html">omicverse.utils.mde</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.plot_paga.html">omicverse.utils.plot_paga</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.refine_label.html">omicverse.utils.refine_label</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.retrieve_layers.html">omicverse.utils.retrieve_layers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.roe.html">omicverse.utils.roe</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.store_layers.html">omicverse.utils.store_layers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.symbol2id.html">omicverse.utils.symbol2id</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.weighted_knn_trainer.html">omicverse.utils.weighted_knn_trainer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.weighted_knn_transfer.html">omicverse.utils.weighted_knn_transfer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.wrap_dataframe.html">omicverse.utils.wrap_dataframe</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../Release_notes.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../Developer_guild.html">Developer guild</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../GPU_supported_registry_functions.html">Registered Functions — GPU Support Overview</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/Starlitnightly/omicverse/discussions">Discussion</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/Starlitnightly/omicverse">GitHub</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/Starlitnightly/omicverse" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/Starlitnightly/omicverse/blob/master/docs/Tutorials-plotting/t_visualize_single.ipynb?plain=1" target="_blank"
+   class="btn btn-sm btn-source-file-button dropdown-item"
+   title="Show source"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-code"></i>
+  </span>
+<span class="btn__text-container">Show source</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/Starlitnightly/omicverse/edit/master/docs/Tutorials-plotting/t_visualize_single.ipynb" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/Starlitnightly/omicverse/issues/new?title=Issue%20on%20page%20%2FTutorials-plotting/t_visualize_single.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/Tutorials-plotting/t_visualize_single.ipynb" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.ipynb</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Visualization of single cell RNA-seq</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#optimizing-color-mapping">Optimizing color mapping</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#stacked-histogram-of-cell-proportions">Stacked histogram of cell proportions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#a-collection-of-some-interesting-embedded-plot">A collection of some interesting embedded plot</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#visualizing-gene-density-in-spatial-transcriptomics">Visualizing Gene Density in Spatial Transcriptomics</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#bar-graph-with-overlapping-dots-bar-dot-plot">Bar graph with overlapping dots (Bar-dot) plot</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#boxplot-with-jitter-points">Boxplot with jitter points</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#dotplot">Dotplot</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#marker-gene-plot">Marker gene plot</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#beautiful-umap">Beautiful UMAP</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="visualization-of-single-cell-rna-seq">
+<h1>Visualization of single cell RNA-seq<a class="headerlink" href="#visualization-of-single-cell-rna-seq" title="Link to this heading">#</a></h1>
+<p>In this part, we will introduce the tutorial of special plot of <code class="docutils literal notranslate"><span class="pre">omicverse</span></code>.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">omicverse</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ov</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">style</span><span class="p">(</span><span class="n">font_path</span><span class="o">=</span><span class="s1">&#39;Arial&#39;</span><span class="p">)</span>
+
+<span class="c1"># Enable auto-reload for development</span>
+<span class="o">%</span><span class="k">load_ext</span> autoreload
+<span class="o">%</span><span class="k">autoreload</span> 2
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>🔬 Starting plot initialization...
+Using already downloaded Arial font from: /var/folders/4m/2xw3_2s503s9r616083n7w440000gn/T/omicverse_arial.ttf
+Registered as: Arial
+🧬 Detecting GPU devices…
+✅ Apple Silicon MPS detected
+    • [MPS] Apple Silicon GPU - Metal Performance Shaders available
+
+   ____            _     _    __                  
+  / __ \____ ___  (_)___| |  / /__  _____________ 
+ / / / / __ `__ \/ / ___/ | / / _ \/ ___/ ___/ _ \ 
+/ /_/ / / / / / / / /__ | |/ /  __/ /  (__  )  __/ 
+\____/_/ /_/ /_/_/\___/ |___/\___/_/  /____/\___/                                              
+
+🔖 Version: 1.7.10rc1   📚 Tutorials: https://omicverse.readthedocs.io/
+✅ plot_set complete.
+</pre></div>
+</div>
+</div>
+</div>
+<p>We utilized single-cell RNA-seq data (GEO accession: GSE95753) obtained from the dentate gyrus of the hippocampus in mouse.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#import scvelo as scv</span>
+<span class="c1">#adata = scv.datasets.dentategyrus()</span>
+<span class="c1">#adata = scv.datasets.dentategyrus()</span>
+<span class="n">adata</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">datasets</span><span class="o">.</span><span class="n">dentate_gyrus_scvelo</span><span class="p">()</span>
+<span class="n">adata</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Using Stanford mirror for dentategyrus_scv
+⚠️ File ./data/dentategyrus_scv.h5ad already exists
+ Loading data from ./data/dentategyrus_scv.h5ad
+✅ Successfully loaded: 2930 cells × 13913 genes
+</pre></div>
+</div>
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>AnnData object with n_obs × n_vars = 2930 × 13913
+    obs: &#39;clusters&#39;, &#39;age(days)&#39;, &#39;clusters_enlarged&#39;
+    uns: &#39;clusters_colors&#39;
+    obsm: &#39;X_umap&#39;
+    layers: &#39;ambiguous&#39;, &#39;spliced&#39;, &#39;unspliced&#39;
+</pre></div>
+</div>
+</div>
+</div>
+<section id="optimizing-color-mapping">
+<h2>Optimizing color mapping<a class="headerlink" href="#optimizing-color-mapping" title="Link to this heading">#</a></h2>
+<p>Visualizing spatially resolved biological data with appropriate color mapping can significantly facilitate the exploration of underlying patterns and heterogeneity. Spaco (spatial colorization) provides a spatially constrained approach that generates discriminate color assignments for visualizing single-cell spatial data in various scenarios.</p>
+<p>Jing Z, Zhu Q, Li L, Xie Y, Wu X, Fang Q, et al. <a class="reference external" href="https://doi.org/10.1016/j.patter.2023.100915">Spaco: A comprehensive tool for coloring spatial data at single-cell resolution.</a> Patterns. 2024;100915</p>
+<p><strong>Function</strong>: <code class="docutils literal notranslate"><span class="pre">ov.pl.optim_palette</span></code>:</p>
+<ul class="simple">
+<li><p>adata: the datasets of scRNA-seq</p></li>
+<li><p>basis: he position on the plane should be set to <code class="docutils literal notranslate"><span class="pre">X_spatial</span></code> in spatial RNA-seq, <code class="docutils literal notranslate"><span class="pre">X_umap</span></code>,<code class="docutils literal notranslate"><span class="pre">X_tsne</span></code>,<code class="docutils literal notranslate"><span class="pre">X_mde</span></code> in scRNA-seq and should not be set to <code class="docutils literal notranslate"><span class="pre">X_pca</span></code></p></li>
+<li><p>colors: Specify the colour to be optimised, which should be for one of the columns in adata.obs, noting that it should have the colour first, and that we can use ov.pl.embedding to colour the cell types. If there is no colour then colour blind optimisation colour will be used.</p></li>
+<li><p>palette: You can also re-specify the colour bar that needs to be drawn, just set <code class="docutils literal notranslate"><span class="pre">palette=['#FFFFFF','#000000']</span></code>, we have prepared <code class="docutils literal notranslate"><span class="pre">ov.pl.red_color</span></code>,<code class="docutils literal notranslate"><span class="pre">ov.pl.blue_color</span></code>,<code class="docutils literal notranslate"><span class="pre">ov.pl.green_color</span></code>,<code class="docutils literal notranslate"><span class="pre">ov.pl.orange_color</span></code>, by default.</p></li>
+</ul>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#optim_palette=ov.pl.optim_palette(adata,basis=&#39;X_umap&#39;,colors=&#39;clusters&#39;)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span><span class="n">ax</span><span class="o">=</span><span class="n">ov</span><span class="o">.</span><span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span> <span class="o">=</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">4</span><span class="p">))</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span>
+    <span class="n">adata</span><span class="p">,</span>
+    <span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="s1">&#39;clusters&#39;</span><span class="p">,</span>
+    <span class="n">frameon</span><span class="o">=</span><span class="s1">&#39;small&#39;</span><span class="p">,</span>
+    <span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="c1">#palette=optim_palette,</span>
+    <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;Cell Type of DentateGyrus&#39;</span><span class="p">,</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">15</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Text(0.5, 1.0, &#39;Cell Type of DentateGyrus&#39;)
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/45c2eaa0092ae1c27e73ad133888d5db6c277ea6d6908f4f5344b2beca5c7ef2.png"><img alt="../_images/45c2eaa0092ae1c27e73ad133888d5db6c277ea6d6908f4f5344b2beca5c7ef2.png" src="../_images/45c2eaa0092ae1c27e73ad133888d5db6c277ea6d6908f4f5344b2beca5c7ef2.png" style="width: 407px; height: 309px;" />
+</a>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span>
+    <span class="n">adata</span><span class="p">,</span>
+    <span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="s1">&#39;age(days)&#39;</span><span class="p">,</span>
+    <span class="n">frameon</span><span class="o">=</span><span class="s1">&#39;small&#39;</span><span class="p">,</span>
+    <span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;Axes: title={&#39;center&#39;: &#39;age(days)&#39;}, xlabel=&#39;X_umap1&#39;, ylabel=&#39;X_umap2&#39;&gt;
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/2ce1a54cbe0cb1bf97a03ebbee78d8284af23940ffec0f7a5cae91199b08fe04.png"><img alt="../_images/2ce1a54cbe0cb1bf97a03ebbee78d8284af23940ffec0f7a5cae91199b08fe04.png" src="../_images/2ce1a54cbe0cb1bf97a03ebbee78d8284af23940ffec0f7a5cae91199b08fe04.png" style="width: 308px; height: 284px;" />
+</a>
+</div>
+</div>
+</section>
+<section id="stacked-histogram-of-cell-proportions">
+<h2>Stacked histogram of cell proportions<a class="headerlink" href="#stacked-histogram-of-cell-proportions" title="Link to this heading">#</a></h2>
+<p>This is a graph that appears widely in various CNS-level journals, and is limited to the fact that <code class="docutils literal notranslate"><span class="pre">scanpy</span></code> does not have a proper way of plotting it, and we provide <code class="docutils literal notranslate"><span class="pre">ov.pl.cellproportion</span></code> for plotting it here.</p>
+<p><strong>Function</strong>: <code class="docutils literal notranslate"><span class="pre">ov.pl.cellproportion</span></code>:</p>
+<ul class="simple">
+<li><p>adata: the datasets of scRNA-seq</p></li>
+<li><p>celltype_clusters: Specify the colour to plot, which should be for one of the columns in adata.obs, noting that it should have the colour first, and that we can use ov.pl.embedding to colour the cell types. If there is no colour then colour blind optimisation colour will be used.</p></li>
+<li><p>groupby: The group variable for the different groups of cell types we need to display, in this case we are displaying different ages, so we set it to <code class="docutils literal notranslate"><span class="pre">age(days)</span></code></p></li>
+<li><p>groupby_li: If there are too many groups, we can also select the ones we are interested in plotting, here we use groupby_li to plot the groups</p></li>
+<li><p>figsize: If we specify axes, then this variable can be left empty</p></li>
+<li><p>legend: Whether to show a legend</p></li>
+</ul>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="n">fig</span><span class="p">,</span><span class="n">ax</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1.5</span><span class="p">,</span><span class="mi">4</span><span class="p">))</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">cellproportion</span><span class="p">(</span><span class="n">adata</span><span class="o">=</span><span class="n">adata</span><span class="p">,</span><span class="n">celltype_clusters</span><span class="o">=</span><span class="s1">&#39;clusters&#39;</span><span class="p">,</span>
+                    <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;age(days)&#39;</span><span class="p">,</span><span class="n">legend</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/846e3fa8e0f31b76ef97b0e6326747250c63c97613a161793172bfb47411c0f2.png"><img alt="../_images/846e3fa8e0f31b76ef97b0e6326747250c63c97613a161793172bfb47411c0f2.png" src="../_images/846e3fa8e0f31b76ef97b0e6326747250c63c97613a161793172bfb47411c0f2.png" style="width: 267px; height: 309px;" />
+</a>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span><span class="n">ax</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span> <span class="o">=</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">))</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">cellproportion</span><span class="p">(</span><span class="n">adata</span><span class="o">=</span><span class="n">adata</span><span class="p">,</span><span class="n">celltype_clusters</span><span class="o">=</span><span class="s1">&#39;age(days)&#39;</span><span class="p">,</span>
+                    <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;clusters&#39;</span><span class="p">,</span><span class="n">groupby_li</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;nIPC&#39;</span><span class="p">,</span><span class="s1">&#39;Granule immature&#39;</span><span class="p">,</span><span class="s1">&#39;Granule mature&#39;</span><span class="p">],</span>
+                     <span class="n">legend</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/062621d87e0b36b14fae7b307fde187970c0248953ff5bb9567b3705f1e5f7e3.png"><img alt="../_images/062621d87e0b36b14fae7b307fde187970c0248953ff5bb9567b3705f1e5f7e3.png" src="../_images/062621d87e0b36b14fae7b307fde187970c0248953ff5bb9567b3705f1e5f7e3.png" style="width: 223px; height: 279px;" />
+</a>
+</div>
+</div>
+<p>If you are interested in the changes in cell types in different groups, we recommend using a stacked area graph.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span><span class="n">ax</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span> <span class="o">=</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">))</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">cellstackarea</span><span class="p">(</span><span class="n">adata</span><span class="o">=</span><span class="n">adata</span><span class="p">,</span><span class="n">celltype_clusters</span><span class="o">=</span><span class="s1">&#39;age(days)&#39;</span><span class="p">,</span>
+                    <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;clusters&#39;</span><span class="p">,</span><span class="n">groupby_li</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;nIPC&#39;</span><span class="p">,</span><span class="s1">&#39;Granule immature&#39;</span><span class="p">,</span><span class="s1">&#39;Granule mature&#39;</span><span class="p">],</span>
+                     <span class="n">legend</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span><span class="n">legend_awargs</span><span class="o">=</span><span class="p">{})</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>age(days)_colors
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/ba3e16d8bf7ed45a90aabb68b88dd99f9e79a9e10909f2e783eb9d3a66aa0ca6.png"><img alt="../_images/ba3e16d8bf7ed45a90aabb68b88dd99f9e79a9e10909f2e783eb9d3a66aa0ca6.png" src="../_images/ba3e16d8bf7ed45a90aabb68b88dd99f9e79a9e10909f2e783eb9d3a66aa0ca6.png" style="width: 231px; height: 279px;" />
+</a>
+</div>
+</div>
+</section>
+<section id="a-collection-of-some-interesting-embedded-plot">
+<h2>A collection of some interesting embedded plot<a class="headerlink" href="#a-collection-of-some-interesting-embedded-plot" title="Link to this heading">#</a></h2>
+<p>Our first presentation is an embedding map with the number and proportion of cell types. This graph visualises the low-dimensional representation of cells in addition to the number of cell proportions, etc. It should be noted that the cell proportions plotted on the left side may be distorted when there are too many cell types, and we would be grateful if anyone would be interested in fixing this bug.</p>
+<p><strong>Function</strong>: <code class="docutils literal notranslate"><span class="pre">ov.pl.embedding_celltype</span></code>:</p>
+<ul class="simple">
+<li><p>adata: the datasets of scRNA-seq</p></li>
+<li><p>figsize: Note that we don’t usually provide the ax parameter for combinatorial graphs, this is due to the fact that combinatorial graphs are made up of multiple axes, so the figsize parameter is more important, here we set it to <code class="docutils literal notranslate"><span class="pre">figsize=(7,4)</span></code>.</p></li>
+<li><p>basis: he position on the plane should be set to <code class="docutils literal notranslate"><span class="pre">X_spatial</span></code> in spatial RNA-seq, <code class="docutils literal notranslate"><span class="pre">X_umap</span></code>,<code class="docutils literal notranslate"><span class="pre">X_tsne</span></code>,<code class="docutils literal notranslate"><span class="pre">X_mde</span></code> in scRNA-seq and should not be set to <code class="docutils literal notranslate"><span class="pre">X_pca</span></code></p></li>
+<li><p>celltype_key: Specify the colour to be optimised, which should be for one of the columns in adata.obs, noting that it should have the colour first, and that we can use ov.pl.embedding to colour the cell types. If there is no colour then colour blind optimisation colour will be used.</p></li>
+<li><p>title: Note that the space entered in title is used to control the position.</p></li>
+<li><p>celltype_range: Since our number of cell types is different in each data, we want to have the flexibility to control where the cell scale plot is drawn, here we set it to <code class="docutils literal notranslate"><span class="pre">(1,10)</span></code>. You can also tweak the observations yourself to find the parameter that best suits your data.</p></li>
+<li><p>embedding_range: As with the positional parameters of the cell types, they need to be adjusted several times on their own for optimal results.</p></li>
+</ul>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,(</span><span class="n">ax1</span><span class="p">,</span><span class="n">ax2</span><span class="p">)</span><span class="o">=</span><span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding_celltype</span><span class="p">(</span>
+    <span class="n">adata</span><span class="p">,</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span><span class="mi">4</span><span class="p">),</span><span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span>
+    <span class="n">celltype_key</span><span class="o">=</span><span class="s1">&#39;clusters&#39;</span><span class="p">,</span>
+    <span class="n">title</span><span class="o">=</span><span class="s1">&#39;            Cell type&#39;</span><span class="p">,</span>
+    <span class="n">celltype_range</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">10</span><span class="p">),</span>
+    <span class="n">embedding_range</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">10</span><span class="p">),</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/d70f5e3037771eddeea3a146ab2598dc8c43a40a3f5f2cf0470e36cbba3e9da0.png"><img alt="../_images/d70f5e3037771eddeea3a146ab2598dc8c43a40a3f5f2cf0470e36cbba3e9da0.png" src="../_images/d70f5e3037771eddeea3a146ab2598dc8c43a40a3f5f2cf0470e36cbba3e9da0.png" style="width: 452px; height: 259px;" />
+</a>
+</div>
+</div>
+<p>Sometimes we want to be able to circle a certain type of cell that we are interested in, and here we use convex polygons to achieve this, while the shape of the convex polygons may be optimised in future versions.</p>
+<p><strong>Function</strong>: <code class="docutils literal notranslate"><span class="pre">ov.pl.ConvexHull</span></code>:</p>
+<ul class="simple">
+<li><p>adata: the datasets of scRNA-seq</p></li>
+<li><p>basis: he position on the plane should be set to <code class="docutils literal notranslate"><span class="pre">X_spatial</span></code> in spatial RNA-seq, <code class="docutils literal notranslate"><span class="pre">X_umap</span></code>,<code class="docutils literal notranslate"><span class="pre">X_tsne</span></code>,<code class="docutils literal notranslate"><span class="pre">X_mde</span></code> in scRNA-seq and should not be set to <code class="docutils literal notranslate"><span class="pre">X_pca</span></code></p></li>
+<li><p>cluster_key: Specify the celltype to be optimised, which should be for one of the columns in adata.obs, noting that it should have the colour first, and that we can use ov.pl.embedding to colour the cell types. If there is no colour then colour blind optimisation colour will be used.</p></li>
+<li><p>hull_cluster: the target celltype to be circled.</p></li>
+</ul>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="n">fig</span><span class="p">,</span><span class="n">ax</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span> <span class="o">=</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">4</span><span class="p">))</span>
+
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span>
+                <span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span>
+                <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;clusters&#39;</span><span class="p">],</span>
+                <span class="n">frameon</span><span class="o">=</span><span class="s1">&#39;small&#39;</span><span class="p">,</span>
+                <span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">ConvexHull</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span>
+                <span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span>
+                <span class="n">cluster_key</span><span class="o">=</span><span class="s1">&#39;clusters&#39;</span><span class="p">,</span>
+                <span class="n">hull_cluster</span><span class="o">=</span><span class="s1">&#39;Granule mature&#39;</span><span class="p">,</span>
+                <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>clusters_colors
+</pre></div>
+</div>
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;Axes: title={&#39;center&#39;: &#39;clusters&#39;}, xlabel=&#39;X_umap1&#39;, ylabel=&#39;X_umap2&#39;&gt;
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/f07fec20061f4245e3e64db3ff5bb1400fe394820322be4a8b6201bedee2f7b9.png"><img alt="../_images/f07fec20061f4245e3e64db3ff5bb1400fe394820322be4a8b6201bedee2f7b9.png" src="../_images/f07fec20061f4245e3e64db3ff5bb1400fe394820322be4a8b6201bedee2f7b9.png" style="width: 407px; height: 309px;" />
+</a>
+</div>
+</div>
+<p>Besides, if you don’t want to plot convexhull, you can plot the contour instead.</p>
+<p><strong>Function</strong>: <code class="docutils literal notranslate"><span class="pre">ov.pl.contour</span></code>:</p>
+<ul class="simple">
+<li><p>adata: the datasets of scRNA-seq</p></li>
+<li><p>basis: he position on the plane should be set to <code class="docutils literal notranslate"><span class="pre">X_spatial</span></code> in spatial RNA-seq, <code class="docutils literal notranslate"><span class="pre">X_umap</span></code>,<code class="docutils literal notranslate"><span class="pre">X_tsne</span></code>,<code class="docutils literal notranslate"><span class="pre">X_mde</span></code> in scRNA-seq and should not be set to <code class="docutils literal notranslate"><span class="pre">X_pca</span></code></p></li>
+<li><p>groupby: Specify the celltype to be optimised, which should be for one of the columns in adata.obs, noting that it should have the colour first, and that we can use ov.pl.embedding to colour the cell types. If there is no colour then colour blind optimisation colour will be used.</p></li>
+<li><p>clusters: the target celltype to be circled.</p></li>
+<li><p>colors: the color of the contour</p></li>
+<li><p>linestyles: the linestyles of the contour</p></li>
+<li><p>**kwargs: more kwargs could be found from <code class="docutils literal notranslate"><span class="pre">plt.contour</span></code></p></li>
+</ul>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="n">fig</span><span class="p">,</span><span class="n">ax</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span> <span class="o">=</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">4</span><span class="p">))</span>
+
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span>
+                <span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span>
+                <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;clusters&#39;</span><span class="p">],</span>
+                <span class="n">frameon</span><span class="o">=</span><span class="s1">&#39;small&#39;</span><span class="p">,</span>
+                <span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">contour</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span><span class="n">adata</span><span class="o">=</span><span class="n">adata</span><span class="p">,</span><span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;clusters&#39;</span><span class="p">,</span><span class="n">clusters</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;Granule immature&#39;</span><span class="p">,</span><span class="s1">&#39;Granule mature&#39;</span><span class="p">],</span>
+       <span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span><span class="n">contour_threshold</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span><span class="n">colors</span><span class="o">=</span><span class="s1">&#39;#000000&#39;</span><span class="p">,</span>
+        <span class="n">linestyles</span><span class="o">=</span><span class="s1">&#39;dashed&#39;</span><span class="p">,)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;Axes: title={&#39;center&#39;: &#39;clusters&#39;}, xlabel=&#39;X_umap1&#39;, ylabel=&#39;X_umap2&#39;&gt;
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/f85ca6b5bf7141b31d32f21b3de144b49e8dc5e3475e51c871e4a245193b6097.png"><img alt="../_images/f85ca6b5bf7141b31d32f21b3de144b49e8dc5e3475e51c871e4a245193b6097.png" src="../_images/f85ca6b5bf7141b31d32f21b3de144b49e8dc5e3475e51c871e4a245193b6097.png" style="width: 407px; height: 309px;" />
+</a>
+</div>
+</div>
+<p>In scanpy’s default <code class="docutils literal notranslate"><span class="pre">embedding</span></code> plotting function, when we set legend=True, legend masking may occur. To solve this problem, we introduced <code class="docutils literal notranslate"><span class="pre">ov.pl.embedding_adjust</span></code> in omicverse to automatically adjust the position of the legend.</p>
+<p><strong>Function</strong>: <code class="docutils literal notranslate"><span class="pre">ov.pl.embedding_adjust</span></code>:</p>
+<ul class="simple">
+<li><p>adata: the datasets of scRNA-seq</p></li>
+<li><p>basis: he position on the plane should be set to <code class="docutils literal notranslate"><span class="pre">X_spatial</span></code> in spatial RNA-seq, <code class="docutils literal notranslate"><span class="pre">X_umap</span></code>,<code class="docutils literal notranslate"><span class="pre">X_tsne</span></code>,<code class="docutils literal notranslate"><span class="pre">X_mde</span></code> in scRNA-seq and should not be set to <code class="docutils literal notranslate"><span class="pre">X_pca</span></code></p></li>
+<li><p>groupby: Specify the celltype to be optimised, which should be for one of the columns in adata.obs, noting that it should have the colour first, and that we can use ov.pl.embedding to colour the cell types. If there is no colour then colour blind optimisation colour will be used.</p></li>
+<li><p>exclude: We can specify which cell types are not to be plotted, in this case we set it to <code class="docutils literal notranslate"><span class="pre">OL</span></code></p></li>
+<li><p>adjust_kwargs: We can manually specify the parameters of <a class="reference external" href="https://adjusttext.readthedocs.io/en/latest/">adjustText</a>, the specific parameters see the documentation of adjustText, it should be noted that we have to use dict to specify the parameters here.</p></li>
+<li><p>text_kwargs: We can also specify the font colour manually by specifying the <a class="reference external" href="https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.text.html">text_kwargs</a> parameter</p></li>
+</ul>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">patheffects</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">4</span><span class="p">))</span>
+
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span>
+    <span class="n">adata</span><span class="p">,</span>
+    <span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;clusters&#39;</span><span class="p">],</span>
+    <span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">legend_loc</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">add_outline</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> 
+    <span class="n">frameon</span><span class="o">=</span><span class="s1">&#39;small&#39;</span><span class="p">,</span><span class="n">legend_fontoutline</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span>
+<span class="p">)</span>
+
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding_adjust</span><span class="p">(</span>
+    <span class="n">adata</span><span class="p">,</span>
+    <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;clusters&#39;</span><span class="p">,</span>
+    <span class="n">exclude</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;OL&quot;</span><span class="p">,),</span>  
+    <span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span>
+    <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span>
+    <span class="n">adjust_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">arrowprops</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">arrowstyle</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">)),</span>
+    <span class="n">text_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span> <span class="p">,</span><span class="n">weight</span><span class="o">=</span><span class="s1">&#39;bold&#39;</span><span class="p">,</span>
+                     <span class="n">path_effects</span><span class="o">=</span><span class="p">[</span><span class="n">patheffects</span><span class="o">.</span><span class="n">withStroke</span><span class="p">(</span><span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">foreground</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">)]</span> <span class="p">),</span>
+<span class="p">)</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/8c3423df07858d92eda77ecf380074559c8b7b0babf1040543343535a32e98b7.png"><img alt="../_images/8c3423df07858d92eda77ecf380074559c8b7b0babf1040543343535a32e98b7.png" src="../_images/8c3423df07858d92eda77ecf380074559c8b7b0babf1040543343535a32e98b7.png" style="width: 272px; height: 284px;" />
+</a>
+</div>
+</div>
+<p>Sometimes we are interested in the distribution density of a certain class of cell types in a categorical variable, which is cumbersome to plot in the <code class="docutils literal notranslate"><span class="pre">scanpy</span></code> implementation, so we have simplified the implementation in omicverse and ensured the same plotting.</p>
+<p><strong>Function</strong>: <code class="docutils literal notranslate"><span class="pre">ov.pl.embedding_density</span></code>:</p>
+<ul class="simple">
+<li><p>adata: the datasets of scRNA-seq</p></li>
+<li><p>basis: he position on the plane should be set to <code class="docutils literal notranslate"><span class="pre">X_spatial</span></code> in spatial RNA-seq, <code class="docutils literal notranslate"><span class="pre">X_umap</span></code>,<code class="docutils literal notranslate"><span class="pre">X_tsne</span></code>,<code class="docutils literal notranslate"><span class="pre">X_mde</span></code> in scRNA-seq and should not be set to <code class="docutils literal notranslate"><span class="pre">X_pca</span></code></p></li>
+<li><p>groupby: Specify the celltype to be optimised, which should be for one of the columns in adata.obs, noting that it should have the colour first, and that we can use ov.pl.embedding to colour the cell types. If there is no colour then colour blind optimisation colour will be used.</p></li>
+<li><p>target_clusters: We can specify which cell types are to be plotted, in this case we set it to <code class="docutils literal notranslate"><span class="pre">Granule</span> <span class="pre">mature</span></code></p></li>
+<li><p>kwargs: other parameter can be found in <code class="docutils literal notranslate"><span class="pre">scanpy.pl.embedding</span></code></p></li>
+</ul>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding_density</span><span class="p">(</span>
+    <span class="n">adata</span><span class="p">,</span>
+    <span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span>
+    <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;clusters&#39;</span><span class="p">,</span>
+    <span class="n">target_clusters</span><span class="o">=</span><span class="s1">&#39;Granule mature&#39;</span><span class="p">,</span>
+    <span class="n">frameon</span><span class="o">=</span><span class="s1">&#39;small&#39;</span><span class="p">,</span>
+    <span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;RdBu_r&#39;</span><span class="p">,</span><span class="n">alpha</span><span class="o">=</span><span class="mf">0.8</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>computing density on &#39;umap&#39;
+--&gt; added
+    &#39;temp_density&#39;, densities (adata.obs)
+    &#39;temp_density_params&#39;, parameter (adata.uns)
+</pre></div>
+</div>
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;Axes: title={&#39;center&#39;: &#39;Granule mature&#39;}, xlabel=&#39;X_umap1&#39;, ylabel=&#39;X_umap2&#39;&gt;
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/7e04b389c9bdb28869c91e054c81b596870ce1a36f92ae8f2258c77057ccb256.png"><img alt="../_images/7e04b389c9bdb28869c91e054c81b596870ce1a36f92ae8f2258c77057ccb256.png" src="../_images/7e04b389c9bdb28869c91e054c81b596870ce1a36f92ae8f2258c77057ccb256.png" style="width: 326px; height: 286px;" />
+</a>
+</div>
+</div>
+</section>
+<section id="visualizing-gene-density-in-spatial-transcriptomics">
+<h2>Visualizing Gene Density in Spatial Transcriptomics<a class="headerlink" href="#visualizing-gene-density-in-spatial-transcriptomics" title="Link to this heading">#</a></h2>
+<p>Gene density visualization is an essential technique for spatial transcriptomics data analysis. It allows researchers to observe the spatial distribution and expression intensity of specific genes across a tissue section. This approach helps identify regions of high or low expression, spatial gradients, and expression patterns that may correspond to biological structures or functional domains.</p>
+<p>Key aspects of gene density visualization:</p>
+<ul class="simple">
+<li><p><strong>Expression hotspots</strong>: Identify regions where specific genes are highly expressed, which may indicate specialized cell types or functional tissue domains</p></li>
+<li><p><strong>Spatial gradients</strong>: Detect gradual changes in gene expression across tissue that may reflect developmental trajectories or signaling cascades</p></li>
+<li><p><strong>Co-expression patterns</strong>: Analyze the spatial relationship between multiple genes to understand coordinated gene regulation</p></li>
+<li><p><strong>Tissue architecture</strong>: Correlate gene expression with histological features to link molecular profiles with structural elements</p></li>
+</ul>
+<p>Using the <code class="docutils literal notranslate"><span class="pre">ov.pl.embedding</span></code> or <code class="docutils literal notranslate"><span class="pre">sc.pl.spatial</span></code> functions with appropriate parameters allows us to generate these informative visualizations and gain deeper insights into the spatial organization of gene expression within the tissue.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span>
+                <span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span>
+                <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;Sox4&#39;</span><span class="p">],</span>
+                <span class="n">frameon</span><span class="o">=</span><span class="s1">&#39;small&#39;</span><span class="p">,</span>
+                <span class="n">vmax</span><span class="o">=</span><span class="s1">&#39;p99.2&#39;</span><span class="p">,</span>
+                <span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">,)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;Axes: title={&#39;center&#39;: &#39;Sox4&#39;}, xlabel=&#39;X_umap1&#39;, ylabel=&#39;X_umap2&#39;&gt;
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/462f35339ea37f04c0ac47ce2e660650c2311c63cdfc9d64eca769e7f472d9f0.png"><img alt="../_images/462f35339ea37f04c0ac47ce2e660650c2311c63cdfc9d64eca769e7f472d9f0.png" src="../_images/462f35339ea37f04c0ac47ce2e660650c2311c63cdfc9d64eca769e7f472d9f0.png" style="width: 313px; height: 286px;" />
+</a>
+</div>
+</div>
+<p>adjust argument is the most important argument to control the density.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">calculate_gene_density</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span>
+                              <span class="n">features</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;Sox4&#39;</span><span class="p">],</span>
+                              <span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span>
+                              <span class="n">dims</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span>
+                              <span class="n">adjust</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span><span class="c1">#adjust the bandwidth of the kernel density estimate</span>
+                              <span class="n">min_expr</span><span class="o">=</span><span class="mf">0.01</span>
+                              <span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>✅ density_Sox4 written (train cells = 625)
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ax</span><span class="o">=</span><span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span>
+                <span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span>
+                <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;density_Sox4&#39;</span><span class="p">],</span>
+                <span class="n">frameon</span><span class="o">=</span><span class="s1">&#39;small&#39;</span><span class="p">,</span>
+                <span class="n">vmax</span><span class="o">=</span><span class="s1">&#39;p99.2&#39;</span><span class="p">,</span>
+                <span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">,)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/de8c9b8a8f2e980bfe89a77234f6e831ed5eb894f44d6fe421b36736f9938135.png"><img alt="../_images/de8c9b8a8f2e980bfe89a77234f6e831ed5eb894f44d6fe421b36736f9938135.png" src="../_images/de8c9b8a8f2e980bfe89a77234f6e831ed5eb894f44d6fe421b36736f9938135.png" style="width: 344px; height: 284px;" />
+</a>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ax</span><span class="o">=</span><span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span>
+                <span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span>
+                <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;density_Sox4&#39;</span><span class="p">],</span>
+                <span class="n">frameon</span><span class="o">=</span><span class="s1">&#39;small&#39;</span><span class="p">,</span>
+                <span class="n">vmax</span><span class="o">=</span><span class="s1">&#39;p99.2&#39;</span><span class="p">,</span>
+                <span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">,)</span>
+
+
+
+<span class="c1"># overlay contours</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">add_density_contour</span><span class="p">(</span>
+    <span class="n">ax</span><span class="p">,</span>
+    <span class="n">embeddings</span><span class="o">=</span><span class="n">adata</span><span class="p">[</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">&quot;density_Sox4&quot;</span><span class="p">]</span><span class="o">&gt;</span><span class="mf">0.03</span><span class="p">]</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s2">&quot;X_umap&quot;</span><span class="p">][:,</span> <span class="p">:</span><span class="mi">2</span><span class="p">],</span>
+    <span class="n">weights</span><span class="o">=</span><span class="n">adata</span><span class="p">[</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">&quot;density_Sox4&quot;</span><span class="p">]</span><span class="o">&gt;</span><span class="mf">0.03</span><span class="p">]</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">&quot;density_Sox4&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(),</span>   <span class="c1"># raw expression as weight</span>
+    <span class="n">levels</span><span class="o">=</span><span class="s2">&quot;quantile&quot;</span><span class="p">,</span>          <span class="c1"># use quantile‐based levels (auto)</span>
+    <span class="n">n_quantiles</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>              <span class="c1"># 4 contours: 20 %, 40 %, 60 %, 80 %</span>
+    <span class="n">bw_adjust</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span>
+    <span class="n">fill</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>                 <span class="c1"># set True for filled contours</span>
+    <span class="n">linewidth</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">cmap_contour</span><span class="o">=</span><span class="s2">&quot;Greys&quot;</span><span class="p">,</span>
+    <span class="n">zorder</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;matplotlib.contour.QuadContourSet at 0x3639d68f0&gt;
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/8159b889dea27ed0876b9a6c2b79d9777f6295b4baa4ca4d297b4d17d354efd9.png"><img alt="../_images/8159b889dea27ed0876b9a6c2b79d9777f6295b4baa4ca4d297b4d17d354efd9.png" src="../_images/8159b889dea27ed0876b9a6c2b79d9777f6295b4baa4ca4d297b4d17d354efd9.png" style="width: 344px; height: 284px;" />
+</a>
+</div>
+</div>
+</section>
+<section id="bar-graph-with-overlapping-dots-bar-dot-plot">
+<h2>Bar graph with overlapping dots (Bar-dot) plot<a class="headerlink" href="#bar-graph-with-overlapping-dots-bar-dot-plot" title="Link to this heading">#</a></h2>
+<p>In biological research, bardotplot plots are the most common class of graphs we use, but unfortunately, there is no direct implementation of plotting functions in either matplotlib, seaborn or scanpy. To compensate for this, we implement bardotplot plotting in omicverse and provide manual addition of p-values (it should be noted that manual addition refers to the manual addition of p-values for model fitting rather than making up p-values yourself).</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ov</span><span class="o">.</span><span class="n">single</span><span class="o">.</span><span class="n">geneset_aucell</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span>
+                            <span class="n">geneset_name</span><span class="o">=</span><span class="s1">&#39;Sox&#39;</span><span class="p">,</span>
+                            <span class="n">geneset</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;Sox17&#39;</span><span class="p">,</span> <span class="s1">&#39;Sox4&#39;</span><span class="p">,</span> <span class="s1">&#39;Sox7&#39;</span><span class="p">,</span> <span class="s1">&#39;Sox18&#39;</span><span class="p">,</span> <span class="s1">&#39;Sox5&#39;</span><span class="p">])</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">omicverse</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ov</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">style</span><span class="p">(</span><span class="n">font_path</span><span class="o">=</span><span class="s1">&#39;Arial&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>🔬 Starting plot initialization...
+Using already downloaded Arial font from: /var/folders/4m/2xw3_2s503s9r616083n7w440000gn/T/omicverse_arial.ttf
+Registered as: Arial
+🧬 Detecting GPU devices…
+✅ Apple Silicon MPS detected
+    • [MPS] Apple Silicon GPU - Metal Performance Shaders available
+✅ plot_set complete.
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">violin</span><span class="p">(</span>
+    <span class="n">adata</span><span class="p">,</span><span class="n">keys</span><span class="o">=</span><span class="s1">&#39;Sox4&#39;</span><span class="p">,</span><span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;clusters&#39;</span><span class="p">,</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span><span class="n">rotation</span><span class="o">=</span><span class="mi">90</span><span class="p">,</span>
+    <span class="n">alternating_background</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span><span class="n">add_box</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">use_group_colors_background</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span><span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">comparisons</span><span class="o">=</span><span class="p">[(</span><span class="s1">&#39;Neuroblast&#39;</span><span class="p">,</span><span class="s1">&#39;OL&#39;</span><span class="p">),</span>
+                <span class="p">(</span><span class="s1">&#39;Mossy&#39;</span><span class="p">,</span><span class="s1">&#39;Cck-Tox&#39;</span><span class="p">),</span>
+                <span class="p">(</span><span class="s1">&#39;nIPC&#39;</span><span class="p">,</span><span class="s1">&#39;OL&#39;</span><span class="p">)]</span>
+    
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;Axes: xlabel=&#39;clusters&#39;, ylabel=&#39;Sox4&#39;&gt;
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/ea0220cd88e48896ea4be0944edc179794bcf432b2fdc11838bcd4736c5bb1cd.png"><img alt="../_images/ea0220cd88e48896ea4be0944edc179794bcf432b2fdc11838bcd4736c5bb1cd.png" src="../_images/ea0220cd88e48896ea4be0944edc179794bcf432b2fdc11838bcd4736c5bb1cd.png" style="width: 563px; height: 341px;" />
+</a>
+</div>
+</div>
+<p><strong>Function</strong>: <code class="docutils literal notranslate"><span class="pre">ov.pl.embedding_density</span></code>:</p>
+<ul class="simple">
+<li><p>adata: the datasets of scRNA-seq</p></li>
+<li><p>groupby: Specify the celltype to be optimised, which should be for one of the columns in adata.obs, noting that it should have the colour first, and that we can use ov.pl.embedding to colour the cell types. If there is no colour then colour blind optimisation colour will be used.</p></li>
+<li><p>color: The size of the variable to be plotted, which can be a gene, stored in adata.var, or a cell value, stored in adata.obs.</p></li>
+<li><p>bar_kwargs: We provide the parameters of the barplot for input, see the matplotlib documentation for more <a class="reference external" href="https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.bar.html">details</a></p></li>
+<li><p>scatter_kwargs: We also provide the parameters of the scatter for input, see the matplotlib documentation for more <a class="reference external" href="https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.scatter.html">details</a></p></li>
+</ul>
+<p><strong>Function</strong>: <code class="docutils literal notranslate"><span class="pre">ov.pl.add_palue</span></code>:</p>
+<ul class="simple">
+<li><p>ax: the axes of bardotplot</p></li>
+<li><p>line_x1: The left side of the p-value line to be plotted</p></li>
+<li><p>line_x2: The right side of the p-value line to be plotted|</p></li>
+<li><p>line_y: The height of the p-value line to be plotted</p></li>
+<li><p>text_y: How much above the p-value line is plotted text</p></li>
+<li><p>text: the text of p-value, you can set <code class="docutils literal notranslate"><span class="pre">***</span></code> to instead <code class="docutils literal notranslate"><span class="pre">p&lt;0.001</span></code></p></li>
+<li><p>fontsize: the fontsize of text</p></li>
+<li><p>fontcolor: the color of text</p></li>
+<li><p>horizontalalignment: the location of text</p></li>
+</ul>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span><span class="mi">2</span><span class="p">))</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">bardotplot</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span><span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;clusters&#39;</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="s1">&#39;Sox_aucell&#39;</span><span class="p">,</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span><span class="mi">2</span><span class="p">),</span>
+           <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span>
+          <span class="n">ylabel</span><span class="o">=</span><span class="s1">&#39;Expression&#39;</span><span class="p">,</span>
+           <span class="n">bar_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;alpha&#39;</span><span class="p">:</span><span class="mf">0.5</span><span class="p">,</span><span class="s1">&#39;linewidth&#39;</span><span class="p">:</span><span class="mi">2</span><span class="p">,</span><span class="s1">&#39;width&#39;</span><span class="p">:</span><span class="mf">0.6</span><span class="p">,</span><span class="s1">&#39;capsize&#39;</span><span class="p">:</span><span class="mi">4</span><span class="p">},</span>
+           <span class="n">scatter_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;alpha&#39;</span><span class="p">:</span><span class="mf">0.8</span><span class="p">,</span><span class="s1">&#39;s&#39;</span><span class="p">:</span><span class="mi">10</span><span class="p">,</span><span class="s1">&#39;marker&#39;</span><span class="p">:</span><span class="s1">&#39;o&#39;</span><span class="p">})</span>
+
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">add_palue</span><span class="p">(</span><span class="n">ax</span><span class="p">,</span><span class="n">line_x1</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span><span class="n">line_x2</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span><span class="n">line_y</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+          <span class="n">text_y</span><span class="o">=</span><span class="mf">0.02</span><span class="p">,</span>
+          <span class="n">text</span><span class="o">=</span><span class="s1">&#39;$p=</span><span class="si">{}</span><span class="s1">$&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="mf">0.001</span><span class="p">,</span><span class="mi">3</span><span class="p">)),</span>
+          <span class="n">fontsize</span><span class="o">=</span><span class="mi">11</span><span class="p">,</span><span class="n">fontcolor</span><span class="o">=</span><span class="s1">&#39;#000000&#39;</span><span class="p">,</span>
+             <span class="n">horizontalalignment</span><span class="o">=</span><span class="s1">&#39;center&#39;</span><span class="p">,)</span>
+
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">add_palue</span><span class="p">(</span>
+    <span class="n">ax</span><span class="p">,</span>
+    <span class="n">line_x1</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span><span class="c1">#OL</span>
+    <span class="n">line_x2</span><span class="o">=</span><span class="mi">11</span><span class="p">,</span><span class="c1">#OPC</span>
+    <span class="n">line_y</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span><span class="c1">#Expression</span>
+    <span class="n">text_y</span><span class="o">=</span><span class="mf">0.02</span><span class="p">,</span>
+    <span class="n">text</span><span class="o">=</span><span class="s1">&#39;$p=</span><span class="si">{}</span><span class="s1">$&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="mf">0.005</span><span class="p">,</span><span class="mi">3</span><span class="p">)),</span>
+    <span class="n">fontsize</span><span class="o">=</span><span class="mi">11</span><span class="p">,</span><span class="n">fontcolor</span><span class="o">=</span><span class="s1">&#39;#000000&#39;</span><span class="p">,</span>
+    <span class="n">horizontalalignment</span><span class="o">=</span><span class="s1">&#39;center&#39;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/0619354826ce7ca0f32db2e7f420b767790a37928ebeb16087ef6c074f66f836.png"><img alt="../_images/0619354826ce7ca0f32db2e7f420b767790a37928ebeb16087ef6c074f66f836.png" src="../_images/0619354826ce7ca0f32db2e7f420b767790a37928ebeb16087ef6c074f66f836.png" style="width: 449px; height: 281px;" />
+</a>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span><span class="mi">2</span><span class="p">))</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">bardotplot</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span><span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;clusters&#39;</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="s1">&#39;Sox17&#39;</span><span class="p">,</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span><span class="mi">2</span><span class="p">),</span>
+           <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span>
+          <span class="n">ylabel</span><span class="o">=</span><span class="s1">&#39;Expression&#39;</span><span class="p">,</span><span class="n">xlabel</span><span class="o">=</span><span class="s1">&#39;Cell Type&#39;</span><span class="p">,</span>
+           <span class="n">bar_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;alpha&#39;</span><span class="p">:</span><span class="mf">0.5</span><span class="p">,</span><span class="s1">&#39;linewidth&#39;</span><span class="p">:</span><span class="mi">2</span><span class="p">,</span><span class="s1">&#39;width&#39;</span><span class="p">:</span><span class="mf">0.6</span><span class="p">,</span><span class="s1">&#39;capsize&#39;</span><span class="p">:</span><span class="mi">4</span><span class="p">},</span>
+           <span class="n">scatter_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;alpha&#39;</span><span class="p">:</span><span class="mf">0.8</span><span class="p">,</span><span class="s1">&#39;s&#39;</span><span class="p">:</span><span class="mi">10</span><span class="p">,</span><span class="s1">&#39;marker&#39;</span><span class="p">:</span><span class="s1">&#39;o&#39;</span><span class="p">})</span>
+
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">add_palue</span><span class="p">(</span><span class="n">ax</span><span class="p">,</span><span class="n">line_x1</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span><span class="n">line_x2</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span><span class="n">line_y</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+          <span class="n">text_y</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span>
+          <span class="n">text</span><span class="o">=</span><span class="s1">&#39;$p=</span><span class="si">{}</span><span class="s1">$&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="mf">0.001</span><span class="p">,</span><span class="mi">3</span><span class="p">)),</span>
+          <span class="n">fontsize</span><span class="o">=</span><span class="mi">11</span><span class="p">,</span><span class="n">fontcolor</span><span class="o">=</span><span class="s1">&#39;#000000&#39;</span><span class="p">,</span>
+             <span class="n">horizontalalignment</span><span class="o">=</span><span class="s1">&#39;center&#39;</span><span class="p">,)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/68b67916b08ab5fb1ad075789b313405fb5277ea76128d907f9f84a2b62b12b8.png"><img alt="../_images/68b67916b08ab5fb1ad075789b313405fb5277ea76128d907f9f84a2b62b12b8.png" src="../_images/68b67916b08ab5fb1ad075789b313405fb5277ea76128d907f9f84a2b62b12b8.png" style="width: 436px; height: 299px;" />
+</a>
+</div>
+</div>
+</section>
+<section id="boxplot-with-jitter-points">
+<h2>Boxplot with jitter points<a class="headerlink" href="#boxplot-with-jitter-points" title="Link to this heading">#</a></h2>
+<p>A box plot, also known as a box-and-whisker plot, is a graphical representation used to display the distribution and summary statistics of a dataset. It provides a concise and visual way to understand the central tendency, spread, and potential outliers in the data.</p>
+<p><strong>Function</strong>: <code class="docutils literal notranslate"><span class="pre">ov.pl.single_group_boxplot</span></code>:</p>
+<ul class="simple">
+<li><p>adata (AnnData object): The data object containing the information for plotting.</p></li>
+<li><p>groupby (str): The variable used for grouping the data</p></li>
+<li><p>color (str): The variable used for coloring the data points.</p></li>
+<li><p>type_color_dict (dict): A dictionary mapping group categories to specific colors.</p></li>
+<li><p>scatter_kwargs (dict): Additional keyword arguments for customizing the scatter plot.</p></li>
+<li><p>ax (matplotlib.axes.Axes): A pre-existing axes object for plotting (optional).  (optional).(optional).</p></li>
+</ul>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">seaborn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sns</span>
+<span class="c1">#sns.set_style(&#39;white&#39;)</span>
+
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">single_group_boxplot</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span><span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;clusters&#39;</span><span class="p">,</span>
+             <span class="n">color</span><span class="o">=</span><span class="s1">&#39;Sox_aucell&#39;</span><span class="p">,</span>
+             <span class="n">type_color_dict</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">Categorical</span><span class="p">(</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;clusters&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">categories</span><span class="p">,</span> <span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;clusters_colors&#39;</span><span class="p">])),</span>
+             <span class="n">x_ticks_plot</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+             <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">2</span><span class="p">),</span>
+             <span class="n">kruskal_test</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+             <span class="n">ylabel</span><span class="o">=</span><span class="s1">&#39;Sox_aucell&#39;</span><span class="p">,</span>
+             <span class="n">legend_plot</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+             <span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span>
+             <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Expression&#39;</span><span class="p">,</span>
+             <span class="n">scatter_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;alpha&#39;</span><span class="p">:</span><span class="mf">0.8</span><span class="p">,</span><span class="s1">&#39;s&#39;</span><span class="p">:</span><span class="mi">10</span><span class="p">,</span><span class="s1">&#39;marker&#39;</span><span class="p">:</span><span class="s1">&#39;o&#39;</span><span class="p">},</span>
+             <span class="n">point_number</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
+             <span class="n">sort</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+             <span class="n">save</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+             <span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xticks</span><span class="p">(</span><span class="n">rotation</span><span class="o">=</span><span class="mi">90</span><span class="p">,</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>(array([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13]),
+ [Text(0, 0, &#39;Astrocytes&#39;),
+  Text(1, 0, &#39;Cajal Retzius&#39;),
+  Text(2, 0, &#39;Cck-Tox&#39;),
+  Text(3, 0, &#39;Endothelial&#39;),
+  Text(4, 0, &#39;GABA&#39;),
+  Text(5, 0, &#39;Granule immature&#39;),
+  Text(6, 0, &#39;Granule mature&#39;),
+  Text(7, 0, &#39;Microglia&#39;),
+  Text(8, 0, &#39;Mossy&#39;),
+  Text(9, 0, &#39;Neuroblast&#39;),
+  Text(10, 0, &#39;OL&#39;),
+  Text(11, 0, &#39;OPC&#39;),
+  Text(12, 0, &#39;Radial Glia-like&#39;),
+  Text(13, 0, &#39;nIPC&#39;)])
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/2291c9498faa668b0a91e40f10f90c78abd1dd9f71568265e3e42ac1056f8468.png"><img alt="../_images/2291c9498faa668b0a91e40f10f90c78abd1dd9f71568265e3e42ac1056f8468.png" src="../_images/2291c9498faa668b0a91e40f10f90c78abd1dd9f71568265e3e42ac1056f8468.png" style="width: 386px; height: 281px;" />
+</a>
+</div>
+</div>
+</section>
+<section id="dotplot">
+<h2>Dotplot<a class="headerlink" href="#dotplot" title="Link to this heading">#</a></h2>
+<p>A complex heatmap, also known as a clustered heatmap, is a data visualization technique used to represent complex relationships and patterns in multivariate data. It combines several elements, including clustering, color mapping, and hierarchical organization, to provide a comprehensive view of data across multiple dimensions.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="n">marker_genes_dict</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;Sox&#39;</span><span class="p">:[</span><span class="s1">&#39;Sox4&#39;</span><span class="p">,</span> <span class="s1">&#39;Sox7&#39;</span><span class="p">,</span> <span class="s1">&#39;Sox18&#39;</span><span class="p">,</span> <span class="s1">&#39;Sox5&#39;</span><span class="p">],</span>
+<span class="p">}</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">dotplot</span><span class="p">(</span>
+    <span class="n">adata</span><span class="p">,</span><span class="n">marker_genes_dict</span><span class="p">,</span>
+    <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;clusters&#39;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;marsilea.heatmap.SizedHeatmap at 0x7efe46f615a0&gt;
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/6ac6bf5dd7a740f12a1ae8f28ed1f791081095ea48aed673986185ab923e57a7.png"><img alt="../_images/6ac6bf5dd7a740f12a1ae8f28ed1f791081095ea48aed673986185ab923e57a7.png" src="../_images/6ac6bf5dd7a740f12a1ae8f28ed1f791081095ea48aed673986185ab923e57a7.png" style="width: 547px; height: 502px;" />
+</a>
+</div>
+</div>
+</section>
+<section id="marker-gene-plot">
+<h2>Marker gene plot<a class="headerlink" href="#marker-gene-plot" title="Link to this heading">#</a></h2>
+<p>In single-cell analysis, a marker gene heatmap is a powerful visualization tool that helps researchers to understand the expression patterns of specific marker genes across different cell populations. Here we provide <code class="docutils literal notranslate"><span class="pre">ov.pl.marker_heatmap</span></code> for visualizing the patterns of marker genes.</p>
+<p>We first preprocess the data and define the dictionary of cell type and marker gene.
+<strong>Please ensure that each gene in the dictionary appears only once</strong> (i.e. different cells cannot have the same marker gene, otherwise an error will be reported).</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">adata</span><span class="o">=</span><span class="n">ov</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">preprocess</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;shiftlog|pearson&#39;</span><span class="p">,</span><span class="n">n_HVGs</span><span class="o">=</span><span class="mi">2000</span><span class="p">,)</span>
+
+<span class="n">marker_genes_dict</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;Granule immature&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;Sepw1&#39;</span><span class="p">,</span> <span class="s1">&#39;Camk2b&#39;</span><span class="p">,</span> <span class="s1">&#39;Cnih2&#39;</span><span class="p">],</span>
+ <span class="s1">&#39;Radial Glia-like&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;Dbi&#39;</span><span class="p">,</span> <span class="s1">&#39;Fabp7&#39;</span><span class="p">,</span> <span class="s1">&#39;Aldoc&#39;</span><span class="p">],</span>
+ <span class="s1">&#39;Granule mature&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;Malat1&#39;</span><span class="p">,</span> <span class="s1">&#39;Rasl10a&#39;</span><span class="p">,</span> <span class="s1">&#39;Ppp3ca&#39;</span><span class="p">],</span>
+ <span class="s1">&#39;Neuroblast&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;Igfbpl1&#39;</span><span class="p">,</span> <span class="s1">&#39;Tubb2b&#39;</span><span class="p">,</span> <span class="s1">&#39;Tubb5&#39;</span><span class="p">],</span>
+ <span class="s1">&#39;Microglia&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;Lgmn&#39;</span><span class="p">,</span> <span class="s1">&#39;C1qa&#39;</span><span class="p">,</span> <span class="s1">&#39;C1qb&#39;</span><span class="p">],</span>
+ <span class="s1">&#39;Cajal Retzius&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;Diablo&#39;</span><span class="p">,</span> <span class="s1">&#39;Ramp1&#39;</span><span class="p">,</span> <span class="s1">&#39;Stmn1&#39;</span><span class="p">],</span>
+ <span class="s1">&#39;OPC&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;Olig1&#39;</span><span class="p">,</span> <span class="s1">&#39;C1ql1&#39;</span><span class="p">,</span> <span class="s1">&#39;Pllp&#39;</span><span class="p">],</span>
+ <span class="s1">&#39;Cck-Tox&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;Tshz2&#39;</span><span class="p">,</span> <span class="s1">&#39;Cck&#39;</span><span class="p">,</span> <span class="s1">&#39;Nap1l5&#39;</span><span class="p">],</span>
+ <span class="s1">&#39;GABA&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;Gad2&#39;</span><span class="p">,</span> <span class="s1">&#39;Gad1&#39;</span><span class="p">,</span> <span class="s1">&#39;Snhg11&#39;</span><span class="p">],</span>
+ <span class="s1">&#39;Endothelial&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;Sparc&#39;</span><span class="p">,</span> <span class="s1">&#39;Myl12a&#39;</span><span class="p">,</span> <span class="s1">&#39;Itm2a&#39;</span><span class="p">],</span>
+ <span class="s1">&#39;Astrocytes&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;Apoe&#39;</span><span class="p">,</span>  <span class="s1">&#39;Atp1a2&#39;</span><span class="p">],</span>
+ <span class="s1">&#39;OL&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;Plp1&#39;</span><span class="p">,</span> <span class="s1">&#39;Mog&#39;</span><span class="p">,</span> <span class="s1">&#39;Mag&#39;</span><span class="p">],</span>
+ <span class="s1">&#39;Mossy&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;Arhgdig&#39;</span><span class="p">,</span> <span class="s1">&#39;Camk4&#39;</span><span class="p">],</span>
+ <span class="s1">&#39;nIPC&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;Hmgn2&#39;</span><span class="p">,</span> <span class="s1">&#39;Ptma&#39;</span><span class="p">,</span> <span class="s1">&#39;H2afz&#39;</span><span class="p">]}</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Begin robust gene identification
+After filtration, 13264/13913 genes are kept.     Among 13264 genes, 13189 genes are robust.
+End of robust gene identification.
+Begin size normalization: shiftlog and HVGs selection pearson
+normalizing counts per cell
+The following highly-expressed genes are not considered during normalization factor computation:
+[&#39;Hba-a1&#39;, &#39;Malat1&#39;, &#39;Ptgds&#39;, &#39;Hbb-bt&#39;]
+    finished (0:00:00)
+extracting highly variable genes
+--&gt; added
+    &#39;highly_variable&#39;, boolean vector (adata.var)
+    &#39;highly_variable_rank&#39;, float vector (adata.var)
+    &#39;highly_variable_nbatches&#39;, int vector (adata.var)
+    &#39;highly_variable_intersection&#39;, boolean vector (adata.var)
+    &#39;means&#39;, float vector (adata.var)
+    &#39;variances&#39;, float vector (adata.var)
+    &#39;residual_variances&#39;, float vector (adata.var)
+Time to analyze data in cpu: 0.6747586727142334 seconds.
+End of size normalization: shiftlog and HVGs selection pearson
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">dotplot</span><span class="p">(</span>
+    <span class="n">adata</span><span class="p">,</span><span class="n">marker_genes_dict</span><span class="p">,</span>
+    <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;clusters&#39;</span><span class="p">,</span><span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;RdBu_r&#39;</span><span class="p">,</span>
+    <span class="n">standard_scale</span><span class="o">=</span><span class="s1">&#39;var&#39;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;marsilea.heatmap.SizedHeatmap at 0x7efe46b82e90&gt;
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/38be0a26adaeae10d35b43d6be11cf64224c0e5888212c4ffe4a6985e208b887.png"><img alt="../_images/38be0a26adaeae10d35b43d6be11cf64224c0e5888212c4ffe4a6985e208b887.png" src="../_images/38be0a26adaeae10d35b43d6be11cf64224c0e5888212c4ffe4a6985e208b887.png" style="width: 1507px; height: 552px;" />
+</a>
+</div>
+</div>
+</section>
+<section id="beautiful-umap">
+<h2>Beautiful UMAP<a class="headerlink" href="#beautiful-umap" title="Link to this heading">#</a></h2>
+<p>Here, we provide a combination of the above functions as an example to guide you in drawing a more beautiful UMAP.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">color_dict</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span>
+    <span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;clusters&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">cat</span><span class="o">.</span><span class="n">categories</span><span class="p">,</span>
+    <span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;clusters_colors&#39;</span><span class="p">]</span>
+<span class="p">))</span>
+<span class="n">color_dict</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>{&#39;Astrocytes&#39;: &#39;#3ba458&#39;,
+ &#39;Cajal Retzius&#39;: &#39;#404040&#39;,
+ &#39;Cck-Tox&#39;: &#39;#7a7a7a&#39;,
+ &#39;Endothelial&#39;: &#39;#fda762&#39;,
+ &#39;GABA&#39;: &#39;#6950a3&#39;,
+ &#39;Granule immature&#39;: &#39;#2575b7&#39;,
+ &#39;Granule mature&#39;: &#39;#08306b&#39;,
+ &#39;Microglia&#39;: &#39;#e1bfb0&#39;,
+ &#39;Mossy&#39;: &#39;#e5d8bd&#39;,
+ &#39;Neuroblast&#39;: &#39;#79b5d9&#39;,
+ &#39;OL&#39;: &#39;#f14432&#39;,
+ &#39;OPC&#39;: &#39;#fc8a6a&#39;,
+ &#39;Radial Glia-like&#39;: &#39;#98d594&#39;,
+ &#39;nIPC&#39;: &#39;#d0e1f2&#39;}
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">patheffects</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+
+<span class="c1"># Create a figure and axis with a specified size</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
+
+<span class="c1"># Plot the UMAP embedding with celltype coloring</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span>
+    <span class="n">adata</span><span class="p">,</span>
+    <span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;clusters&#39;</span><span class="p">],</span>
+    <span class="n">size</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+    <span class="n">title</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span>
+    <span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">legend_loc</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">add_outline</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">frameon</span><span class="o">=</span><span class="s1">&#39;small&#39;</span><span class="p">,</span>
+    <span class="n">legend_fontoutline</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span>
+    <span class="n">arrow_scale</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span> 
+    <span class="n">arrow_width</span> <span class="o">=</span> <span class="mf">0.005</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Define celltype groups and their contour properties</span>
+<span class="n">contour_groups</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">([</span><span class="s1">&#39;Granule immature&#39;</span><span class="p">,</span><span class="s1">&#39;Granule mature&#39;</span><span class="p">],</span> <span class="s1">&#39;#08306b&#39;</span><span class="p">),</span>
+    <span class="p">([</span><span class="s1">&#39;Radial Glia-like&#39;</span><span class="p">,</span> <span class="s1">&#39;Astrocytes&#39;</span><span class="p">,</span> <span class="p">],</span> <span class="s1">&#39;#3ba458&#39;</span><span class="p">),</span>
+    <span class="p">([</span><span class="s1">&#39;OL&#39;</span><span class="p">,</span> <span class="s1">&#39;OPC&#39;</span><span class="p">,</span> <span class="p">],</span> <span class="s1">&#39;#fc8a6a&#39;</span><span class="p">),</span>
+    <span class="p">([</span><span class="s1">&#39;nIPC&#39;</span><span class="p">,</span> <span class="s1">&#39;Neuroblast&#39;</span><span class="p">,</span> <span class="p">],</span> <span class="s1">&#39;#79b5d9&#39;</span><span class="p">),</span>
+<span class="p">]</span>
+
+<span class="c1"># Plot contours for each group</span>
+<span class="k">for</span> <span class="n">clusters</span><span class="p">,</span> <span class="n">color</span> <span class="ow">in</span> <span class="n">contour_groups</span><span class="p">:</span>
+    <span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">contour</span><span class="p">(</span>
+        <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span>
+        <span class="n">adata</span><span class="o">=</span><span class="n">adata</span><span class="p">,</span>
+        <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;clusters&#39;</span><span class="p">,</span>
+        <span class="n">clusters</span><span class="o">=</span><span class="n">clusters</span><span class="p">,</span>
+        <span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span>
+        <span class="n">contour_threshold</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+        <span class="n">colors</span><span class="o">=</span><span class="n">color</span><span class="p">,</span>
+        <span class="n">linestyles</span><span class="o">=</span><span class="s1">&#39;dashed&#39;</span><span class="p">,</span>
+        <span class="n">linewidths</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="p">)</span>
+
+<span class="n">ct_color</span><span class="o">=</span><span class="p">[]</span>
+<span class="k">for</span> <span class="n">ct</span> <span class="ow">in</span> <span class="n">color_dict</span><span class="p">:</span>
+    <span class="n">ct_color</span><span class="o">.</span><span class="n">append</span><span class="p">(([</span><span class="n">ct</span><span class="p">],</span><span class="n">color_dict</span><span class="p">[</span><span class="n">ct</span><span class="p">]))</span>
+
+<span class="n">all_celltypes</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s1">&#39;clusters&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span>
+
+<span class="c1"># Adjust embedding annotations for each group</span>
+<span class="k">for</span> <span class="n">exclude_clusters</span><span class="p">,</span> <span class="n">text_color</span> <span class="ow">in</span> <span class="n">ct_color</span><span class="p">:</span>
+    <span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding_adjust</span><span class="p">(</span>
+        <span class="n">adata</span><span class="p">,</span>
+        <span class="n">groupby</span><span class="o">=</span><span class="s1">&#39;clusters&#39;</span><span class="p">,</span>
+        <span class="n">exclude</span><span class="o">=</span><span class="nb">set</span><span class="p">(</span><span class="n">all_celltypes</span><span class="p">)</span><span class="o">-</span><span class="nb">set</span><span class="p">(</span><span class="n">exclude_clusters</span><span class="p">),</span>
+        <span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span>
+        <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span>
+        <span class="n">adjust_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">arrowprops</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">arrowstyle</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">)),</span>
+        <span class="n">text_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+            <span class="n">fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span>
+            <span class="n">weight</span><span class="o">=</span><span class="s1">&#39;normal&#39;</span><span class="p">,</span>
+            <span class="n">color</span><span class="o">=</span><span class="n">text_color</span><span class="p">,</span>
+            <span class="n">path_effects</span><span class="o">=</span><span class="p">[</span><span class="n">patheffects</span><span class="o">.</span><span class="n">withStroke</span><span class="p">(</span><span class="n">linewidth</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">foreground</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">)]</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/5e60029f73415b904ddccc5f6e8a4115bdd7050d71d871853ddadde3d63b0b28.png"><img alt="../_images/5e60029f73415b904ddccc5f6e8a4115bdd7050d71d871853ddadde3d63b0b28.png" src="../_images/5e60029f73415b904ddccc5f6e8a4115bdd7050d71d871853ddadde3d63b0b28.png" style="width: 397px; height: 387px;" />
+</a>
+</div>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../tutorials/index_plotting.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Visualization &amp; Plotting</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="t_visualize_bulk.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Visualization of Bulk RNA-seq</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#optimizing-color-mapping">Optimizing color mapping</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#stacked-histogram-of-cell-proportions">Stacked histogram of cell proportions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#a-collection-of-some-interesting-embedded-plot">A collection of some interesting embedded plot</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#visualizing-gene-density-in-spatial-transcriptomics">Visualizing Gene Density in Spatial Transcriptomics</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#bar-graph-with-overlapping-dots-bar-dot-plot">Bar graph with overlapping dots (Bar-dot) plot</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#boxplot-with-jitter-points">Boxplot with jitter points</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#dotplot">Dotplot</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#marker-gene-plot">Marker gene plot</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#beautiful-umap">Beautiful UMAP</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Zehua Zeng
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2026, 112 Lab, USTB.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

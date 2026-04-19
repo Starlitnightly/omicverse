@@ -1,0 +1,262 @@
+/* OmicVerse Sphinx / Furo theme overrides
+   Colour palette sourced from omicverse-notebook theme variables */
+
+/* Brand colours — forest green palette */
+:root {
+    --ov-green:       #4c7a69;
+    --ov-green-light: #78aa95;
+    --ov-green-dark:  #2f5a4a;
+    --ov-green-pale:  #b1d1c3;
+
+    /* dark-mode layout shades (matches --jp-layout-color*) */
+    --ov-dark-bg0: #0f1311;
+    --ov-dark-bg1: #151a17;
+    --ov-dark-bg2: #1b211d;
+
+    /* light-mode layout shades */
+    --ov-light-bg0: #f8fbf9;
+    --ov-light-bg1: #eef4f1;
+    --ov-light-bg2: #e3ece7;
+}
+
+/* Sidebar logo sizing */
+.sidebar-logo {
+    max-width: 180px;
+    margin: 0 auto;
+}
+
+/* Card hover effect (sphinx-design grid cards) */
+.sd-card:hover {
+    box-shadow: 0 4px 16px rgba(76, 122, 105, 0.22);
+    transition: box-shadow 0.2s ease;
+}
+
+/* Code block copy button */
+.copybtn {
+    opacity: 0.6;
+}
+.copybtn:hover {
+    opacity: 1;
+}
+
+/* Admonition colours */
+.admonition.note > .admonition-title {
+    background-color: var(--ov-green);
+}
+
+/* Navigation active link */
+.sidebar-tree .current-page > .reference {
+    color: var(--ov-green);
+    font-weight: 600;
+}
+
+/* ================================================================== */
+/* Syntax highlighting — omicverse-notebook colour palette            */
+/* Light: theme-light/variables.css  --jp-mirror-editor-*            */
+/* Dark : theme/variables.css        --jp-mirror-editor-*            */
+/* ================================================================== */
+
+/* --- Shared: code block background follows Furo's variable -------- */
+.highlight,
+.highlight pre {
+    background-color: var(--color-code-background) !important;
+    background: var(--color-code-background) !important;
+}
+
+/* --- Light mode token colours (--jp-mirror-editor-* light theme) -- */
+.highlight .k,  .highlight .kd, .highlight .kn,
+.highlight .kp, .highlight .kr, .highlight .kt  { color: #5d8677; } /* keyword        */
+.highlight .s,  .highlight .s1, .highlight .s2,
+.highlight .sb, .highlight .sc, .highlight .sd,
+.highlight .se, .highlight .sh, .highlight .si,
+.highlight .sl, .highlight .ss, .highlight .sx  { color: #7c8e41; } /* string         */
+.highlight .c,  .highlight .c1, .highlight .cm,
+.highlight .cs, .highlight .cp               { color: #8a978f; font-style: italic; } /* comment */
+.highlight .mi, .highlight .mf, .highlight .mh,
+.highlight .mo, .highlight .il              { color: #6f8fb2; } /* number         */
+.highlight .nf, .highlight .fm              { color: #a36d2f; } /* function name  */
+.highlight .nc                              { color: #a36d2f; } /* class name     */
+.highlight .nb                              { color: #739e8f; } /* builtin        */
+.highlight .na                              { color: #6a94a8; } /* attribute      */
+.highlight .o,  .highlight .ow             { color: #5d8677; } /* operator       */
+.highlight .n,  .highlight .nn,
+.highlight .ni, .highlight .nd             { color: #25312b; } /* name           */
+.highlight .p,  .highlight .bp             { color: #36423b; } /* punctuation    */
+.highlight .nt                              { color: #5d8677; } /* tag            */
+.highlight .nv, .highlight .vc,
+.highlight .vg, .highlight .vi             { color: #25312b; } /* variable       */
+.highlight .ge                              { font-style: italic; }
+.highlight .gs                              { font-weight: bold; }
+
+/* --- Dark mode token colours (--jp-mirror-editor-* dark theme) ---- */
+body[data-theme="dark"] .highlight .k,
+body[data-theme="dark"] .highlight .kd,
+body[data-theme="dark"] .highlight .kn,
+body[data-theme="dark"] .highlight .kp,
+body[data-theme="dark"] .highlight .kr,
+body[data-theme="dark"] .highlight .kt     { color: #84c3a0; } /* keyword        */
+
+body[data-theme="dark"] .highlight .s,
+body[data-theme="dark"] .highlight .s1,
+body[data-theme="dark"] .highlight .s2,
+body[data-theme="dark"] .highlight .sb,
+body[data-theme="dark"] .highlight .sc,
+body[data-theme="dark"] .highlight .sd,
+body[data-theme="dark"] .highlight .se,
+body[data-theme="dark"] .highlight .sh,
+body[data-theme="dark"] .highlight .si,
+body[data-theme="dark"] .highlight .sl,
+body[data-theme="dark"] .highlight .ss,
+body[data-theme="dark"] .highlight .sx     { color: #cad78f; } /* string         */
+
+body[data-theme="dark"] .highlight .c,
+body[data-theme="dark"] .highlight .c1,
+body[data-theme="dark"] .highlight .cm,
+body[data-theme="dark"] .highlight .cs,
+body[data-theme="dark"] .highlight .cp     { color: #708980; font-style: italic; } /* comment */
+
+body[data-theme="dark"] .highlight .mi,
+body[data-theme="dark"] .highlight .mf,
+body[data-theme="dark"] .highlight .mh,
+body[data-theme="dark"] .highlight .mo,
+body[data-theme="dark"] .highlight .il     { color: #a6cbbb; } /* number         */
+
+body[data-theme="dark"] .highlight .nf,
+body[data-theme="dark"] .highlight .fm     { color: #d6b56f; } /* function name  */
+
+body[data-theme="dark"] .highlight .nc     { color: #d6b56f; } /* class name     */
+
+body[data-theme="dark"] .highlight .nb     { color: #9bcdb6; } /* builtin        */
+
+body[data-theme="dark"] .highlight .na     { color: #8ab7ca; } /* attribute      */
+
+body[data-theme="dark"] .highlight .o,
+body[data-theme="dark"] .highlight .ow     { color: #84c3a0; } /* operator       */
+
+body[data-theme="dark"] .highlight .n,
+body[data-theme="dark"] .highlight .nn,
+body[data-theme="dark"] .highlight .ni,
+body[data-theme="dark"] .highlight .nd     { color: #e2ece6; } /* name           */
+
+body[data-theme="dark"] .highlight .p,
+body[data-theme="dark"] .highlight .bp     { color: #edf4ef; } /* punctuation    */
+
+body[data-theme="dark"] .highlight .nt     { color: #84c3a0; } /* tag            */
+
+body[data-theme="dark"] .highlight .nv,
+body[data-theme="dark"] .highlight .vc,
+body[data-theme="dark"] .highlight .vg,
+body[data-theme="dark"] .highlight .vi     { color: #e2ece6; } /* variable       */
+
+/* Same rules scoped to prefers-color-scheme: dark for users without toggle */
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="light"]) .highlight .k,
+    body:not([data-theme="light"]) .highlight .kd,
+    body:not([data-theme="light"]) .highlight .kn,
+    body:not([data-theme="light"]) .highlight .kp,
+    body:not([data-theme="light"]) .highlight .kr,
+    body:not([data-theme="light"]) .highlight .kt  { color: #84c3a0; }
+
+    body:not([data-theme="light"]) .highlight .s,
+    body:not([data-theme="light"]) .highlight .s1,
+    body:not([data-theme="light"]) .highlight .s2,
+    body:not([data-theme="light"]) .highlight .sb,
+    body:not([data-theme="light"]) .highlight .sc,
+    body:not([data-theme="light"]) .highlight .sd,
+    body:not([data-theme="light"]) .highlight .se,
+    body:not([data-theme="light"]) .highlight .sh,
+    body:not([data-theme="light"]) .highlight .si,
+    body:not([data-theme="light"]) .highlight .sl,
+    body:not([data-theme="light"]) .highlight .ss,
+    body:not([data-theme="light"]) .highlight .sx  { color: #cad78f; }
+
+    body:not([data-theme="light"]) .highlight .c,
+    body:not([data-theme="light"]) .highlight .c1,
+    body:not([data-theme="light"]) .highlight .cm,
+    body:not([data-theme="light"]) .highlight .cs,
+    body:not([data-theme="light"]) .highlight .cp  { color: #708980; font-style: italic; }
+
+    body:not([data-theme="light"]) .highlight .mi,
+    body:not([data-theme="light"]) .highlight .mf,
+    body:not([data-theme="light"]) .highlight .mh,
+    body:not([data-theme="light"]) .highlight .mo,
+    body:not([data-theme="light"]) .highlight .il  { color: #a6cbbb; }
+
+    body:not([data-theme="light"]) .highlight .nf,
+    body:not([data-theme="light"]) .highlight .fm  { color: #d6b56f; }
+
+    body:not([data-theme="light"]) .highlight .nc  { color: #d6b56f; }
+    body:not([data-theme="light"]) .highlight .nb  { color: #9bcdb6; }
+    body:not([data-theme="light"]) .highlight .na  { color: #8ab7ca; }
+
+    body:not([data-theme="light"]) .highlight .o,
+    body:not([data-theme="light"]) .highlight .ow  { color: #84c3a0; }
+
+    body:not([data-theme="light"]) .highlight .n,
+    body:not([data-theme="light"]) .highlight .nn,
+    body:not([data-theme="light"]) .highlight .ni,
+    body:not([data-theme="light"]) .highlight .nd  { color: #e2ece6; }
+
+    body:not([data-theme="light"]) .highlight .p,
+    body:not([data-theme="light"]) .highlight .bp  { color: #edf4ef; }
+
+    body:not([data-theme="light"]) .highlight .nt  { color: #84c3a0; }
+
+    body:not([data-theme="light"]) .highlight .nv,
+    body:not([data-theme="light"]) .highlight .vc,
+    body:not([data-theme="light"]) .highlight .vg,
+    body:not([data-theme="light"]) .highlight .vi  { color: #e2ece6; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Notebook output: scrollable DataFrame tables                        */
+/* ------------------------------------------------------------------ */
+
+.output.text_html {
+    overflow-x: auto;
+    max-width: 100%;
+    display: block;
+}
+
+table.dataframe {
+    border-collapse: collapse !important;
+    font-size: 0.85em;
+    white-space: nowrap;
+    background-color: var(--color-background-primary) !important;
+    color: var(--color-foreground-primary) !important;
+}
+
+table.dataframe th,
+table.dataframe td {
+    border: 1px solid var(--color-background-border, #d0d0d0) !important;
+    padding: 4px 10px !important;
+    background-color: var(--color-background-primary) !important;
+    color: var(--color-foreground-primary) !important;
+}
+
+table.dataframe tbody tr:nth-child(even) th,
+table.dataframe tbody tr:nth-child(even) td {
+    background-color: var(--color-background-secondary) !important;
+}
+
+table.dataframe thead th {
+    background-color: var(--color-background-secondary) !important;
+    font-weight: 600;
+    border-bottom: 2px solid var(--color-brand-primary, #4c7a69) !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* Notebook output images — proportional scaling                       */
+/* ------------------------------------------------------------------ */
+
+.cell_output a.reference.image-reference {
+    display: block;
+    max-width: 100%;
+}
+
+.cell_output a.reference.image-reference img,
+.cell_output img {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block;
+}

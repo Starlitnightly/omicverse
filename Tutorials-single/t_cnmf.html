@@ -1,0 +1,2881 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="GeneModule Identified" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="Tutorials-single/t_cnmf.html" />
+<meta property="og:site_name" content="omicverse" />
+<meta property="og:description" content="In omicverse, we prepared two methods to identify the gene module, one is cNMF, the other one is hospot. Loading dataset: Here, we use the dentategyrus dataset as an example for cNMF or Hospot. Con..." />
+<meta property="og:image:width" content="1146" />
+<meta property="og:image:height" content="600" />
+<meta property="og:image" content="_images/social_previews/summary_Tutorials-single_t_cnmf_10d390f9.png" />
+<meta property="og:image:alt" content="In omicverse, we prepared two methods to identify the gene module, one is cNMF, the other one is hospot. Loading dataset: Here, we use the dentategyrus dataset as an example for cNMF or Hospot. Con..." />
+<meta name="description" content="In omicverse, we prepared two methods to identify the gene module, one is cNMF, the other one is hospot. Loading dataset: Here, we use the dentategyrus dataset as an example for cNMF or Hospot. Con..." />
+<meta name="twitter:card" content="summary_large_image" />
+
+    <title>GeneModule Identified &#8212; omicverse</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster.custom.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster.bundle.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-shadow.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-punk.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-noir.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-light.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/tooltipster-sideTip-borderless.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/micromodal.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=3a64e6d4" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/icons.css?v=b452f90d" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/override.css?v=216aaec1" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/jquery.js?v=5d32c60e"></script>
+    <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+    <script src="../_static/documentation_options.js?v=f9413015"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/js/hoverxref.js"></script>
+    <script src="../_static/js/tooltipster.bundle.min.js"></script>
+    <script src="../_static/js/micromodal.min.js"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'Tutorials-single/t_cnmf';</script>
+    <link rel="icon" href="../_static/favicon.ico"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Lazy analysis of scRNA-seq" href="t_lazy.html" />
+    <link rel="prev" title="Data integration and batch correction" href="t_single_batch.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/logo.png" class="logo__image only-light" alt="omicverse - Home"/>
+    <script>document.write(`<img src="../_static/logo.png" class="logo__image only-dark" alt="omicverse - Home"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../index.html">
+                    OmicVerse Documentation
+                </a>
+            </li>
+        </ul>
+        <ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../Installation_guild.html">OmicVerse Installation Guide</a></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../tutorials/index.html">Tutorials</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_bulk.html">Bulk RNA-seq</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_upstream.html">Upstream</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_mapping_STAR.html">Bulk RNA-seq mapping with STAR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_mapping_kbpython.html">Bulk RNA-seq mapping with kb-python</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_preprocessing.html">Preprocessing</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_bulk_combat.html">Batch correction in Bulk RNA-seq or microarray data</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_downstream.html">Downstream</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_deg.html">Different Expression Analysis</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_deseq2.html">Different Expression Analysis with DEseq2</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_network.html">Protein-Protein interaction (PPI) analysis by String-db</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_wgcna.html">WGCNA (Weighted gene co-expression network analysis) analysis</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_deconvolution.html">Deconvolution</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_decov_bulk.html">Bulk deconvolution with reference scRNA-seq</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_bulk_others.html">Others</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-bulk/t_tcga.html">TCGA database preprocess</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_metabol.html">Metabolomics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_01_intro.html">Metabolomics preprocessing and univariate statistics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_02_multivariate.html">Multivariate discrimination with PLS-DA and OPLS-DA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_03_pathway.html">Metabolite-set enrichment analysis (MSEA)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_04_untargeted.html">Untargeted LC-MS and mummichog pathway inference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_05_lipidomics.html">Lipidomics with LIPID MAPS and LION</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_06_batch_correction.html">Batch effect and drift correction for LC-MS</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_07_multifactor.html">Multi-factor designs — ASCA and linear mixed models</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_08_biomarker.html">Biomarker discovery — univariate AUC + multivariate panel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_09_dgca.html">Differential correlation — DGCA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-metabol/t_metabol_10_multiomics.html">Multi-omics integration — metabolomics + RNA-seq with MOFA</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_microbiome.html">Microbiome</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-microbiome/t_16s_amplicon.html">16S rRNA amplicon analysis with OmicVerse</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-microbiome/t_16s_phylogeny.html">16S phylogeny: MAFFT → FastTree → Faith PD + UniFrac</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-microbiome/t_16s_dada2.html">DADA2 backend: pure-Python ASV inference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-microbiome/t_16s_da_comparison.html">Differential abundance: Wilcoxon vs DESeq2 vs ANCOM-BC</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="../tutorials/index_single.html">Single-Cell RNA-seq</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_alignment.html">Alignment</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="t_alignment_1k.html">Alignment and analysis of single-cell RNA-seq data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_alignment_velocity.html">Alignment and RNA velocity analysis of single-cell RNA-seq data.</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 current active has-children"><a class="reference internal" href="../tutorials/index_single_preprocessing.html">Preprocessing</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="t_preprocess_cpu.html">Preprocessing the data of scRNA-seq with omicverse[CPU-GPU-mixed]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_preprocess_gpu.html">Preprocessing the data of scRNA-seq with omicverse[GPU]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_preprocess_rust.html">Preprocessing the data of scRNA-seq [Rust / out-of-memory]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_cluster.html">Clustering space</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_single_batch.html">Data integration and batch correction</a></li>
+<li class="toctree-l4 current active"><a class="current reference internal" href="#">GeneModule Identified</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_lazy.html">Lazy analysis of scRNA-seq</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_annotation.html">Annotation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="t_anno_noref.html">Reference-free automated single-cell cell type annotation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_anno_ref.html">Reference automated single-cell cell type annotation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_gptanno.html">Automatic cell type annotation with GPT/Other</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_cellmatch.html">Mapping Cell Names to the Cell Ontology/Taxonomy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_cellanno.html">Celltype auto annotation with SCSA</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_metatime.html">Celltype auto annotation with MetaTiME</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_tosica.html">Celltype annotation migration(mapping) with TOSICA</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_scmulan.html">Using scMulan to annotate cell types in Heart, Lung, Liver, Bone marrow, Blood, Brain, and Thymus</a></li>
+
+
+
+
+
+<li class="toctree-l4"><a class="reference internal" href="t_cellvote.html">Consensus annotation with CellVote</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_trajectory.html">Trajectory</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="t_cytotrace.html">Prediction of absolute developmental potential using CytoTrace2</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_traj.html">Basic Trajectory Inference</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_stavia.html">Trajectory Inference with StaVIA</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_cellfate_gene.html">Timing-associated genes analysis with TimeFateKernel</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_cellfate.html">Identify the driver regulators of cell fate decisions</a></li>
+
+
+
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_cell_structure.html">Cell Structure</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="t_metacells.html">Inference of MetaCell from Single-Cell RNA-seq</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_deg_single.html">Differential expression and celltype analysis [All Cell]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_scdeg.html">Differential expression analysis [Meta Cell]</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_scenic.html">Gene Regulatory Network Analysis with SCENIC</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_aucell.html">Pathway analysis with AUCell</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_cellphonedb.html">Cell-cell communication with CellPhoneDB</a></li>
+
+<li class="toctree-l4"><a class="reference internal" href="t_scdrug.html">Drug response predict with scDrug</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_simba.html">Data integration and batch correction with SIMBA</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_velocity.html">Velocity</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-velo/t_velo.html">Velocity Basic Calculation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-velo/t_graphvelo.html">Velocity Optimization</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_single_multi_omics.html">Multi-omics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="t_mofa.html">Multi omics analysis by MOFA</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_mofa_glue.html">Multi omics analysis by MOFA and GLUE</a></li>
+<li class="toctree-l4"><a class="reference internal" href="t_anno_trans.html">Celltype annotation transfer in multi-omics</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_multi_omics.html">Multi-Omics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-Multi-Omics/bulk-single/t_bulktrajblend.html">Bulk RNA-seq generate ‘interrupted’ cells to interpolate scRNA-seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-Multi-Omics/bulk-single/t_bulk2single.html">Bulk RNA-seq to Single RNA-seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-Multi-Omics/bulk-single/t_single2spatial.html">Single RNA-seq to Spatial RNA-seq</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_spatial.html">Spatial Transcriptomics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_spatial_preprocessing.html">Preprocessing</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_crop_rotate.html">Crop and Rotation of spatial transcriptomic data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_cellpose.html">Cell Segmemtation (10x HD)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_nanostring_preprocess.html">Analyze NanoString data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_xenium_preprocess.html">Analyze Xenium data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_visium_hd_preprocess.html">Analyze Visium HD data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_staligner.html">Spatial integration and clustering</a></li>
+
+
+
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_spatial_clustering.html">Clustering</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/cluster/t_cluster_graphst.html">Spatial clustering with GraphST + pymclustR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/cluster/t_cluster_binary.html">Spatial clustering with BINARY + pymclustR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/cluster/t_cluster_stagate.html">Spatial clustering with STAGATE + pymclustR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/cluster/t_cluster_cast.html">Spatial clustering with CAST + pymclustR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/cluster/t_cluster_banksy.html">Spatial clustering with BANKSY + pymclustR</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_spatial_deconvolution.html">Deconvolution</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_spaceflow.html">Identifying Pseudo-Spatial Map</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_decov.html">Spatial deconvolution with reference scRNA-seq</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_flashdeconv.html">FlashDeconv: Fast Spatial Deconvolution via Structure-Preserving Sketching</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_starfysh_new.html">Spatial deconvolution without reference scRNA-seq</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_spatial_downstream.html">Downstream</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_stt.html">Spatial transition tensor of single cells</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_commot_flowsig.html">Spatial Communication</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_gaston.html">Spatial IsoDepth Calculation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-space/t_slat.html">Single cell spatial alignment tools</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_foundation.html">Foundation Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_overview.html">Overview</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_guide.html">ov.fm — Foundation Model Module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm.html">ov.fm — Unified Foundation Model API</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_skill_ready.html">Skill-Ready Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scgpt_guide.html">scGPT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_scgpt.html">scGPT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_geneformer_guide.html">Geneformer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_geneformer.html">GeneFormer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_uce_guide.html">UCE</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_uce.html">UCE</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scfoundation_guide.html">scFoundation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_scfoundation.html">scFoundation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_cellplm_guide.html">CellPLM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_cellplm.html">CellPLM</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_core.html">Core Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scbert_guide.html">scBERT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_genecompass_guide.html">GeneCompass</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_nicheformer_guide.html">Nicheformer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scmulan_guide.html">scMulan</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_specialized.html">Specialized Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_tgpt_guide.html">tGPT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_cellfm_guide.html">CellFM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_sccello_guide.html">scCello</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scprint_guide.html">scPRINT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_aidocell_guide.html">AIDO.Cell</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_pulsar_guide.html">PULSAR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_tabula_guide.html">Tabula</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../tutorials/index_foundation_domain.html">Domain-Specific Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_atacformer_guide.html">ATACformer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_scplantllm_guide.html">scPlantLLM</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_langcell_guide.html">LangCell</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_cell2sentence_guide.html">Cell2Sentence</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_genept_guide.html">GenePT</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../Tutorials-llm/t_fm_chatcell_guide.html">ChatCell</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index_plotting.html">Visualization &amp; Plotting</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-plotting/t_visualize_single.html">Visualization of single cell RNA-seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-plotting/t_visualize_bulk.html">Visualization of Bulk RNA-seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-plotting/t_palette.html">Palette optimization for publication-quality single-cell &amp; spatial plots</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-plotting/t_publication_plotting.html">Scientific plotting for publication with OmicVerse</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-plotting/t_visualize_colorsystem.html">Color system</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../omicclaw/index.html">OmicClaw</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../omicclaw/index_gateway.html">Gateway and Channels</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_msg_bot_overview.html">OmicClaw Gateway Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_setup_auth.html">OmicClaw Setup and Auth</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_channel_telegram.html">OmicClaw Telegram Tutorial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_channel_feishu.html">OmicClaw Feishu 教程</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_channel_imessage.html">OmicClaw iMessage Tutorial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_channel_qq.html">OmicClaw QQ Tutorial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_session_commands.html">OmicClaw Session Workflow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-jarvis/t_troubleshooting.html">OmicClaw Troubleshooting</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../omicclaw/index_mcp.html">MCP Server</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_guide.html">OmicVerse MCP Server</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_quickstart.html">OmicVerse MCP Quick Start</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_full_start.html">OmicVerse MCP Full Start</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_tools.html">OmicVerse MCP Tool Catalog</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_clients.html">OmicVerse MCP Clients and Deployment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_runtime.html">OmicVerse MCP Runtime and Troubleshooting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_reference.html">OmicVerse MCP Reference</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_mcp_claude_code.html">Using OmicVerse MCP with Claude Code — Step by Step</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../omicclaw/index_notebooks.html">General Notebooks</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/t_ov_agent_pbmc3k.html">J.A.R.V.I.S. with PBMC3k</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../Tutorials-llm/ov_agent_ten_task_suite.html">J.A.R.V.I.S. with Ten-Task Suite</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../api/index.html">API Reference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../api/user.html">User API</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.generate_reference_table.html">omicverse.generate_reference_table</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.settings.cpu_gpu_mixed_init.html">omicverse.settings.cpu_gpu_mixed_init</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.settings.gpu_init.html">omicverse.settings.gpu_init</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.load.html">omicverse.io.load</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read.html">omicverse.io.read</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_10x_h5.html">omicverse.io.read_10x_h5</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_10x_mtx.html">omicverse.io.read_10x_mtx</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_csv.html">omicverse.io.read_csv</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_h5ad.html">omicverse.io.read_h5ad</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_nanostring.html">omicverse.io.read_nanostring</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_visium_hd.html">omicverse.io.read_visium_hd</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_visium_hd_bin.html">omicverse.io.read_visium_hd_bin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_visium_hd_seg.html">omicverse.io.read_visium_hd_seg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.read_xenium.html">omicverse.io.read_xenium</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.save.html">omicverse.io.save</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.io.spatial.read_visium.html">omicverse.io.spatial.read_visium</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.bulk_rnaseq_pipeline.html">omicverse.alignment.bulk_rnaseq_pipeline</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.count.html">omicverse.alignment.count</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.fastp.html">omicverse.alignment.fastp</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.featureCount.html">omicverse.alignment.featureCount</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.fqdump.html">omicverse.alignment.fqdump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.parallel_fastq_dump.html">omicverse.alignment.parallel_fastq_dump</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.prefetch.html">omicverse.alignment.prefetch</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.ref.html">omicverse.alignment.ref</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.alignment.STAR.html">omicverse.alignment.STAR</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.anndata_to_CPU.html">omicverse.pp.anndata_to_CPU</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.anndata_to_GPU.html">omicverse.pp.anndata_to_GPU</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.binary_search.html">omicverse.pp.binary_search</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.filter_cells.html">omicverse.pp.filter_cells</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.filter_genes.html">omicverse.pp.filter_genes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.highly_variable_features.html">omicverse.pp.highly_variable_features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.highly_variable_genes.html">omicverse.pp.highly_variable_genes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.identify_robust_genes.html">omicverse.pp.identify_robust_genes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.leiden.html">omicverse.pp.leiden</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.log1p.html">omicverse.pp.log1p</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.louvain.html">omicverse.pp.louvain</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.mde.html">omicverse.pp.mde</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.neighbors.html">omicverse.pp.neighbors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.normalize_pearson_residuals.html">omicverse.pp.normalize_pearson_residuals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.pca.html">omicverse.pp.pca</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.preprocess.html">omicverse.pp.preprocess</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.qc.html">omicverse.pp.qc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.recover_counts.html">omicverse.pp.recover_counts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.regress.html">omicverse.pp.regress</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.regress_and_scale.html">omicverse.pp.regress_and_scale</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.remove_cc_genes.html">omicverse.pp.remove_cc_genes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.scale.html">omicverse.pp.scale</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.score_genes_cell_cycle.html">omicverse.pp.score_genes_cell_cycle</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.scrublet.html">omicverse.pp.scrublet</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.scrublet_simulate_doublets.html">omicverse.pp.scrublet_simulate_doublets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.select_hvf_pegasus.html">omicverse.pp.select_hvf_pegasus</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.sude.html">omicverse.pp.sude</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.tsne.html">omicverse.pp.tsne</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pp.umap.html">omicverse.pp.umap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Annotation.html">omicverse.single.Annotation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.AnnotationRef.html">omicverse.single.AnnotationRef</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.autoResolution.html">omicverse.single.autoResolution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.batch_correction.html">omicverse.single.batch_correction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.CellOntologyMapper.html">omicverse.single.CellOntologyMapper</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.CellVote.html">omicverse.single.CellVote</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.cNMF.html">omicverse.single.cNMF</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.convert_human_to_mouse_network.html">omicverse.single.convert_human_to_mouse_network</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.cosg.html">omicverse.single.cosg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.cytotrace2.html">omicverse.single.cytotrace2</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.DCT.html">omicverse.single.DCT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.DEG.html">omicverse.single.DEG</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.download_cl.html">omicverse.single.download_cl</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Drug_Response.html">omicverse.single.Drug_Response</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.dynamic_features.html">omicverse.single.dynamic_features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.factor_correlation.html">omicverse.single.factor_correlation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.factor_exact.html">omicverse.single.factor_exact</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Fate.html">omicverse.single.Fate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.find_markers.html">omicverse.single.find_markers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.gene_trends.html">omicverse.single.gene_trends</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.generate_scRNA_report.html">omicverse.single.generate_scRNA_report</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.geneset_aucell.html">omicverse.single.geneset_aucell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_celltype_marker.html">omicverse.single.get_celltype_marker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_cluster_celltype.html">omicverse.single.get_cluster_celltype</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_markers.html">omicverse.single.get_markers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_obs_value.html">omicverse.single.get_obs_value</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.get_weights.html">omicverse.single.get_weights</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.GLUE_pair.html">omicverse.single.GLUE_pair</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.gptcelltype.html">omicverse.single.gptcelltype</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.gptcelltype_local.html">omicverse.single.gptcelltype_local</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.lazy.html">omicverse.single.lazy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.load_human_prior_interaction_network.html">omicverse.single.load_human_prior_interaction_network</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.MetaCell.html">omicverse.single.MetaCell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.MetaTiME.html">omicverse.single.MetaTiME</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Monocle.html">omicverse.single.Monocle</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.mouse_hsc_nestorowa16.html">omicverse.single.mouse_hsc_nestorowa16</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pathway_aucell.html">omicverse.single.pathway_aucell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pathway_aucell_enrichment.html">omicverse.single.pathway_aucell_enrichment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pathway_enrichment.html">omicverse.single.pathway_enrichment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pathway_enrichment_plot.html">omicverse.single.pathway_enrichment_plot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.plot_metacells.html">omicverse.single.plot_metacells</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pyCEFCON.html">omicverse.single.pyCEFCON</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pyMOFA.html">omicverse.single.pyMOFA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pyMOFAART.html">omicverse.single.pyMOFAART</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pySCSA.html">omicverse.single.pySCSA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pySIMBA.html">omicverse.single.pySIMBA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.pyTOSICA.html">omicverse.single.pyTOSICA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.run_cellphonedb_v5.html">omicverse.single.run_cellphonedb_v5</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.scanpy_cellanno_from_dict.html">omicverse.single.scanpy_cellanno_from_dict</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.SCENIC.html">omicverse.single.SCENIC</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.TrajInfer.html">omicverse.single.TrajInfer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.single.Velo.html">omicverse.single.Velo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.batch_correction.html">omicverse.bulk.batch_correction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.Deconvolution.html">omicverse.bulk.Deconvolution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.geneset_enrichment.html">omicverse.bulk.geneset_enrichment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.geneset_plot.html">omicverse.bulk.geneset_plot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.geneset_plot_multi.html">omicverse.bulk.geneset_plot_multi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.Matrix_ID_mapping.html">omicverse.bulk.Matrix_ID_mapping</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.pyDEG.html">omicverse.bulk.pyDEG</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.pyGSEA.html">omicverse.bulk.pyGSEA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.pyPPI.html">omicverse.bulk.pyPPI</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.pyTCGA.html">omicverse.bulk.pyTCGA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk.string_interaction.html">omicverse.bulk.string_interaction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.bin2cell.html">omicverse.space.bin2cell</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.Cal_Spatial_Net.html">omicverse.space.Cal_Spatial_Net</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.calculate_gene_signature.html">omicverse.space.calculate_gene_signature</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.CAST.html">omicverse.space.CAST</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.cellcharter.html">omicverse.space.cellcharter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.CellLoc.html">omicverse.space.CellLoc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.CellMap.html">omicverse.space.CellMap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.clusters.html">omicverse.space.clusters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.create_communication_anndata.html">omicverse.space.create_communication_anndata</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.crop_space_visium.html">omicverse.space.crop_space_visium</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.Deconvolution.html">omicverse.space.Deconvolution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.GASTON.html">omicverse.space.GASTON</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.map_spatial_auto.html">omicverse.space.map_spatial_auto</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.map_spatial_manual.html">omicverse.space.map_spatial_manual</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.merge_cluster.html">omicverse.space.merge_cluster</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.moranI.html">omicverse.space.moranI</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.pySpaceFlow.html">omicverse.space.pySpaceFlow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.pySTAGATE.html">omicverse.space.pySTAGATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.pySTAligner.html">omicverse.space.pySTAligner</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.read_visium_10x.html">omicverse.space.read_visium_10x</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.rotate_space_visium.html">omicverse.space.rotate_space_visium</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.salvage_secondary_labels.html">omicverse.space.salvage_secondary_labels</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.spatial_autocorr.html">omicverse.space.spatial_autocorr</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.spatial_neighbors.html">omicverse.space.spatial_neighbors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.STT.html">omicverse.space.STT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.svg.html">omicverse.space.svg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.sync_visium_hd_seg_geometries.html">omicverse.space.sync_visium_hd_seg_geometries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.Tangram.html">omicverse.space.Tangram</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.update_classification_from_database.html">omicverse.space.update_classification_from_database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.visium_10x_hd_cellpose_expand.html">omicverse.space.visium_10x_hd_cellpose_expand</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.visium_10x_hd_cellpose_gex.html">omicverse.space.visium_10x_hd_cellpose_gex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.space.visium_10x_hd_cellpose_he.html">omicverse.space.visium_10x_hd_cellpose_he</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.Bulk2Single.html">omicverse.bulk2single.Bulk2Single</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.bulk2single_plot_cellprop.html">omicverse.bulk2single.bulk2single_plot_cellprop</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.bulk2single_plot_correlation.html">omicverse.bulk2single.bulk2single_plot_correlation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.BulkTrajBlend.html">omicverse.bulk2single.BulkTrajBlend</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.bulk2single.Single2Spatial.html">omicverse.bulk2single.Single2Spatial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.add_density_contour.html">omicverse.pl.add_density_contour</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.add_palue.html">omicverse.pl.add_palue</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.add_pie2spatial.html">omicverse.pl.add_pie2spatial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.add_streamplot.html">omicverse.pl.add_streamplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.bardotplot.html">omicverse.pl.bardotplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.boxplot.html">omicverse.pl.boxplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.calculate_gene_density.html">omicverse.pl.calculate_gene_density</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ccc_heatmap.html">omicverse.pl.ccc_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ccc_network_plot.html">omicverse.pl.ccc_network_plot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ccc_stat_plot.html">omicverse.pl.ccc_stat_plot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.cell_cor_heatmap.html">omicverse.pl.cell_cor_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.CellChatViz.html">omicverse.pl.CellChatViz</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.cellproportion.html">omicverse.pl.cellproportion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.complexheatmap.html">omicverse.pl.complexheatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.contour.html">omicverse.pl.contour</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ConvexHull.html">omicverse.pl.ConvexHull</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.create_custom_colormap.html">omicverse.pl.create_custom_colormap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.dotplot.html">omicverse.pl.dotplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.dynamic_heatmap.html">omicverse.pl.dynamic_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.dynamic_trends.html">omicverse.pl.dynamic_trends</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding.html">omicverse.pl.embedding</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding_adjust.html">omicverse.pl.embedding_adjust</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding_atlas.html">omicverse.pl.embedding_atlas</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding_celltype.html">omicverse.pl.embedding_celltype</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.embedding_density.html">omicverse.pl.embedding_density</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.feature_heatmap.html">omicverse.pl.feature_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.ForbiddenCity.html">omicverse.pl.ForbiddenCity</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.gen_mpl_labels.html">omicverse.pl.gen_mpl_labels</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.geneset_wordcloud.html">omicverse.pl.geneset_wordcloud</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.group_heatmap.html">omicverse.pl.group_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.marker_heatmap.html">omicverse.pl.marker_heatmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.markers_dotplot.html">omicverse.pl.markers_dotplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.palette.html">omicverse.pl.palette</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_cellproportion.html">omicverse.pl.plot_cellproportion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_embedding_celltype.html">omicverse.pl.plot_embedding_celltype</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_flowsig_network.html">omicverse.pl.plot_flowsig_network</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_grouped_fractions.html">omicverse.pl.plot_grouped_fractions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_pca_variance_ratio.html">omicverse.pl.plot_pca_variance_ratio</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_set.html">omicverse.pl.plot_set</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_spatial.html">omicverse.pl.plot_spatial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.plot_text_set.html">omicverse.pl.plot_text_set</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.rank_genes_groups_dotplot.html">omicverse.pl.rank_genes_groups_dotplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.single_group_boxplot.html">omicverse.pl.single_group_boxplot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.tsne.html">omicverse.pl.tsne</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.umap.html">omicverse.pl.umap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.venn.html">omicverse.pl.venn</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.violin.html">omicverse.pl.violin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.pl.volcano.html">omicverse.pl.volcano</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.bhattacherjee.html">omicverse.datasets.bhattacherjee</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.blobs.html">omicverse.datasets.blobs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.bm.html">omicverse.datasets.bm</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.bone_marrow.html">omicverse.datasets.bone_marrow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.burczynski06.html">omicverse.datasets.burczynski06</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.chromaffin.html">omicverse.datasets.chromaffin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.cite_seq.html">omicverse.datasets.cite_seq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.create_mock_dataset.html">omicverse.datasets.create_mock_dataset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.decov_bulk_covid_bulk.html">omicverse.datasets.decov_bulk_covid_bulk</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.decov_bulk_covid_single.html">omicverse.datasets.decov_bulk_covid_single</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.dentate_gyrus.html">omicverse.datasets.dentate_gyrus</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.dentate_gyrus_scvelo.html">omicverse.datasets.dentate_gyrus_scvelo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.download_data.html">omicverse.datasets.download_data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.download_data_requests.html">omicverse.datasets.download_data_requests</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.get_adata.html">omicverse.datasets.get_adata</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.gillespie.html">omicverse.datasets.gillespie</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.haber.html">omicverse.datasets.haber</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.hematopoiesis.html">omicverse.datasets.hematopoiesis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.hematopoiesis_raw.html">omicverse.datasets.hematopoiesis_raw</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.hg_forebrain_glutamatergic.html">omicverse.datasets.hg_forebrain_glutamatergic</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.hl60.html">omicverse.datasets.hl60</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.human_tfs.html">omicverse.datasets.human_tfs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.krumsiek11.html">omicverse.datasets.krumsiek11</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.moignard15.html">omicverse.datasets.moignard15</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.multi_brain_5k.html">omicverse.datasets.multi_brain_5k</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.nascseq.html">omicverse.datasets.nascseq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.pancreas_cellrank.html">omicverse.datasets.pancreas_cellrank</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.pancreatic_endocrinogenesis.html">omicverse.datasets.pancreatic_endocrinogenesis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.paul15.html">omicverse.datasets.paul15</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.pbmc3k.html">omicverse.datasets.pbmc3k</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.pbmc8k.html">omicverse.datasets.pbmc8k</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.sc_ref_Lymph_Node.html">omicverse.datasets.sc_ref_Lymph_Node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.sceu_seq_organoid.html">omicverse.datasets.sceu_seq_organoid</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.sceu_seq_rpe1.html">omicverse.datasets.sceu_seq_rpe1</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.scifate.html">omicverse.datasets.scifate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.scnt_seq_neuron_labeling.html">omicverse.datasets.scnt_seq_neuron_labeling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.scnt_seq_neuron_splicing.html">omicverse.datasets.scnt_seq_neuron_splicing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.scslamseq.html">omicverse.datasets.scslamseq</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.seqfish.html">omicverse.datasets.seqfish</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.toggleswitch.html">omicverse.datasets.toggleswitch</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.datasets.zebrafish.html">omicverse.datasets.zebrafish</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.external.GraphST.html">omicverse.external.GraphST</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.call_tool.html">omicverse.utils.biocontext.call_tool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.get_ensembl_id.html">omicverse.utils.biocontext.get_ensembl_id</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.get_fulltext.html">omicverse.utils.biocontext.get_fulltext</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.get_uniprot_id.html">omicverse.utils.biocontext.get_uniprot_id</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.list_tools.html">omicverse.utils.biocontext.list_tools</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_alphafold.html">omicverse.utils.biocontext.query_alphafold</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_cell_ontology.html">omicverse.utils.biocontext.query_cell_ontology</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_chebi.html">omicverse.utils.biocontext.query_chebi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_efo.html">omicverse.utils.biocontext.query_efo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_go.html">omicverse.utils.biocontext.query_go</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_hpa.html">omicverse.utils.biocontext.query_hpa</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_interpro.html">omicverse.utils.biocontext.query_interpro</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_opentargets.html">omicverse.utils.biocontext.query_opentargets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_panglaodb.html">omicverse.utils.biocontext.query_panglaodb</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_reactome.html">omicverse.utils.biocontext.query_reactome</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_string.html">omicverse.utils.biocontext.query_string</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.query_uniprot.html">omicverse.utils.biocontext.query_uniprot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_clinical_trials.html">omicverse.utils.biocontext.search_clinical_trials</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_drugs.html">omicverse.utils.biocontext.search_drugs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_interpro.html">omicverse.utils.biocontext.search_interpro</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_literature.html">omicverse.utils.biocontext.search_literature</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_preprints.html">omicverse.utils.biocontext.search_preprints</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.biocontext.search_pride.html">omicverse.utils.biocontext.search_pride</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.cal_paga.html">omicverse.utils.cal_paga</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.cluster.html">omicverse.utils.cluster</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert2gene_id.html">omicverse.utils.convert2gene_id</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert2gene_symbol.html">omicverse.utils.convert2gene_symbol</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert2symbol.html">omicverse.utils.convert2symbol</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert_adata_for_rust.html">omicverse.utils.convert_adata_for_rust</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.convert_to_pandas.html">omicverse.utils.convert_to_pandas</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_CaDRReS_model.html">omicverse.utils.download_CaDRReS_model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_GDSC_data.html">omicverse.utils.download_GDSC_data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_geneid_annotation_pair.html">omicverse.utils.download_geneid_annotation_pair</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_pathway_database.html">omicverse.utils.download_pathway_database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.download_tosica_gmt.html">omicverse.utils.download_tosica_gmt</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.geneset_prepare.html">omicverse.utils.geneset_prepare</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.get_gene_annotation.html">omicverse.utils.get_gene_annotation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.gtf_to_pair_tsv.html">omicverse.utils.gtf_to_pair_tsv</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.LDA_topic.html">omicverse.utils.LDA_topic</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.mde.html">omicverse.utils.mde</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.plot_paga.html">omicverse.utils.plot_paga</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.refine_label.html">omicverse.utils.refine_label</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.retrieve_layers.html">omicverse.utils.retrieve_layers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.roe.html">omicverse.utils.roe</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.store_layers.html">omicverse.utils.store_layers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.symbol2id.html">omicverse.utils.symbol2id</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.weighted_knn_trainer.html">omicverse.utils.weighted_knn_trainer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.weighted_knn_transfer.html">omicverse.utils.weighted_knn_transfer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/reference/omicverse.utils.wrap_dataframe.html">omicverse.utils.wrap_dataframe</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../Release_notes.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../Developer_guild.html">Developer guild</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../GPU_supported_registry_functions.html">Registered Functions — GPU Support Overview</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/Starlitnightly/omicverse/discussions">Discussion</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/Starlitnightly/omicverse">GitHub</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/Starlitnightly/omicverse" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/Starlitnightly/omicverse/blob/master/docs/Tutorials-single/t_cnmf.ipynb?plain=1" target="_blank"
+   class="btn btn-sm btn-source-file-button dropdown-item"
+   title="Show source"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-code"></i>
+  </span>
+<span class="btn__text-container">Show source</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/Starlitnightly/omicverse/edit/master/docs/Tutorials-single/t_cnmf.ipynb" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/Starlitnightly/omicverse/issues/new?title=Issue%20on%20page%20%2FTutorials-single/t_cnmf.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/Tutorials-single/t_cnmf.ipynb" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.ipynb</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>GeneModule Identified</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#loading-dataset">Loading dataset</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#consensus-non-negative-matrix-factorization-cnmf">Consensus Non-negative Matrix factorization (cNMF)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-and-training-model">Initialize and Training model</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#compute-the-stability-and-error-at-each-choice-of-k-to-see-if-a-clear-choice-jumps-out">Compute the stability and error at each choice of K to see if a clear choice jumps out.</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#visualization-the-result">Visualization the result</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#explode-the-cnmf-result">Explode the cNMF result</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#hotspot">Hotspot</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#determining-informative-genes">Determining informative genes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#grouping-genes-into-lineage-based-modules">Grouping genes into lineage-based modules</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#summary-module-scores">Summary Module Scores</a></li>
+</ul>
+</li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="genemodule-identified">
+<h1>GeneModule Identified<a class="headerlink" href="#genemodule-identified" title="Link to this heading">#</a></h1>
+<p>In omicverse, we prepared two methods to identify the gene module, one is <code class="docutils literal notranslate"><span class="pre">cNMF</span></code>, the other one is <code class="docutils literal notranslate"><span class="pre">hospot</span></code>.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">scanpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sc</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">omicverse</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ov</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">style</span><span class="p">(</span><span class="n">font_path</span><span class="o">=</span><span class="s1">&#39;Arial&#39;</span><span class="p">)</span>
+
+<span class="o">%</span><span class="k">load_ext</span> autoreload
+<span class="o">%</span><span class="k">autoreload</span> 2
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>🔬 Starting plot initialization...
+Using already downloaded Arial font from: /tmp/omicverse_arial.ttf
+Registered as: Arial
+🧬 Detecting GPU devices…
+✅ NVIDIA CUDA GPUs detected: 1
+    • [CUDA 0] NVIDIA H100 80GB HBM3
+      Memory: 79.1 GB | Compute: 9.0
+
+   ____            _     _    __                  
+  / __ \____ ___  (_)___| |  / /__  _____________ 
+ / / / / __ `__ \/ / ___/ | / / _ \/ ___/ ___/ _ \ 
+/ /_/ / / / / / / / /__ | |/ /  __/ /  (__  )  __/ 
+\____/_/ /_/ /_/_/\___/ |___/\___/_/  /____/\___/                                              
+
+🔖 Version: 1.7.9rc1   📚 Tutorials: https://omicverse.readthedocs.io/
+✅ plot_set complete.
+</pre></div>
+</div>
+</div>
+</div>
+<section id="loading-dataset">
+<h2>Loading dataset<a class="headerlink" href="#loading-dataset" title="Link to this heading">#</a></h2>
+<p>Here, we use the dentategyrus dataset as an example for cNMF or Hospot.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">adata</span><span class="o">=</span><span class="n">ov</span><span class="o">.</span><span class="n">datasets</span><span class="o">.</span><span class="n">pancreatic_endocrinogenesis</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>🔍 Downloading data to ./data/endocrinogenesis_day15.h5ad
+⚠️ File ./data/endocrinogenesis_day15.h5ad already exists
+ Loading data from ./data/endocrinogenesis_day15.h5ad
+✅ Successfully loaded: 3696 cells × 27998 genes
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="o">%%time</span>
+<span class="n">adata</span><span class="o">=</span><span class="n">ov</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">preprocess</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;shiftlog|pearson&#39;</span><span class="p">,</span><span class="n">n_HVGs</span><span class="o">=</span><span class="mi">2000</span><span class="p">,)</span>
+<span class="n">adata</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>🔍 [2026-01-07 17:06:35] Running preprocessing in &#39;cpu&#39; mode...
+Begin robust gene identification
+    After filtration, 17750/27998 genes are kept.
+    Among 17750 genes, 16426 genes are robust.
+✅ Robust gene identification completed successfully.
+Begin size normalization: shiftlog and HVGs selection pearson
+
+<span class=" -Color -Color-Bold">🔍 Count Normalization:</span>
+   Target sum: <span class=" -Color -Color-Bold">500000.0</span>
+   Exclude highly expressed: <span class=" -Color -Color-Bold">True</span>
+   Max fraction threshold: <span class=" -Color -Color-Bold">0.2</span>
+   ⚠️ Excluding <span class=" -Color -Color-Bold">1</span> highly-expressed genes from normalization computation
+   Excluded genes: <span class=" -Color -Color-Bold">[&#39;Ghrl&#39;]</span>
+
+✅ Count Normalization Completed Successfully!
+   ✓ Processed: <span class=" -Color -Color-Bold">3,696</span> cells × <span class=" -Color -Color-Bold">16,426</span> genes
+   ✓ Runtime: <span class=" -Color -Color-Bold">0.25s</span>
+
+<span class=" -Color -Color-Bold">🔍 Highly Variable Genes Selection (Experimental):</span>
+   Method: <span class=" -Color -Color-Bold">pearson_residuals</span>
+   Target genes: <span class=" -Color -Color-Bold">2,000</span>
+   Theta (overdispersion): <span class=" -Color -Color-Bold">100</span>
+
+✅ Experimental HVG Selection Completed Successfully!
+   ✓ Selected: <span class=" -Color -Color-Bold">2,000</span> highly variable genes out of <span class=" -Color -Color-Bold">16,426</span> total (12.2%)
+   ✓ Results added to AnnData object:
+     • &#39;highly_variable&#39;: <span class=" -Color -Color-Bold">Boolean vector</span> (adata.var)
+     • &#39;highly_variable_rank&#39;: <span class=" -Color -Color-Bold">Float vector</span> (adata.var)
+     • &#39;highly_variable_nbatches&#39;: <span class=" -Color -Color-Bold">Int vector</span> (adata.var)
+     • &#39;highly_variable_intersection&#39;: <span class=" -Color -Color-Bold">Boolean vector</span> (adata.var)
+     • &#39;means&#39;: <span class=" -Color -Color-Bold">Float vector</span> (adata.var)
+     • &#39;variances&#39;: <span class=" -Color -Color-Bold">Float vector</span> (adata.var)
+     • &#39;residual_variances&#39;: <span class=" -Color -Color-Bold">Float vector</span> (adata.var)
+    Time to analyze data in cpu: 1.11 seconds.
+✅ Preprocessing completed successfully.
+    Added:
+        &#39;highly_variable_features&#39;, boolean vector (adata.var)
+        &#39;means&#39;, float vector (adata.var)
+        &#39;variances&#39;, float vector (adata.var)
+        &#39;residual_variances&#39;, float vector (adata.var)
+        &#39;counts&#39;, raw counts layer (adata.layers)
+    End of size normalization: shiftlog and HVGs selection pearson
+CPU times: user 1.43 s, sys: 717 ms, total: 2.15 s
+Wall time: 1.51 s
+</pre></div>
+</div>
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>AnnData object with n_obs × n_vars = 3696 × 16426
+    obs: &#39;clusters_coarse&#39;, &#39;clusters&#39;, &#39;S_score&#39;, &#39;G2M_score&#39;
+    var: &#39;highly_variable_genes&#39;, &#39;n_cells&#39;, &#39;percent_cells&#39;, &#39;robust&#39;, &#39;highly_variable_features&#39;, &#39;means&#39;, &#39;variances&#39;, &#39;residual_variances&#39;, &#39;highly_variable_rank&#39;, &#39;highly_variable&#39;
+    uns: &#39;clusters_coarse_colors&#39;, &#39;clusters_colors&#39;, &#39;day_colors&#39;, &#39;neighbors&#39;, &#39;pca&#39;, &#39;log1p&#39;, &#39;hvg&#39;, &#39;status&#39;, &#39;status_args&#39;, &#39;REFERENCE_MANU&#39;
+    obsm: &#39;X_pca&#39;, &#39;X_umap&#39;
+    layers: &#39;spliced&#39;, &#39;unspliced&#39;, &#39;counts&#39;
+    obsp: &#39;distances&#39;, &#39;connectivities&#39;
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ov</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">scale</span><span class="p">(</span><span class="n">adata</span><span class="p">)</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">pca</span><span class="p">(</span><span class="n">adata</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>computing PCA🔍
+    with n_comps=50
+   🖥️ Using sklearn PCA for CPU computation
+   🖥️ sklearn PCA backend: CPU computation
+    finished✅ (0:00:02)
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">patheffects</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">4</span><span class="p">))</span>
+<span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span>
+    <span class="n">adata</span><span class="p">,</span>
+    <span class="n">basis</span><span class="o">=</span><span class="s2">&quot;X_umap&quot;</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;clusters&#39;</span><span class="p">],</span>
+    <span class="n">frameon</span><span class="o">=</span><span class="s1">&#39;small&#39;</span><span class="p">,</span>
+    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Celltypes&quot;</span><span class="p">,</span>
+    <span class="c1">#legend_loc=&#39;on data&#39;,</span>
+    <span class="n">legend_fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span>
+    <span class="n">legend_fontoutline</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="c1">#size=10,</span>
+    <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span>
+    <span class="c1">#legend_loc=True, </span>
+    <span class="n">add_outline</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> 
+    <span class="c1">#add_outline=True,</span>
+    <span class="n">outline_color</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">,</span>
+    <span class="n">outline_width</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;Axes: title={&#39;center&#39;: &#39;Celltypes&#39;}, xlabel=&#39;X_umap1&#39;, ylabel=&#39;X_umap2&#39;&gt;
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/4d188f5931fe40203039c4eb82f4846163c98d3cac9ddcd71012e084f0026cad.png"><img alt="../_images/4d188f5931fe40203039c4eb82f4846163c98d3cac9ddcd71012e084f0026cad.png" src="../_images/4d188f5931fe40203039c4eb82f4846163c98d3cac9ddcd71012e084f0026cad.png" style="width: 391px; height: 284px;" />
+</a>
+</div>
+</div>
+</section>
+<section id="consensus-non-negative-matrix-factorization-cnmf">
+<h2>Consensus Non-negative Matrix factorization (cNMF)<a class="headerlink" href="#consensus-non-negative-matrix-factorization-cnmf" title="Link to this heading">#</a></h2>
+<p>cNMF is an analysis pipeline for inferring gene expression programs from single-cell RNA-Seq (scRNA-Seq) data.</p>
+<p>It takes a count matrix (N cells X G genes) as input and produces a (K x G) matrix of gene expression programs (GEPs) and a (N x K) matrix specifying the usage of each program for each cell in the data. You can read more about the method in the <a class="reference external" href="https://github.com/dylkot/cNMF">github</a> and check out examples on dentategyrus.</p>
+<ul class="simple">
+<li><p>Dylan KotliarAdrian VeresM Aurel NagyShervin TabriziEran HodisDouglas A MeltonPardis C Sabeti (2019) Identifying gene expression programs of cell-type identity and cellular activity with single-cell RNA-Seq eLife 8:e43803.</p></li>
+</ul>
+<section id="initialize-and-training-model">
+<h3>Initialize and Training model<a class="headerlink" href="#initialize-and-training-model" title="Link to this heading">#</a></h3>
+<p>In omicverse, you can set <code class="docutils literal notranslate"><span class="pre">use_gpu=True</span></code> to perform the NMF analysis using torchnmf package, it’s easy to install using <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">torchnmf</span></code>. But it should be noticed the accurancy is different if you use <code class="docutils literal notranslate"><span class="pre">use_gpu=True</span></code> mode.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="c1">## Initialize the cnmf object that will be used to run analyses</span>
+<span class="n">cnmf_obj</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">single</span><span class="o">.</span><span class="n">cNMF</span><span class="p">(</span>
+    <span class="n">adata</span><span class="p">,</span><span class="n">components</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">15</span><span class="p">),</span> <span class="n">n_iter</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> 
+    <span class="n">seed</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span> <span class="n">num_highvar_genes</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span>
+    <span class="n">output_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;pancrea_cNMF&#39;</span><span class="p">,</span><span class="n">use_gpu</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>normalizing counts per cell
+    finished (0:00:00)
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">## Specify that the jobs are being distributed over a single worker (total_workers=1) and then launch that worker</span>
+<span class="n">cnmf_obj</span><span class="o">.</span><span class="n">factorize</span><span class="p">(</span><span class="n">worker_i</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">total_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>🚀 Running NMF on GPU (device 0)
+Running 200 factorization iterations for worker 0...
+✓ Worker 0 completed 200 iterations. Total in memory: 200
+</pre></div>
+</div>
+</div>
+</div>
+<p>if u want to accerlate the calculation, you can try the code below</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#cnmf_obj.factorize(worker_i=0, total_workers=2)</span>
+<span class="c1">#cnmf_obj.factorize(worker_i=1, total_workers=2)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">cnmf_obj</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span><span class="n">skip_missing_files</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Combining factorizations for k=5.
+  Found all 20 iterations for k=5
+Combining factorizations for k=6.
+  Found all 20 iterations for k=6
+Combining factorizations for k=7.
+  Found all 20 iterations for k=7
+Combining factorizations for k=8.
+  Found all 20 iterations for k=8
+Combining factorizations for k=9.
+  Found all 20 iterations for k=9
+Combining factorizations for k=10.
+  Found all 20 iterations for k=10
+Combining factorizations for k=11.
+  Found all 20 iterations for k=11
+Combining factorizations for k=12.
+  Found all 20 iterations for k=12
+Combining factorizations for k=13.
+  Found all 20 iterations for k=13
+Combining factorizations for k=14.
+  Found all 20 iterations for k=14
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">cnmf_obj</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;test/cnmf_obj.pkl&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>✓ cNMF object saved to: test/cnmf_obj.pkl
+  - 200 factorization iterations
+  - 10 merged spectra (K values)
+  - 0 consensus results
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">cnmf_obj</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;test/cnmf_obj.pkl&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><span class=" -Color -Color-Bold">📂 Load Operation:</span>
+   Source path: <span class=" -Color -Color-Bold">test/cnmf_obj.pkl</span>
+   Using: <span class=" -Color -Color-Bold">pickle</span>
+   ✅ Successfully loaded!
+   Loaded object type: <span class=" -Color -Color-Bold">cNMF</span>
+────────────────────────────────────────────────────────────
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="compute-the-stability-and-error-at-each-choice-of-k-to-see-if-a-clear-choice-jumps-out">
+<h3>Compute the stability and error at each choice of K to see if a clear choice jumps out.<a class="headerlink" href="#compute-the-stability-and-error-at-each-choice-of-k-to-see-if-a-clear-choice-jumps-out" title="Link to this heading">#</a></h3>
+<p>Please note that the maximum stability solution is not always the best choice depending on the application. However it is often a good starting point even if you have to investigate several choices of K</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sil_data</span> <span class="o">=</span> <span class="n">cnmf_obj</span><span class="o">.</span><span class="n">calculate_silhouette_k</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">density_threshold</span><span class="o">=</span><span class="mf">2.0</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Average silhouette score: </span><span class="si">{</span><span class="n">sil_data</span><span class="p">[</span><span class="s1">&#39;avg_silhouette&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Per-sample scores: </span><span class="si">{</span><span class="n">sil_data</span><span class="p">[</span><span class="s1">&#39;silhouette_values&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cluster labels: </span><span class="si">{</span><span class="n">sil_data</span><span class="p">[</span><span class="s1">&#39;cluster_labels&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Average silhouette score: 0.6299
+Per-sample scores: [0.7106916  0.5630814  0.9380699  0.9647325  0.7674971  0.6231896
+ 0.7462224  0.37565622 0.6270655  0.06985006 0.57842237 0.7953116
+ 0.6916376  0.78109527 0.7101993  0.55603576 0.7441653  0.75451505
+ 0.5479283  0.9625558  0.39097318 0.43278462 0.97507685 0.60460097
+ 0.7781605  0.67471343 0.53983855 0.76693016 0.64284235 0.41358513
+ 0.7894957  0.5756324  0.9714798  0.54308915 0.73912    0.5916759
+ 0.29305577 0.5943038  0.9639678  0.75087273 0.4957365  0.7721111
+ 0.5499817  0.5790103  0.73023146 0.588068   0.77418405 0.18887511
+ 0.3828089  0.71155    0.93825644 0.66316015 0.7878561  0.9744356
+ 0.7274356  0.628735   0.96383363 0.63263124 0.64927    0.17515936
+ 0.7908563  0.59846324 0.67699015 0.37909067 0.7533861  0.27464965
+ 0.94846934 0.56372494 0.62612045 0.39772192 0.4309683  0.50130105
+ 0.5352081  0.2945753  0.7588943  0.7905221  0.7286009  0.94101614
+ 0.5963504  0.60703915 0.6570392  0.17053658 0.7238535  0.63654566
+ 0.164855   0.60783756 0.70025706 0.64824665 0.08693045 0.70052814
+ 0.6865447  0.5977072  0.95368004 0.7289692  0.44170102 0.7777483
+ 0.7743478  0.4995771  0.69891447 0.580345   0.78578705 0.3635015
+ 0.71654373 0.9585754  0.6125389  0.629792   0.6913672  0.4552708
+ 0.10541853 0.96240723 0.38784292 0.6745267  0.79051185 0.70214224
+ 0.84903276 0.6250461  0.509497   0.055472   0.6147614  0.49948195
+ 0.25953737 0.72868174 0.7900021  0.6660114  0.360943   0.6711156
+ 0.7861118  0.9580041  0.57364947 0.43281323 0.78196883 0.64617914
+ 0.50612485 0.1185286  0.7382589  0.9742657  0.67354196 0.76530886
+ 0.5728536  0.7114021 ]
+Cluster labels: [4 2 0 6 3 1 5 1 2 4 1 3 4 5 4 2 5 3 1 0 1 1 6 2 5 4 1 3 2 1 3 4 6 1 5 1 1
+ 2 0 5 4 3 1 2 4 3 5 3 1 5 0 2 3 6 4 1 0 1 2 4 3 5 4 4 5 2 0 1 3 1 1 1 2 2
+ 5 3 4 6 1 5 2 3 4 3 3 1 5 2 4 3 4 2 0 4 1 3 5 1 5 1 3 1 4 0 2 1 3 5 2 0 2
+ 4 3 4 0 1 5 2 2 1 1 4 3 2 1 5 5 0 4 1 3 2 1 1 3 6 2 5 1 4]
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span><span class="mi">8</span><span class="p">))</span>
+<span class="k">for</span> <span class="n">k</span><span class="p">,</span><span class="n">ax</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">15</span><span class="p">),</span><span class="n">axes</span><span class="o">.</span><span class="n">flatten</span><span class="p">()):</span>
+    <span class="n">cnmf_obj</span><span class="o">.</span><span class="n">plot_silhouette_for_k</span><span class="p">(</span>
+        <span class="n">k</span><span class="o">=</span><span class="n">k</span><span class="p">,</span>
+        <span class="n">density_threshold</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">show_avg</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;Spectral&#39;</span><span class="p">,</span><span class="n">ax</span><span class="o">=</span><span class="n">ax</span>
+    <span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/6cd871329d61b9c8e53f8f38d4595375b828109f7878e944779eb7515ba01f53.png"><img alt="../_images/6cd871329d61b9c8e53f8f38d4595375b828109f7878e944779eb7515ba01f53.png" src="../_images/6cd871329d61b9c8e53f8f38d4595375b828109f7878e944779eb7515ba01f53.png" style="width: 941px; height: 620px;" />
+</a>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="o">=</span><span class="n">cnmf_obj</span><span class="o">.</span><span class="n">k_selection_plot</span><span class="p">(</span><span class="n">close_fig</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Calculating silhouette scores for K selection...
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/279aacce6ab5be1cee491d10f8bf42e0f755c566eed4fa10b62082b4d8314b6b.png"><img alt="../_images/279aacce6ab5be1cee491d10f8bf42e0f755c566eed4fa10b62082b4d8314b6b.png" src="../_images/279aacce6ab5be1cee491d10f8bf42e0f755c566eed4fa10b62082b4d8314b6b.png" style="width: 782px; height: 390px;" />
+</a>
+</div>
+</div>
+<p>In this range, K=12 gave the most stable solution so we will begin by looking at that.</p>
+<p>The next step computes the consensus solution for a given choice of K. We first run it without any outlier filtering to see what that looks like. Setting the density threshold to anything &gt;= 2.00 (the maximum possible distance between two unit vectors) ensures that nothing will be filtered.</p>
+<p>Then we run the consensus with a filter for outliers determined based on inspecting the histogram of distances between components and their nearest neighbors</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">selected_K</span> <span class="o">=</span> <span class="mi">12</span>
+<span class="n">density_threshold</span> <span class="o">=</span> <span class="mf">2.00</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">cnmf_obj</span><span class="o">.</span><span class="n">consensus</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="n">selected_K</span><span class="p">,</span> 
+                   <span class="n">density_threshold</span><span class="o">=</span><span class="n">density_threshold</span><span class="p">,</span> 
+                   <span class="n">show_clustering</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> 
+                   <span class="n">close_clustergram_fig</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/9d5fe16c690e99c43d164584616fc42a276dfdfd6d15e592ed9c6ccad7e4cba3.png"><img alt="../_images/9d5fe16c690e99c43d164584616fc42a276dfdfd6d15e592ed9c6ccad7e4cba3.png" src="../_images/9d5fe16c690e99c43d164584616fc42a276dfdfd6d15e592ed9c6ccad7e4cba3.png" style="width: 1127px; height: 753px;" />
+</a>
+</div>
+</div>
+<p>The above consensus plot shows that there is a substantial degree of concordance between the replicates with a few outliers. An outlier threshold of 0.1 seems appropriate</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">density_threshold</span> <span class="o">=</span> <span class="mf">0.10</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">cnmf_obj</span><span class="o">.</span><span class="n">consensus</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="n">selected_K</span><span class="p">,</span> 
+                   <span class="n">density_threshold</span><span class="o">=</span><span class="n">density_threshold</span><span class="p">,</span> 
+                   <span class="n">show_clustering</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> 
+                   <span class="n">close_clustergram_fig</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/a81404d0bc52677a23422c0a753c8ce9d40f92e6ee5d24a8143712693aba1bbc.png"><img alt="../_images/a81404d0bc52677a23422c0a753c8ce9d40f92e6ee5d24a8143712693aba1bbc.png" src="../_images/a81404d0bc52677a23422c0a753c8ce9d40f92e6ee5d24a8143712693aba1bbc.png" style="width: 1127px; height: 753px;" />
+</a>
+</div>
+</div>
+</section>
+<section id="visualization-the-result">
+<h3>Visualization the result<a class="headerlink" href="#visualization-the-result" title="Link to this heading">#</a></h3>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">seaborn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sns</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">patheffects</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">gridspec</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+
+<span class="n">width_ratios</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.2</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+<span class="n">height_ratios</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.2</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">width_ratios</span><span class="p">),</span> <span class="nb">sum</span><span class="p">(</span><span class="n">height_ratios</span><span class="p">)))</span>
+<span class="n">gs</span> <span class="o">=</span> <span class="n">gridspec</span><span class="o">.</span><span class="n">GridSpec</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">height_ratios</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">width_ratios</span><span class="p">),</span> <span class="n">fig</span><span class="p">,</span>
+                        <span class="mf">0.01</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">,</span> <span class="mf">0.98</span><span class="p">,</span> <span class="mf">0.98</span><span class="p">,</span>
+                       <span class="n">height_ratios</span><span class="o">=</span><span class="n">height_ratios</span><span class="p">,</span>
+                       <span class="n">width_ratios</span><span class="o">=</span><span class="n">width_ratios</span><span class="p">,</span>
+                       <span class="n">wspace</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">hspace</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+            
+<span class="n">D</span> <span class="o">=</span> <span class="n">cnmf_obj</span><span class="o">.</span><span class="n">topic_dist</span><span class="p">[</span><span class="n">cnmf_obj</span><span class="o">.</span><span class="n">spectra_order</span><span class="p">,</span> <span class="p">:][:,</span> <span class="n">cnmf_obj</span><span class="o">.</span><span class="n">spectra_order</span><span class="p">]</span>
+<span class="n">dist_ax</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="n">gs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span> <span class="n">xscale</span><span class="o">=</span><span class="s1">&#39;linear&#39;</span><span class="p">,</span> <span class="n">yscale</span><span class="o">=</span><span class="s1">&#39;linear&#39;</span><span class="p">,</span>
+                                      <span class="n">xticks</span><span class="o">=</span><span class="p">[],</span> <span class="n">yticks</span><span class="o">=</span><span class="p">[],</span><span class="n">xlabel</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">ylabel</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span>
+                                      <span class="n">frameon</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">dist_im</span> <span class="o">=</span> <span class="n">dist_ax</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">D</span><span class="p">,</span> <span class="n">interpolation</span><span class="o">=</span><span class="s1">&#39;none&#39;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;viridis&#39;</span><span class="p">,</span>
+                         <span class="n">aspect</span><span class="o">=</span><span class="s1">&#39;auto&#39;</span><span class="p">,</span> <span class="n">rasterized</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">left_ax</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="n">gs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">],</span> <span class="n">xscale</span><span class="o">=</span><span class="s1">&#39;linear&#39;</span><span class="p">,</span> <span class="n">yscale</span><span class="o">=</span><span class="s1">&#39;linear&#39;</span><span class="p">,</span> <span class="n">xticks</span><span class="o">=</span><span class="p">[],</span> <span class="n">yticks</span><span class="o">=</span><span class="p">[],</span>
+                <span class="n">xlabel</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">ylabel</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">frameon</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">left_ax</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">cnmf_obj</span><span class="o">.</span><span class="n">kmeans_cluster_labels</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="n">cnmf_obj</span><span class="o">.</span><span class="n">spectra_order</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+                            <span class="n">interpolation</span><span class="o">=</span><span class="s1">&#39;none&#39;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;Spectral&#39;</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="s1">&#39;auto&#39;</span><span class="p">,</span>
+                            <span class="n">rasterized</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">top_ax</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="n">gs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span> <span class="n">xscale</span><span class="o">=</span><span class="s1">&#39;linear&#39;</span><span class="p">,</span> <span class="n">yscale</span><span class="o">=</span><span class="s1">&#39;linear&#39;</span><span class="p">,</span> <span class="n">xticks</span><span class="o">=</span><span class="p">[],</span> <span class="n">yticks</span><span class="o">=</span><span class="p">[],</span>
+                <span class="n">xlabel</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">ylabel</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">frameon</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">top_ax</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">cnmf_obj</span><span class="o">.</span><span class="n">kmeans_cluster_labels</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="n">cnmf_obj</span><span class="o">.</span><span class="n">spectra_order</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span>
+                  <span class="n">interpolation</span><span class="o">=</span><span class="s1">&#39;none&#39;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;Spectral&#39;</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="s1">&#39;auto&#39;</span><span class="p">,</span>
+                    <span class="n">rasterized</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">cbar_gs</span> <span class="o">=</span> <span class="n">gridspec</span><span class="o">.</span><span class="n">GridSpecFromSubplotSpec</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">subplot_spec</span><span class="o">=</span><span class="n">gs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span>
+                                   <span class="n">wspace</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">hspace</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">cbar_ax</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="n">cbar_gs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">],</span> <span class="n">xscale</span><span class="o">=</span><span class="s1">&#39;linear&#39;</span><span class="p">,</span> <span class="n">yscale</span><span class="o">=</span><span class="s1">&#39;linear&#39;</span><span class="p">,</span>
+    <span class="n">xlabel</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">ylabel</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">frameon</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Euclidean</span><span class="se">\n</span><span class="s1">Distance&#39;</span><span class="p">)</span>
+<span class="n">cbar_ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Euclidean</span><span class="se">\n</span><span class="s1">Distance&#39;</span><span class="p">,</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+<span class="n">vmin</span> <span class="o">=</span> <span class="n">D</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+<span class="n">vmax</span> <span class="o">=</span> <span class="n">D</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">dist_im</span><span class="p">,</span> <span class="n">cax</span><span class="o">=</span><span class="n">cbar_ax</span><span class="p">,</span>
+        <span class="n">ticks</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">vmin</span><span class="p">,</span> <span class="n">vmax</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
+        <span class="p">)</span>
+<span class="n">cbar_ax</span><span class="o">.</span><span class="n">set_yticklabels</span><span class="p">(</span><span class="n">cbar_ax</span><span class="o">.</span><span class="n">get_yticklabels</span><span class="p">(),</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>[Text(1, 0.0, &#39;0.000&#39;),
+ Text(1, 0.6961943507194519, &#39;0.696&#39;),
+ Text(1, 1.3923887014389038, &#39;1.392&#39;)]
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/12c44e55bfe2fb23260ccc7a9f04f21dea5e19b68b8c499a5673fcd9f9539cfb.png"><img alt="../_images/12c44e55bfe2fb23260ccc7a9f04f21dea5e19b68b8c499a5673fcd9f9539cfb.png" src="../_images/12c44e55bfe2fb23260ccc7a9f04f21dea5e19b68b8c499a5673fcd9f9539cfb.png" style="width: 421px; height: 341px;" />
+</a>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">density_filter</span> <span class="o">=</span> <span class="n">cnmf_obj</span><span class="o">.</span><span class="n">local_density</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">density_threshold</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">hist_ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">4</span><span class="p">))</span>
+
+<span class="c1">#hist_ax = fig.add_subplot(hist_gs[0,0], xscale=&#39;linear&#39;, yscale=&#39;linear&#39;,</span>
+ <span class="c1">#   xlabel=&#39;&#39;, ylabel=&#39;&#39;, frameon=True, title=&#39;Local density histogram&#39;)</span>
+<span class="n">hist_ax</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">cnmf_obj</span><span class="o">.</span><span class="n">local_density</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">50</span><span class="p">))</span>
+<span class="n">hist_ax</span><span class="o">.</span><span class="n">yaxis</span><span class="o">.</span><span class="n">tick_right</span><span class="p">()</span>
+
+<span class="n">xlim</span> <span class="o">=</span> <span class="n">hist_ax</span><span class="o">.</span><span class="n">get_xlim</span><span class="p">()</span>
+<span class="n">ylim</span> <span class="o">=</span> <span class="n">hist_ax</span><span class="o">.</span><span class="n">get_ylim</span><span class="p">()</span>
+<span class="k">if</span> <span class="n">density_threshold</span> <span class="o">&lt;</span> <span class="n">xlim</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+    <span class="n">hist_ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">density_threshold</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;k&#39;</span><span class="p">)</span>
+    <span class="n">hist_ax</span><span class="o">.</span><span class="n">text</span><span class="p">(</span><span class="n">density_threshold</span>  <span class="o">+</span> <span class="mf">0.02</span><span class="p">,</span> <span class="n">ylim</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="mf">0.95</span><span class="p">,</span> <span class="s1">&#39;filtering</span><span class="se">\n</span><span class="s1">threshold</span><span class="se">\n\n</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">va</span><span class="o">=</span><span class="s1">&#39;top&#39;</span><span class="p">)</span>
+<span class="n">hist_ax</span><span class="o">.</span><span class="n">set_xlim</span><span class="p">(</span><span class="n">xlim</span><span class="p">)</span>
+<span class="n">hist_ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Mean distance to k nearest neighbors</span><span class="se">\n\n</span><span class="si">%d</span><span class="s1">/</span><span class="si">%d</span><span class="s1"> (</span><span class="si">%.0f%%</span><span class="s1">) spectra above threshold</span><span class="se">\n</span><span class="s1">were removed prior to clustering&#39;</span><span class="o">%</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="o">~</span><span class="n">density_filter</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">density_filter</span><span class="p">),</span> <span class="mi">100</span><span class="o">*</span><span class="p">(</span><span class="o">~</span><span class="n">density_filter</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()))</span>
+<span class="n">hist_ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Local density histogram&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Text(0.5, 1.0, &#39;Local density histogram&#39;)
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/e737367615b50bf8d1dee0b3f893b212b7c944c454c64137052c160f4aeb3c8c.png"><img alt="../_images/e737367615b50bf8d1dee0b3f893b212b7c944c454c64137052c160f4aeb3c8c.png" src="../_images/e737367615b50bf8d1dee0b3f893b212b7c944c454c64137052c160f4aeb3c8c.png" style="width: 294px; height: 368px;" />
+</a>
+</div>
+</div>
+</section>
+<section id="explode-the-cnmf-result">
+<h3>Explode the cNMF result<a class="headerlink" href="#explode-the-cnmf-result" title="Link to this heading">#</a></h3>
+<p>We can load the results for a cNMF run with a given K and density filtering threshold like below</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">result_dict</span> <span class="o">=</span> <span class="n">cnmf_obj</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="n">K</span><span class="o">=</span><span class="n">selected_K</span><span class="p">,</span> <span class="n">density_threshold</span><span class="o">=</span><span class="n">density_threshold</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">result_dict</span><span class="p">[</span><span class="s1">&#39;usage_norm&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>cNMF_1</th>
+      <th>cNMF_2</th>
+      <th>cNMF_3</th>
+      <th>cNMF_4</th>
+      <th>cNMF_5</th>
+      <th>cNMF_6</th>
+      <th>cNMF_7</th>
+      <th>cNMF_8</th>
+      <th>cNMF_9</th>
+      <th>cNMF_10</th>
+      <th>cNMF_11</th>
+      <th>cNMF_12</th>
+    </tr>
+    <tr>
+      <th>index</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>AAACCTGAGAGGGATA</th>
+      <td>0.052900</td>
+      <td>0.557367</td>
+      <td>0.000422</td>
+      <td>0.021016</td>
+      <td>0.006930</td>
+      <td>0.003447</td>
+      <td>0.079662</td>
+      <td>0.082491</td>
+      <td>0.000638</td>
+      <td>0.005284</td>
+      <td>0.030603</td>
+      <td>0.159242</td>
+    </tr>
+    <tr>
+      <th>AAACCTGAGCCTTGAT</th>
+      <td>0.020833</td>
+      <td>0.000962</td>
+      <td>0.570114</td>
+      <td>0.043898</td>
+      <td>0.000887</td>
+      <td>0.173351</td>
+      <td>0.007137</td>
+      <td>0.132107</td>
+      <td>0.004638</td>
+      <td>0.000670</td>
+      <td>0.029395</td>
+      <td>0.016007</td>
+    </tr>
+    <tr>
+      <th>AAACCTGAGGCAATTA</th>
+      <td>0.000142</td>
+      <td>0.306285</td>
+      <td>0.050380</td>
+      <td>0.000632</td>
+      <td>0.017096</td>
+      <td>0.028461</td>
+      <td>0.017249</td>
+      <td>0.053764</td>
+      <td>0.000810</td>
+      <td>0.005584</td>
+      <td>0.131687</td>
+      <td>0.387909</td>
+    </tr>
+    <tr>
+      <th>AAACCTGCATCATCCC</th>
+      <td>0.011620</td>
+      <td>0.000740</td>
+      <td>0.142481</td>
+      <td>0.011996</td>
+      <td>0.002794</td>
+      <td>0.510735</td>
+      <td>0.001547</td>
+      <td>0.281503</td>
+      <td>0.003506</td>
+      <td>0.025785</td>
+      <td>0.005863</td>
+      <td>0.001429</td>
+    </tr>
+    <tr>
+      <th>AAACCTGGTAAGTGGC</th>
+      <td>0.543322</td>
+      <td>0.149150</td>
+      <td>0.003397</td>
+      <td>0.199798</td>
+      <td>0.000105</td>
+      <td>0.011512</td>
+      <td>0.023303</td>
+      <td>0.000721</td>
+      <td>0.003200</td>
+      <td>0.022096</td>
+      <td>0.025705</td>
+      <td>0.017692</td>
+    </tr>
+  </tbody>
+</table>
+</div></div></div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">result_dict</span><span class="p">[</span><span class="s1">&#39;gep_scores&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>1</th>
+      <th>2</th>
+      <th>3</th>
+      <th>4</th>
+      <th>5</th>
+      <th>6</th>
+      <th>7</th>
+      <th>8</th>
+      <th>9</th>
+      <th>10</th>
+      <th>11</th>
+      <th>12</th>
+    </tr>
+    <tr>
+      <th>index</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>Xkr4</th>
+      <td>-0.007757</td>
+      <td>-0.001951</td>
+      <td>0.010988</td>
+      <td>0.000303</td>
+      <td>0.000153</td>
+      <td>-0.006076</td>
+      <td>0.001394</td>
+      <td>-0.000277</td>
+      <td>0.007163</td>
+      <td>-0.000909</td>
+      <td>-0.001658</td>
+      <td>-0.001580</td>
+    </tr>
+    <tr>
+      <th>Mrpl15</th>
+      <td>-0.004883</td>
+      <td>0.017592</td>
+      <td>-0.018511</td>
+      <td>-0.027615</td>
+      <td>-0.021772</td>
+      <td>0.037728</td>
+      <td>0.013916</td>
+      <td>0.011741</td>
+      <td>-0.016687</td>
+      <td>0.021974</td>
+      <td>-0.005451</td>
+      <td>-0.004443</td>
+    </tr>
+    <tr>
+      <th>Npbwr1</th>
+      <td>0.008097</td>
+      <td>0.001318</td>
+      <td>-0.010134</td>
+      <td>-0.018095</td>
+      <td>-0.016732</td>
+      <td>0.000294</td>
+      <td>-0.003005</td>
+      <td>0.000016</td>
+      <td>0.055294</td>
+      <td>-0.001144</td>
+      <td>-0.000746</td>
+      <td>-0.001143</td>
+    </tr>
+    <tr>
+      <th>4732440D04Rik</th>
+      <td>0.008619</td>
+      <td>-0.005695</td>
+      <td>-0.006195</td>
+      <td>-0.013188</td>
+      <td>0.014607</td>
+      <td>0.001333</td>
+      <td>-0.008327</td>
+      <td>-0.001492</td>
+      <td>0.005998</td>
+      <td>0.000943</td>
+      <td>0.000016</td>
+      <td>-0.002278</td>
+    </tr>
+    <tr>
+      <th>Gm26901</th>
+      <td>-0.007764</td>
+      <td>0.026168</td>
+      <td>-0.008942</td>
+      <td>0.023266</td>
+      <td>-0.009654</td>
+      <td>-0.017616</td>
+      <td>-0.010079</td>
+      <td>0.009438</td>
+      <td>-0.008486</td>
+      <td>-0.003649</td>
+      <td>-0.001237</td>
+      <td>-0.000615</td>
+    </tr>
+  </tbody>
+</table>
+</div></div></div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">result_dict</span><span class="p">[</span><span class="s1">&#39;gep_tpm&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>1</th>
+      <th>2</th>
+      <th>3</th>
+      <th>4</th>
+      <th>5</th>
+      <th>6</th>
+      <th>7</th>
+      <th>8</th>
+      <th>9</th>
+      <th>10</th>
+      <th>11</th>
+      <th>12</th>
+    </tr>
+    <tr>
+      <th>index</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>Xkr4</th>
+      <td>0.000000</td>
+      <td>8.302266e-03</td>
+      <td>1.477936e-02</td>
+      <td>0.000000</td>
+      <td>1.833748e-03</td>
+      <td>3.670955e-05</td>
+      <td>8.236001e-29</td>
+      <td>1.203458e-02</td>
+      <td>0.008952</td>
+      <td>0.000000</td>
+      <td>0.000000e+00</td>
+      <td>0.002387</td>
+    </tr>
+    <tr>
+      <th>Mrpl15</th>
+      <td>0.010844</td>
+      <td>4.420368e-19</td>
+      <td>9.274849e-01</td>
+      <td>0.018528</td>
+      <td>5.522656e-01</td>
+      <td>7.091711e-02</td>
+      <td>1.485689e-01</td>
+      <td>3.118949e-02</td>
+      <td>0.046750</td>
+      <td>0.155717</td>
+      <td>5.128206e-14</td>
+      <td>0.662705</td>
+    </tr>
+    <tr>
+      <th>Npbwr1</th>
+      <td>0.016931</td>
+      <td>0.000000e+00</td>
+      <td>2.428719e-16</td>
+      <td>0.000000</td>
+      <td>9.940618e-04</td>
+      <td>4.695393e-07</td>
+      <td>0.000000e+00</td>
+      <td>0.000000e+00</td>
+      <td>0.000000</td>
+      <td>0.009431</td>
+      <td>0.000000e+00</td>
+      <td>0.000000</td>
+    </tr>
+    <tr>
+      <th>4732440D04Rik</th>
+      <td>0.008692</td>
+      <td>1.156003e-05</td>
+      <td>7.946806e-03</td>
+      <td>0.000000</td>
+      <td>4.226314e-02</td>
+      <td>3.767684e-02</td>
+      <td>3.580834e-02</td>
+      <td>2.182026e-12</td>
+      <td>0.000063</td>
+      <td>0.005495</td>
+      <td>3.885308e-30</td>
+      <td>0.006224</td>
+    </tr>
+    <tr>
+      <th>Gm26901</th>
+      <td>0.000000</td>
+      <td>3.010304e-02</td>
+      <td>3.764709e-20</td>
+      <td>0.000000</td>
+      <td>1.401298e-45</td>
+      <td>1.688556e-03</td>
+      <td>8.005813e-03</td>
+      <td>0.000000e+00</td>
+      <td>0.000000</td>
+      <td>0.000000</td>
+      <td>0.000000e+00</td>
+      <td>0.062770</td>
+    </tr>
+  </tbody>
+</table>
+</div></div></div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">result_dict</span><span class="p">[</span><span class="s1">&#39;top_genes&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>1</th>
+      <th>2</th>
+      <th>3</th>
+      <th>4</th>
+      <th>5</th>
+      <th>6</th>
+      <th>7</th>
+      <th>8</th>
+      <th>9</th>
+      <th>10</th>
+      <th>11</th>
+      <th>12</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>Hmgn3</td>
+      <td>Anxa2</td>
+      <td>Nnat</td>
+      <td>Grin3a</td>
+      <td>Krt7</td>
+      <td>Sox4</td>
+      <td>Gmnn</td>
+      <td>Olfm1</td>
+      <td>Ghrl</td>
+      <td>Birc5</td>
+      <td>Prph</td>
+      <td>Gpr132</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>Chgb</td>
+      <td>Cldn3</td>
+      <td>Ppp1r1a</td>
+      <td>Atoh8</td>
+      <td>1110012L19Rik</td>
+      <td>Nptx2</td>
+      <td>Mcm5</td>
+      <td>Selm</td>
+      <td>Maged2</td>
+      <td>Nusap1</td>
+      <td>Stmn2</td>
+      <td>AB124611</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>Rap1b</td>
+      <td>Krt18</td>
+      <td>Ins2</td>
+      <td>Enpp2</td>
+      <td>BC023829</td>
+      <td>Mpzl1</td>
+      <td>Pcna</td>
+      <td>Ppp1r14a</td>
+      <td>Gm11837</td>
+      <td>Cenpf</td>
+      <td>Hand2</td>
+      <td>Tyrobp</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>Cldn4</td>
+      <td>Atp1b1</td>
+      <td>Sdf2l1</td>
+      <td>Ttr</td>
+      <td>Gspt1</td>
+      <td>Bcl2</td>
+      <td>2810417H13Rik</td>
+      <td>Tmsb4x</td>
+      <td>Arg1</td>
+      <td>Plk1</td>
+      <td>Stmn4</td>
+      <td>Fcgr3</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>Pax6</td>
+      <td>Lurap1l</td>
+      <td>Iapp</td>
+      <td>Tmem171</td>
+      <td>Cck</td>
+      <td>Gadd45a</td>
+      <td>Rrm2</td>
+      <td>Shf</td>
+      <td>Irs4</td>
+      <td>Cks2</td>
+      <td>Pirt</td>
+      <td>AI662270</td>
+    </tr>
+  </tbody>
+</table>
+</div></div></div>
+</div>
+<p>We can extract cell classes directly based on the highest cNMF in each cell, but this has the disadvantage that it will lead to mixed cell classes if the heterogeneity of our data is not as strong as it should be.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">cnmf_obj</span><span class="o">.</span><span class="n">get_results</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span><span class="n">result_dict</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>cNMF_cluster is added to adata.obs
+gene scores are added to adata.var
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="n">result_dict</span><span class="p">[</span><span class="s1">&#39;usage_norm&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span>
+           <span class="n">use_raw</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">ncols</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">vmin</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">frameon</span><span class="o">=</span><span class="s1">&#39;small&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/58a070bbd7afe98841fe25e0c5ee5ef6311df4d79f3d8013a4433380863693f6.png"><img alt="../_images/58a070bbd7afe98841fe25e0c5ee5ef6311df4d79f3d8013a4433380863693f6.png" src="../_images/58a070bbd7afe98841fe25e0c5ee5ef6311df4d79f3d8013a4433380863693f6.png" style="width: 1009px; height: 1124px;" />
+</a>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span>
+    <span class="n">adata</span><span class="p">,</span>
+    <span class="n">basis</span><span class="o">=</span><span class="s2">&quot;X_umap&quot;</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;cNMF_cluster&#39;</span><span class="p">],</span>
+    <span class="n">frameon</span><span class="o">=</span><span class="s1">&#39;small&#39;</span><span class="p">,</span>
+    <span class="c1">#title=&quot;Celltypes&quot;,</span>
+    <span class="c1">#legend_loc=&#39;on data&#39;,</span>
+    <span class="n">legend_fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span>
+    <span class="n">legend_fontoutline</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="c1">#size=10,</span>
+    <span class="c1">#legend_loc=True, </span>
+    <span class="n">add_outline</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> 
+    <span class="c1">#add_outline=True,</span>
+    <span class="n">outline_color</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">,</span>
+    <span class="n">outline_width</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;Axes: title={&#39;center&#39;: &#39;cNMF_cluster&#39;}, xlabel=&#39;X_umap1&#39;, ylabel=&#39;X_umap2&#39;&gt;
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/ea276bf4ebc355d11fcf22d475f08e2f043e02f70f6bb525c34ca5f986551031.png"><img alt="../_images/ea276bf4ebc355d11fcf22d475f08e2f043e02f70f6bb525c34ca5f986551031.png" src="../_images/ea276bf4ebc355d11fcf22d475f08e2f043e02f70f6bb525c34ca5f986551031.png" style="width: 361px; height: 290px;" />
+</a>
+</div>
+</div>
+<p>Here we are, proposing another idea of categorisation. We use cells with cNMF greater than 0.5 as a primitive class, and then train a random forest classification model, and then use the random forest classification model to classify cells with cNMF less than 0.5 to get a more accurate</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">cnmf_obj</span><span class="o">.</span><span class="n">get_results_rfc</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span><span class="n">result_dict</span><span class="p">,</span>
+                         <span class="n">use_rep</span><span class="o">=</span><span class="s1">&#39;scaled|original|X_pca&#39;</span><span class="p">,</span>
+                        <span class="n">cNMF_threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Single Tree: 0.9555555555555556
+Random Forest: 0.9873015873015873
+cNMF_cluster_rfc is added to adata.obs
+cNMF_cluster_clf is added to adata.obs
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span>
+    <span class="n">adata</span><span class="p">,</span>
+    <span class="n">basis</span><span class="o">=</span><span class="s2">&quot;X_umap&quot;</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;cNMF_cluster_rfc&#39;</span><span class="p">,</span><span class="s1">&#39;cNMF_cluster_clf&#39;</span><span class="p">],</span>
+    <span class="n">frameon</span><span class="o">=</span><span class="s1">&#39;small&#39;</span><span class="p">,</span>
+    <span class="c1">#title=&quot;Celltypes&quot;,</span>
+    <span class="c1">#legend_loc=&#39;on data&#39;,</span>
+    <span class="n">legend_fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span>
+    <span class="n">legend_fontoutline</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="c1">#size=10,</span>
+    <span class="c1">#legend_loc=True, </span>
+    <span class="n">add_outline</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> 
+    <span class="c1">#add_outline=True,</span>
+    <span class="n">outline_color</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">,</span>
+    <span class="n">outline_width</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>[&lt;Axes: title={&#39;center&#39;: &#39;cNMF_cluster_rfc&#39;}, xlabel=&#39;X_umap1&#39;, ylabel=&#39;X_umap2&#39;&gt;,
+ &lt;Axes: title={&#39;center&#39;: &#39;cNMF_cluster_clf&#39;}, xlabel=&#39;X_umap1&#39;, ylabel=&#39;X_umap2&#39;&gt;]
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/14cd63d0d4ab0e56489ded290bcc0fdf51fa931534b89b7c9a20557104e5c2e9.png"><img alt="../_images/14cd63d0d4ab0e56489ded290bcc0fdf51fa931534b89b7c9a20557104e5c2e9.png" src="../_images/14cd63d0d4ab0e56489ded290bcc0fdf51fa931534b89b7c9a20557104e5c2e9.png" style="width: 651px; height: 287px;" />
+</a>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">plot_genes</span><span class="o">=</span><span class="p">[]</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">result_dict</span><span class="p">[</span><span class="s1">&#39;top_genes&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+    <span class="n">plot_genes</span><span class="o">+=</span><span class="n">result_dict</span><span class="p">[</span><span class="s1">&#39;top_genes&#39;</span><span class="p">][</span><span class="n">i</span><span class="p">][:</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">dotplot</span><span class="p">(</span>
+    <span class="n">adata</span><span class="p">,</span><span class="n">plot_genes</span><span class="p">,</span>
+    <span class="s2">&quot;cNMF_cluster_rfc&quot;</span><span class="p">,</span> <span class="n">dendrogram</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">standard_scale</span><span class="o">=</span><span class="s1">&#39;var&#39;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;marsilea.heatmap.SizedHeatmap at 0x7f84d0263e20&gt;
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/e0bed4e16c024bad8cc551246ff66e37ee509fc92f68ea9bacaedfb7dcc7db9e.png"><img alt="../_images/e0bed4e16c024bad8cc551246ff66e37ee509fc92f68ea9bacaedfb7dcc7db9e.png" src="../_images/e0bed4e16c024bad8cc551246ff66e37ee509fc92f68ea9bacaedfb7dcc7db9e.png" style="width: 1311px; height: 449px;" />
+</a>
+</div>
+</div>
+</section>
+</section>
+<section id="hotspot">
+<h2>Hotspot<a class="headerlink" href="#hotspot" title="Link to this heading">#</a></h2>
+<p>Hotspot is a tool for identifying informative genes (and gene modules) in a single-cell dataset.</p>
+<ul class="simple">
+<li><p>DeTomaso D, Yosef N. Hotspot identifies informative gene modules across modalities of single-cell genomics. Cell Syst. 2021 May 19;12(5):446-456.e9. doi: 10.1016/j.cels.2021.04.005. Epub 2021 May 4. PMID: 33951459.</p></li>
+</ul>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># to calculate the total_counts</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">calculate_qc_metrics</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">percent_top</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">log1p</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create the Hotspot object and the neighborhood graph</span>
+<span class="c1"># hotspot works a lot faster with a csc matrix!</span>
+<span class="n">adata</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="s2">&quot;counts_csc&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="s2">&quot;counts&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">tocsc</span><span class="p">()</span>
+<span class="n">hs</span> <span class="o">=</span> <span class="n">ov</span><span class="o">.</span><span class="n">single</span><span class="o">.</span><span class="n">Hotspot</span><span class="p">(</span>
+    <span class="n">adata</span><span class="p">,</span> 
+    <span class="n">layer_key</span><span class="o">=</span><span class="s2">&quot;counts_csc&quot;</span><span class="p">,</span> 
+    <span class="n">model</span><span class="o">=</span><span class="s1">&#39;danb&#39;</span><span class="p">,</span> 
+    <span class="n">latent_obsm_key</span><span class="o">=</span><span class="s2">&quot;X_pca&quot;</span><span class="p">,</span>
+    <span class="n">umi_counts_obs_key</span><span class="o">=</span><span class="s2">&quot;total_counts&quot;</span>
+<span class="p">)</span>
+
+<span class="n">hs</span><span class="o">.</span><span class="n">create_knn_graph</span><span class="p">(</span>
+    <span class="n">weighted_graph</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">n_neighbors</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="determining-informative-genes">
+<h3>Determining informative genes<a class="headerlink" href="#determining-informative-genes" title="Link to this heading">#</a></h3>
+<p>Now we compute autocorrelations for each gene, in the pca-space, to determine which genes have the most informative variation.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">hs_results</span> <span class="o">=</span> <span class="n">hs</span><span class="o">.</span><span class="n">compute_autocorrelations</span><span class="p">(</span><span class="n">jobs</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+
+<span class="n">hs_results</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">15</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>C</th>
+      <th>Z</th>
+      <th>Pval</th>
+      <th>FDR</th>
+    </tr>
+    <tr>
+      <th>Gene</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>Btbd17</th>
+      <td>0.735443</td>
+      <td>221.872382</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>Gadd45a</th>
+      <td>0.666501</td>
+      <td>213.692549</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>Neurog3</th>
+      <td>0.658402</td>
+      <td>208.855264</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>Spp1</th>
+      <td>0.806283</td>
+      <td>200.751152</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>Mdk</th>
+      <td>0.695210</td>
+      <td>199.681646</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>Rps19</th>
+      <td>0.819013</td>
+      <td>199.041836</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>Gnas</th>
+      <td>0.701187</td>
+      <td>192.850484</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>Rpl13</th>
+      <td>0.817551</td>
+      <td>192.250551</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>Nnat</th>
+      <td>0.780046</td>
+      <td>191.744472</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>Rpl18a</th>
+      <td>0.780471</td>
+      <td>191.128396</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>Rpl32</th>
+      <td>0.796391</td>
+      <td>190.960143</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>Gcg</th>
+      <td>0.603454</td>
+      <td>190.364941</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>Ins2</th>
+      <td>0.753340</td>
+      <td>189.588977</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>Ppp1r1a</th>
+      <td>0.727086</td>
+      <td>188.885836</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>Rps4x</th>
+      <td>0.797900</td>
+      <td>187.245979</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div></div>
+</div>
+</section>
+<section id="grouping-genes-into-lineage-based-modules">
+<h3>Grouping genes into lineage-based modules<a class="headerlink" href="#grouping-genes-into-lineage-based-modules" title="Link to this heading">#</a></h3>
+<p>To get a better idea of what expression patterns exist, it is helpful to group the genes into modules.</p>
+<p>Hotspot does this using the concept of “local correlations” - that is,
+correlations that are computed between genes between cells in the same neighborhood.</p>
+<p>Here we avoid running the calculation for all Genes x Genes pairs and instead
+only run this on genes that have significant autocorrelation to begin with.</p>
+<p>The method <code class="docutils literal notranslate"><span class="pre">compute_local_correlations</span></code> returns a Genes x Genes matrix of
+Z-scores for the significance of the correlation between genes. This object
+is also retained in the <code class="docutils literal notranslate"><span class="pre">hs</span></code> object and is used in the subsequent steps.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Select the genes with significant lineage autocorrelation</span>
+<span class="n">hs_genes</span> <span class="o">=</span> <span class="n">hs_results</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">hs_results</span><span class="o">.</span><span class="n">FDR</span> <span class="o">&lt;</span> <span class="mf">0.05</span><span class="p">]</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s1">&#39;Z&#39;</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">500</span><span class="p">)</span><span class="o">.</span><span class="n">index</span>
+
+<span class="c1"># Compute pair-wise local correlations between these genes</span>
+<span class="n">lcz</span> <span class="o">=</span> <span class="n">hs</span><span class="o">.</span><span class="n">compute_local_correlations</span><span class="p">(</span><span class="n">hs_genes</span><span class="p">,</span> <span class="n">jobs</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Computing pair-wise local correlation on 500 features...
+</pre></div>
+</div>
+</div>
+</div>
+<p>Now that pair-wise local correlations are calculated, we can group genes into modules.</p>
+<p>To do this, a convenience method is included <code class="docutils literal notranslate"><span class="pre">create_modules</span></code> which performs
+agglomerative clustering with two caveats:</p>
+<ul class="simple">
+<li><p>If the FDR-adjusted p-value of the correlation between two branches exceeds <code class="docutils literal notranslate"><span class="pre">fdr_threshold</span></code>,
+then the branches are not merged.</p></li>
+<li><p>If two branches are two be merged and they are both have at least min_gene_threshold genes,
+then the branches are not merged. Further genes that would join to the resulting merged module
+(and are therefore ambiguous) either remain unassigned (if core_only=True) or are assigned to the module with the
+smaller average correlations between genes, i.e. the least-dense module (if <code class="docutils literal notranslate"><span class="pre">core_only=False</span></code>)</p></li>
+</ul>
+<p>The output is a Series that maps gene to module number. Unassigned genes are indicated with a module number of <code class="docutils literal notranslate"><span class="pre">-1</span></code></p>
+<p>This method was used to preserved substructure (nested modules) while still giving the analyst
+some control. However, since there are a lot of ways to do hierarchical clustering, you can also
+manually cluster using the gene-distances in <code class="docutils literal notranslate"><span class="pre">hs.local_correlation_z</span></code></p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">modules</span> <span class="o">=</span> <span class="n">hs</span><span class="o">.</span><span class="n">create_modules</span><span class="p">(</span>
+    <span class="n">min_gene_threshold</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">core_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">fdr_threshold</span><span class="o">=</span><span class="mf">0.05</span>
+<span class="p">)</span>
+
+<span class="n">modules</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Module
+-1     93
+ 1     82
+ 9     47
+ 4     44
+ 3     39
+ 8     37
+ 6     26
+ 13    22
+ 12    21
+ 11    20
+ 7     19
+ 2     19
+ 5     16
+ 10    15
+Name: count, dtype: int64
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">hs</span><span class="o">.</span><span class="n">plot_local_correlations</span><span class="p">(</span><span class="n">vmin</span><span class="o">=-</span><span class="mi">30</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mi">30</span><span class="p">,)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;seaborn.matrix.ClusterGrid at 0x7f52ab7e3f10&gt;
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/205b30326088504306504486c87ca24cc44b3dfdd143cbf6a8f94c2f80d78b03.png"><img alt="../_images/205b30326088504306504486c87ca24cc44b3dfdd143cbf6a8f94c2f80d78b03.png" src="../_images/205b30326088504306504486c87ca24cc44b3dfdd143cbf6a8f94c2f80d78b03.png" style="width: 782px; height: 716px;" />
+</a>
+</div>
+</div>
+<p>To explore individual genes, we can look at the genes with the top autocorrelation
+in a given module as these are likely the most informative.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Show the top genes for a module</span>
+
+<span class="n">module</span> <span class="o">=</span> <span class="mi">4</span>
+
+<span class="n">results</span> <span class="o">=</span> <span class="n">hs</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">hs</span><span class="o">.</span><span class="n">modules</span><span class="p">)</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">results</span><span class="o">.</span><span class="n">Module</span> <span class="o">==</span> <span class="n">module</span><span class="p">]</span>
+
+<span class="n">results</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s1">&#39;Z&#39;</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>C</th>
+      <th>Z</th>
+      <th>Pval</th>
+      <th>FDR</th>
+      <th>Module</th>
+    </tr>
+    <tr>
+      <th>Gene</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>Btbd17</th>
+      <td>0.735443</td>
+      <td>221.872382</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>4.0</td>
+    </tr>
+    <tr>
+      <th>Gadd45a</th>
+      <td>0.666501</td>
+      <td>213.692549</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>4.0</td>
+    </tr>
+    <tr>
+      <th>Neurog3</th>
+      <td>0.658402</td>
+      <td>208.855264</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>4.0</td>
+    </tr>
+    <tr>
+      <th>Mdk</th>
+      <td>0.695210</td>
+      <td>199.681646</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>4.0</td>
+    </tr>
+    <tr>
+      <th>Tmsb4x</th>
+      <td>0.628210</td>
+      <td>187.142300</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>4.0</td>
+    </tr>
+    <tr>
+      <th>Neurod2</th>
+      <td>0.549973</td>
+      <td>183.843618</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>4.0</td>
+    </tr>
+    <tr>
+      <th>Selm</th>
+      <td>0.601179</td>
+      <td>178.700916</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>4.0</td>
+    </tr>
+    <tr>
+      <th>Smarcd2</th>
+      <td>0.577830</td>
+      <td>174.089181</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>4.0</td>
+    </tr>
+    <tr>
+      <th>Sox4</th>
+      <td>0.613079</td>
+      <td>173.945370</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>4.0</td>
+    </tr>
+    <tr>
+      <th>Btg2</th>
+      <td>0.554990</td>
+      <td>165.342505</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>4.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div></div>
+</div>
+</section>
+<section id="summary-module-scores">
+<h3>Summary Module Scores<a class="headerlink" href="#summary-module-scores" title="Link to this heading">#</a></h3>
+<p>To aid in the recognition of the general behavior of a module, Hotspot can compute
+aggregate module scores.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">module_scores</span> <span class="o">=</span> <span class="n">hs</span><span class="o">.</span><span class="n">calculate_module_scores</span><span class="p">()</span>
+
+<span class="n">module_scores</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Computing scores for 13 modules...
+</pre></div>
+</div>
+<div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>1</th>
+      <th>2</th>
+      <th>3</th>
+      <th>4</th>
+      <th>5</th>
+      <th>6</th>
+      <th>7</th>
+      <th>8</th>
+      <th>9</th>
+      <th>10</th>
+      <th>11</th>
+      <th>12</th>
+      <th>13</th>
+    </tr>
+    <tr>
+      <th>index</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>AAACCTGAGAGGGATA</th>
+      <td>-6.583796</td>
+      <td>-1.093584</td>
+      <td>-3.131375</td>
+      <td>-2.099180</td>
+      <td>-0.819142</td>
+      <td>-2.400016</td>
+      <td>-0.451105</td>
+      <td>2.504838</td>
+      <td>-2.298986</td>
+      <td>-1.439230</td>
+      <td>-0.739708</td>
+      <td>3.368700</td>
+      <td>0.531080</td>
+    </tr>
+    <tr>
+      <th>AAACCTGAGCCTTGAT</th>
+      <td>7.663903</td>
+      <td>-0.765588</td>
+      <td>6.610663</td>
+      <td>-2.388122</td>
+      <td>-0.689135</td>
+      <td>2.296545</td>
+      <td>-1.217827</td>
+      <td>-3.391921</td>
+      <td>0.921212</td>
+      <td>-0.813991</td>
+      <td>-1.694216</td>
+      <td>-2.358554</td>
+      <td>-2.625691</td>
+    </tr>
+    <tr>
+      <th>AAACCTGAGGCAATTA</th>
+      <td>-6.066218</td>
+      <td>-1.212847</td>
+      <td>-3.005648</td>
+      <td>-2.684893</td>
+      <td>-0.703958</td>
+      <td>-2.226183</td>
+      <td>-0.702572</td>
+      <td>2.636014</td>
+      <td>-2.243965</td>
+      <td>-0.119376</td>
+      <td>0.899747</td>
+      <td>2.736469</td>
+      <td>-0.274772</td>
+    </tr>
+    <tr>
+      <th>AAACCTGCATCATCCC</th>
+      <td>11.594423</td>
+      <td>4.786089</td>
+      <td>5.015609</td>
+      <td>-2.241397</td>
+      <td>0.848967</td>
+      <td>8.482152</td>
+      <td>-0.886003</td>
+      <td>-3.327994</td>
+      <td>12.943623</td>
+      <td>0.456323</td>
+      <td>-1.689177</td>
+      <td>-2.565122</td>
+      <td>-2.858705</td>
+    </tr>
+    <tr>
+      <th>AAACCTGGTAAGTGGC</th>
+      <td>-3.090054</td>
+      <td>-1.036188</td>
+      <td>-3.197947</td>
+      <td>5.563916</td>
+      <td>-0.793746</td>
+      <td>-2.413544</td>
+      <td>-1.378844</td>
+      <td>-2.149192</td>
+      <td>-2.072845</td>
+      <td>-2.134279</td>
+      <td>-1.460957</td>
+      <td>-0.137338</td>
+      <td>6.417286</td>
+    </tr>
+  </tbody>
+</table>
+</div></div></div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">module_cols</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">module_scores</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+    <span class="n">key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Module_</span><span class="si">{</span><span class="n">c</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">module_scores</span><span class="p">[</span><span class="n">c</span><span class="p">]</span>
+    <span class="n">module_cols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ov</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">basis</span><span class="o">=</span><span class="s1">&#39;X_umap&#39;</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="n">module_cols</span><span class="p">,</span>
+           <span class="n">use_raw</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">ncols</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">frameon</span><span class="o">=</span><span class="s1">&#39;small&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<a class="reference internal image-reference" href="../_images/326dc6b8ec7c39af12e1d1a1d4897225687c56ca561fe1125b0aacae3e69800d.png"><img alt="../_images/326dc6b8ec7c39af12e1d1a1d4897225687c56ca561fe1125b0aacae3e69800d.png" src="../_images/326dc6b8ec7c39af12e1d1a1d4897225687c56ca561fe1125b0aacae3e69800d.png" style="width: 1017px; height: 1401px;" />
+</a>
+</div>
+</div>
+</section>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="t_single_batch.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Data integration and batch correction</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="t_lazy.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Lazy analysis of scRNA-seq</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#loading-dataset">Loading dataset</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#consensus-non-negative-matrix-factorization-cnmf">Consensus Non-negative Matrix factorization (cNMF)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#initialize-and-training-model">Initialize and Training model</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#compute-the-stability-and-error-at-each-choice-of-k-to-see-if-a-clear-choice-jumps-out">Compute the stability and error at each choice of K to see if a clear choice jumps out.</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#visualization-the-result">Visualization the result</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#explode-the-cnmf-result">Explode the cNMF result</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#hotspot">Hotspot</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#determining-informative-genes">Determining informative genes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#grouping-genes-into-lineage-based-modules">Grouping genes into lineage-based modules</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#summary-module-scores">Summary Module Scores</a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Zehua Zeng
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2026, 112 Lab, USTB.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

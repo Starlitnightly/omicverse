@@ -1,0 +1,56 @@
+/* OmicVerse Sphinx / sphinx_book_theme — narrow overrides
+   (base theme + code/admonition/card/table styling live in custom.css;
+    this file only covers niche notebook-output rules.) */
+
+/* ------------------------------------------------------------------ */
+/* Notebook output: scrollable DataFrame tables                        */
+/* ------------------------------------------------------------------ */
+
+.output.text_html {
+    overflow-x: auto;
+    max-width: 100%;
+    display: block;
+}
+
+table.dataframe {
+    border-collapse: collapse !important;
+    font-size: 0.85em;
+    white-space: nowrap;
+    background-color: var(--pst-color-background, #fff) !important;
+    color: var(--pst-color-text-base, #25312b) !important;
+}
+
+table.dataframe th,
+table.dataframe td {
+    border: 1px solid var(--pst-color-border, #d8e4de) !important;
+    padding: 4px 10px !important;
+    background-color: var(--pst-color-background, #fff) !important;
+    color: var(--pst-color-text-base, #25312b) !important;
+}
+
+table.dataframe tbody tr:nth-child(even) th,
+table.dataframe tbody tr:nth-child(even) td {
+    background-color: var(--pst-color-surface, #eef4f1) !important;
+}
+
+table.dataframe thead th {
+    background-color: var(--pst-color-surface, #eef4f1) !important;
+    font-weight: 600;
+    border-bottom: 2px solid #4c7a69 !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* Notebook output images — proportional scaling                       */
+/* ------------------------------------------------------------------ */
+
+.cell_output a.reference.image-reference {
+    display: block;
+    max-width: 100%;
+}
+
+.cell_output a.reference.image-reference img,
+.cell_output img {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block;
+}
