@@ -140,7 +140,10 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
     method : str, default='leiden'
         Clustering backend. Supported values include ``'leiden'``,
         ``'louvain'``, ``'kmeans'``, ``'GMM'``, ``'mclust'``,
-        ``'mclust_R'``, ``'schist'``, ``'scICE'``, and ``'cellcharter'``.
+        ``'pymclustR'``, ``'schist'``, ``'scICE'``, and ``'cellcharter'``.
+        ``'pymclustR'`` is the pure-Python re-implementation of CRAN
+        ``mclust`` (the legacy ``'mclust_R'`` rpy2 backend has been
+        removed).
     use_rep : str, default='X_pca'
         Key in ``adata.obsm`` used for embedding-based methods such as GMM,
         K-means, and scICE.
@@ -207,26 +210,43 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
             )
         schist.inference.nested_model(adata, **kwargs)
         add_reference(adata,'schist','clustering with schist')
-    elif method=='mclust_R':
+    elif method=='pymclustR':
+        # Pure-Python re-implementation of CRAN mclust — same 14
+        # covariance parameterisations, same EM, same BIC. Replaces
+        # the legacy ``method='mclust_R'`` (rpy2 bridge) so omicverse
+        # no longer needs an R install.
+        try:
+            from mclust_py import Mclust as _PyMclust
+        except ImportError as e:
+            raise ImportError(
+                "pymclustR is required for method='pymclustR'. "
+                "Install with: pip install pymclustR"
+            ) from e
+        if n_components is None:
+            raise ValueError("n_components must be provided for method='pymclustR'")
         np.random.seed(random_state)
-        import rpy2.robjects as robjects
-        robjects.r.library("mclust")
-
-        import rpy2.robjects.numpy2ri
-        # rpy2.robjects.numpy2ri.activate()
-        r_random_seed = robjects.r['set.seed']
-        r_random_seed(random_state)
-        rmclust = robjects.r['Mclust']
-
-        res = rmclust(rpy2.robjects.numpy2ri.numpy2rpy(adata.obsm[use_rep]), n_components, 'EEE')
-        mclust_res = np.array(res[-2])
-
-        adata.obs[method] = mclust_res
-        adata.obs[method] = adata.obs[method].astype('int')
+        modelNames = kwargs.pop('modelNames', 'EEE')
+        if isinstance(modelNames, str):
+            modelNames = [modelNames]
+        fit = _PyMclust(
+            adata.obsm[use_rep],
+            G=[int(n_components)],
+            model_names=list(modelNames),
+            **kwargs,
+        )
+        adata.obs[method] = fit.classification.astype(int)
         adata.obs[method] = adata.obs[method].astype('category')
+        adata.uns.setdefault('pymclustR', {})[use_rep] = {
+            'modelName': fit.model_name,
+            'G': fit.G,
+            'loglik': fit.loglik,
+            'bic': fit.bic,
+        }
         print(f"""finished: found {n_components} clusters and added
-    'mclust', the cluster labels (adata.obs, categorical)""")
-        add_reference(adata,'mclust','clustering with Gaussian Mixture Model')
+    'pymclustR', the cluster labels (adata.obs, categorical)
+    [model={fit.model_name}, loglik={fit.loglik:.4f}, BIC={fit.bic:.4f}]""")
+        add_reference(adata, 'pymclustR',
+                      'clustering with pymclustR (Python re-implementation of CRAN mclust)')
     elif method=='scICE':
         from ._scice import scICE
         scice = scICE(n_jobs=-1,use_gpu=False)
@@ -257,9 +277,21 @@ def cluster(adata:anndata.AnnData,method:str='leiden',
     'cellcharter', the cluster labels (adata.obs, categorical)""")
         add_reference(adata,'cellcharter','clustering with CellCharter')
         return model
+    else:
+        if method == 'mclust_R':
+            raise ValueError(
+                "method='mclust_R' (rpy2 bridge to CRAN mclust) was removed. "
+                "Use method='pymclustR' — same 14 covariance parameterizations, "
+                "no R / rpy2 dependency. Install with: pip install pymclustR"
+            )
+        raise ValueError(
+            f"Unknown clustering method: {method!r}. Supported: 'leiden', "
+            "'louvain', 'kmeans', 'GMM', 'mclust', 'pymclustR', 'schist', "
+            "'scICE', 'cellcharter'."
+        )
 
 
-      
+
 @register_function(
     aliases=["精化标签", "refine_label", "label_refinement", "标签优化", "邻域投票"],
     category="utils",

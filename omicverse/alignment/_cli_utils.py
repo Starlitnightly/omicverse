@@ -21,6 +21,10 @@ _INSTALL_HINTS = {
     "featureCounts": "conda install -c bioconda -y subread",
     "pigz": "conda install -c conda-forge -y pigz",
     "gzip": "conda install -c conda-forge -y gzip",
+    "vsearch": "conda install -c bioconda -y vsearch",
+    "cutadapt": "pip install cutadapt",
+    "emu": "pip install emu",
+    "Rscript": "conda install -c conda-forge -y r-base bioconductor-dada2",
 }
 
 
@@ -34,6 +38,8 @@ _INSTALL_COMMANDS = {
     "featureCounts": ["subread", "-c", "bioconda"],
     "pigz": ["pigz", "-c", "conda-forge"],
     "gzip": ["gzip", "-c", "conda-forge"],
+    "vsearch": ["vsearch", "-c", "bioconda"],
+    "cutadapt": ["cutadapt", "-c", "bioconda"],
 }
 
 
