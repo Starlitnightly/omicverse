@@ -404,7 +404,12 @@ def _select_root_cell(adata, root_state=None, reverse=False):
         if 'State' not in adata.obs.columns:
             raise ValueError("State not set. Call order_cells() without root_state first.")
 
-        root_candidates = adata.obs[adata.obs['State'] == root_state]
+        # State is stored as a string-keyed Categorical (see writer in
+        # this module); accept either int or str from the caller by
+        # stringifying on comparison.
+        root_state_key = str(root_state)
+        root_candidates = adata.obs[adata.obs['State'].astype(str)
+                                    == root_state_key]
         if len(root_candidates) == 0:
             raise ValueError(f"No cells for State = {root_state}")
 
@@ -543,10 +548,19 @@ def order_cells(adata, root_state=None, reverse=None):
                 )
             y_names = [mst.vs[i]['name'] for i in cv]
             cell_states = cc_ordering.loc[y_names, 'cell_state'].values
-            adata.obs['State'] = pd.Categorical(cell_states)
+            # Store State as a **string-keyed** Categorical. Integer
+            # categories leak into `adata.uns['State_colors']` lookups
+            # downstream — ov.pl.embedding's palette normaliser stringifies
+            # category keys but not the loop-over-categories in the
+            # legend path, so int-keyed Categoricals crash with
+            # `KeyError: <int>`. Keep State as the R-style "1","2",...
+            adata.obs['State'] = pd.Categorical(
+                [str(v) for v in cell_states]
+            )
         else:
             adata.obs['State'] = pd.Categorical(
-                cc_ordering_new.loc[adata.obs_names, 'cell_state'].values
+                [str(v) for v in
+                 cc_ordering_new.loc[adata.obs_names, 'cell_state'].values]
             )
 
         # Find branch points. A strictly linear trajectory has no branch
@@ -573,7 +587,8 @@ def order_cells(adata, root_state=None, reverse=None):
 
         adata.obs['Pseudotime'] = cc_ordering.loc[adata.obs_names, 'pseudo_time'].values
         adata.obs['State'] = pd.Categorical(
-            cc_ordering.loc[adata.obs_names, 'cell_state'].values
+            [str(v) for v in
+             cc_ordering.loc[adata.obs_names, 'cell_state'].values]
         )
 
         branch_points = [mst.vs[v]['name'] for v in range(mst.vcount()) if mst.degree(v) > 2]

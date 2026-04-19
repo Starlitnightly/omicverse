@@ -27,6 +27,7 @@ from .differential import (
 from .clustering import cluster_cells, cluster_genes
 from .plotting import (
     plot_cell_trajectory,
+    plot_trajectory_overlay,
     plot_genes_in_pseudotime,
     plot_genes_branched_heatmap,
     plot_genes_branched_pseudotime,
@@ -67,6 +68,7 @@ __all__ = [
     "cluster_genes",
     # plotting
     "plot_cell_trajectory",
+    "plot_trajectory_overlay",
     "plot_genes_in_pseudotime",
     "plot_genes_branched_heatmap",
     "plot_genes_branched_pseudotime",

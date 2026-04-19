@@ -652,6 +652,112 @@ class Monocle:
     # Alias matching Monocle2 R names
     plot_cell_trajectory = plot_trajectory
 
+    def plot_trajectory_overlay(self, ax, **kwargs):
+        """Overlay the DDRTree principal-graph skeleton + branch points
+        on an externally-drawn axes (e.g. one produced by
+        ``ov.pl.embedding(basis='X_DDRTree')``).
+
+        Parameters
+        ----------
+        ax : matplotlib.axes.Axes
+            Target axes whose coordinate system matches
+            ``adata.obsm['X_DDRTree']``.
+        show_tree, show_branch_points : bool
+            Toggle the MST edges and numbered branch-point markers.
+        backbone_color, cell_link_size, branch_point_size,
+        branch_point_color, branch_point_label_color,
+        branch_point_label_fontsize, theta, x, y, zorder_base
+            Forwarded to the underlying helper — see
+            :func:`omicverse.external.monocle2_py.plotting.plot_trajectory_overlay`.
+
+        Returns
+        -------
+        matplotlib.axes.Axes
+            The same axes, for chaining.
+
+        Examples
+        --------
+        Draw cells with omicverse's embedding plotter, then overlay the
+        DDRTree backbone and branch points::
+
+            import omicverse as ov
+            fig, ax = plt.subplots(figsize=(7, 5))
+            ov.pl.embedding(
+                mono.adata, basis='X_DDRTree', color='State',
+                ax=ax, show=False,
+            )
+            mono.plot_trajectory_overlay(ax)
+        """
+        return self._m2.plot_trajectory_overlay(self.adata, ax, **kwargs)
+
+    def plot_trajectory_with_embedding(
+        self,
+        color: str = 'State',
+        *,
+        basis: str = 'X_DDRTree',
+        cell_size: float = 4.0,
+        figsize: tuple = (7, 5),
+        show_tree: bool = True,
+        show_branch_points: bool = True,
+        backbone_color: str = 'black',
+        cell_link_size: float = 0.75,
+        branch_point_size: float = 150,
+        **embedding_kwargs,
+    ):
+        """Convenience combo: render ``ov.pl.embedding`` then overlay
+        the DDRTree backbone + branch points.
+
+        This is the ``ov.pl.embedding(...)`` + ``plot_trajectory_overlay``
+        pipeline in one call. For fine-grained control over the
+        embedding (custom palette, multiple colour keys, subplots, …)
+        call the two steps separately.
+
+        Parameters
+        ----------
+        color : str
+            Column to colour cells by — passed to ``ov.pl.embedding``.
+        basis : str
+            Key in ``adata.obsm`` that carries the trajectory layout.
+            Default ``'X_DDRTree'``.
+        cell_size : float
+            Matplotlib scatter ``s`` equivalent for the cells. Mapped to
+            ``ov.pl.embedding``'s ``size`` argument as ``cell_size ** 2``
+            to match the R/Monocle convention where ``cell_size`` is a
+            radius-like parameter.
+        figsize, show_tree, show_branch_points, backbone_color,
+        cell_link_size, branch_point_size
+            Styling forwarded to the overlay.
+        **embedding_kwargs
+            Extra keyword arguments forwarded to ``ov.pl.embedding``.
+
+        Returns
+        -------
+        (matplotlib.figure.Figure, matplotlib.axes.Axes)
+        """
+        import matplotlib.pyplot as plt
+        import omicverse as ov
+
+        fig, ax = plt.subplots(1, 1, figsize=figsize)
+        ov.pl.embedding(
+            self.adata,
+            basis=basis,
+            color=color,
+            ax=ax,
+            size=cell_size ** 2,
+            show=False,
+            **embedding_kwargs,
+        )
+        self._m2.plot_trajectory_overlay(
+            self.adata, ax,
+            show_tree=show_tree,
+            show_branch_points=show_branch_points,
+            backbone_color=backbone_color,
+            cell_link_size=cell_link_size,
+            branch_point_size=branch_point_size,
+        )
+        fig.tight_layout()
+        return fig, ax
+
     def plot_complex_cell_trajectory(self, color_by: str = 'State', **kwargs):
         """Dendrogram-style trajectory layout (Pseudotime on Y-axis)."""
         return self._m2.plot_complex_cell_trajectory(self.adata, color_by=color_by, **kwargs)
