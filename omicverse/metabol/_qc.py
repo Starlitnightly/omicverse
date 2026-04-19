@@ -26,6 +26,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 from anndata import AnnData
+from scipy import stats
 
 from .._registry import register_function
 
@@ -253,3 +254,149 @@ def _resolve_sample_array(adata: AnnData, col_or_arr: str | np.ndarray) -> np.nd
             f"array shape {arr.shape} does not match n_obs={adata.n_obs}"
         )
     return arr
+
+
+# ---------------------------------------------------------------------------
+# Sample-level outlier detection — Hotelling T² + DModX on PCA
+# ---------------------------------------------------------------------------
+@register_function(
+    aliases=[
+        'sample_qc',
+        'hotelling_t2',
+        'dmodx',
+        '离群样本',
+    ],
+    category='metabolomics',
+    description='Per-sample outlier flags via Hotelling T-squared (inside the PCA model) plus DModX (distance to the PCA residual plane). The standard SIMCA-style sample-level diagnostic for metabolomics runs.',
+    examples=[
+        "ov.metabol.sample_qc(adata, n_components=2)",
+        "ov.metabol.sample_qc(adata, n_components=3, alpha=0.99)",
+    ],
+    related=[
+        'metabol.cv_filter',
+        'metabol.serrf',
+        'metabol.plsda',
+    ],
+)
+def sample_qc(
+    adata: AnnData,
+    *,
+    n_components: int = 2,
+    alpha: float = 0.95,
+    center: bool = True,
+    scale: bool = True,
+    layer: str | None = None,
+) -> "pd.DataFrame":
+    """Hotelling T-squared + DModX sample-level outlier detection.
+
+    Fits PCA on ``adata.X`` (after mean-centre + unit-variance scale by
+    default) and returns per-sample diagnostics.
+
+    - **Hotelling T-squared** ``= Σ (t_a / s_a)^2`` — quadratic-form
+      distance from the sample to the model origin inside the PC
+      subspace. Critical value at level ``alpha`` is the
+      ``(1-alpha)``-quantile of a scaled F distribution (Hotelling
+      1947); flagged samples are deep *within* the model space.
+    - **DModX** ``= sqrt(||residual||² / (p - A))`` — standardised
+      distance from the sample to the residual subspace. Flagged
+      samples are *outside* the model space. DModX critical value is
+      based on an F approximation (Eriksson 2013, Ch. 7).
+
+    A sample flagged by either metric should be inspected before
+    downstream stats — T-squared catches unusual profiles that still
+    "look like" the training set; DModX catches novel profiles that
+    don't fit the PCA subspace at all.
+
+    Parameters
+    ----------
+    n_components
+        Number of PCs to retain. Default 2 — enough for a 2-D score
+        plot, too few for detecting outliers in high-dimensional
+        data. Try 3–5 for real studies.
+    alpha
+        Significance level for flagging. Default 0.95.
+    center, scale
+        Pre-processing. Default: mean-centre + scale to unit variance
+        (matches SIMCA / MetaboAnalyst convention).
+    layer
+        AnnData layer (default ``None`` → ``adata.X``).
+
+    Returns
+    -------
+    pd.DataFrame
+        Indexed by sample name, columns:
+        ``T2`` (Hotelling T-squared), ``DModX``,
+        ``T2_crit`` / ``DModX_crit`` (critical values at ``alpha``),
+        ``T2_flag`` / ``DModX_flag`` (bools), ``is_outlier``
+        (flagged by either).
+
+        Also attaches ``attrs['variance_explained']`` (array of length
+        ``n_components``) and ``attrs['n_components']``.
+    """
+    from sklearn.decomposition import PCA
+
+    Xraw = adata.X if layer is None else adata.layers[layer]
+    X = np.asarray(Xraw, dtype=np.float64)
+    n, p = X.shape
+
+    # Impute NaNs with column median so PCA doesn't choke
+    col_med = np.nanmedian(X, axis=0)
+    col_med = np.where(np.isfinite(col_med), col_med, 0.0)
+    nan_idx = np.isnan(X)
+    if nan_idx.any():
+        X = np.where(nan_idx, np.broadcast_to(col_med, X.shape), X)
+
+    if center:
+        X = X - X.mean(axis=0, keepdims=True)
+    if scale:
+        sd = X.std(axis=0, ddof=1)
+        sd = np.where(sd > 0, sd, 1.0)
+        X = X / sd
+
+    A = min(n_components, min(X.shape) - 1)
+    if A < 1:
+        raise ValueError(
+            f"need at least one PC, got n_components={n_components} "
+            f"on data shape {X.shape}"
+        )
+    pca = PCA(n_components=A)
+    T = pca.fit_transform(X)          # (n, A)
+    P = pca.components_.T             # (p, A)
+    var_explained = pca.explained_variance_ratio_
+
+    # Hotelling T² — sum of squared standardised scores
+    score_var = T.var(axis=0, ddof=1)
+    score_var = np.where(score_var > 0, score_var, 1.0)
+    t2 = ((T ** 2) / score_var).sum(axis=1)
+    # Critical value (Hotelling 1947, F-scaled)
+    f_crit = stats.f.ppf(alpha, A, max(n - A, 1))
+    t2_crit = A * (n - 1) / max(n - A, 1) * f_crit
+
+    # DModX — RMSE of residual vector per sample
+    X_hat = T @ P.T
+    residuals = X - X_hat
+    if p > A:
+        dmodx = np.sqrt((residuals ** 2).sum(axis=1) / (p - A))
+    else:
+        dmodx = np.zeros(n)
+    # Critical value — F approximation (Eriksson 2013)
+    # s0 = total residual variance (per-row), s_crit = s0 * sqrt(F_alpha)
+    s0 = dmodx.mean() if dmodx.size else 1.0
+    dmodx_crit = s0 * np.sqrt(stats.f.ppf(alpha, max(p - A, 1),
+                                           max((n - A - 1) * (p - A), 1)))
+
+    t2_flag = t2 > t2_crit
+    dmodx_flag = dmodx > dmodx_crit
+    out = pd.DataFrame({
+        "T2": t2,
+        "DModX": dmodx,
+        "T2_crit": float(t2_crit),
+        "DModX_crit": float(dmodx_crit),
+        "T2_flag": t2_flag,
+        "DModX_flag": dmodx_flag,
+        "is_outlier": t2_flag | dmodx_flag,
+    }, index=adata.obs_names.copy())
+    out.attrs["n_components"] = A
+    out.attrs["variance_explained"] = var_explained.tolist()
+    out.attrs["alpha"] = alpha
+    return out

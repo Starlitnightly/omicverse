@@ -27,15 +27,16 @@ Quick-start
 Pipeline stages
 ---------------
 I/O                      ``read_metaboanalyst``, ``read_wide``, ``read_lcms``
-QC (MS-specific)         ``cv_filter``, ``drift_correct``, ``blank_filter``
+QC (MS-specific)         ``cv_filter``, ``drift_correct``, ``blank_filter``, ``sample_qc`` (Hotelling T² + DModX)
 Batch / drift            ``serrf`` (QC-based Random Forest, Fan 2019)
 Imputation               ``impute`` (kNN / half-min / QRILC / zero)
 Sample normalization     ``normalize`` (PQN / TIC / median / MSTUS)
 Feature transform        ``transform`` (log / glog / autoscale / Pareto)
-Univariate differential  ``differential`` (Welch t / Student t / Wilcoxon / limma-moderated)
-Multi-factor designs     ``asca`` (ANOVA-SCA), ``mixed_model`` (statsmodels MixedLM)
+Univariate differential  ``differential`` (2 groups) / ``anova`` (3+ groups Welch/ANOVA/Kruskal)
+Multi-factor designs     ``asca`` (ANOVA-SCA), ``mixed_model`` (MixedLM), ``meba`` (time-series Hotelling)
 Biomarker discovery      ``roc_feature``, ``biomarker_panel`` (nested CV)
-Differential correlation ``dgca`` (DGCA, McKenzie 2016)
+Correlation              ``dgca`` (differential), ``corr_network`` (static within-condition)
+Multi-omics integration  ``run_mofa`` (bridge to mofapy2 for metabol + RNA joint factors)
 Multivariate             ``plsda``, ``opls_da`` (with VIP scores + Q²)
 Pathway enrichment       ``msea_ora``, ``msea_gsea``, ``lion_enrichment``
 Mass-based annotation    ``annotate_peaks``, ``mummichog_basic``
@@ -68,6 +69,7 @@ _LAZY_ATTRS: dict[str, tuple[str, str]] = {
     "cv_filter":              ("._qc", "cv_filter"),
     "drift_correct":          ("._qc", "drift_correct"),
     "blank_filter":           ("._qc", "blank_filter"),
+    "sample_qc":              ("._qc", "sample_qc"),
     # Batch / drift correction (sklearn RF)
     "serrf":                  ("._batch", "serrf"),
     # Preprocessing
@@ -76,17 +78,22 @@ _LAZY_ATTRS: dict[str, tuple[str, str]] = {
     "transform":              ("._transform", "transform"),
     # Univariate stats (scipy.stats)
     "differential":           ("._stats", "differential"),
+    "anova":                  ("._stats", "anova"),
     # Multi-factor designs (statsmodels.MixedLM + numpy SVD)
     "asca":                   ("._multifactor", "asca"),
     "ASCAEffect":             ("._multifactor", "ASCAEffect"),
     "ASCAResult":             ("._multifactor", "ASCAResult"),
     "mixed_model":            ("._multifactor", "mixed_model"),
+    "meba":                   ("._multifactor", "meba"),
     # Biomarker discovery (sklearn)
     "roc_feature":            ("._biomarker", "roc_feature"),
     "biomarker_panel":        ("._biomarker", "biomarker_panel"),
     "BiomarkerPanelResult":   ("._biomarker", "BiomarkerPanelResult"),
     # Differential correlation (vectorised numpy + scipy)
     "dgca":                   ("._correlation", "dgca"),
+    "corr_network":           ("._correlation", "corr_network"),
+    # Multi-omics integration (bridge to ov.single.pyMOFA / mofapy2)
+    "run_mofa":               ("._integration", "run_mofa"),
     # Multivariate (sklearn)
     "plsda":                  ("._plsda", "plsda"),
     "opls_da":                ("._plsda", "opls_da"),
@@ -142,6 +149,7 @@ _REGISTRY_SUBMODULES = (
     "._multifactor",
     "._biomarker",
     "._correlation",
+    "._integration",
     "._plsda",
     "._msea",
     "._mummichog",
@@ -188,7 +196,7 @@ def __dir__():
                       + list(_LAZY_SUBMODULES)))
 
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
     # class API
@@ -201,6 +209,7 @@ __all__ = [
     "cv_filter",
     "drift_correct",
     "blank_filter",
+    "sample_qc",
     # batch / drift correction
     "serrf",
     # preprocessing
@@ -209,17 +218,22 @@ __all__ = [
     "transform",
     # stats
     "differential",
+    "anova",
     # multi-factor designs
     "asca",
     "ASCAEffect",
     "ASCAResult",
     "mixed_model",
+    "meba",
     # biomarker discovery
     "roc_feature",
     "biomarker_panel",
     "BiomarkerPanelResult",
     # differential correlation
     "dgca",
+    "corr_network",
+    # multi-omics integration
+    "run_mofa",
     # multivariate
     "plsda",
     "opls_da",

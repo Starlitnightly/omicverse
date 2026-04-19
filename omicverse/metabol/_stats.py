@@ -30,6 +30,7 @@ from .._registry import register_function
 
 
 TestMethod = Literal["t", "welch_t", "wilcoxon", "limma"]
+ANOVAMethod = Literal["welch_anova", "anova", "kruskal"]
 
 
 @register_function(
@@ -212,3 +213,144 @@ def _inv_trigamma(x: float, tol: float = 1e-7, max_iter: int = 50) -> float:
         if abs(step) < tol:
             break
     return max(y, 1e-6)
+
+
+# ---------------------------------------------------------------------------
+# anova — 3+ groups
+# ---------------------------------------------------------------------------
+@register_function(
+    aliases=[
+        'anova',
+        'welch_anova',
+        'kruskal',
+        '多组方差分析',
+    ],
+    category='metabolomics',
+    description='Per-metabolite 3+ group test — Welch ANOVA (Alexander-Govern, default; handles unequal variances), classic one-way ANOVA, or Kruskal-Wallis. Matches differential output schema plus per-group means.',
+    examples=[
+        "ov.metabol.anova(adata, group_col='dose')",
+        "ov.metabol.anova(adata, group_col='time', method='kruskal')",
+    ],
+    related=[
+        'metabol.differential',
+        'metabol.asca',
+        'metabol.meba',
+    ],
+)
+def anova(
+    adata: AnnData,
+    *,
+    group_col: str = "group",
+    groups: Optional[list] = None,
+    method: ANOVAMethod = "welch_anova",
+    layer: Optional[str] = None,
+) -> pd.DataFrame:
+    """Per-metabolite test across 3+ groups.
+
+    Parameters
+    ----------
+    group_col
+        Factor column in ``adata.obs``.
+    groups
+        Subset of levels to test. ``None`` → use every unique level
+        in ``group_col`` with at least 2 samples.
+    method
+        - ``"welch_anova"`` (default) — Alexander-Govern test
+          (``scipy.stats.alexandergovern``), Welch's generalisation
+          for unequal variances. Robust and recommended.
+        - ``"anova"`` — classic one-way ``f_oneway``. Assumes equal
+          variances across groups; most sensitive when that holds.
+        - ``"kruskal"`` — non-parametric ``kruskal``. Use when the
+          Gaussian / symmetry assumption fails even after log.
+    layer
+        AnnData layer (default ``None`` → ``adata.X``).
+
+    Returns
+    -------
+    pd.DataFrame
+        Indexed by metabolite with columns:
+
+        - ``stat`` — test statistic (F, Kruskal H, or Alexander-Govern A)
+        - ``pvalue``, ``padj`` — raw and BH-FDR
+        - ``mean_<level>`` — one column per tested group level
+        - ``n_groups`` — number of levels actually tested
+    """
+    if group_col not in adata.obs.columns:
+        raise KeyError(f"adata.obs has no column {group_col!r}")
+
+    labels = adata.obs[group_col].astype(str).to_numpy()
+    if groups is None:
+        uniq = [str(v) for v in pd.unique(adata.obs[group_col])]
+        groups = [g for g in uniq if (labels == g).sum() >= 2]
+    else:
+        groups = [str(g) for g in groups]
+    if len(groups) < 3:
+        raise ValueError(
+            f"anova needs ≥3 groups, got {len(groups)}: {groups}. "
+            "For two-group tests use metabol.differential."
+        )
+    if any((labels == g).sum() < 2 for g in groups):
+        small = [g for g in groups if (labels == g).sum() < 2]
+        raise ValueError(f"groups with <2 samples: {small}")
+
+    Xraw = adata.X if layer is None else adata.layers[layer]
+    X = np.asarray(Xraw, dtype=np.float64)
+    group_data = [X[labels == g] for g in groups]
+
+    p = X.shape[1]
+    stat = np.full(p, np.nan)
+    pval = np.full(p, np.nan)
+
+    if method == "welch_anova":
+        for j in range(p):
+            cols = [g[:, j] for g in group_data]
+            cols = [c[np.isfinite(c)] for c in cols]
+            if any(len(c) < 2 for c in cols):
+                continue
+            try:
+                r = stats.alexandergovern(*cols, nan_policy="omit")
+                stat[j] = float(r.statistic)
+                pval[j] = float(r.pvalue)
+            except Exception:
+                continue
+    elif method == "anova":
+        for j in range(p):
+            cols = [g[:, j] for g in group_data]
+            cols = [c[np.isfinite(c)] for c in cols]
+            if any(len(c) < 2 for c in cols):
+                continue
+            try:
+                F, pv = stats.f_oneway(*cols)
+                stat[j] = float(F)
+                pval[j] = float(pv)
+            except Exception:
+                continue
+    elif method == "kruskal":
+        for j in range(p):
+            cols = [g[:, j] for g in group_data]
+            cols = [c[np.isfinite(c)] for c in cols]
+            if any(len(c) < 2 for c in cols):
+                continue
+            try:
+                H, pv = stats.kruskal(*cols, nan_policy="omit")
+                stat[j] = float(H)
+                pval[j] = float(pv)
+            except Exception:
+                continue
+    else:
+        raise ValueError(f"unknown method={method!r}")
+
+    padj = _bh_fdr(pval)
+
+    means = {f"mean_{g}": np.nanmean(group_data[i], axis=0)
+             for i, g in enumerate(groups)}
+    out = pd.DataFrame({
+        "stat": stat,
+        "pvalue": pval,
+        "padj": padj,
+        **means,
+        "n_groups": len(groups),
+    }, index=adata.var_names.copy())
+    out.attrs.update({"groups": groups, "method": method,
+                      "group_col": group_col})
+    return out

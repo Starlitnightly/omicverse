@@ -31,6 +31,7 @@ from typing import Optional, Sequence, Union
 import numpy as np
 import pandas as pd
 from anndata import AnnData
+from scipy import stats
 
 from .._registry import register_function
 from ._utils import bh_fdr
@@ -453,4 +454,175 @@ def mixed_model(
         out.attrs["term"] = term
         out.attrs["formula"] = formula
         out.attrs["groups"] = groups
+    return out
+
+
+# ---------------------------------------------------------------------------
+# MEBA — per-feature Hotelling T² on time-course profiles
+# ---------------------------------------------------------------------------
+@register_function(
+    aliases=[
+        'meba',
+        'MEBA',
+        'hotelling_time_series',
+        '时间序列差异',
+    ],
+    category='metabolomics',
+    description="MEBA (MetaboAnalyst-style time-series): per-feature Hotelling T-squared testing whether each subject's time course differs between two groups. Balanced-design only (every subject observed at every time point).",
+    examples=[
+        "ov.metabol.meba(adata, group_col='treatment', time_col='time', subject_col='patient')",
+    ],
+    related=[
+        'metabol.mixed_model',
+        'metabol.asca',
+        'metabol.anova',
+    ],
+)
+def meba(
+    adata: AnnData,
+    *,
+    group_col: str,
+    time_col: str,
+    subject_col: str,
+    groups: Optional[tuple] = None,
+    layer: Optional[str] = None,
+) -> pd.DataFrame:
+    """Per-feature Hotelling T-squared for two-group time-course comparison.
+
+    For each feature, build a ``(n_subjects, n_timepoints)`` matrix per
+    group — each row is one subject's time course. Hotelling's
+    two-sample T-squared tests whether the two groups have the same
+    mean time-course vector, returning an F-distributed statistic.
+
+    The design must be **balanced**: every subject observed at every
+    time point. Subjects missing any cell are dropped and listed in
+    ``result.attrs['dropped_subjects']``.
+
+    Parameters
+    ----------
+    group_col
+        Column in ``adata.obs`` with the two-class labels.
+    time_col
+        Column in ``adata.obs`` giving the time point (any type
+        castable to str; ordering inferred from ``pd.unique`` to
+        preserve appearance order).
+    subject_col
+        Column in ``adata.obs`` identifying each subject. The same
+        subject must appear at every time point in one (and only one)
+        group.
+    groups
+        ``(group_a, group_b)`` pair. ``None`` → first two unique
+        values.
+    layer
+        AnnData layer (default ``None`` → ``adata.X``).
+
+    Returns
+    -------
+    pd.DataFrame
+        Indexed by metabolite, columns ``T2, F, df1, df2, pvalue,
+        padj, n_a, n_b, k``.
+    """
+    for col in (group_col, time_col, subject_col):
+        if col not in adata.obs.columns:
+            raise KeyError(f"adata.obs has no column {col!r}")
+
+    labels = adata.obs[group_col].astype(str).to_numpy()
+    tlabels = adata.obs[time_col].astype(str).to_numpy()
+    slabels = adata.obs[subject_col].astype(str).to_numpy()
+
+    if groups is None:
+        uniq = [str(v) for v in pd.unique(adata.obs[group_col])]
+        if len(uniq) < 2:
+            raise ValueError(f"{group_col!r} has <2 levels")
+        group_a, group_b = uniq[0], uniq[1]
+    else:
+        group_a, group_b = str(groups[0]), str(groups[1])
+
+    time_levels = [str(v) for v in pd.unique(adata.obs[time_col])]
+    k = len(time_levels)
+    if k < 2:
+        raise ValueError(f"{time_col!r} has <2 levels")
+
+    Xraw = adata.X if layer is None else adata.layers[layer]
+    X = np.asarray(Xraw, dtype=np.float64)
+
+    dropped: list[str] = []
+
+    def _subject_matrix(g_label: str):
+        subj_rows: dict[str, np.ndarray] = {}
+        for s in np.unique(slabels[labels == g_label]):
+            rows = []
+            ok = True
+            for t in time_levels:
+                mask = (slabels == s) & (tlabels == t) & (labels == g_label)
+                if mask.sum() != 1:
+                    ok = False
+                    break
+                rows.append(int(np.where(mask)[0][0]))
+            if ok:
+                subj_rows[s] = np.array(rows, dtype=int)
+            else:
+                dropped.append(s)
+        if not subj_rows:
+            return [], np.zeros((0, k), dtype=int)
+        return list(subj_rows), np.array([v for v in subj_rows.values()])
+
+    subjects_a, rows_a = _subject_matrix(group_a)
+    subjects_b, rows_b = _subject_matrix(group_b)
+    n_a, n_b = rows_a.shape[0], rows_b.shape[0]
+    if n_a < 2 or n_b < 2:
+        raise ValueError(
+            f"need ≥2 balanced-design subjects per group, got "
+            f"{n_a} ({group_a}) / {n_b} ({group_b}). "
+            f"Dropped subjects: {dropped}"
+        )
+
+    df1 = k
+    df2 = n_a + n_b - k - 1
+    if df2 < 1:
+        raise ValueError(
+            f"residual df = {df2} <= 0; need more subjects than time "
+            f"points for Hotelling T-squared (n_a+n_b > k+1)."
+        )
+
+    p = X.shape[1]
+    T2 = np.full(p, np.nan)
+    F = np.full(p, np.nan)
+    pval = np.full(p, np.nan)
+
+    for j in range(p):
+        Ya = np.array([X[r, j] for r in rows_a])
+        Yb = np.array([X[r, j] for r in rows_b])
+        if not np.isfinite(Ya).all() or not np.isfinite(Yb).all():
+            continue
+        mean_a = Ya.mean(axis=0)
+        mean_b = Yb.mean(axis=0)
+        S_a = np.cov(Ya, rowvar=False, ddof=1) if n_a > 1 else np.zeros((k, k))
+        S_b = np.cov(Yb, rowvar=False, ddof=1) if n_b > 1 else np.zeros((k, k))
+        S_pool = ((n_a - 1) * S_a + (n_b - 1) * S_b) / (n_a + n_b - 2)
+        if k == 1:
+            S_pool = np.atleast_2d(S_pool)
+        try:
+            S_inv = np.linalg.pinv(S_pool)
+        except Exception:
+            continue
+        diff = mean_a - mean_b
+        t2 = (n_a * n_b / (n_a + n_b)) * float(diff @ S_inv @ diff)
+        f_stat = ((n_a + n_b - k - 1) / ((n_a + n_b - 2) * k)) * t2
+        T2[j] = t2
+        F[j] = f_stat
+        pval[j] = float(stats.f.sf(max(f_stat, 0.0), df1, df2))
+
+    padj = bh_fdr(pval)
+    out = pd.DataFrame({
+        "T2": T2, "F": F,
+        "df1": df1, "df2": df2,
+        "pvalue": pval, "padj": padj,
+        "n_a": n_a, "n_b": n_b, "k": k,
+    }, index=adata.var_names.copy())
+    out.attrs.update({
+        "group_a": group_a, "group_b": group_b,
+        "time_levels": time_levels,
+        "dropped_subjects": dropped,
+    })
     return out

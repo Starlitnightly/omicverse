@@ -218,3 +218,132 @@ def _rankdata_cols(X: np.ndarray) -> np.ndarray:
     for j in range(X.shape[1]):
         out[:, j] = stats.rankdata(X[:, j], nan_policy="omit")
     return out
+
+
+# ---------------------------------------------------------------------------
+# Static within-condition correlation network
+# ---------------------------------------------------------------------------
+@register_function(
+    aliases=[
+        'corr_network',
+        'correlation_network',
+        '相关网络',
+    ],
+    category='metabolomics',
+    description='Static within-condition metabolite correlation network. Complement to dgca: dgca compares conditions, corr_network describes each condition in isolation. Returns a filtered edge list (|r| >= threshold, padj < alpha).',
+    examples=[
+        "ov.metabol.corr_network(adata, method='spearman', abs_r_threshold=0.5)",
+        "ov.metabol.corr_network(adata, group_col='group', group='case', features=top20)",
+    ],
+    related=[
+        'metabol.dgca',
+        'metabol.biomarker_panel',
+    ],
+)
+def corr_network(
+    adata: AnnData,
+    *,
+    group_col: Optional[str] = None,
+    group: Optional[str] = None,
+    features: Optional[Sequence[str]] = None,
+    method: str = "spearman",
+    abs_r_threshold: float = 0.5,
+    padj_threshold: float = 0.05,
+    layer: Optional[str] = None,
+) -> pd.DataFrame:
+    """Pairwise metabolite correlation network within a single condition.
+
+    Parameters
+    ----------
+    group_col, group
+        If both given, restrict to samples where
+        ``adata.obs[group_col] == group``. If ``group_col`` is given
+        but ``group`` is None a ``ValueError`` is raised — partial
+        filtering makes no sense. If both are None, all samples are
+        used.
+    features
+        Optional subset of metabolite names (reduces O(p^2)).
+    method
+        ``"spearman"`` (default, heavy-tailed-friendly) or
+        ``"pearson"``.
+    abs_r_threshold
+        Keep pairs with ``|r| >= abs_r_threshold`` in the output edge
+        list.
+    padj_threshold
+        Keep pairs with BH-FDR ``padj < padj_threshold``.
+    layer
+        AnnData layer (default ``None`` → ``adata.X``).
+
+    Returns
+    -------
+    pd.DataFrame
+        Filtered edge list, columns
+        ``feature_a, feature_b, r, pvalue, padj``. Sorted by
+        ``|r|`` descending. Intended as input to ``networkx.Graph``
+        (``nx.from_pandas_edgelist(df, source='feature_a',
+        target='feature_b', edge_attr='r')``).
+    """
+    if (group_col is None) ^ (group is None):
+        raise ValueError("pass both group_col and group, or neither")
+
+    if group_col is not None:
+        if group_col not in adata.obs.columns:
+            raise KeyError(f"adata.obs has no column {group_col!r}")
+        mask = (adata.obs[group_col].astype(str).to_numpy()
+                == str(group))
+        if mask.sum() < 4:
+            raise ValueError(
+                f"only {mask.sum()} samples in group {group!r}; need >=4"
+            )
+    else:
+        mask = np.ones(adata.n_obs, dtype=bool)
+
+    Xraw = adata.X if layer is None else adata.layers[layer]
+    X = np.asarray(Xraw, dtype=np.float64)[mask]
+
+    var_names = list(adata.var_names)
+    if features is not None:
+        feat = list(features)
+        miss = [f for f in feat if f not in var_names]
+        if miss:
+            raise KeyError(f"features not in adata.var_names: {miss[:5]}...")
+        idx = [var_names.index(f) for f in feat]
+        X = X[:, idx]
+        names = feat
+    else:
+        names = var_names
+
+    if method == "spearman":
+        X = _rankdata_cols(X)
+    elif method != "pearson":
+        raise ValueError(f"unknown method={method!r}")
+
+    n = X.shape[0]
+    R = _fast_corr(X)
+    clip = 1.0 - 1e-10
+    Z = np.arctanh(np.clip(R, -clip, clip))
+    se = 1.0 / np.sqrt(max(n - 3, 1))
+    pvals = 2.0 * stats.norm.sf(np.abs(Z) / se)
+
+    p = R.shape[0]
+    iu, ju = np.triu_indices(p, k=1)
+    r_arr = R[iu, ju]
+    p_arr = pvals[iu, ju]
+    padj = bh_fdr(p_arr)
+
+    keep = (np.abs(r_arr) >= abs_r_threshold) & (padj < padj_threshold)
+    edges = pd.DataFrame({
+        "feature_a": [names[i] for i in iu[keep]],
+        "feature_b": [names[j] for j in ju[keep]],
+        "r": r_arr[keep],
+        "pvalue": p_arr[keep],
+        "padj": padj[keep],
+    })
+    edges["abs_r"] = edges["r"].abs()
+    edges = edges.sort_values("abs_r", ascending=False).drop(columns="abs_r")
+    edges = edges.reset_index(drop=True)
+    edges.attrs["n_samples"] = int(n)
+    edges.attrs["method"] = method
+    edges.attrs["group_col"] = group_col
+    edges.attrs["group"] = group
+    return edges
