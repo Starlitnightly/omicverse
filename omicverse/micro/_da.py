@@ -28,15 +28,15 @@ def _dense(X):
 
 
 @register_function(
-    aliases=["pyDA", "differential_abundance"],
+    aliases=["DA", "differential_abundance"],
     category="microbiome",
     description="Differential abundance testing: Wilcoxon / pyDESeq2 / ANCOM-BC.",
     examples=[
-        "ov.micro.pyDA(adata).wilcoxon(group_key='group', rank='genus')",
+        "ov.micro.DA(adata).wilcoxon(group_key='group', rank='genus')",
     ],
-    related=["micro.pyAlpha", "bulk.pyDEG"],
+    related=["micro.Alpha", "bulk.pyDEG"],
 )
-class pyDA:
+class DA:
     """Per-feature differential abundance across sample groups.
 
     Parameters
@@ -188,7 +188,7 @@ class pyDA:
             from pydeseq2.ds import DeseqStats
         except ImportError as exc:
             raise ImportError(
-                "pyDA.deseq2 requires pydeseq2 (pip install pydeseq2)."
+                "DA.deseq2 requires pydeseq2 (pip install pydeseq2)."
             ) from exc
         counts, features = self._features(rank)
 
@@ -249,7 +249,7 @@ class pyDA:
             from skbio.stats.composition import ancombc as _ancombc
         except ImportError as exc:
             raise ImportError(
-                "pyDA.ancombc requires scikit-bio >= 0.7.1 "
+                "DA.ancombc requires scikit-bio >= 0.7.1 "
                 "(pip install 'scikit-bio>=0.7.1')."
             ) from exc
         counts, features = self._features(rank)

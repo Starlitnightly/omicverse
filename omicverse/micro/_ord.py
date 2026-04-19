@@ -1,7 +1,7 @@
 """Ordination for microbiome AnnData.
 
 PCoA (principal coordinates) and NMDS operate on the beta-diversity distance
-matrices produced by :class:`omicverse.micro.pyBeta`. Results are stored in
+matrices produced by :class:`omicverse.micro.Beta`. Results are stored in
 ``adata.obsm[<dist>_pcoa]`` / ``adata.obsm[<dist>_nmds]`` so they slot into
 ``scanpy.pl`` or matplotlib directly.
 """
@@ -21,22 +21,22 @@ from .._registry import register_function
 
 
 @register_function(
-    aliases=["pyOrdinate", "ordination", "pcoa"],
+    aliases=["Ordinate", "ordination", "pcoa"],
     category="microbiome",
     description="Ordination (PCoA / NMDS) on a beta-diversity distance matrix.",
     examples=[
-        "ov.micro.pyOrdinate(adata, dist_key='braycurtis').pcoa(n=3)",
+        "ov.micro.Ordinate(adata, dist_key='braycurtis').pcoa(n=3)",
     ],
-    related=["micro.pyBeta"],
+    related=["micro.Beta"],
 )
-class pyOrdinate:
+class Ordinate:
     """Reduce a sample × sample distance matrix to 2-D / 3-D coords.
 
     Parameters
     ----------
     adata
         AnnData with a distance matrix already computed by
-        :meth:`pyBeta.run` (stored in ``adata.obsp[dist_key]``).
+        :meth:`Beta.run` (stored in ``adata.obsp[dist_key]``).
     dist_key
         Key into ``adata.obsp``. Defaults to ``'braycurtis'``.
     """
@@ -47,7 +47,7 @@ class pyOrdinate:
         if dist_key not in adata.obsp:
             raise KeyError(
                 f"adata.obsp does not contain {dist_key!r}. "
-                "Compute it first, e.g. ov.micro.pyBeta(adata).run(metric='braycurtis')."
+                "Compute it first, e.g. ov.micro.Beta(adata).run(metric='braycurtis')."
             )
         self.D = np.asarray(adata.obsp[dist_key])
         self.result_: dict[str, np.ndarray] = {}
@@ -67,7 +67,7 @@ class pyOrdinate:
             from skbio import DistanceMatrix
         except ImportError as exc:
             raise ImportError(
-                "pyOrdinate.pcoa requires scikit-bio."
+                "Ordinate.pcoa requires scikit-bio."
             ) from exc
         dm = DistanceMatrix(self.D, ids=list(self.adata.obs_names))
         res = _skbio_pcoa(dm, number_of_dimensions=n)
@@ -91,7 +91,7 @@ class pyOrdinate:
         try:
             from sklearn.manifold import MDS
         except ImportError as exc:
-            raise ImportError("pyOrdinate.nmds requires scikit-learn.") from exc
+            raise ImportError("Ordinate.nmds requires scikit-learn.") from exc
         mds = MDS(n_components=n, dissimilarity="precomputed",
                   random_state=random_state, n_init=4,
                   normalized_stress="auto")

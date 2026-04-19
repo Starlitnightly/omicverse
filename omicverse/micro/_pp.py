@@ -29,7 +29,7 @@ def _dense(X):
     category="microbiome",
     description="Subsample each sample's counts to a common depth without replacement (rarefaction).",
     examples=["ov.micro.rarefy(adata, depth=None, seed=0)"],
-    related=["micro.pyAlpha", "micro.pyBeta"],
+    related=["micro.Alpha", "micro.Beta"],
 )
 def rarefy(
     adata: "ad.AnnData",
@@ -192,7 +192,7 @@ def _pseudo_count(X, method: str = "multiplicative") -> np.ndarray:
     category="microbiome",
     description="Centred log-ratio transform of sample counts.",
     examples=["ov.micro.clr(adata, layer_out='clr')"],
-    related=["micro.ilr", "micro.pyBeta"],
+    related=["micro.ilr", "micro.Beta"],
 )
 def clr(
     adata: "ad.AnnData",

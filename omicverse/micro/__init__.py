@@ -7,11 +7,11 @@ Downstream 16S / amplicon analysis on top of the AnnData produced by
 
 Classes
 -------
-pyAlpha : Alpha-diversity (Shannon / Simpson / Chao1 / Observed / Faith PD)
-pyBeta  : Beta-diversity distance matrices (Bray-Curtis / Jaccard / Aitchison
+Alpha : Alpha-diversity (Shannon / Simpson / Chao1 / Observed / Faith PD)
+Beta  : Beta-diversity distance matrices (Bray-Curtis / Jaccard / Aitchison
           / UniFrac — UniFrac requires ``unifrac`` package + phylogenetic tree)
-pyOrdinate : PCoA / NMDS / RDA / CCA ordinations (via scikit-bio / sklearn)
-pyDA    : Differential-abundance testing (Wilcoxon, pyDESeq2, ANCOM-BC)
+Ordinate : PCoA / NMDS / RDA / CCA ordinations (via scikit-bio / sklearn)
+DA    : Differential-abundance testing (Wilcoxon, pyDESeq2, ANCOM-BC)
 
 Functions
 ---------
@@ -25,29 +25,29 @@ Examples
 >>> import omicverse as ov
 >>> adata = ov.alignment.amplicon_16s_pipeline(fastq_dir='raw/', ...)
 >>> # diversity
->>> alpha = ov.micro.pyAlpha(adata).run(metrics=['shannon', 'observed_asvs'])
->>> beta  = ov.micro.pyBeta(adata).run(metric='braycurtis', rarefy=True)
+>>> alpha = ov.micro.Alpha(adata).run(metrics=['shannon', 'observed_asvs'])
+>>> beta  = ov.micro.Beta(adata).run(metric='braycurtis', rarefy=True)
 >>> # ordination
->>> ord_  = ov.micro.pyOrdinate(adata, dist_key='braycurtis').pcoa(n=3)
+>>> ord_  = ov.micro.Ordinate(adata, dist_key='braycurtis').pcoa(n=3)
 >>> # differential abundance at genus level
->>> da    = ov.micro.pyDA(adata).wilcoxon(group_key='group', rank='genus')
+>>> da    = ov.micro.DA(adata).wilcoxon(group_key='group', rank='genus')
 """
 
-from ._diversity import pyAlpha, pyBeta, ALPHA_METRICS, BETA_METRICS
-from ._ord import pyOrdinate
-from ._da import pyDA
+from ._diversity import Alpha, Beta, ALPHA_METRICS, BETA_METRICS
+from ._ord import Ordinate
+from ._da import DA
 from ._pp import rarefy, filter_by_prevalence, collapse_taxa, clr, ilr
 
 __all__ = [
     # diversity
-    "pyAlpha",
-    "pyBeta",
+    "Alpha",
+    "Beta",
     "ALPHA_METRICS",
     "BETA_METRICS",
     # ordination
-    "pyOrdinate",
+    "Ordinate",
     # differential abundance
-    "pyDA",
+    "DA",
     # preprocessing
     "rarefy",
     "filter_by_prevalence",

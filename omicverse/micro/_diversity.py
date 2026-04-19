@@ -64,20 +64,20 @@ def _build_tree_file(adata: "ad.AnnData") -> Optional[str]:
 
 
 # ----------------------------------------------------------------------------
-# pyAlpha
+# Alpha
 # ----------------------------------------------------------------------------
 
 
 @register_function(
-    aliases=["alpha_diversity", "pyAlpha", "within_sample_diversity"],
+    aliases=["alpha_diversity", "Alpha", "within_sample_diversity"],
     category="microbiome",
     description="Alpha diversity: per-sample richness / evenness metrics via scikit-bio.",
     examples=[
-        "ov.micro.pyAlpha(adata).run(metrics=['shannon', 'observed_otus'])",
+        "ov.micro.Alpha(adata).run(metrics=['shannon', 'observed_otus'])",
     ],
-    related=["micro.pyBeta", "micro.pyOrdinate"],
+    related=["micro.Beta", "micro.Ordinate"],
 )
-class pyAlpha:
+class Alpha:
     """Compute and store per-sample alpha-diversity metrics on ``adata.obs``.
 
     Parameters
@@ -138,7 +138,7 @@ class pyAlpha:
             from skbio.diversity import alpha_diversity
         except ImportError as exc:
             raise ImportError(
-                "ov.micro.pyAlpha requires scikit-bio (pip install scikit-bio)."
+                "ov.micro.Alpha requires scikit-bio (pip install scikit-bio)."
             ) from exc
 
         metrics = [metrics] if isinstance(metrics, str) else list(metrics)
@@ -184,21 +184,21 @@ class pyAlpha:
 
 
 # ----------------------------------------------------------------------------
-# pyBeta
+# Beta
 # ----------------------------------------------------------------------------
 
 
 @register_function(
-    aliases=["beta_diversity", "pyBeta", "pairwise_distance"],
+    aliases=["beta_diversity", "Beta", "pairwise_distance"],
     category="microbiome",
     description="Beta diversity: sample × sample dissimilarity matrices "
                 "(Bray-Curtis / Jaccard / Aitchison / UniFrac) via scikit-bio.",
     examples=[
-        "ov.micro.pyBeta(adata).run(metric='braycurtis', rarefy=True)",
+        "ov.micro.Beta(adata).run(metric='braycurtis', rarefy=True)",
     ],
-    related=["micro.pyAlpha", "micro.pyOrdinate"],
+    related=["micro.Alpha", "micro.Ordinate"],
 )
-class pyBeta:
+class Beta:
     """Compute sample × sample distance matrices.
 
     Parameters
@@ -286,7 +286,7 @@ class pyBeta:
                 from skbio.diversity import beta_diversity
             except ImportError as exc:
                 raise ImportError(
-                    "ov.micro.pyBeta requires scikit-bio (pip install scikit-bio)."
+                    "ov.micro.Beta requires scikit-bio (pip install scikit-bio)."
                 ) from exc
             dm_skbio = beta_diversity(metric, counts, ids=ids)
             dm = pd.DataFrame(dm_skbio.data, index=ids, columns=ids)
@@ -308,7 +308,7 @@ class pyBeta:
             from skbio.diversity import beta_diversity
         except ImportError as exc:
             raise ImportError(
-                "pyBeta requires scikit-bio for UniFrac metrics."
+                "Beta requires scikit-bio for UniFrac metrics."
             ) from exc
         tf = _build_tree_file(self.adata)
         ids = list(self.adata.obs_names)
