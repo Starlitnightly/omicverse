@@ -61,28 +61,35 @@ def _null_ctx():
 
 
 @contextlib.contextmanager
-def _tree_tempfile(adata: "ad.AnnData"):
-    """Context manager that materialises ``adata.uns['tree']`` (newick) to a
-    temp ``.nwk`` file for downstream tools (unifrac / skbio Faith PD) and
-    reliably deletes it on exit — previous implementation leaked one file
-    per call in ``/tmp``.
+def _tree_object(adata: "ad.AnnData"):
+    """Context manager that parses ``adata.uns['tree']`` (newick string)
+    into a ``skbio.tree.TreeNode``. scikit-bio's phylogenetic metrics want
+    a TreeNode object (not a file path).
     """
     tree = adata.uns.get("tree") if hasattr(adata, "uns") else None
     if not tree:
         yield None
         return
-    tmp = tempfile.NamedTemporaryFile(
-        mode="w", suffix=".nwk", delete=False, prefix="omicverse_micro_tree_"
-    )
     try:
-        tmp.write(tree)
-        tmp.close()
-        yield tmp.name
+        from skbio.tree import TreeNode
+    except ImportError as exc:
+        raise ImportError(
+            "Phylogenetic diversity requires scikit-bio (pip install scikit-bio)."
+        ) from exc
+    import io
+    tn = TreeNode.read(io.StringIO(tree))
+    # FastTree emits unrooted trees; skbio's phylogenetic metrics
+    # (Faith PD, UniFrac) require a rooted tree. Midpoint rooting is the
+    # canonical fix for 16S ASV trees — it's neutral wrt outgroup choice.
+    try:
+        tn = tn.root_at_midpoint()
+    except Exception:
+        # Already rooted, or a single-leaf edge case — pass through.
+        pass
+    try:
+        yield tn
     finally:
-        try:
-            os.unlink(tmp.name)
-        except OSError:
-            pass
+        pass  # nothing to clean up — no temp file
 
 
 # ----------------------------------------------------------------------------
@@ -165,7 +172,7 @@ class Alpha:
         # Wrap all metric calls that need the phylogenetic tree in a single
         # context so the temp newick file is reliably deleted on exit.
         need_tree = any(m == "faith_pd" for m in metrics)
-        with _tree_tempfile(self.adata) if need_tree else _null_ctx() as tree_file:
+        with _tree_object(self.adata) if need_tree else _null_ctx() as tree_file:
             for m in metrics:
                 if m == "faith_pd":
                     if not tree_file:
@@ -177,7 +184,8 @@ class Alpha:
                         "faith_pd",
                         counts,
                         ids=ids,
-                        otu_ids=list(self.adata.var_names),
+                        # scikit-bio >=0.6 renamed `otu_ids` → `taxa`
+                        taxa=list(self.adata.var_names),
                         tree=tree_file,
                     )
                 else:
@@ -328,10 +336,11 @@ class Beta:
                 "Beta requires scikit-bio for UniFrac metrics."
             ) from exc
         ids = list(self.adata.obs_names)
-        otu_ids = list(self.adata.var_names)
-        with _tree_tempfile(self.adata) as tf:
+        # scikit-bio >=0.6 renamed `otu_ids` → `taxa`
+        taxa = list(self.adata.var_names)
+        with _tree_object(self.adata) as tf:
             dm_skbio = beta_diversity(
-                metric, counts, ids=ids, otu_ids=otu_ids,
+                metric, counts, ids=ids, taxa=taxa,
                 tree=tf, validate=True,
             )
         return pd.DataFrame(dm_skbio.data, index=ids, columns=ids)
