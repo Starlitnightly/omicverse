@@ -21,10 +21,7 @@ except ImportError as exc:  # pragma: no cover
     raise ImportError("anndata is required for ov.micro._da") from exc
 
 from .._registry import register_function
-
-
-def _dense(X):
-    return X.toarray() if sparse.issparse(X) else np.asarray(X)
+from ._utils import dense as _dense
 
 
 @register_function(
@@ -244,7 +241,16 @@ class DA:
         rank: Optional[str] = None,
         min_prevalence: float = 0.1,
     ) -> pd.DataFrame:
-        """ANCOM-BC via ``skbio.stats.composition.ancombc`` (skbio ≥ 0.7.1)."""
+        """ANCOM-BC via ``skbio.stats.composition.ancombc`` (skbio ≥ 0.7.1).
+
+        .. note::
+            The scikit-bio ANCOM-BC API is evolving (the 0.7.1 return type
+            is a named-tuple-like bundle, not a DataFrame). This wrapper
+            expects the 0.7.1 shape with attributes ``lfc / se / W / p / q
+            / diff_abn`` indexed by feature and will raise
+            :class:`NotImplementedError` on other shapes so the caller
+            knows to pin scikit-bio.
+        """
         try:
             from skbio.stats.composition import ancombc as _ancombc
         except ImportError as exc:
@@ -263,9 +269,28 @@ class DA:
             index=self.adata.obs_names,
         )
         res = _ancombc(table=table, metadata=meta, formula=group_key)
-        # Normalise output shape: ANCOM-BC returns a dict-like with lfc, se, p, q, W
-        df = res.reset_index() if hasattr(res, "reset_index") else pd.DataFrame(res)
-        df["prevalence"] = prev[keep]
+
+        try:
+            df = pd.DataFrame({
+                "lfc":      pd.Series(res.lfc),
+                "se":       pd.Series(res.se),
+                "W":        pd.Series(res.W),
+                "p_value":  pd.Series(res.p),
+                "q_value":  pd.Series(res.q),
+                "diff_abn": pd.Series(res.diff_abn),
+            })
+            df.index.name = "feature"
+            df = df.reset_index()
+        except (AttributeError, TypeError) as exc:
+            raise NotImplementedError(
+                f"Installed scikit-bio returns an unsupported ANCOM-BC "
+                f"shape ({type(res).__name__}). Pin scikit-bio to a "
+                f"supported version (>=0.7.1) or open an issue."
+            ) from exc
+
+        feat_prev = pd.Series(prev[keep], index=feats)
+        df["prevalence"] = df["feature"].map(feat_prev).values
+
         self.result_ = df
         self.adata.uns.setdefault("micro", {}).setdefault("da", {})[
             f"ancombc_{group_key}_{rank or 'asv'}"

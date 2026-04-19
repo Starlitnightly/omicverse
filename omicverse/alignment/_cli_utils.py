@@ -22,7 +22,7 @@ _INSTALL_HINTS = {
     "pigz": "conda install -c conda-forge -y pigz",
     "gzip": "conda install -c conda-forge -y gzip",
     "vsearch": "conda install -c bioconda -y vsearch",
-    "cutadapt": "pip install cutadapt  # or: conda install -c bioconda -y cutadapt",
+    "cutadapt": "pip install cutadapt",
     "emu": "pip install emu",
     "Rscript": "conda install -c conda-forge -y r-base bioconductor-dada2",
 }

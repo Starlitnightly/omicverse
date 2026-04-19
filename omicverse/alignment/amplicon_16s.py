@@ -17,7 +17,8 @@ Output: an :class:`anndata.AnnData` with
                           per rank (``domain`` / ``phylum`` / ``class`` /
                           ``order`` / ``family`` / ``genus`` / ``species``),
                           ``taxonomy`` (``;``-joined), ``sintax_confidence``
-                          (per rank, mean bootstrap)
+                          (minimum bootstrap across reported ranks — a
+                          conservative per-ASV confidence summary)
   - ``uns['pipeline']``  — run parameters + per-step output paths
 
 No implicit writes to ``$HOME``. All paths live under the caller-supplied
@@ -25,8 +26,6 @@ No implicit writes to ``$HOME``. All paths live under the caller-supplied
 """
 from __future__ import annotations
 
-import gzip
-import io
 import re
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -80,10 +79,18 @@ def _discover_samples(fastq_dir: str) -> List[_SampleTuple]:
                 break
         if matched:
             continue
-        # R2 counterpart
+        # R2 counterpart — anchor the tag right before the FASTQ extension to
+        # avoid false positives like "sample_group2_R1_001.fastq.gz" matching
+        # "_2" anywhere in the middle.
+        r2_tags = ("_R2_001", "_R2", ".R2", "_2")
         r2_name = None
-        for tag in ("_R2_001", "_R2", "_2", ".R2"):
-            if tag in name:
+        stem = name
+        for ext in (".fastq.gz", ".fq.gz", ".fastq", ".fq"):
+            if stem.endswith(ext):
+                stem = stem[: -len(ext)]
+                break
+        for tag in r2_tags:
+            if stem.endswith(tag):
                 r2_name = name
                 break
         if not r2_name:
@@ -139,7 +146,7 @@ def _parse_sintax_tsv(path: str) -> pd.DataFrame:
     rank_prefix_map = dict(zip(rank_codes, rank_names))
 
     records = []
-    with open(path, "r") as fh:
+    with open(path, "r", encoding="utf-8") as fh:
         for line in fh:
             parts = line.rstrip("\n").split("\t")
             if not parts or not parts[0]:
@@ -189,7 +196,7 @@ def _parse_asv_fasta(path: str) -> pd.Series:
     seqs: List[str] = []
     current = None
     buf: List[str] = []
-    with open(path, "r") as fh:
+    with open(path, "r", encoding="utf-8") as fh:
         for line in fh:
             if line.startswith(">"):
                 if current is not None:
@@ -206,9 +213,15 @@ def _parse_asv_fasta(path: str) -> pd.Series:
 
 
 def _load_otutab(path: str) -> pd.DataFrame:
-    """Read vsearch ``otutab.tsv`` (first col = ASV id, rest = samples)."""
-    df = pd.read_csv(path, sep="\t", comment=None)
-    first_col = df.columns[0]
+    """Read vsearch ``otutab.tsv`` (first col = ASV id, rest = samples).
+
+    ``vsearch --otutabout`` emits a header line starting with literal
+    ``#OTU ID`` — this is *not* a comment, it is the ASV-id column name.
+    We therefore do NOT pass ``comment='#'`` to ``read_csv``; the leading
+    ``#`` is stripped when we rename the first column to ``'asv'``.
+    """
+    df = pd.read_csv(path, sep="\t")
+    first_col = df.columns[0]  # typically "#OTU ID"
     df = df.rename(columns={first_col: "asv"}).set_index("asv")
     df.columns = [str(c) for c in df.columns]
     return df
@@ -336,7 +349,7 @@ def build_amplicon_anndata(
 def amplicon_16s_pipeline(
     fastq_dir: Optional[str] = None,
     samples: Optional[Sequence[_SampleTuple]] = None,
-    workdir: str = "amplicon_16s_run",
+    workdir: Optional[str] = None,
     db_fasta: Optional[str] = None,
     *,
     primer_fwd: Optional[str] = None,
@@ -404,6 +417,13 @@ def amplicon_16s_pipeline(
         raise ValueError("Provide either `fastq_dir` or `samples`.")
     if fastq_dir and samples:
         raise ValueError("Specify only one of `fastq_dir` or `samples`.")
+    if not workdir:
+        raise ValueError(
+            "`workdir` is required. omicverse never writes intermediate "
+            "pipeline artefacts to an implicit location — pass an explicit "
+            "path (e.g. a directory under /scratch). "
+            "Example: workdir='/scratch/<user>/amplicon_run1'."
+        )
 
     workdir = str(Path(workdir).expanduser().resolve())
     ensure_dir(workdir)
@@ -412,6 +432,18 @@ def amplicon_16s_pipeline(
         sample_list = _discover_samples(fastq_dir)
     else:
         sample_list = [tuple(s) for s in samples]  # type: ignore[arg-type]
+
+    # Sanitise sample names: reject path separators so a caller-supplied
+    # "../foo" cannot escape `workdir`. Allowed chars: alphanumerics, dash,
+    # underscore, dot; anything else raises.
+    _safe = re.compile(r"^[A-Za-z0-9_.\-]+$")
+    for (s, _f1, _f2) in sample_list:
+        if not _safe.match(s):
+            raise ValueError(
+                f"Illegal sample name {s!r}: only [A-Za-z0-9_.-] allowed. "
+                "omicverse rejects path separators to prevent accidental "
+                "writes outside workdir."
+            )
 
     paths: Dict[str, str] = {"workdir": workdir}
 
@@ -550,6 +582,8 @@ def amplicon_16s_pipeline(
             "merge_max_diffs": merge_max_diffs,
             "merge_min_overlap": merge_min_overlap,
             "filter_max_ee": filter_max_ee,
+            "filter_min_len": filter_min_len,
+            "filter_max_len": filter_max_len,
             "derep_min_uniq": derep_min_uniq,
             "unoise_alpha": unoise_alpha,
             "unoise_minsize": unoise_minsize,

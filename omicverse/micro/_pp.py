@@ -18,10 +18,7 @@ except ImportError as exc:  # pragma: no cover
     raise ImportError("anndata is required for ov.micro._pp") from exc
 
 from .._registry import register_function
-
-
-def _dense(X):
-    return X.toarray() if sparse.issparse(X) else np.asarray(X)
+from ._utils import dense as _dense
 
 
 @register_function(
@@ -36,10 +33,13 @@ def rarefy(
     depth: Optional[int] = None,
     seed: int = 0,
     drop_shallow: bool = True,
-    layer_out: str = "rarefied",
+    save_original: bool = True,
     copy: bool = False,
 ) -> "ad.AnnData":
     """Rarefy counts to a common depth.
+
+    The rarefied matrix **overwrites** ``adata.X``; the original counts are
+    retained in ``adata.layers['counts_raw']`` when ``save_original=True``.
 
     Parameters
     ----------
@@ -52,9 +52,9 @@ def rarefy(
     drop_shallow
         If True, samples with library size < depth are DROPPED. If False,
         their original counts are kept (no subsampling possible below depth).
-    layer_out
-        Layer name where the rarefied matrix is stored. ``X`` is overwritten.
-        Set to an empty string to skip storing the original counts.
+    save_original
+        If True, a copy of the pre-rarefaction ``X`` is saved to
+        ``adata.layers['counts_raw']``.
     copy
         Return a copy instead of modifying in place.
     """
@@ -82,12 +82,14 @@ def rarefy(
             pick = rng.choice(idx, size=depth, replace=False)
             rarefied[i] = np.bincount(pick, minlength=len(row))
 
+    if save_original:
+        adata.layers["counts_raw"] = adata.X.copy()
+
     if not keep.all():
-        adata._inplace_subset_obs(keep)
+        # Public AnnData subset API (``_inplace_subset_*`` is private).
+        adata = adata[keep].copy() if not copy else adata[keep].copy()
         rarefied = rarefied[keep]
 
-    if layer_out:
-        adata.layers["counts_raw"] = adata.X.copy()
     adata.X = sparse.csr_matrix(rarefied, dtype=np.int32)
     adata.uns.setdefault("micro", {})["rarefaction_depth"] = int(depth)
     return adata
@@ -121,7 +123,8 @@ def filter_by_prevalence(
     X = _dense(adata.X)
     presence = (X >= min_count).sum(axis=0) / X.shape[0]
     keep = presence >= min_prevalence
-    adata._inplace_subset_var(keep)
+    # Public AnnData subset API
+    adata = adata[:, keep].copy()
     return adata
 
 

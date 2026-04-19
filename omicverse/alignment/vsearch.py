@@ -20,19 +20,18 @@ explicitly via ``db_fasta``.
 """
 from __future__ import annotations
 
-import gzip
+import shlex
 import shutil
+import subprocess
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 from .._registry import register_function
 from ._cli_utils import (
     build_env,
     ensure_dir,
-    is_gz,
     resolve_executable,
     resolve_jobs,
-    run_cmd,
     run_in_threads,
 )
 
@@ -43,22 +42,6 @@ _Sample = Tuple[str, str, Optional[str]]
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _decompress_if_gz(path: Path, staging_dir: Path) -> Path:
-    """vsearch's merge_pairs handles .gz fine, but some paths (sintax on gz
-    reference) are more reliable on plain text. This helper decompresses
-    lazily and caches in ``staging_dir``.
-    """
-    if not is_gz(path):
-        return path
-    staging_dir.mkdir(parents=True, exist_ok=True)
-    plain = staging_dir / path.name[:-3]
-    if plain.exists() and plain.stat().st_size > 0:
-        return plain
-    with gzip.open(path, "rb") as src, open(plain, "wb") as dst:
-        shutil.copyfileobj(src, dst)
-    return plain
 
 
 def _vsearch_bin(explicit: Optional[str], auto_install: bool) -> Tuple[str, dict]:
@@ -154,9 +137,8 @@ def merge_pairs(
         if max_merge_len > 0:
             cmd.extend(["--fastq_maxmergelen", str(max_merge_len)])
         if extra_args:
-            cmd.extend(list(extra_args))
+            cmd.extend(str(a) for a in extra_args)
 
-        import subprocess, shlex
         print(">>", " ".join(shlex.quote(str(c)) for c in cmd), flush=True)
         with open(log, "w") as fh:
             proc = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT, env=env, text=True)
@@ -256,9 +238,8 @@ def filter_quality(
         if trunc_len > 0:
             cmd.extend(["--fastq_trunclen", str(trunc_len)])
         if extra_args:
-            cmd.extend(list(extra_args))
+            cmd.extend(str(a) for a in extra_args)
 
-        import subprocess, shlex
         print(">>", " ".join(shlex.quote(str(c)) for c in cmd), flush=True)
         with open(log, "w") as fh:
             proc = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT, env=env, text=True)
@@ -336,9 +317,8 @@ def dereplicate(
         "--threads", str(threads),
     ]
     if extra_args:
-        cmd.extend(list(extra_args))
+        cmd.extend(str(a) for a in extra_args)
 
-    import subprocess, shlex
     print(">>", " ".join(shlex.quote(str(c)) for c in cmd), flush=True)
     with open(log, "w") as fh:
         proc = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT, env=env, text=True)
@@ -402,9 +382,8 @@ def unoise3(
         "--threads", str(threads),
     ]
     if extra_args:
-        cmd.extend(list(extra_args))
+        cmd.extend(str(a) for a in extra_args)
 
-    import subprocess, shlex
     print(">>", " ".join(shlex.quote(str(c)) for c in cmd), flush=True)
     with open(log, "w") as fh:
         proc = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT, env=env, text=True)
@@ -458,12 +437,16 @@ def uchime3_denovo(
         "--sizein", "--sizeout",
     ]
 
-    import subprocess, shlex
     print(">>", " ".join(shlex.quote(str(c)) for c in cmd), flush=True)
     with open(log, "w") as fh:
         proc = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT, env=env, text=True)
-    if proc.returncode != 0 or not nonchim.exists():
-        raise RuntimeError(f"vsearch uchime3_denovo failed; see {log}")
+    if (proc.returncode != 0
+            or not nonchim.exists()
+            or nonchim.stat().st_size == 0):
+        raise RuntimeError(
+            f"vsearch uchime3_denovo failed or produced empty non-chimera "
+            f"output (all ASVs classified as chimeric?); see {log}"
+        )
 
     return {"asv": str(nonchim), "chimeras": str(chim), "log": str(log)}
 
@@ -541,9 +524,8 @@ def sintax(
         "--threads", str(threads),
     ]
     if extra_args:
-        cmd.extend(list(extra_args))
+        cmd.extend(str(a) for a in extra_args)
 
-    import subprocess, shlex
     print(">>", " ".join(shlex.quote(str(c)) for c in cmd), flush=True)
     with open(log, "w") as fh:
         proc = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT, env=env, text=True)
@@ -611,9 +593,8 @@ def usearch_global(
         "--threads", str(threads),
     ]
     if extra_args:
-        cmd.extend(list(extra_args))
+        cmd.extend(str(a) for a in extra_args)
 
-    import subprocess, shlex
     print(">>", " ".join(shlex.quote(str(c)) for c in cmd), flush=True)
     with open(log, "w") as fh:
         proc = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT, env=env, text=True)

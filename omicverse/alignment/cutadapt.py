@@ -10,6 +10,8 @@ to ``$HOME``.
 """
 from __future__ import annotations
 
+import shlex
+import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
@@ -20,7 +22,6 @@ from ._cli_utils import (
     is_gz,
     resolve_executable,
     resolve_jobs,
-    run_cmd,
     run_in_threads,
 )
 
@@ -114,10 +115,9 @@ def _run_cutadapt_one(
     if fq2:
         cmd.append(str(fq2))
     if extra_args:
-        cmd.extend(list(extra_args))
+        cmd.extend(str(a) for a in extra_args)
 
     with open(log, "w") as fh:
-        import subprocess, shlex
         print(">>", " ".join(shlex.quote(str(c)) for c in cmd), flush=True)
         proc = subprocess.run(
             cmd, stdout=fh, stderr=subprocess.STDOUT, env=env, text=True

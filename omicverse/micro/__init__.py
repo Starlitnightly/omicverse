@@ -25,7 +25,7 @@ Examples
 >>> import omicverse as ov
 >>> adata = ov.alignment.amplicon_16s_pipeline(fastq_dir='raw/', ...)
 >>> # diversity
->>> alpha = ov.micro.Alpha(adata).run(metrics=['shannon', 'observed_asvs'])
+>>> alpha = ov.micro.Alpha(adata).run(metrics=['shannon', 'observed_otus'])
 >>> beta  = ov.micro.Beta(adata).run(metric='braycurtis', rarefy=True)
 >>> # ordination
 >>> ord_  = ov.micro.Ordinate(adata, dist_key='braycurtis').pcoa(n=3)

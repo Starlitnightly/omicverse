@@ -18,6 +18,7 @@ except ImportError as exc:  # pragma: no cover
     raise ImportError("anndata is required for ov.micro._diversity") from exc
 
 from .._registry import register_function
+from ._utils import dense as _dense, rarefy_counts as _rarefy_counts
 
 
 # ``scikit-bio`` canonical metric names
@@ -43,10 +44,6 @@ BETA_METRICS = (
     "weighted_unifrac",
     "weighted_normalized_unifrac",
 )
-
-
-def _dense(X):
-    return X.toarray() if sparse.issparse(X) else np.asarray(X)
 
 
 def _build_tree_file(adata: "ad.AnnData") -> Optional[str]:
@@ -105,22 +102,7 @@ class Alpha:
         self.result_: Optional[pd.DataFrame] = None
 
     def _counts(self) -> np.ndarray:
-        X = _dense(self.adata.X).astype(np.int64)
-        if self.rarefy_depth is None:
-            return X
-        # rarefy to target depth
-        rng = np.random.default_rng(self.seed)
-        depth = int(self.rarefy_depth)
-        rar = np.zeros_like(X)
-        for i, row in enumerate(X):
-            tot = int(row.sum())
-            if tot <= depth:
-                rar[i] = row
-            else:
-                idx = np.repeat(np.arange(len(row)), row.astype(int))
-                pick = rng.choice(idx, size=depth, replace=False)
-                rar[i] = np.bincount(pick, minlength=len(row))
-        return rar
+        return _rarefy_counts(_dense(self.adata.X), self.rarefy_depth, self.seed)
 
     def run(
         self,
@@ -224,22 +206,8 @@ class Beta:
         self.seed = seed
         self.dm_: dict[str, "pd.DataFrame"] = {}
 
-    def _counts(self) -> np.ndarray:
-        X = _dense(self.adata.X).astype(np.int64)
-        if self.rarefy_depth is None:
-            return X
-        rng = np.random.default_rng(self.seed)
-        depth = int(self.rarefy_depth)
-        rar = np.zeros_like(X)
-        for i, row in enumerate(X):
-            tot = int(row.sum())
-            if tot <= depth:
-                rar[i] = row
-            else:
-                idx = np.repeat(np.arange(len(row)), row.astype(int))
-                pick = rng.choice(idx, size=depth, replace=False)
-                rar[i] = np.bincount(pick, minlength=len(row))
-        return rar
+    def _counts(self, rarefy_depth: Optional[int]) -> np.ndarray:
+        return _rarefy_counts(_dense(self.adata.X), rarefy_depth, self.seed)
 
     def run(
         self,
@@ -269,18 +237,18 @@ class Beta:
         if metric not in BETA_METRICS:
             # still pass-through to skbio
             pass
-        if rarefy is not None:
-            saved = self.rarefy_depth
-            if rarefy and saved is None:
-                X = _dense(self.adata.X)
-                self.rarefy_depth = int(X.sum(axis=1).min())
-            if not rarefy:
-                self.rarefy_depth = None
-        counts = self._counts()
+        # Resolve the rarefaction depth for THIS call without mutating self.
+        call_depth: Optional[int] = self.rarefy_depth
+        if rarefy is True and call_depth is None:
+            X = _dense(self.adata.X)
+            call_depth = int(X.sum(axis=1).min())
+        elif rarefy is False:
+            call_depth = None
+        counts = self._counts(call_depth)
         ids = list(self.adata.obs_names)
 
         if "unifrac" in metric.lower():
-            dm = self._beta_unifrac(counts, metric, tree_key)
+            dm = self._beta_unifrac(counts, metric, tree_key, call_depth)
         else:
             try:
                 from skbio.diversity import beta_diversity
@@ -297,8 +265,8 @@ class Beta:
                                               self.adata.obs_names].values
         return dm
 
-    def _beta_unifrac(self, counts: np.ndarray, metric: str, tree_key: str
-                      ) -> pd.DataFrame:
+    def _beta_unifrac(self, counts: np.ndarray, metric: str, tree_key: str,
+                      call_depth: Optional[int] = None) -> pd.DataFrame:
         tree = self.adata.uns.get(tree_key)
         if not tree:
             raise ValueError(
