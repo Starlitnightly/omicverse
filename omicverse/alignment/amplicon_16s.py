@@ -394,9 +394,11 @@ def amplicon_16s_pipeline(
         first; otherwise primer trimming is skipped (e.g. the mothur MiSeq
         SOP test dataset ships with primers already removed).
     backend
-        Currently only ``'vsearch'`` is implemented. The ``'dada2'`` /
-        ``'emu'`` / ``'qiime2'`` backends raise ``NotImplementedError`` —
-        stubs exist to keep the API stable.
+        ``'vsearch'`` (default) — UNOISE3 via vsearch.
+        ``'dada2'`` — pure-Python DADA2 via
+        :func:`omicverse.alignment.dada2_pipeline` (needs ``pip install
+        pydada2``). ``'emu'`` / ``'qiime2'`` still raise
+        ``NotImplementedError``.
     threads, jobs
         CPU parallelism.
     overwrite
@@ -408,10 +410,10 @@ def amplicon_16s_pipeline(
         Samples × ASVs matrix with taxonomy / sequence / confidence in
         ``var``. Sample metadata (if provided) is merged into ``obs``.
     """
-    if backend != "vsearch":
+    if backend not in ("vsearch", "dada2"):
         raise NotImplementedError(
             f"backend={backend!r} is not implemented yet. "
-            "Use backend='vsearch' (the UNOISE3-based default)."
+            "Use 'vsearch' (UNOISE3, default) or 'dada2' (pydada2)."
         )
     if not fastq_dir and not samples:
         raise ValueError("Provide either `fastq_dir` or `samples`.")
@@ -453,6 +455,42 @@ def amplicon_16s_pipeline(
 
     paths: Dict[str, str] = {"workdir": workdir}
 
+    # --- DADA2 dispatch: cutadapt (optional) then delegate ------------
+    if backend == "dada2":
+        from . import dada2 as _dada2_mod
+        # Apply primer trimming if requested, so DADA2 sees trimmed reads
+        dada2_samples: List[_SampleTuple] = list(sample_list)
+        if primer_fwd:
+            trim_dir = str(Path(workdir) / "cutadapt")
+            trim_results = _cutadapt_mod.cutadapt(
+                samples=dada2_samples,
+                primer_fwd=primer_fwd,
+                primer_rev=primer_rev,
+                output_dir=trim_dir,
+                threads=threads,
+                jobs=jobs,
+                overwrite=overwrite,
+            )
+            if isinstance(trim_results, dict):
+                trim_results = [trim_results]
+            dada2_samples = [
+                (r["sample"], r["trim1"], r.get("trim2") or None)
+                for r in trim_results
+            ]
+            paths["cutadapt"] = trim_dir
+        return _dada2_mod.dada2_pipeline(
+            dada2_samples,
+            workdir=workdir,
+            db_fasta=db_fasta,
+            max_ee=filter_max_ee,
+            sintax_cutoff=sintax_cutoff,
+            sintax_strand=sintax_strand,
+            threads=threads,
+            sample_metadata=sample_metadata,
+            overwrite=overwrite,
+        )
+
+    # --- vsearch backend (default) ------------------------------------
     # --- Step 1: optional primer trim ---------------------------------
     current_samples: List[_SampleTuple] = list(sample_list)
     if primer_fwd:

@@ -27,6 +27,10 @@ from .mafft import mafft
 from .fasttree import fasttree
 from .phylogeny import build_phylogeny
 
+# DADA2 backend (pure-Python via pydada2)
+from . import dada2
+from .dada2 import dada2_pipeline
+
 __all__ = [
     "single",
     "ref",
@@ -50,4 +54,7 @@ __all__ = [
     "mafft",
     "fasttree",
     "build_phylogeny",
+    # DADA2
+    "dada2",
+    "dada2_pipeline",
 ]
