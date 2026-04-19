@@ -1,22 +1,18 @@
-r"""
+"""
 Metabolomics analysis for omicverse — AnnData-native peak-table workflows.
 
 ``ov.metabol`` covers the downstream-of-peak-picking stages of a
 metabolomics study: QC, imputation, normalization, transformation,
-univariate and multivariate statistics. Input is a peak table (produced
-by XCMS / MZmine / MS-DIAL / OpenMS / MetaboAnalyst) loaded into an
-AnnData with ``obs=samples``, ``var=metabolites`` — the same convention
-as every other omicverse module.
-
-**Not covered**: raw-file processing (mzML → peak table) and advanced
-annotation (MS/MS spectral matching). Use ``pyopenms`` / MZmine / MS-DIAL
-upstream, then bring the peak table here.
+univariate and multivariate statistics, pathway enrichment (MSEA /
+mummichog), and a lipidomics path. Input is a peak table (produced by
+XCMS / MZmine / MS-DIAL / OpenMS / MetaboAnalyst) loaded into an
+AnnData with ``obs=samples``, ``var=metabolites`` — the same
+convention as every other omicverse module.
 
 Quick-start
 -----------
 >>> from omicverse.metabol import pyMetabo, read_metaboanalyst
->>> # group_col is required — pass the exact header name of the factor
->>> # column in your CSV (e.g. "Muscle loss" for the cachexia demo).
+>>> # group_col is required — pass the factor column name from your CSV
 >>> adata = read_metaboanalyst("human_cachexia.csv", group_col="Muscle loss")
 >>> m = pyMetabo(adata)
 >>> (m.impute(method="qrilc", seed=0)
@@ -25,66 +21,119 @@ Quick-start
 ...    .differential(method="welch_t", log_transformed=True)
 ...    .transform(method="pareto", stash_raw=False)
 ...    .opls_da(n_ortho=1))
->>> m.deg_table.head()                         # univariate hits
->>> m.vip_table().head()                       # multivariate VIP
->>> m.significant_metabolites(padj_thresh=0.05)
+>>> m.deg_table.head()
+>>> m.vip_table().head()
 
 Pipeline stages
 ---------------
-I/O
-    ``read_metaboanalyst``, ``read_wide``, ``read_lcms``
-QC  (MS-specific)
-    ``cv_filter``, ``drift_correct``, ``blank_filter``
-Imputation
-    ``impute`` — kNN, half-min, QRILC, zero
-Sample normalization
-    ``normalize`` — PQN, TIC, median, MSTUS
-Feature transform
-    ``transform`` — log, glog, autoscale, Pareto
-Differential analysis
-    ``differential`` — t-test, Wilcoxon, limma-moderated
-Multivariate
-    ``plsda``, ``opls_da`` — PLS-DA / OPLS-DA with VIP
-Plotting
-    ``volcano``, ``s_plot``, ``vip_bar``
+I/O                      ``read_metaboanalyst``, ``read_wide``, ``read_lcms``
+QC (MS-specific)         ``cv_filter``, ``drift_correct``, ``blank_filter``
+Imputation               ``impute`` (kNN / half-min / QRILC / zero)
+Sample normalization     ``normalize`` (PQN / TIC / median / MSTUS)
+Feature transform        ``transform`` (log / glog / autoscale / Pareto)
+Univariate differential  ``differential`` (Welch t / Student t / Wilcoxon / limma-moderated)
+Multivariate             ``plsda``, ``opls_da`` (with VIP scores + Q²)
+Pathway enrichment       ``msea_ora``, ``msea_gsea``, ``lion_enrichment``
+Mass-based annotation    ``annotate_peaks``, ``mummichog_basic``
+ID mapping               ``map_ids``
+Database fetchers        ``fetch_kegg_pathways``, ``fetch_chebi_compounds``,
+                         ``fetch_lion_associations``, ``fetch_hmdb_from_name``
+Plotting                 ``volcano``, ``s_plot``, ``vip_bar``,
+                         ``pathway_bar``, ``pathway_dot``
 
-Relationship to existing omicverse modules
-------------------------------------------
-- Multi-omics integration: reuse ``ov.single.pyMOFA`` directly on an
-  AnnData stack (gene expression × metabolite concentrations).
-- Batch correction: ``ov.bulk.batch_correction`` (pyComBat) works on
-  metabolite matrices out-of-the-box.
-- WGCNA-style co-expression: ``ov.bulk.pyWGCNA`` ditto.
+All scipy / sklearn / statsmodels / matplotlib imports are deferred
+via module-level ``__getattr__`` — ``import omicverse.metabol`` itself
+stays lightweight, each symbol is loaded only when first accessed.
+Follows the same lazy-loading pattern used by the top-level
+``omicverse`` package.
 """
 from __future__ import annotations
 
-from . import plotting
-from ._fetchers import (
-    clear_cache,
-    fetch_chebi_compounds,
-    fetch_hmdb_from_name,
-    fetch_kegg_pathways,
-    fetch_lion_associations,
-)
-from ._id_mapping import map_ids, normalize_name
-from ._impute import impute
-from ._lipidomics import (
-    LipidIdentity,
-    aggregate_by_class,
-    annotate_lipids,
-    lion_enrichment,
-    parse_lipid,
-)
-from ._msea import load_pathways, msea_gsea, msea_ora
-from ._mummichog import annotate_peaks, mummichog_basic, mummichog_external
-from ._norm import normalize
-from ._plsda import PLSDAResult, opls_da, plsda
-from ._qc import blank_filter, cv_filter, drift_correct
-from ._stats import differential
-from ._transform import transform
-from .io import read_lcms, read_metaboanalyst, read_wide
-from .plotting import pathway_bar, pathway_dot, s_plot, vip_bar, volcano
-from .pymetabo import pyMetabo
+import importlib as _importlib
+
+
+# ---------------------------------------------------------------------------
+# Lazy-attribute map: public symbol → (submodule path, attribute in submodule)
+# ---------------------------------------------------------------------------
+_LAZY_ATTRS: dict[str, tuple[str, str]] = {
+    # I/O — small module, but defer anyway for consistency
+    "read_metaboanalyst":     (".io", "read_metaboanalyst"),
+    "read_wide":              (".io", "read_wide"),
+    "read_lcms":              (".io", "read_lcms"),
+    # QC (pulls statsmodels for drift_correct)
+    "cv_filter":              ("._qc", "cv_filter"),
+    "drift_correct":          ("._qc", "drift_correct"),
+    "blank_filter":           ("._qc", "blank_filter"),
+    # Preprocessing
+    "impute":                 ("._impute", "impute"),
+    "normalize":              ("._norm", "normalize"),
+    "transform":              ("._transform", "transform"),
+    # Univariate stats (scipy.stats)
+    "differential":           ("._stats", "differential"),
+    # Multivariate (sklearn)
+    "plsda":                  ("._plsda", "plsda"),
+    "opls_da":                ("._plsda", "opls_da"),
+    "PLSDAResult":            ("._plsda", "PLSDAResult"),
+    # Pathway enrichment (scipy.stats + vendored gseapy)
+    "msea_ora":               ("._msea", "msea_ora"),
+    "msea_gsea":              ("._msea", "msea_gsea"),
+    "load_pathways":          ("._msea", "load_pathways"),
+    # Mummichog (scipy.stats + heavy DataFrame work)
+    "annotate_peaks":         ("._mummichog", "annotate_peaks"),
+    "mummichog_basic":        ("._mummichog", "mummichog_basic"),
+    "mummichog_external":     ("._mummichog", "mummichog_external"),
+    # ID mapping
+    "map_ids":                ("._id_mapping", "map_ids"),
+    "normalize_name":         ("._id_mapping", "normalize_name"),
+    # Database fetchers (network + urllib + gzip)
+    "fetch_kegg_pathways":    ("._fetchers", "fetch_kegg_pathways"),
+    "fetch_lion_associations": ("._fetchers", "fetch_lion_associations"),
+    "fetch_chebi_compounds":  ("._fetchers", "fetch_chebi_compounds"),
+    "fetch_hmdb_from_name":   ("._fetchers", "fetch_hmdb_from_name"),
+    "clear_cache":            ("._fetchers", "clear_cache"),
+    # Lipidomics (re + regex + scipy)
+    "LipidIdentity":          ("._lipidomics", "LipidIdentity"),
+    "parse_lipid":            ("._lipidomics", "parse_lipid"),
+    "annotate_lipids":        ("._lipidomics", "annotate_lipids"),
+    "aggregate_by_class":     ("._lipidomics", "aggregate_by_class"),
+    "lion_enrichment":        ("._lipidomics", "lion_enrichment"),
+    # Plotting (matplotlib)
+    "volcano":                (".plotting", "volcano"),
+    "s_plot":                 (".plotting", "s_plot"),
+    "vip_bar":                (".plotting", "vip_bar"),
+    "pathway_bar":            (".plotting", "pathway_bar"),
+    "pathway_dot":            (".plotting", "pathway_dot"),
+    # Lifecycle class
+    "pyMetabo":               (".pymetabo", "pyMetabo"),
+}
+
+# Whole-submodule lazy loads — ``ov.metabol.plotting`` returns the module
+_LAZY_SUBMODULES = {"plotting"}
+
+
+def __getattr__(name: str):
+    """Module-level lazy import. Triggered on first access to every public
+    symbol, so ``import omicverse.metabol`` itself does no heavy work."""
+    if name in _LAZY_ATTRS:
+        module_path, attr_name = _LAZY_ATTRS[name]
+        module = _importlib.import_module(module_path, __name__)
+        value = getattr(module, attr_name)
+        globals()[name] = value           # cache so subsequent access is free
+        return value
+    if name in _LAZY_SUBMODULES:
+        module = _importlib.import_module(f".{name}", __name__)
+        globals()[name] = module
+        return module
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    """Make tab-completion and ``dir(ov.metabol)`` show the full lazy API."""
+    return sorted(set(list(globals().keys()) + list(_LAZY_ATTRS.keys())
+                      + list(_LAZY_SUBMODULES)))
+
+
+__version__ = "0.2.0"
 
 __all__ = [
     # class API
@@ -117,7 +166,7 @@ __all__ = [
     # ID mapping
     "map_ids",
     "normalize_name",
-    # Database fetchers (full DBs via cached on-demand download)
+    # database fetchers
     "fetch_kegg_pathways",
     "fetch_lion_associations",
     "fetch_chebi_compounds",

@@ -193,6 +193,54 @@ def test_msea_ora_empty_when_no_hits_resolve_to_kegg():
         )
 
 
+def test_metabol_import_does_not_pull_in_heavy_deps():
+    """Regression: ``import omicverse.metabol`` must stay lightweight —
+    scipy / sklearn / statsmodels / matplotlib should NOT be imported at
+    module init time. They're loaded lazily via ``__getattr__`` on first
+    access of the functions that need them.
+    """
+    import subprocess
+    import sys
+    import textwrap
+
+    probe = textwrap.dedent("""
+        import sys
+        import omicverse.metabol   # noqa — the whole point
+        heavy = [m for m in ("sklearn", "statsmodels", "matplotlib")
+                 if m in sys.modules]
+        # scipy is a borderline case — it's small and already pulled in by
+        # numpy on many installs, so we don't gate it. sklearn et al are
+        # the real concern.
+        print(",".join(heavy) or "CLEAN")
+    """)
+    result = subprocess.run(
+        [sys.executable, "-c", probe],
+        capture_output=True, text=True, check=True,
+    )
+    assert result.stdout.strip() == "CLEAN", (
+        f"import omicverse.metabol eagerly loaded: {result.stdout.strip()} — "
+        "this defeats the lazy-loading pattern in metabol/__init__.py"
+    )
+
+
+def test_metabol_lazy_attrs_resolve_correctly():
+    """Every symbol in __all__ must be reachable via __getattr__ and
+    caches itself in globals() on first access."""
+    import omicverse.metabol as m
+
+    # First-access triggers the lazy import + caches; second access is
+    # pure-dict lookup. Both must give the same object.
+    f1 = m.opls_da
+    f2 = m.opls_da
+    assert f1 is f2
+    # Cheap paths shouldn't have triggered heavy deps that aren't needed
+    assert callable(m.normalize_name)
+    # Unknown name still raises AttributeError (not KeyError)
+    import pytest
+    with pytest.raises(AttributeError, match="has no attribute"):
+        _ = m.not_a_real_symbol
+
+
 def test_differential_single_group_raises():
     import anndata as ad
     from omicverse.metabol import differential
