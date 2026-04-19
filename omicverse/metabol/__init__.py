@@ -32,6 +32,8 @@ Imputation               ``impute`` (kNN / half-min / QRILC / zero)
 Sample normalization     ``normalize`` (PQN / TIC / median / MSTUS)
 Feature transform        ``transform`` (log / glog / autoscale / Pareto)
 Univariate differential  ``differential`` (Welch t / Student t / Wilcoxon / limma-moderated)
+Multi-factor designs     ``asca`` (ANOVA-SCA), ``mixed_model`` (statsmodels MixedLM)
+Biomarker discovery      ``roc_feature``, ``biomarker_panel`` (nested CV)
 Multivariate             ``plsda``, ``opls_da`` (with VIP scores + Q²)
 Pathway enrichment       ``msea_ora``, ``msea_gsea``, ``lion_enrichment``
 Mass-based annotation    ``annotate_peaks``, ``mummichog_basic``
@@ -70,6 +72,15 @@ _LAZY_ATTRS: dict[str, tuple[str, str]] = {
     "transform":              ("._transform", "transform"),
     # Univariate stats (scipy.stats)
     "differential":           ("._stats", "differential"),
+    # Multi-factor designs (statsmodels.MixedLM + numpy SVD)
+    "asca":                   ("._multifactor", "asca"),
+    "ASCAEffect":             ("._multifactor", "ASCAEffect"),
+    "ASCAResult":             ("._multifactor", "ASCAResult"),
+    "mixed_model":            ("._multifactor", "mixed_model"),
+    # Biomarker discovery (sklearn)
+    "roc_feature":            ("._biomarker", "roc_feature"),
+    "biomarker_panel":        ("._biomarker", "biomarker_panel"),
+    "BiomarkerPanelResult":   ("._biomarker", "BiomarkerPanelResult"),
     # Multivariate (sklearn)
     "plsda":                  ("._plsda", "plsda"),
     "opls_da":                ("._plsda", "opls_da"),
@@ -121,6 +132,8 @@ _REGISTRY_SUBMODULES = (
     "._norm",
     "._transform",
     "._stats",
+    "._multifactor",
+    "._biomarker",
     "._plsda",
     "._msea",
     "._mummichog",
@@ -186,6 +199,15 @@ __all__ = [
     "transform",
     # stats
     "differential",
+    # multi-factor designs
+    "asca",
+    "ASCAEffect",
+    "ASCAResult",
+    "mixed_model",
+    # biomarker discovery
+    "roc_feature",
+    "biomarker_panel",
+    "BiomarkerPanelResult",
     # multivariate
     "plsda",
     "opls_da",
