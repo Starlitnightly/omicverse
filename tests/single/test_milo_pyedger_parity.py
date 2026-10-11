@@ -14,14 +14,9 @@ matrix, using the identical options this module uses:
     fit <- glmQLFit(dge, design, robust=FALSE, legacy=FALSE)   # edgeR 4.x default
     qlf <- glmQLFTest(fit, coef=2)
 
-Findings (pinned below): **logFC agrees** with edgeR (max|Δ| ~2e-6).
-**F / PValue track it closely but not exactly** (F Pearson ~0.98, PValue
-Spearman > 0.99). pyedger implements the edgeR 4.0 ``legacy=FALSE`` QL
-method, which it matches to ~1e-8 on this matrix. Later edgeR rewrote that
-method (``compute_ave_qd``/``compute_adj_vec``, ``fitFDistUnequalDF1``,
-data-driven ``top.proportion``), and on this matrix edgeR 4.0.16 and 4.4.0
-themselves differ by up to 33% in F. The thresholds below are temporary until
-pyedger ports the newer QL method.
+Findings (pinned below): with pyedger >= 0.2.0, which tracks edgeR 4.10 (whose
+``legacy=FALSE`` QL method is identical to 4.4's on this matrix), logFC agrees to
+~1e-13 and F / PValue to ~2e-9 relative.
 """
 from pathlib import Path
 
@@ -68,22 +63,13 @@ def _pyedger_da(Y, cond):
 
 
 def test_milo_pyedger_matches_bioconductor_edger():
-    from scipy.stats import spearmanr
-
     ref = pd.read_csv(_REF, index_col=0)
     Y, cond = _simulate_nhood_counts()
     tab = _pyedger_da(Y, cond).loc[ref.index]
 
-    # logFC: R-parity (up to GLM-IRLS tolerance)
-    d_lfc = np.abs(tab["logFC"].to_numpy() - ref["logFC"].to_numpy())
-    assert d_lfc.max() < 1e-4, f"logFC max|Δ|={d_lfc.max():.2e} vs edgeR"
-
-    # F / PValue: edgeR 4.0 vs 4.4 QL method (see module docstring);
-    # temporary thresholds until pyedger ports the newer method.
-    f_pear = np.corrcoef(tab["F"], ref["F"])[0, 1]
-    p_spear = spearmanr(tab["PValue"], ref["PValue"]).correlation
-    assert f_pear > 0.97, f"F Pearson={f_pear:.4f} vs edgeR"
-    assert p_spear > 0.99, f"PValue Spearman={p_spear:.4f} vs edgeR"
+    for col in ("logFC", "F", "PValue"):
+        np.testing.assert_allclose(tab[col].to_numpy(), ref[col].to_numpy(), rtol=1e-6, atol=1e-9,
+                                   err_msg=f"{col} vs edgeR")
 
 
 def test_milo_da_nhoods_runs_without_inmoose(monkeypatch):

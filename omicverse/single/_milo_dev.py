@@ -550,9 +550,9 @@ class Milo:
             # glmQLFTest), via the pure-Python pyedger port. No inmoose / R.
             # Note: dispersion uses trend_method='none' and robust QL
             # moderation is not implemented in pyedger (robust=False), which
-            # also matches the previous inmoose behaviour. pyedger follows the
-            # edgeR 4.0 legacy=FALSE QL method; agreement with Bioconductor
-            # edgeR 4.4 (same options) is pinned in
+            # also matches the previous inmoose behaviour. pyedger follows
+            # edgeR 4.10's legacy=FALSE QL method; agreement with Bioconductor
+            # edgeR (same options) is pinned in
             # tests/single/test_milo_pyedger_parity.py.
             _edger.estimateDisp(dge, design=X, trend_method="none", robust=False)
             # legacy=False is edgeR 4.x's (and miloR's) default bias-adjusted QL
