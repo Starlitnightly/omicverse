@@ -77,6 +77,13 @@ from ._cellchat import (
     cellchat_communication_patterns, cellchat_subset_communication,
 )
 from ._comm import to_comm_adata, extract_comm_adata
+from ._ccc import (
+    run_ccc, get_ccc, compare_ccc, available_ccc_methods, register_ccc_method,
+    long_to_comm_adata, ccc_consensus_table,
+)
+from ._ccc_fastccc import run_fastccc
+from ._ccc_cytosignal import run_cytosignal
+from ._ccc_secact import run_secact, secact_activity
 
 from ._scgsea import (
     geneset_aucell,pathway_aucell,pathway_aucell_enrichment,
@@ -373,6 +380,17 @@ __all__ = [
     'cellchat_communication_patterns',
     'cellchat_subset_communication',
     'to_comm_adata',
+    'run_ccc',
+    'get_ccc',
+    'compare_ccc',
+    'available_ccc_methods',
+    'register_ccc_method',
+    'long_to_comm_adata',
+    'ccc_consensus_table',
+    'run_fastccc',
+    'run_cytosignal',
+    'run_secact',
+    'secact_activity',
     'extract_comm_adata',
     # Pathway and functional analysis
     'geneset_aucell',
