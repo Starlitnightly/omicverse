@@ -78,6 +78,8 @@ from ._cellcharter import cellcharter
 from ._tools import *
 from ._commot import create_communication_anndata,update_classification_from_database
 from ._communication import run_commot, run_flowsig
+from ._ccc import run_ccc
+from ..single._ccc_cytosignal import run_cytosignal
 from ._tissue_zones import nmf_tissue_zones, TissueZones
 from ._deconvolution import Deconvolution,calculate_gene_signature
 from ._split import split_balance, split_purify, split_reassign_residuals, split_spatial_score
@@ -167,6 +169,8 @@ __all__ = [
     # Utility functions (imported from _tools)
     'create_communication_anndata',
     'run_commot',
+    'run_ccc',
+    'run_cytosignal',
     'run_flowsig',
     'update_classification_from_database',
 

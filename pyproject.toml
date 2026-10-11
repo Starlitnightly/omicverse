@@ -528,6 +528,12 @@ exclude = [
 "omicverse.external.samap" = ["LICENSE"]
 # CellChat (PyTorch port): CellChatDB v2 tables exported from R CellChat + provenance notice.
 "omicverse.external.cellchat" = ["data/*.csv.gz", "data/NOTICE"]
+# FastCCC (MIT) numpy port: upstream licence/citation notice.
+"omicverse.external.fastccc" = ["NOTICE"]
+# SecAct (MIT) numpy port: notice only; the 80 MB signature is downloaded on first use.
+"omicverse.external.secact" = ["NOTICE"]
+# CytoSignal (GPL-3) port: LR databases exported from the R package + provenance notice.
+"omicverse.external.cytosignal" = ["data/*.csv.gz", "data/NOTICE"]
 # Vendored Bonsai (CC BY-NC 4.0): the licence, the citation file and the
 # config template the runner seeds every run from all have to ship.
 "omicverse.external.bonsai" = ["LICENSE-CC-BY-NC-4.0.md", "CITATION.cff"]
