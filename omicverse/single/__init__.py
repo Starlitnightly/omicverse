@@ -134,6 +134,7 @@ from ._pseudotime_fate import PseudotimeFate, PseudotimeFateResult
 # Single-cell CNV inference — pure-Python CopyKAT / inferCNV wrappers.
 # Usage: cnv = ov.single.CNV(adata, method='copykat'); cnv.run()
 from ._cnv import CNV
+from ._scissor import Scissor
 
 # Single-cell metabolism — scMetabolism / Compass / scFEA + MEBOCOST.
 # Usage: met = ov.single.Metabolism(adata, method='scmetabolism'); met.run()
@@ -440,6 +441,7 @@ __all__ = [
 
     # Single-cell CNV
     'CNV',
+    'Scissor',
 
     # Single-cell metabolism
     'Metabolism',
