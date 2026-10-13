@@ -28,7 +28,8 @@ if TYPE_CHECKING:
 # scipy >= 1.17 ships a C port of ARPACK that offsets into the n x ncv
 # Lanczos basis as `v[ldv * j]` with 32-bit ints. umap-learn picks eigsh with
 # ncv = sqrt(n) for graphs below 2M nodes, so from ~1.66M cells the offset
-# overflows and OpenBLAS segfaults during spectral initialisation (#990).
+# overflows and OpenBLAS segfaults during spectral initialisation (#990,
+# scipy/scipy#26395).
 # lobpcg (umap's own choice >= 2M) has no such limit.
 _ARPACK_INT32_MAX = 2**31 - 1
 
