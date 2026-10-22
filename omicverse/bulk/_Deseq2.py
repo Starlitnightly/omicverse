@@ -628,8 +628,6 @@ class pyDEG(object):
                 f"Input columns {missing!r} were not found in the pyDEG count matrix."
             )
 
-        from pydeseq2.dds import DeseqDataSet
-        from pydeseq2.ds import DeseqStats
         from scipy.stats import ttest_ind
         from statsmodels.stats.multitest import multipletests
         print(f"⚙️ You are using {method} method for differential expression analysis.")
@@ -673,7 +671,17 @@ class pyDEG(object):
             raise ValueError('The method is not supported.')
             print(f"⚙️ You are using {method} method for differential expression analysis.")
         elif method=='DEseq2':
-            import pydeseq2
+            # pydeseq2 is optional (extras full / easy / tests); only this
+            # branch needs it, so the other methods work without it.
+            try:
+                import pydeseq2
+                from pydeseq2.dds import DeseqDataSet
+                from pydeseq2.ds import DeseqStats
+            except ImportError as exc:
+                raise ImportError(
+                    "method='DEseq2' requires pydeseq2 (pip install pydeseq2). "
+                    "method='edger', 'edgepy', 'limma' and 'ttest' do not need it."
+                ) from exc
             counts_df = self.data[group1+group2].T
             clinical_df = pd.DataFrame(index=group1+group2)
 
