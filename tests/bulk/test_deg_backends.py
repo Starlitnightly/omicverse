@@ -7,6 +7,8 @@ wiring produces the standard pyDEG result schema and recovers planted
 differential genes.
 """
 
+import sys
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -82,6 +84,29 @@ def test_limma_specific_columns(deg_counts):
     # limma exposes the moderated t statistic and average expression.
     assert "t" in res.columns
     assert "AveExpr" in res.columns
+
+
+@pytest.fixture
+def no_pydeseq2(monkeypatch):
+    """Make ``import pydeseq2`` fail, as on an install without the extras."""
+    monkeypatch.setitem(sys.modules, "pydeseq2", None)
+
+
+# edger is left out only for speed (~1 min on 400 genes); it goes through the
+# same code path before the method branch.
+@pytest.mark.parametrize("method", ["limma", "edgepy", "ttest"])
+def test_methods_run_without_pydeseq2(deg_counts, no_pydeseq2, method):
+    dds = ov.bulk.pyDEG(deg_counts.copy())
+    dds.drop_duplicates_index()
+    res = dds.deg_analysis(["s0", "s1", "s2"], ["s3", "s4", "s5"], method=method)
+    assert res.shape[0] == N_GENES
+
+
+def test_deseq2_without_pydeseq2_raises_install_hint(deg_counts, no_pydeseq2):
+    dds = ov.bulk.pyDEG(deg_counts.copy())
+    dds.drop_duplicates_index()
+    with pytest.raises(ImportError, match=r"pip install pydeseq2"):
+        dds.deg_analysis(["s0", "s1", "s2"], ["s3", "s4", "s5"], method="DEseq2")
 
 
 def test_unknown_method_raises(deg_counts):
